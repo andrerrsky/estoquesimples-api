@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Estoque Simples</string>
+    <string name="my_own_title">Avalie o aplicativo!</string>
+    <string name="my_own_message">Se gostou do app e ele esta sendo útil, você poderia avalia-lo rapidinho? Não vai levar nem 1 minuto, obrigado pelo seu suporte! :) </string>
+    <string name="my_own_rate">Avaliar agora! :D</string>
+    <string name="my_own_thanks">Não obrigado :(</string>
+    <string name="my_own_cancel">Depois :|</string>
+    <string name="sim">Sim!</string>
+</resources>

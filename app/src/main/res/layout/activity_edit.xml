@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    tools:context="br.com.gameloop.estoquesimples.EditActivity">
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent" >
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="Editar Produto"
+            android:id="@+id/editTitle"
+            android:textStyle="bold"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textPersonName"
+            android:ems="10"
+            android:id="@+id/editName"
+            android:hint="Nome do Produto"
+            android:layout_below="@+id/editPhoto"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="@dimen/activity_horizontal_margin"
+            android:layout_alignParentEnd="true" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:id="@+id/editAmount"
+            android:layout_below="@+id/editName"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/editName"
+            android:layout_alignEnd="@+id/editName"
+            android:hint="Quantidade em estoque" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned"
+            android:ems="10"
+            android:id="@+id/editValue"
+            android:layout_below="@+id/editAmount"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/editName"
+            android:digits="0123456789.,$"
+            android:hint="Valor ($)" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:ems="10"
+            android:id="@+id/editDescription"
+            android:layout_below="@+id/editValue"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/editValue"
+            android:layout_alignEnd="@+id/editValue"
+            android:hint="Descrição" />
+
+        <ImageButton
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:id="@+id/editPhoto"
+            android:src="@drawable/camera_icon"
+            android:scaleType="fitXY"
+            android:layout_below="@+id/editTitle"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp"
+            android:background="#00ffffff" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Galeria"
+            android:id="@+id/editGallery"
+            android:layout_alignTop="@+id/editPhoto"
+            android:layout_toRightOf="@+id/editPhoto"
+            android:layout_toEndOf="@+id/editPhoto"
+            android:onClick="editTakeGalleryPhoto"
+            android:layout_marginLeft="16dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Câmera"
+            android:id="@+id/editCamera"
+            android:layout_below="@+id/editGallery"
+            android:layout_alignLeft="@+id/editGallery"
+            android:layout_alignStart="@+id/editGallery"
+            android:onClick="editTakeCameraPhoto" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pronto"
+            android:id="@+id/editReady"
+            android:onClick="editProduct"
+            android:layout_alignParentBottom="true"
+            android:layout_alignRight="@+id/editDescription"
+            android:layout_alignEnd="@+id/editDescription" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cancelar"
+            android:id="@+id/editCancel"
+            android:layout_alignParentBottom="true"
+            android:layout_toLeftOf="@+id/editReady"
+            android:layout_toStartOf="@+id/editReady"
+            android:layout_below="@id/editDescription"
+            android:onClick="cancelEdit" />
+
+    </RelativeLayout>
+
+</ScrollView>

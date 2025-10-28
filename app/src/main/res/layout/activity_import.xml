@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="br.com.gameloop.estoquesimples.ImportActivity">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="Importar um arquivo de outra aplicação"
+            android:id="@+id/importFileTitle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="16dp"
+            android:layout_marginRight="16dp"
+            android:layout_marginLeft="16dp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="Você pode importar arquivos com a seguinte estrutura:"
+            android:id="@+id/importDesc1"
+            android:gravity="center_horizontal"
+            android:textAlignment="center"
+            android:layout_centerHorizontal="true"
+            android:layout_below="@+id/importFileTitle"
+            android:layout_marginLeft="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginRight="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="Nome, Descrição, Quantidade, Valor (separados por virgula simples)\nSendo 1 item por linha\nFormatos .txt ou .csv"
+            android:id="@+id/importDesc2"
+            android:layout_below="@+id/importDesc1"
+            android:layout_centerHorizontal="true"
+            android:gravity="center_horizontal"
+            android:layout_marginTop="16dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Selecionar Arquivo"
+            android:id="@+id/buttonImport"
+            android:layout_below="@+id/importDesc2"
+            android:layout_centerHorizontal="true"
+            android:onClick="importFile"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:id="@+id/importStatus"
+            android:layout_below="@+id/buttonImport"
+            android:layout_centerHorizontal="true"
+            android:textStyle="bold"
+            android:layout_margin="16dp"
+            android:gravity="center_horizontal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="Importar ou exportar um banco de dados existente"
+            android:id="@+id/importExportTitle"
+            android:layout_below="@+id/buttonImport"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="16dp"
+            android:textStyle="bold"
+            android:layout_marginRight="26dp"
+            android:layout_marginLeft="26dp"
+            android:gravity="center"
+            android:textAlignment="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:text="Você pode importar ou exportar um banco de dados existente\n\nRecomendamos que você exporte e salve seu banco de dados sempre que possivel para não perder as informações armazenadas.\n\nAo exportar, o banco de dados será salvo em seu cartão SD na pasta &apos;/EstoqueSimples/Bancos de Dados&apos;."
+            android:id="@+id/importExportDesc"
+            android:layout_below="@+id/importExportTitle"
+            android:layout_centerHorizontal="true"
+            android:gravity="center_horizontal"
+            android:layout_marginLeft="26dp"
+            android:layout_marginRight="26dp"
+            android:layout_marginTop="16dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Importar Banco de Dados"
+            android:id="@+id/buttonImportDB"
+            android:layout_below="@+id/importExportDesc"
+            android:layout_centerHorizontal="true"
+            android:onClick="importDBFile"
+            android:layout_marginTop="6dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Exportar Banco de Dados"
+            android:id="@+id/buttonExportDB"
+            android:layout_below="@+id/buttonImportDB"
+            android:layout_centerHorizontal="true"
+            android:onClick="exportDBFile"
+            android:layout_marginBottom="16dp" />
+
+    </RelativeLayout>
+
+</ScrollView>

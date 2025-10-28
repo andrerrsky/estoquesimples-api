@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    tools:context="br.com.gameloop.estoquesimples.AddActivity">
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent" >
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="Novo Produto"
+            android:id="@+id/addTitle"
+            android:textStyle="bold"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textPersonName"
+            android:ems="10"
+            android:id="@+id/addName"
+            android:hint="Nome do Produto"
+            android:layout_below="@+id/addPhoto"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="@dimen/activity_horizontal_margin"
+            android:layout_alignParentEnd="true" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:id="@+id/addAmount"
+            android:layout_below="@+id/addName"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/addName"
+            android:layout_alignEnd="@+id/addName"
+            android:hint="Quantidade em estoque" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned"
+            android:ems="10"
+            android:id="@+id/addValue"
+            android:layout_below="@+id/addAmount"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/addName"
+            android:digits="0123456789.,$"
+            android:hint="Valor ($)" />
+
+        <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:ems="10"
+            android:id="@+id/addDescription"
+            android:layout_below="@+id/addValue"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/addValue"
+            android:layout_alignEnd="@+id/addValue"
+            android:hint="Descrição" />
+
+        <ImageButton
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:id="@+id/addPhoto"
+            android:src="@drawable/camera_icon"
+            android:scaleType="fitXY"
+            android:layout_below="@+id/addTitle"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="16dp"
+            android:background="#00ffffff" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Galeria"
+            android:id="@+id/addGallery"
+            android:layout_alignTop="@+id/addPhoto"
+            android:layout_toRightOf="@+id/addPhoto"
+            android:layout_toEndOf="@+id/addPhoto"
+            android:onClick="addTakeGalleryPhoto"
+            android:layout_marginLeft="16dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Câmera"
+            android:id="@+id/addCamera"
+            android:layout_below="@+id/addGallery"
+            android:layout_alignLeft="@+id/addGallery"
+            android:layout_alignStart="@+id/addGallery"
+            android:onClick="addTakeCameraPhoto" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pronto"
+            android:id="@+id/addReady"
+            android:onClick="addProduct"
+            android:layout_alignParentBottom="true"
+            android:layout_alignRight="@+id/addDescription"
+            android:layout_alignEnd="@+id/addDescription" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cancelar"
+            android:id="@+id/addCancel"
+            android:layout_alignParentBottom="true"
+            android:layout_toLeftOf="@+id/addReady"
+            android:layout_toStartOf="@+id/addReady"
+            android:layout_below="@id/addDescription"
+            android:onClick="cancelAdd" />
+
+    </RelativeLayout>
+
+</ScrollView>
