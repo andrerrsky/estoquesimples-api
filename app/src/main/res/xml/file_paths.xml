@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Diretório de cache interno para fotos temporárias -->
+    <cache-path name="cache_images" path="images/" />
+    
+    <!-- Diretório de arquivos internos da aplicação -->
+    <files-path name="app_images" path="images/" />
+    
+    <!-- Diretório público de fotos (para compatibilidade com código antigo) -->
+    <external-path name="external_images" path="EstoqueSimples/Imagens/" />
+    
+    <!-- Diretório de arquivos externos da aplicação -->
+    <external-files-path name="external_files" path="/" />
+    
+    <!-- Diretório de cache externo -->
+    <external-cache-path name="external_cache" path="/" />
+    
+    <!-- Diretório de PDFs exportados -->
+    <external-path name="pdf_files" path="EstoqueSimples/" />
+    
+    <!-- Diretório de Downloads (Android 10+) -->
+    <external-path name="downloads" path="Download/EstoqueSimples/" />
+</paths>
+

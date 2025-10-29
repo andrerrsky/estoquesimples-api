@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_home"
+        android:icon="@drawable/home_icon"
+        android:title="Inicio" />
+    <item
+        android:id="@+id/navigation_new"
+        android:icon="@drawable/new_icon"
+        android:title="Novo Produto" />
+    <item
+        android:id="@+id/navigation_reports"
+        android:icon="@drawable/report_icon"
+        android:title="Relatórios" />
+    <item
+        android:id="@+id/navigation_import"
+        android:icon="@drawable/import_icon"
+        android:title="Imp/Exp" />
+</menu>
+

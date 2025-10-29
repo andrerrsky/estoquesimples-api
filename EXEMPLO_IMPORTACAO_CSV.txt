@@ -1,0 +1,55 @@
+EXEMPLO DE FORMATO PARA IMPORTAÇÃO CSV/TXT
+=============================================
+
+FORMATO: 12 campos separados por vírgula (,) - um produto por linha
+
+ORDEM DOS CAMPOS:
+1. Nome (obrigatório)
+2. Descrição
+3. Quantidade
+4. Valor
+5. Foto (caminho da foto)
+6. Categoria
+7. SKU (código do produto)
+8. Código de Barras
+9. Fornecedor
+10. Localização
+11. Estoque Mínimo
+12. Unidade
+
+OBSERVAÇÕES IMPORTANTES:
+- Campos vazios devem ser deixados em branco entre as vírgulas
+- NÃO use vírgulas dentro dos valores (serão removidas automaticamente)
+- Valores numéricos devem usar formato simples (ex: 100, 29.90)
+- O campo Nome é obrigatório
+
+EXEMPLOS:
+=========
+
+Exemplo 1 - Produto completo com todos os campos:
+Notebook Dell,Notebook para escritório,10,2500.00,/sdcard/foto.jpg,Eletrônicos,NB-DELL-001,7891234567890,Dell Inc,Estoque Principal,5,un
+
+Exemplo 2 - Produto com campos básicos (descrição, quantidade, valor):
+Mouse USB,,50,25.90,,Periféricos,MS-USB-001,,,,10,un
+
+Exemplo 3 - Produto mínimo (apenas nome, quantidade e valor):
+Teclado Mecânico,,15,150.00,,,,,,,,
+
+Exemplo 4 - Produto com categoria e localização:
+Cadeira Gamer,Cadeira ergonômica para gamers,8,890.00,,Móveis,CD-GM-001,,Fornecedor XYZ,Depósito B,2,un
+
+Exemplo 5 - Produto de consumo:
+Caneta Azul,Caneta esferográfica azul,200,1.50,,Material de Escritório,CN-AZ-001,1234567890123,Papelaria ABC,Prateleira 3,50,cx
+
+ARQUIVO DE EXEMPLO COMPLETO (copie as linhas abaixo):
+======================================================
+
+Notebook Dell,Notebook para escritório,10,2500.00,,Eletrônicos,NB-DELL-001,,,Estoque Principal,5,un
+Mouse USB,Mouse óptico USB,50,25.90,,Periféricos,MS-USB-001,,,Prateleira 1,10,un
+Teclado Mecânico,Teclado mecânico RGB,15,150.00,,Periféricos,TEC-MEC-001,,,Prateleira 1,5,un
+Cadeira Gamer,Cadeira ergonômica,8,890.00,,Móveis,CD-GM-001,,Fornecedor XYZ,Depósito B,2,un
+Caneta Azul,Caneta esferográfica,200,1.50,,Escritório,CN-AZ-001,1234567890123,,Prateleira 3,50,cx
+Monitor 24 pol,Monitor LED 24 polegadas,12,650.00,,Eletrônicos,MON-24-001,,,Estoque Principal,3,un
+HD Externo 1TB,Hard Drive externo USB 3.0,25,280.00,,Informática,HD-EXT-1TB,7891234567891,WD,Prateleira 2,10,un
+Impressora Laser,Impressora laser monocromática,5,850.00,,Periféricos,IMP-LAS-001,,,Depósito A,2,un
+

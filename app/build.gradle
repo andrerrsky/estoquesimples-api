@@ -1,30 +1,68 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 24
-    buildToolsVersion "24.0.2"
+    namespace 'br.com.gameloop.estoquesimples'
+    compileSdk 35
+
 
     defaultConfig {
         applicationId "br.com.gameloop.estoquesimples"
-        minSdkVersion 15
-        targetSdkVersion 24
-        versionCode 4
-        versionName "4.0"
+        minSdkVersion 23
+        targetSdkVersion 35
+        versionCode 11
+        versionName "11.0"
     }
+
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
     }
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:24.2.1'
-    compile 'com.squareup.picasso:picasso:2.5.2'
-    compile 'com.github.lecho:hellocharts-library:1.5.8@aar'
-    compile 'com.github.armcha:LuseenBottomNavigation:1.8.2'
-    compile 'io.github.kobakei:ratethisapp:1.1.0'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    
+    // AndroidX Libraries
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'com.google.android.material:material:1.13.0'
+    
+    // Image Loading
+    implementation 'com.squareup.picasso:picasso:2.71828'
+    
+    // Charts
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
+    
+    // Barcode Scanner
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    
+    // Bottom Navigation (Material Design replacement)
+    // Using Material Design's BottomNavigationView instead of deprecated library
+
+    // Ads and Billing
+    implementation 'com.appodeal.ads:sdk:3.10.0.0'
+    implementation 'com.android.billingclient:billing:8.0.0'
+    
+    // WorkManager for scheduled notifications
+    implementation 'androidx.work:work-runtime:2.10.0'
+    implementation 'com.google.guava:guava:31.1-android'
+    
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
 }
