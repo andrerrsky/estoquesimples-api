@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
@@ -86,15 +87,19 @@ public class HistoryActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
+        int itemId = item.getItemId();
+        
+        if (itemId == android.R.id.home) {
             onBackPressed();
             return true;
-        }
-        if (item.getItemId() == R.id.menu_about) {
+        } else if (itemId == R.id.menu_analytics) {
+            Intent intent = new Intent(this, AnalyticsActivity.class);
+            startActivity(intent);
+            return true;
+        } else if (itemId == R.id.menu_about) {
             MainActivity.instance.showAboutActivity();
             return true;
-        }
-        if (item.getItemId() == R.id.menu_history) {
+        } else if (itemId == R.id.menu_history) {
             // Já estamos nesta tela
             return true;
         }

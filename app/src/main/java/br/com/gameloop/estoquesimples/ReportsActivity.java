@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -50,8 +51,8 @@ public class ReportsActivity extends AppCompatActivity {
 
     private String higherAmoutProductText;
     private String lowerAmoutProductText;
-    private int higherAmoutProductValue;
-    private int lowerAmoutProductValue;
+    private double higherAmoutProductValue;
+    private double lowerAmoutProductValue;
 
     private TextView higher;
     private TextView lower;
@@ -69,29 +70,40 @@ public class ReportsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_reports);
+        
+        try {
+            setContentView(R.layout.activity_reports);
 
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            }
 
-        chart = (PieChart) findViewById(R.id.chart);
+            // Inicializar views de forma segura
+            chart = (PieChart) findViewById(R.id.chart);
+            higher = (TextView) findViewById(R.id.higher);
+            lower = (TextView) findViewById(R.id.lower);
+            totalProducts = (TextView) findViewById(R.id.totalProducts);
+            totalItems = (TextView) findViewById(R.id.totalItems);
+            totalValue = (TextView) findViewById(R.id.totalValue);
+            averageValue = (TextView) findViewById(R.id.averageValue);
+            lowStockWarning = (TextView) findViewById(R.id.lowStockWarning);
+            lowStockList = (TextView) findViewById(R.id.lowStockList);
+            categoriesList = (TextView) findViewById(R.id.categoriesList);
+            categoryTitle = (TextView) findViewById(R.id.categoryTitle);
+            categorySection = findViewById(R.id.categorySection);
+            dividerLowStock = findViewById(R.id.dividerLowStock);
+            btnExportPdf = (Button) findViewById(R.id.btnExportPdf);
 
-        higher = (TextView) findViewById(R.id.higher);
-        lower = (TextView) findViewById(R.id.lower);
-        totalProducts = (TextView) findViewById(R.id.totalProducts);
-        totalItems = (TextView) findViewById(R.id.totalItems);
-        totalValue = (TextView) findViewById(R.id.totalValue);
-        averageValue = (TextView) findViewById(R.id.averageValue);
-        lowStockWarning = (TextView) findViewById(R.id.lowStockWarning);
-        lowStockList = (TextView) findViewById(R.id.lowStockList);
-        categoriesList = (TextView) findViewById(R.id.categoriesList);
-        categoryTitle = (TextView) findViewById(R.id.categoryTitle);
-        categorySection = findViewById(R.id.categorySection);
-        dividerLowStock = findViewById(R.id.dividerLowStock);
-        btnExportPdf = (Button) findViewById(R.id.btnExportPdf);
+            // Verificar se os campos obrigatórios foram inicializados
+            if (!areFieldsInitialized()) {
+                Log.e("ReportsActivity", "Critical fields not initialized");
+                Toast.makeText(this, "Erro ao carregar interface. Por favor, reinicie o aplicativo.", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
 
-        generateData();
+            generateData();
 
         // Configurar botão de exportação de PDF
         btnExportPdf.setOnClickListener(new View.OnClickListener() {
@@ -108,8 +120,58 @@ public class ReportsActivity extends AppCompatActivity {
         // Configurar e mostrar MREC do Appodeal com AdManager
         initializeAppodealAds();
 
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Critical error in onCreate", e);
+            Toast.makeText(this, "Erro ao inicializar tela de relatórios: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            // Tentar mostrar pelo menos um estado vazio
+            try {
+                showEmptyState();
+            } catch (Exception ex) {
+                Log.e("ReportsActivity", "Error showing empty state", ex);
+            }
+        }
+
     }
     
+    /**
+     * Verifica se todos os campos obrigatórios foram inicializados
+     * @return true se todos os campos obrigatórios não são null
+     */
+    private boolean areFieldsInitialized() {
+        boolean allInitialized = true;
+        
+        if (chart == null) {
+            Log.e("ReportsActivity", "chart is null");
+            allInitialized = false;
+        }
+        if (higher == null) {
+            Log.e("ReportsActivity", "higher is null");
+            allInitialized = false;
+        }
+        if (lower == null) {
+            Log.e("ReportsActivity", "lower is null");
+            allInitialized = false;
+        }
+        if (totalProducts == null) {
+            Log.e("ReportsActivity", "totalProducts is null");
+            allInitialized = false;
+        }
+        if (totalItems == null) {
+            Log.e("ReportsActivity", "totalItems is null");
+            allInitialized = false;
+        }
+        if (totalValue == null) {
+            Log.e("ReportsActivity", "totalValue is null");
+            allInitialized = false;
+        }
+        if (btnExportPdf == null) {
+            Log.e("ReportsActivity", "btnExportPdf is null");
+            allInitialized = false;
+        }
+        
+        return allInitialized;
+    }
+
     /**
      * Inicializa e exibe os anúncios usando AdManager
      */
@@ -142,6 +204,10 @@ public class ReportsActivity extends AppCompatActivity {
         
         if (itemId == android.R.id.home) {
             onBackPressed();
+            return true;
+        } else if (itemId == R.id.menu_analytics) {
+            Intent intent = new Intent(this, AnalyticsActivity.class);
+            startActivity(intent);
             return true;
         } else if (itemId == R.id.menu_go_pro) {
             showProActivity();
@@ -183,10 +249,20 @@ public class ReportsActivity extends AppCompatActivity {
 
         List<PieEntry> entries = new ArrayList<>();
 
-        Cursor cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category FROM Estoque", null);
+        // Verificar e inicializar banco de dados se necessário
+        if (!ensureDatabaseAvailable()) {
+            Log.e("ReportsActivity", "Database is not available and could not be initialized");
+            Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_LONG).show();
+            showEmptyState();
+            return;
+        }
+
+        Cursor cursor = null;
+        try {
+            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category FROM Estoque", null);
 
         int cursorCount = cursor.getCount();
-        int totalItemsCount = 0;
+        double totalItemsCount = 0;
         double totalValueSum = 0.0;
         List<String> lowStockProducts = new ArrayList<>();
         java.util.Map<String, Integer> categoryMap = new java.util.HashMap<>();
@@ -194,12 +270,12 @@ public class ReportsActivity extends AppCompatActivity {
         if(cursor.moveToFirst()) {
 
             String columnName = cursor.getString(0);
-            int columnAmount = parseWithDefault(cursor.getString(1), 0);
+            double columnAmount = parseWithDefault(cursor.getString(1), 0);
             double columnValue = parseDoubleWithDefault(cursor.getString(2), 0.0);
-            int columnMinStock = parseWithDefault(cursor.getString(3), 0);
+            double columnMinStock = parseWithDefault(cursor.getString(3), 0);
             String columnCategory = cursor.getString(4);
 
-            entries.add(new PieEntry(columnAmount, columnName));
+            entries.add(new PieEntry((float)columnAmount, columnName));
 
             higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
             lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
@@ -238,7 +314,7 @@ public class ReportsActivity extends AppCompatActivity {
                     lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
                 }
 
-                entries.add(new PieEntry(columnAmount, columnName));
+                entries.add(new PieEntry((float)columnAmount, columnName));
                 
                 totalItemsCount += columnAmount;
                 totalValueSum += (columnAmount * columnValue);
@@ -256,8 +332,6 @@ public class ReportsActivity extends AppCompatActivity {
             }
 
         }
-
-        cursor.close();
 
         // Atualizar estatísticas gerais
         totalProducts.setText("Total de Produtos: " + cursorCount);
@@ -332,11 +406,109 @@ public class ReportsActivity extends AppCompatActivity {
 
         }
 
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error generating report data", e);
+            Toast.makeText(this, "Erro ao gerar relatório: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            showEmptyState();
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    Log.e("ReportsActivity", "Error closing cursor", e);
+                }
+            }
+        }
+
     }
 
-    public static int parseWithDefault(String number, int defaultVal) {
+    /**
+     * Garante que o banco de dados está disponível e aberto
+     * Tenta inicializar se necessário
+     */
+    private boolean ensureDatabaseAvailable() {
         try {
-            return Integer.parseInt(number);
+            // Verificar se o banco já está disponível e aberto
+            if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                return true;
+            }
+
+            // Se MainActivity.instance está disponível, tentar inicializar o banco
+            if (MainActivity.instance != null) {
+                Log.d("ReportsActivity", "Attempting to initialize database through MainActivity");
+                MainActivity.instance.openOrCreateDB();
+                
+                // Verificar se a inicialização foi bem-sucedida
+                if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                    Log.d("ReportsActivity", "Database initialized successfully");
+                    return true;
+                }
+            }
+
+            // Última tentativa: tentar abrir o banco de dados diretamente
+            Log.d("ReportsActivity", "Attempting to open database directly");
+            MainActivity.stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            
+            if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                Log.d("ReportsActivity", "Database opened successfully");
+                return true;
+            }
+
+            Log.e("ReportsActivity", "All attempts to open database failed");
+            return false;
+
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error ensuring database availability", e);
+            return false;
+        }
+    }
+
+    /**
+     * Mostra um estado vazio quando não há dados ou há erro
+     */
+    private void showEmptyState() {
+        try {
+            higher.setText("Sem informações disponíveis no momento.");
+            lower.setText("");
+            totalProducts.setText("Total de Produtos: 0");
+            totalItems.setText("Total de Itens: 0");
+            totalValue.setText("Valor Total: $0.00");
+            averageValue.setText("Valor Médio: $0.00");
+            
+            // Esconder avisos e seções opcionais
+            if (dividerLowStock != null) {
+                dividerLowStock.setVisibility(View.GONE);
+            }
+            if (lowStockWarning != null) {
+                lowStockWarning.setVisibility(View.GONE);
+            }
+            if (lowStockList != null) {
+                lowStockList.setVisibility(View.GONE);
+            }
+            if (categoryTitle != null) {
+                categoryTitle.setVisibility(View.GONE);
+            }
+            if (categorySection != null) {
+                categorySection.setVisibility(View.GONE);
+            }
+            
+            // Limpar gráfico
+            if (chart != null) {
+                chart.clear();
+                chart.setNoDataText("Nenhum dado disponível");
+                chart.invalidate();
+            }
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error showing empty state", e);
+        }
+    }
+
+    public static double parseWithDefault(String number, double defaultVal) {
+        try {
+            if(number == null || number.isEmpty() || number.equals("null")) {
+                return defaultVal;
+            }
+            return Double.parseDouble(number);
         } catch (NumberFormatException e) {
             return defaultVal;
         }
@@ -409,20 +581,42 @@ public class ReportsActivity extends AppCompatActivity {
             // Criar o documento PDF
             PdfDocument pdfDocument = new PdfDocument();
             
+            // Verificar se o banco de dados está disponível
+            if (!ensureDatabaseAvailable()) {
+                Toast.makeText(this, "Erro: Banco de dados não disponível para exportação", Toast.LENGTH_LONG).show();
+                Log.e("ReportsActivity", "Database is not available for PDF export");
+                return;
+            }
+            
             // Buscar dados do banco
-            Cursor cursor = MainActivity.stock.rawQuery(
-                "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
-                null
-            );
+            Cursor cursor = null;
+            try {
+                cursor = MainActivity.stock.rawQuery(
+                    "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
+                    null
+                );
+            } catch (Exception e) {
+                Log.e("ReportsActivity", "Error querying database for PDF export", e);
+                Toast.makeText(this, "Erro ao acessar banco de dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                pdfDocument.close();
+                return;
+            }
+
+            if (cursor == null) {
+                Log.e("ReportsActivity", "Cursor is null after query");
+                Toast.makeText(this, "Erro ao buscar dados do banco", Toast.LENGTH_LONG).show();
+                pdfDocument.close();
+                return;
+            }
 
             int totalProducts = cursor.getCount();
-            int totalItems = 0;
+            double totalItems = 0;
             double totalValue = 0.0;
 
             // Calcular totais
             if (cursor.moveToFirst()) {
                 do {
-                    int amount = parseWithDefault(cursor.getString(2), 0);
+                    double amount = parseWithDefault(cursor.getString(2), 0);
                     double value = parseDoubleWithDefault(cursor.getString(3), 0.0);
                     totalItems += amount;
                     totalValue += (amount * value);
@@ -519,7 +713,7 @@ public class ReportsActivity extends AppCompatActivity {
                     String location = cursor.getString(8);
                     String minStock = cursor.getString(9);
                     String unit = cursor.getString(10);
-                    int amount = parseWithDefault(cursor.getString(2), 0);
+                    double amount = parseWithDefault(cursor.getString(2), 0);
                     double value = parseDoubleWithDefault(cursor.getString(3), 0.0);
 
                     // Nome do produto
@@ -568,11 +762,11 @@ public class ReportsActivity extends AppCompatActivity {
 
                     // Estoque Mínimo
                     if (minStock != null && !minStock.isEmpty() && !minStock.equals("null")) {
-                        int minStockInt = parseWithDefault(minStock, 0);
-                        if (minStockInt > 0) {
-                            canvas.drawText("Estoque Mínimo: " + minStockInt, margin + 20, yPosition, normalPaint);
+                        double minStockDouble = parseWithDefault(minStock, 0);
+                        if (minStockDouble > 0) {
+                            canvas.drawText("Estoque Mínimo: " + minStockDouble, margin + 20, yPosition, normalPaint);
                             yPosition += 15;
-                            if (amount <= minStockInt) {
+                            if (amount <= minStockDouble) {
                                 Paint warningPaint = new Paint(normalPaint);
                                 warningPaint.setColor(Color.RED);
                                 canvas.drawText("Status: ⚠ ESTOQUE BAIXO", margin + 20, yPosition, warningPaint);
@@ -600,7 +794,14 @@ public class ReportsActivity extends AppCompatActivity {
                 canvas.drawText("Nenhum produto cadastrado no momento.", pageWidth / 2, yPosition, normalPaint);
             }
 
-            cursor.close();
+            // Fechar cursor no finally
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    Log.e("ReportsActivity", "Error closing cursor in PDF export", e);
+                }
+            }
 
             // Adicionar rodapé na última página
             if (yPosition > pageHeight - 80) {
@@ -678,15 +879,24 @@ public class ReportsActivity extends AppCompatActivity {
     // Abrir o PDF com um visualizador
     private void openPdfFile(File pdfFile) {
         try {
-            Uri pdfUri;
+            // Usar FileUriHelper para criar URI segura
+            Uri pdfUri = FileUriHelper.getUriForFile(this, pdfFile);
             
-            // A partir do Android 7.0, precisamos usar FileProvider
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                pdfUri = FileProvider.getUriForFile(this, 
-                    getApplicationContext().getPackageName() + ".fileprovider", 
-                    pdfFile);
-            } else {
-                pdfUri = Uri.fromFile(pdfFile);
+            if (pdfUri == null) {
+                Log.e("ReportsActivity", "Failed to create URI for PDF file");
+                Toast.makeText(this, 
+                    "Erro ao criar referência para o arquivo PDF.", 
+                    Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            // Verificar se a URI é segura
+            if (!FileUriHelper.isUriSafe(pdfUri)) {
+                Log.e("ReportsActivity", "Created URI is not safe for sharing: " + pdfUri);
+                Toast.makeText(this, 
+                    "Erro de segurança ao abrir PDF.", 
+                    Toast.LENGTH_LONG).show();
+                return;
             }
 
             Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -702,8 +912,13 @@ public class ReportsActivity extends AppCompatActivity {
                     "Nenhum aplicativo encontrado para abrir PDF.\nInstale um visualizador de PDF.", 
                     Toast.LENGTH_LONG).show();
             }
+        } catch (android.os.FileUriExposedException e) {
+            Log.e("ReportsActivity", "FileUriExposedException when opening PDF", e);
+            Toast.makeText(this, 
+                "Erro de segurança: Não é possível compartilhar arquivo diretamente.\nPor favor, atualize o aplicativo.", 
+                Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("ReportsActivity", "Error opening PDF file", e);
             Toast.makeText(this, 
                 "Erro ao abrir PDF: " + e.getMessage(), 
                 Toast.LENGTH_LONG).show();
@@ -716,14 +931,29 @@ public class ReportsActivity extends AppCompatActivity {
             Intent intent;
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+: abrir a pasta Downloads
+                // Android 10+: abrir a pasta Downloads usando DocumentsProvider
                 intent = new Intent(Intent.ACTION_VIEW);
                 Uri uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download/EstoqueSimples");
                 intent.setDataAndType(uri, "vnd.android.document/directory");
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                // Android 7-9: Não podemos abrir diretório diretamente, mostrar mensagem com caminho
+                Toast.makeText(this, 
+                    "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
+                    "\n\nAbra seu gerenciador de arquivos e navegue até esta pasta.", 
+                    Toast.LENGTH_LONG).show();
+                return;
             } else {
-                // Android 9 e inferior: abrir o gerenciador de arquivos
-                Uri selectedUri = Uri.fromFile(pdfFile.getParentFile());
+                // Android 6 e inferior: pode usar URI de arquivo diretamente
+                Uri selectedUri = FileUriHelper.getUriForDirectory(this, pdfFile.getParentFile());
+                if (selectedUri == null) {
+                    // Fallback: mostrar o caminho
+                    Toast.makeText(this, 
+                        "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath(), 
+                        Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
                 intent = new Intent(Intent.ACTION_VIEW);
                 intent.setDataAndType(selectedUri, "resource/folder");
                 
@@ -736,16 +966,23 @@ public class ReportsActivity extends AppCompatActivity {
             }
 
             // Tentar abrir
-            if (intent.resolveActivity(getPackageManager()) != null) {
+            if (intent != null && intent.resolveActivity(getPackageManager()) != null) {
                 startActivity(intent);
             } else {
                 // Se não conseguir abrir a pasta, mostrar o caminho
                 Toast.makeText(this, 
-                    "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath(), 
+                    "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
+                    "\n\nAbra seu gerenciador de arquivos para localizar o arquivo.", 
                     Toast.LENGTH_LONG).show();
             }
+        } catch (android.os.FileUriExposedException e) {
+            Log.e("ReportsActivity", "FileUriExposedException when opening folder", e);
+            Toast.makeText(this, 
+                "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
+                "\n\nAbra seu gerenciador de arquivos para localizar o arquivo.", 
+                Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("ReportsActivity", "Error opening folder", e);
             // Fallback: mostrar apenas o caminho
             Toast.makeText(this, 
                 "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath(), 
@@ -756,15 +993,24 @@ public class ReportsActivity extends AppCompatActivity {
     // Compartilhar o PDF
     private void sharePdfFile(File pdfFile) {
         try {
-            Uri pdfUri;
+            // Usar FileUriHelper para criar URI segura
+            Uri pdfUri = FileUriHelper.getUriForFile(this, pdfFile);
             
-            // A partir do Android 7.0, precisamos usar FileProvider
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                pdfUri = FileProvider.getUriForFile(this, 
-                    getApplicationContext().getPackageName() + ".fileprovider", 
-                    pdfFile);
-            } else {
-                pdfUri = Uri.fromFile(pdfFile);
+            if (pdfUri == null) {
+                Log.e("ReportsActivity", "Failed to create URI for sharing PDF file");
+                Toast.makeText(this, 
+                    "Erro ao criar referência para o arquivo PDF.", 
+                    Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            // Verificar se a URI é segura
+            if (!FileUriHelper.isUriSafe(pdfUri)) {
+                Log.e("ReportsActivity", "Created URI is not safe for sharing: " + pdfUri);
+                Toast.makeText(this, 
+                    "Erro de segurança ao compartilhar PDF.", 
+                    Toast.LENGTH_LONG).show();
+                return;
             }
 
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
@@ -774,9 +1020,21 @@ public class ReportsActivity extends AppCompatActivity {
             shareIntent.putExtra(Intent.EXTRA_TEXT, "Segue em anexo o relatório de estoque gerado pelo Estoque Simples.");
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            startActivity(Intent.createChooser(shareIntent, "Compartilhar PDF via:"));
+            // Verificar se há apps para compartilhar
+            if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                startActivity(Intent.createChooser(shareIntent, "Compartilhar PDF via:"));
+            } else {
+                Toast.makeText(this, 
+                    "Nenhum aplicativo disponível para compartilhar arquivos.", 
+                    Toast.LENGTH_LONG).show();
+            }
+        } catch (android.os.FileUriExposedException e) {
+            Log.e("ReportsActivity", "FileUriExposedException when sharing PDF", e);
+            Toast.makeText(this, 
+                "Erro de segurança: Não é possível compartilhar arquivo diretamente.\nPor favor, atualize o aplicativo.", 
+                Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("ReportsActivity", "Error sharing PDF file", e);
             Toast.makeText(this, 
                 "Erro ao compartilhar PDF: " + e.getMessage(), 
                 Toast.LENGTH_LONG).show();

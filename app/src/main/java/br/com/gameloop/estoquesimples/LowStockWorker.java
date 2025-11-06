@@ -78,8 +78,8 @@ public class LowStockWorker extends Worker {
             if (cursor.moveToFirst()) {
                 do {
                     String name = cursor.getString(0);
-                    int amount = parseWithDefault(cursor.getString(1), 0);
-                    int minStock = parseWithDefault(cursor.getString(2), 0);
+                    double amount = parseWithDefault(cursor.getString(1), 0);
+                    double minStock = parseWithDefault(cursor.getString(2), 0);
 
                     if (amount <= minStock) {
                         lowStockProducts.add(name + " (" + amount + "/" + minStock + ")");
@@ -101,11 +101,14 @@ public class LowStockWorker extends Worker {
     }
 
     /**
-     * Converte string para int com valor padrão
+     * Converte string para double com valor padrão
      */
-    private int parseWithDefault(String number, int defaultVal) {
+    private double parseWithDefault(String number, double defaultVal) {
         try {
-            return Integer.parseInt(number);
+            if(number == null || number.isEmpty() || number.equals("null")) {
+                return defaultVal;
+            }
+            return Double.parseDouble(number);
         } catch (NumberFormatException e) {
             return defaultVal;
         }

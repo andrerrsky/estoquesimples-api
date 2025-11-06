@@ -153,15 +153,36 @@ public class CustomListView extends ArrayAdapter<String> {
         // Definir valores básicos
         name.setText(names.get(position));
         
-        // Quantidade (sem prefixo "Qtd:")
-        amount.setText(amounts.get(position));
+        // Quantidade com estoque mínimo (formato: "atual / minimo")
+        String amountText = amounts.get(position);
+        String minStockStr = minStocks.get(position);
+        boolean hasMinStock = minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null") && !minStockStr.equals("0");
+        
+        if(hasMinStock) {
+            amountText = amounts.get(position) + " / " + minStockStr;
+        }
+        amount.setText(amountText);
         
         // Valor
         value.setText("$ " + values.get(position));
 
-        // Foto
+        // Foto - com limite de tamanho para evitar crashes por bitmaps muito grandes
         if(photos.get(position) != null && !photos.get(position).isEmpty() && !photos.get(position).equals("null")) {
-            Picasso.get().load("file://" + photos.get(position)).into(photo);
+            try {
+                Picasso.get()
+                    .load("file://" + photos.get(position))
+                    .resize(800, 800) // Limita dimensões máximas a 800x800px
+                    .centerInside() // Mantém aspect ratio
+                    .onlyScaleDown() // Não aumenta imagens menores
+                    .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
+                    .error(R.drawable.package_icon) // Imagem de erro caso falhe
+                    .into(photo);
+            } catch (Exception e) {
+                Log.e(TAG, "Erro ao carregar foto na posição " + position, e);
+                photo.setImageResource(R.drawable.package_icon);
+            }
+        } else {
+            photo.setImageResource(R.drawable.package_icon);
         }
 
         // SKU
@@ -186,8 +207,8 @@ public class CustomListView extends ArrayAdapter<String> {
             skuDivider.setVisibility(View.GONE);
         }
 
-        // Unidade
-        if(units.get(position) != null && !units.get(position).isEmpty() && !units.get(position).equals("null")) {
+        // Unidade - ocultar quando houver barra de estoque mínimo
+        if(!hasMinStock && units.get(position) != null && !units.get(position).isEmpty() && !units.get(position).equals("null")) {
             unit.setText(" " + units.get(position));
             unit.setVisibility(View.VISIBLE);
         } else {
@@ -196,11 +217,11 @@ public class CustomListView extends ArrayAdapter<String> {
 
         // Alerta de estoque baixo
         try {
-            int currentAmount = Integer.parseInt(amounts.get(position));
-            String minStockStr = minStocks.get(position);
+            double currentAmount = Double.parseDouble(amounts.get(position));
+            minStockStr = minStocks.get(position);
             
             if(minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null")) {
-                int minStockValue = Integer.parseInt(minStockStr);
+                double minStockValue = Double.parseDouble(minStockStr);
                 
                 if(minStockValue > 0 && currentAmount <= minStockValue) {
                     lowStockBadge.setVisibility(View.VISIBLE);
@@ -230,7 +251,7 @@ public class CustomListView extends ArrayAdapter<String> {
         TextView detailSku = (TextView) rowView.findViewById(R.id.detailSku);
         TextView detailCategory = (TextView) rowView.findViewById(R.id.detailCategory);
 
-        String minStockStr = minStocks.get(position);
+        minStockStr = minStocks.get(position);
         if(minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null")) {
             detailMinStock.setText(minStockStr);
         } else {
@@ -305,7 +326,7 @@ public class CustomListView extends ArrayAdapter<String> {
 
         final EditText inputQty = new EditText(context);
         inputQty.setHint("Quantidade");
-        inputQty.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        inputQty.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
         container.addView(inputQty);
 
         final EditText inputNote = new EditText(context);
@@ -327,9 +348,9 @@ public class CustomListView extends ArrayAdapter<String> {
                 Toast.makeText(context, "Informe a quantidade", Toast.LENGTH_SHORT).show();
                 return;
             }
-            int qty;
+            double qty;
             try {
-                qty = Integer.parseInt(qtyStr);
+                qty = Double.parseDouble(qtyStr);
             } catch (NumberFormatException e) {
                 Toast.makeText(context, "Quantidade inválida", Toast.LENGTH_SHORT).show();
                 return;
@@ -339,12 +360,12 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
-            int currentAmount = 0;
+            double currentAmount = 0;
             try {
-                currentAmount = Integer.parseInt(amounts.get(position));
+                currentAmount = Double.parseDouble(amounts.get(position));
             } catch (NumberFormatException ignored) { }
 
-            int newAmount = isEntrada ? (currentAmount + qty) : (currentAmount - qty);
+            double newAmount = isEntrada ? (currentAmount + qty) : (currentAmount - qty);
             if (!isEntrada && newAmount < 0) {
                 Toast.makeText(context, "Quantidade insuficiente em estoque", Toast.LENGTH_SHORT).show();
                 return;

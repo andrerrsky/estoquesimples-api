@@ -11,8 +11,8 @@ android {
         applicationId "br.com.gameloop.estoquesimples"
         minSdkVersion 23
         targetSdkVersion 35
-        versionCode 11
-        versionName "11.0"
+        versionCode 12
+        versionName "12.0"
     }
 
     buildTypes {

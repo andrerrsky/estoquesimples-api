@@ -242,7 +242,8 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="number"
+                        android:inputType="numberDecimal|numberSigned"
+                        android:digits="0123456789.,"
                         android:id="@+id/editAmount" />
 
                 </com.google.android.material.textfield.TextInputLayout>
@@ -295,7 +296,8 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="number"
+                        android:inputType="numberDecimal|numberSigned"
+                        android:digits="0123456789.,"
                         android:id="@+id/editMinStock" />
 
                 </com.google.android.material.textfield.TextInputLayout>

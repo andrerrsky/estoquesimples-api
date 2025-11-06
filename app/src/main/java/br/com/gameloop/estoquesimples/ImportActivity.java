@@ -66,9 +66,29 @@ public class ImportActivity extends AppCompatActivity {
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+        // Inicializar campos com verificação de erro
         status = findViewById(R.id.importStatus);
         importDesc2 = findViewById(R.id.importDesc2);
         importExportDesc = findViewById(R.id.importExportDesc);
+
+        // Verificar se os campos foram inicializados
+        if (status == null) {
+            Log.e(TAG, "Failed to initialize status from layout");
+        }
+        if (importDesc2 == null) {
+            Log.e(TAG, "Failed to initialize importDesc2 from layout");
+        }
+        if (importExportDesc == null) {
+            Log.e(TAG, "Failed to initialize importExportDesc from layout");
+        }
+
+        // Verificar se algum campo obrigatório falhou
+        if (!areFieldsInitialized()) {
+            Toast.makeText(this, "Erro ao carregar interface. Por favor, reinicie o aplicativo.", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Critical fields not initialized, closing activity");
+            finish();
+            return;
+        }
 
         statusText = LOG_PREFIX;
 
@@ -103,6 +123,38 @@ public class ImportActivity extends AppCompatActivity {
         if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
             AdManager adManager = AdManager.getInstance(this);
             adManager.showBannerAds(this, 0, R.id.appodealMrecView);
+        }
+    }
+
+    /**
+     * Verifica se todos os campos obrigatórios foram inicializados
+     * @return true se todos os campos obrigatórios não são null
+     */
+    private boolean areFieldsInitialized() {
+        if (status == null) {
+            Log.e(TAG, "status is null");
+            return false;
+        }
+        if (importDesc2 == null) {
+            Log.e(TAG, "importDesc2 is null");
+            return false;
+        }
+        if (importExportDesc == null) {
+            Log.e(TAG, "importExportDesc is null");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Define o texto no campo importExportDesc de forma segura
+     * @param text o texto a ser definido
+     */
+    private void setImportExportDescText(String text) {
+        if (importExportDesc != null) {
+            setImportExportDescText(text);
+        } else {
+            Log.e(TAG, "importExportDesc field is null, cannot set text: " + text);
         }
     }
     
@@ -268,7 +320,11 @@ public class ImportActivity extends AppCompatActivity {
                 statusText += "(" + lineCounter + ") itens encontrados :)\n\n";
             }
 
-            status.setText(statusText);
+            if (status != null) {
+                status.setText(statusText);
+            } else {
+                Log.e(TAG, "status field is null, cannot update status text");
+            }
 
         } catch (IOException e) {
             Toast.makeText(this, "Erro ao importar arquivo: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -289,7 +345,7 @@ public class ImportActivity extends AppCompatActivity {
 
             InputStream inputStream = getContentResolver().openInputStream(uri);
             if (inputStream == null) {
-                importExportDesc.setText("Erro ao abrir arquivo de banco de dados");
+                setImportExportDescText("Erro ao abrir arquivo de banco de dados");
                 Toast.makeText(this, "Erro ao abrir arquivo de banco de dados", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -311,14 +367,14 @@ public class ImportActivity extends AppCompatActivity {
             MainActivity.instance.getListValues();
             MainActivity.instance.updateList();
 
-            importExportDesc.setText("Banco de dados importado com sucesso!\n\nOs produtos já estão disponíveis na lista.");
+            setImportExportDescText("Banco de dados importado com sucesso!\n\nOs produtos já estão disponíveis na lista.");
             Toast.makeText(this, "Banco de dados importado com sucesso!", Toast.LENGTH_SHORT).show();
             
             // Registrar interação para contagem de anúncios
             AdManager.getInstance(this).registerInteraction(this);
 
         } catch (Exception e) {
-            importExportDesc.setText("Erro ao importar: " + e.getMessage());
+            setImportExportDescText("Erro ao importar: " + e.getMessage());
             Toast.makeText(this, "Ocorreu um erro ao importar o banco de dados.", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Erro ao importar banco de dados", e);
         }
@@ -423,9 +479,22 @@ public class ImportActivity extends AppCompatActivity {
         insertValues.put("min_stock", minStock);
         insertValues.put("unit", unit);
 
-        MainActivity.stock.insert("Estoque", null, insertValues);
+        // Verificar se o banco de dados está disponível antes de inserir
+        if (!ensureDatabaseAvailable()) {
+            Log.e(TAG, "Database is not available for insert operation");
+            throw new IllegalStateException("Database not available");
+        }
 
-        MainActivity.instance.updateList();
+        try {
+            MainActivity.stock.insert("Estoque", null, insertValues);
+
+            if (MainActivity.instance != null) {
+                MainActivity.instance.updateList();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error inserting product into database", e);
+            throw new IllegalStateException("Error inserting into database: " + e.getMessage());
+        }
 
     }
 
@@ -457,7 +526,7 @@ public class ImportActivity extends AppCompatActivity {
             File currentDB = new File(currentDBPath);
 
             if (!currentDB.exists()) {
-                importExportDesc.setText("Erro: Banco de dados não encontrado");
+                setImportExportDescText("Erro: Banco de dados não encontrado");
                 Toast.makeText(this, "Banco de dados não encontrado", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -466,7 +535,7 @@ public class ImportActivity extends AppCompatActivity {
             OutputStream outputStream = getContentResolver().openOutputStream(uri);
 
             if (outputStream == null) {
-                importExportDesc.setText("Erro ao criar arquivo de exportação");
+                setImportExportDescText("Erro ao criar arquivo de exportação");
                 Toast.makeText(this, "Erro ao criar arquivo de exportação", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -481,11 +550,11 @@ public class ImportActivity extends AppCompatActivity {
             outputStream.close();
             inputStream.close();
 
-            importExportDesc.setText("Banco de dados exportado com sucesso!\n\nO arquivo foi salvo no local escolhido.");
+            setImportExportDescText("Banco de dados exportado com sucesso!\n\nO arquivo foi salvo no local escolhido.");
             Toast.makeText(this, "Banco de dados exportado com sucesso!", Toast.LENGTH_SHORT).show();
 
         } catch (IOException e) {
-            importExportDesc.setText("Erro ao exportar: " + e.getMessage());
+            setImportExportDescText("Erro ao exportar: " + e.getMessage());
             Toast.makeText(this, "Ocorreu um erro ao exportar o banco de dados.", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Erro ao exportar banco de dados", e);
         }
@@ -520,16 +589,40 @@ public class ImportActivity extends AppCompatActivity {
         try {
             OutputStream outputStream = getContentResolver().openOutputStream(uri);
             if (outputStream == null) {
-                importExportDesc.setText("Erro ao criar arquivo de exportação CSV");
+                setImportExportDescText("Erro ao criar arquivo de exportação CSV");
                 Toast.makeText(this, "Erro ao criar arquivo de exportação CSV", Toast.LENGTH_SHORT).show();
                 return;
             }
 
+            // Verificar se o banco de dados está disponível
+            if (!ensureDatabaseAvailable()) {
+                setImportExportDescText("Erro: Banco de dados não disponível");
+                Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Database not available for CSV export");
+                outputStream.close();
+                return;
+            }
+
             // Buscar todos os produtos do banco de dados
-            Cursor cursor = MainActivity.stock.rawQuery(
-                "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
-                null
-            );
+            Cursor cursor = null;
+            try {
+                cursor = MainActivity.stock.rawQuery(
+                    "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
+                    null
+                );
+            } catch (Exception e) {
+                Log.e(TAG, "Error querying database for CSV export", e);
+                Toast.makeText(this, "Erro ao buscar dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                outputStream.close();
+                return;
+            }
+
+            if (cursor == null) {
+                setImportExportDescText("Erro ao buscar dados do banco");
+                Toast.makeText(this, "Erro ao buscar dados do banco", Toast.LENGTH_SHORT).show();
+                outputStream.close();
+                return;
+            }
 
             int exportedCount = 0;
             StringBuilder csvContent = new StringBuilder();
@@ -578,20 +671,28 @@ public class ImportActivity extends AppCompatActivity {
                     exportedCount++;
                 } while (cursor.moveToNext());
             }
-            cursor.close();
+            
+            // Fechar cursor
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error closing cursor", e);
+                }
+            }
 
             // Escrever conteúdo no arquivo
             outputStream.write(csvContent.toString().getBytes());
             outputStream.flush();
             outputStream.close();
 
-            importExportDesc.setText("Dados exportados com sucesso!\n\n" + 
+            setImportExportDescText("Dados exportados com sucesso!\n\n" + 
                                    exportedCount + " produto(s) exportado(s) para CSV.\n\n" +
                                    "O arquivo foi salvo no local escolhido.");
             Toast.makeText(this, exportedCount + " produto(s) exportado(s) com sucesso!", Toast.LENGTH_LONG).show();
 
         } catch (Exception e) {
-            importExportDesc.setText("Erro ao exportar: " + e.getMessage());
+            setImportExportDescText("Erro ao exportar: " + e.getMessage());
             Toast.makeText(this, "Ocorreu um erro ao exportar os dados.", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Erro ao exportar para CSV", e);
         }
@@ -624,6 +725,49 @@ public class ImportActivity extends AppCompatActivity {
                 });
         alertDialog.show();
 
+    }
+
+    /**
+     * Garante que o banco de dados está disponível e aberto
+     * Tenta inicializar se necessário
+     */
+    private boolean ensureDatabaseAvailable() {
+        try {
+            // Verificar se o banco já está disponível e aberto
+            if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                return true;
+            }
+
+            // Se MainActivity.instance está disponível, tentar inicializar o banco
+            if (MainActivity.instance != null) {
+                Log.d(TAG, "Attempting to initialize database through MainActivity");
+                MainActivity.instance.openOrCreateDB();
+                
+                // Verificar se a inicialização foi bem-sucedida
+                if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                    Log.d(TAG, "Database initialized successfully");
+                    return true;
+                }
+            }
+
+            // Última tentativa: tentar abrir o banco de dados diretamente
+            Log.d(TAG, "Attempting to open database directly");
+            MainActivity.stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            
+            if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
+                // Criar tabela se necessário
+                MainActivity.stock.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
+                Log.d(TAG, "Database opened successfully");
+                return true;
+            }
+
+            Log.e(TAG, "All attempts to open database failed");
+            return false;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error ensuring database availability", e);
+            return false;
+        }
     }
 
 

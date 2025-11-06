@@ -58,13 +58,13 @@
             <!-- Botão X para fechar -->
             <ImageButton
                 android:id="@+id/btnClosePremiumCard"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_alignParentTop="true"
                 android:layout_alignParentRight="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:padding="4dp"
+                android:padding="2dp"
                 android:contentDescription="Fechar" />
 
             <LinearLayout

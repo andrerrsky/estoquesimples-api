@@ -199,20 +199,10 @@
 
             <!-- Botões de Ação -->
             <LinearLayout
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical">
-
-                <ImageButton
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:id="@+id/edit"
-                    android:src="@drawable/edit_icon"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="fitCenter"
-                    android:padding="8dp"
-                    android:contentDescription="Editar produto" />
+                android:gravity="center">
 
                 <ImageButton
                     android:layout_width="40dp"
@@ -223,6 +213,16 @@
                     android:scaleType="fitCenter"
                     android:padding="8dp"
                     android:contentDescription="Excluir produto" />
+
+                <ImageButton
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:id="@+id/edit"
+                    android:src="@drawable/edit_icon"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:scaleType="fitCenter"
+                    android:padding="8dp"
+                    android:contentDescription="Editar produto" />
 
             </LinearLayout>
 

@@ -120,6 +120,9 @@ public class MainActivity extends AppCompatActivity {
 
         instance = this;
 
+        // Configurar Picasso com otimizações de memória para evitar crashes com imagens grandes
+        ImageLoadHelper.configurePicasso(this);
+
         // Inicializar gerenciadores
         premiumManager = PremiumManager.getInstance(this);
         adManager = AdManager.getInstance(this);
@@ -131,8 +134,17 @@ public class MainActivity extends AppCompatActivity {
         btnPremiumCardAction = findViewById(R.id.btnPremiumCardAction);
         btnClosePremiumCard = findViewById(R.id.btnClosePremiumCard);
         
-        btnPremiumCardAction.setOnClickListener(v -> onPremiumCardActionClicked());
-        btnClosePremiumCard.setOnClickListener(v -> onClosePremiumCardClicked());
+        if (btnPremiumCardAction != null) {
+            btnPremiumCardAction.setOnClickListener(v -> onPremiumCardActionClicked());
+        } else {
+            Log.e("MainActivity", "btnPremiumCardAction is null");
+        }
+        
+        if (btnClosePremiumCard != null) {
+            btnClosePremiumCard.setOnClickListener(v -> onClosePremiumCardClicked());
+        } else {
+            Log.e("MainActivity", "btnClosePremiumCard is null");
+        }
         
         // Inicializar SharedPreferences ANTES de usar
         prefs = getApplicationContext().getSharedPreferences("EstoqueSimplesPrefs", 0);
@@ -151,44 +163,52 @@ public class MainActivity extends AppCompatActivity {
 
         // SearchView setup:
         searchView = (SearchView) findViewById(R.id.searchView);
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                filterList(query);
-                return true;
-            }
+        if (searchView != null) {
+            searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    filterList(query);
+                    return true;
+                }
 
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                filterList(newText);
-                return true;
-            }
-        });
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    filterList(newText);
+                    return true;
+                }
+            });
+        } else {
+            Log.e("MainActivity", "searchView is null");
+        }
 
         // Bottom Menu:
         bottomNavigationView = (BottomNavigationView) findViewById(R.id.bottomNavigation);
-        bottomNavigationView.setBackgroundColor(ContextCompat.getColor(getApplicationContext(), R.color.colorActionBar));
-        
-        bottomNavigationView.setOnItemSelectedListener(new BottomNavigationView.OnItemSelectedListener() {
-            @Override
-            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-                int itemId = item.getItemId();
-                
-                if (itemId == R.id.navigation_home) {
-                    return true;
-                } else if (itemId == R.id.navigation_new) {
-                    showAddActivity();
-                    return true;
-                } else if (itemId == R.id.navigation_reports) {
-                    showReportsActivity();
-                    return true;
-                } else if (itemId == R.id.navigation_import) {
-                    showImportActivity();
-                    return true;
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setBackgroundColor(ContextCompat.getColor(getApplicationContext(), R.color.colorActionBar));
+            
+            bottomNavigationView.setOnItemSelectedListener(new BottomNavigationView.OnItemSelectedListener() {
+                @Override
+                public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                    int itemId = item.getItemId();
+                    
+                    if (itemId == R.id.navigation_home) {
+                        return true;
+                    } else if (itemId == R.id.navigation_new) {
+                        showAddActivity();
+                        return true;
+                    } else if (itemId == R.id.navigation_reports) {
+                        showReportsActivity();
+                        return true;
+                    } else if (itemId == R.id.navigation_import) {
+                        showImportActivity();
+                        return true;
+                    }
+                    return false;
                 }
-                return false;
-            }
-        });
+            });
+        } else {
+            Log.e("MainActivity", "bottomNavigationView is null");
+        }
 
         if(!prefs.getBoolean("welcomeMsgAlreadyDisplayed", false)) {
             showWelcomeMessage();
@@ -213,41 +233,68 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void openOrCreateDB() {
-
-        stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
-        stock.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
-        // Histórico de movimentações de estoque
-        stock.execSQL("CREATE TABLE IF NOT EXISTS EstoqueHistorico(id INTEGER PRIMARY KEY AUTOINCREMENT, product_name VARCHAR, change_type VARCHAR, quantity INTEGER, timestamp INTEGER, note VARCHAR);");
-        
-        // Adicionar colunas novas se a tabela já existir (migração)
         try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN category VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN sku VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN barcode VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN supplier VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN location VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN min_stock VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-        
-        try {
-            stock.execSQL("ALTER TABLE Estoque ADD COLUMN unit VARCHAR");
-        } catch (Exception e) { /* Coluna já existe */ }
-
+            stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            
+            if (stock == null) {
+                Log.e("MainActivity", "Failed to open or create database");
+                Toast.makeText(this, "Erro crítico: Não foi possível inicializar o banco de dados", Toast.LENGTH_LONG).show();
+                return;
+            }
+            
+            stock.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
+            // Histórico de movimentações de estoque
+            stock.execSQL("CREATE TABLE IF NOT EXISTS EstoqueHistorico(id INTEGER PRIMARY KEY AUTOINCREMENT, product_name VARCHAR, change_type VARCHAR, quantity INTEGER, timestamp INTEGER, note VARCHAR);");
+            
+            // Adicionar colunas novas se a tabela já existir (migração)
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN category VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column category already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN sku VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column sku already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN barcode VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column barcode already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN supplier VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column supplier already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN location VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column location already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN min_stock VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column min_stock already exists");
+            }
+            
+            try {
+                stock.execSQL("ALTER TABLE Estoque ADD COLUMN unit VARCHAR");
+            } catch (Exception e) { 
+                Log.d("MainActivity", "Column unit already exists");
+            }
+            
+            Log.d("MainActivity", "Database initialized successfully");
+            
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error initializing database", e);
+            Toast.makeText(this, "Erro ao inicializar banco de dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
 
@@ -411,43 +458,58 @@ public class MainActivity extends AppCompatActivity {
 
         clearArrays();
 
-        Cursor cursor = stock.rawQuery("SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", null);
-
-        if(cursor.moveToFirst()) {
-
-            do {
-
-                String columnName = cursor.getString(0);
-                String columnDescription = cursor.getString(1);
-                String columnAmount = cursor.getString(2);
-                String columnValue = cursor.getString(3);
-                String columnPhoto = cursor.getString(4);
-                String columnCategory = cursor.getString(5);
-                String columnSku = cursor.getString(6);
-                String columnBarcode = cursor.getString(7);
-                String columnSupplier = cursor.getString(8);
-                String columnLocation = cursor.getString(9);
-                String columnMinStock = cursor.getString(10);
-                String columnUnit = cursor.getString(11);
-
-                names.add(columnName);
-                descriptions.add(columnDescription);
-                amounts.add(columnAmount);
-                values.add(columnValue);
-                photos.add(columnPhoto);
-                categories.add(columnCategory);
-                skus.add(columnSku);
-                barcodes.add(columnBarcode);
-                suppliers.add(columnSupplier);
-                locations.add(columnLocation);
-                minStocks.add(columnMinStock);
-                units.add(columnUnit);
-
-            } while (cursor.moveToNext());
-
+        // Verificar se o banco de dados está disponível
+        if (stock == null || !stock.isOpen()) {
+            Log.e("MainActivity", "Database is not available in getListValues");
+            Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        cursor.close();
+        Cursor cursor = null;
+        try {
+            cursor = stock.rawQuery("SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+
+                do {
+
+                    String columnName = cursor.getString(0);
+                    String columnDescription = cursor.getString(1);
+                    String columnAmount = cursor.getString(2);
+                    String columnValue = cursor.getString(3);
+                    String columnPhoto = cursor.getString(4);
+                    String columnCategory = cursor.getString(5);
+                    String columnSku = cursor.getString(6);
+                    String columnBarcode = cursor.getString(7);
+                    String columnSupplier = cursor.getString(8);
+                    String columnLocation = cursor.getString(9);
+                    String columnMinStock = cursor.getString(10);
+                    String columnUnit = cursor.getString(11);
+
+                    names.add(columnName);
+                    descriptions.add(columnDescription);
+                    amounts.add(columnAmount);
+                    values.add(columnValue);
+                    photos.add(columnPhoto);
+                    categories.add(columnCategory);
+                    skus.add(columnSku);
+                    barcodes.add(columnBarcode);
+                    suppliers.add(columnSupplier);
+                    locations.add(columnLocation);
+                    minStocks.add(columnMinStock);
+                    units.add(columnUnit);
+
+                } while (cursor.moveToNext());
+
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error loading product list", e);
+            Toast.makeText(this, "Erro ao carregar lista de produtos", Toast.LENGTH_SHORT).show();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
 
     }
 
@@ -478,25 +540,60 @@ public class MainActivity extends AppCompatActivity {
                 .setIcon(R.drawable.delete_icon)
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
-                        stock.execSQL("DELETE FROM Estoque WHERE name='" + finalProductName + "'");
-                        updateList();
-                        Toast.makeText(MainActivity.this, "Produto removido com sucesso!", Toast.LENGTH_LONG).show();
-                        
-                        // Verificar e atualizar agendamento de notificações de estoque baixo
-                        LowStockScheduler.checkAndScheduleNotifications(MainActivity.this);
+                        try {
+                            // Verificar se o banco de dados está disponível
+                            if (stock == null || !stock.isOpen()) {
+                                Log.e("MainActivity", "Database is not available in deleteProduct");
+                                Toast.makeText(MainActivity.this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            
+                            // Usar query parametrizada para prevenir SQL injection
+                            int rowsDeleted = stock.delete("Estoque", "name=?", new String[]{finalProductName});
+                            
+                            if (rowsDeleted > 0) {
+                                updateList();
+                                Toast.makeText(MainActivity.this, "Produto removido com sucesso!", Toast.LENGTH_LONG).show();
+                                
+                                // Verificar e atualizar agendamento de notificações de estoque baixo
+                                LowStockScheduler.checkAndScheduleNotifications(MainActivity.this);
+                            } else {
+                                Toast.makeText(MainActivity.this, "Erro: Produto não encontrado.", Toast.LENGTH_SHORT).show();
+                                Log.w("MainActivity", "No rows deleted for product: " + finalProductName);
+                            }
+                        } catch (Exception e) {
+                            Toast.makeText(MainActivity.this, "Erro ao remover produto: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            Log.e("MainActivity", "Error deleting product", e);
+                        }
                     }})
                 .setNegativeButton(android.R.string.no, null).show();
 
     }
 
     public boolean productAlreadyExists(String productName) {
+        if (productName == null || productName.trim().isEmpty()) {
+            return false;
+        }
 
-        Cursor cursor = stock.rawQuery("SELECT * FROM Estoque WHERE name='" + productName + "'", null);
-        int count = cursor.getCount();
-        cursor.close();
+        // Verificar se o banco de dados está disponível
+        if (stock == null || !stock.isOpen()) {
+            Log.e("MainActivity", "Database is not available in productAlreadyExists");
+            return false;
+        }
 
-        return count > 0;
-
+        Cursor cursor = null;
+        try {
+            // Usar query parametrizada para prevenir SQL injection
+            cursor = stock.rawQuery("SELECT * FROM Estoque WHERE name=?", new String[]{productName});
+            return cursor != null && cursor.getCount() > 0;
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error checking if product exists", e);
+            return false;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
     }
 
     public void showAddActivity() {
@@ -533,6 +630,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void showAnalyticsActivity() {
+        Intent intent = new Intent(this, AnalyticsActivity.class);
+        startActivity(intent);
+    }
+
     public void showWelcomeMessage() {
 
         AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
@@ -560,6 +662,9 @@ public class MainActivity extends AppCompatActivity {
         
         if (itemId == R.id.menu_bulk_edit) {
             showBulkEditDialog();
+            return true;
+        } else if (itemId == R.id.menu_analytics) {
+            showAnalyticsActivity();
             return true;
         } else if (itemId == R.id.menu_go_pro) {
             showProActivity();
@@ -806,7 +911,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showBulkAdjustQuantityDialog(final java.util.List<String> selectedProducts) {
         android.widget.EditText input = new android.widget.EditText(this);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         input.setHint("Digite a quantidade (+ ou -)");
         
         new AlertDialog.Builder(this)
@@ -817,7 +922,7 @@ public class MainActivity extends AppCompatActivity {
                 String value = input.getText().toString();
                 if (!value.isEmpty()) {
                     try {
-                        int adjustment = Integer.parseInt(value);
+                        double adjustment = Double.parseDouble(value);
                         performBulkQuantityAdjustment(selectedProducts, adjustment);
                     } catch (NumberFormatException e) {
                         Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
@@ -873,20 +978,39 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Executa ajuste de quantidade em massa
      */
-    private void performBulkQuantityAdjustment(java.util.List<String> products, int adjustment) {
+    private void performBulkQuantityAdjustment(java.util.List<String> products, double adjustment) {
+        // Verificar se o banco de dados está disponível
+        if (stock == null || !stock.isOpen()) {
+            Log.e("MainActivity", "Database is not available in performBulkQuantityAdjustment");
+            Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         int updated = 0;
         for (String productName : products) {
-            Cursor cursor = stock.rawQuery("SELECT amount FROM Estoque WHERE name=?", new String[]{productName});
+            Cursor cursor = null;
+            try {
+                cursor = stock.rawQuery("SELECT amount FROM Estoque WHERE name=?", new String[]{productName});
             if (cursor.moveToFirst()) {
-                int currentAmount = Integer.parseInt(cursor.getString(0));
-                int newAmount = Math.max(0, currentAmount + adjustment); // Não permitir quantidades negativas
+                double currentAmount = Double.parseDouble(cursor.getString(0));
+                double newAmount = Math.max(0, currentAmount + adjustment); // Não permitir quantidades negativas
                 
                 ContentValues values = new ContentValues();
                 values.put("amount", String.valueOf(newAmount));
                 stock.update("Estoque", values, "name=?", new String[]{productName});
                 updated++;
             }
-            cursor.close();
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error adjusting quantity for product: " + productName, e);
+            } finally {
+                if (cursor != null) {
+                    try {
+                        cursor.close();
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "Error closing cursor", e);
+                    }
+                }
+            }
         }
         
         updateList();
@@ -897,12 +1021,23 @@ public class MainActivity extends AppCompatActivity {
      * Executa atualização de categoria em massa
      */
     private void performBulkCategoryUpdate(java.util.List<String> products, String category) {
+        // Verificar se o banco de dados está disponível
+        if (stock == null || !stock.isOpen()) {
+            Log.e("MainActivity", "Database is not available in performBulkCategoryUpdate");
+            Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         int updated = 0;
         for (String productName : products) {
-            ContentValues values = new ContentValues();
-            values.put("category", category);
-            int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
-            if (rows > 0) updated++;
+            try {
+                ContentValues values = new ContentValues();
+                values.put("category", category);
+                int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
+                if (rows > 0) updated++;
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error updating category for product: " + productName, e);
+            }
         }
         
         updateList();
@@ -913,12 +1048,23 @@ public class MainActivity extends AppCompatActivity {
      * Executa atualização de fornecedor em massa
      */
     private void performBulkSupplierUpdate(java.util.List<String> products, String supplier) {
+        // Verificar se o banco de dados está disponível
+        if (stock == null || !stock.isOpen()) {
+            Log.e("MainActivity", "Database is not available in performBulkSupplierUpdate");
+            Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         int updated = 0;
         for (String productName : products) {
-            ContentValues values = new ContentValues();
-            values.put("supplier", supplier);
-            int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
-            if (rows > 0) updated++;
+            try {
+                ContentValues values = new ContentValues();
+                values.put("supplier", supplier);
+                int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
+                if (rows > 0) updated++;
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error updating supplier for product: " + productName, e);
+            }
         }
         
         updateList();

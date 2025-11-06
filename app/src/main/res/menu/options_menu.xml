@@ -6,6 +6,10 @@
         android:title="@string/bulk_edit_title"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_analytics"
+        android:title="Análise de Estoque"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_go_pro"
         android:title="Versão Profissional"
         app:showAsAction="never" />
