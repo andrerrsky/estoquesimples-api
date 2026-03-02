@@ -213,6 +213,20 @@
                 android:textStyle="bold"
                 android:padding="16dp"
                 android:enabled="false"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Restaurar compra -->
+            <TextView
+                android:id="@+id/txtRestorePurchase"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pro_restore_purchase"
+                android:textSize="14sp"
+                android:textColor="#1976D2"
+                android:padding="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
                 android:layout_marginBottom="16dp" />
 
             <!-- Status/Progress -->

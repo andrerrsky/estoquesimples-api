@@ -60,6 +60,8 @@ public class ReportsActivity extends AppCompatActivity {
     private TextView totalItems;
     private TextView totalValue;
     private TextView averageValue;
+    private TextView totalEntryValue;
+    private TextView totalExitValue;
     private TextView lowStockWarning;
     private TextView lowStockList;
     private TextView categoriesList;
@@ -87,6 +89,8 @@ public class ReportsActivity extends AppCompatActivity {
             totalItems = (TextView) findViewById(R.id.totalItems);
             totalValue = (TextView) findViewById(R.id.totalValue);
             averageValue = (TextView) findViewById(R.id.averageValue);
+            totalEntryValue = (TextView) findViewById(R.id.totalEntryValue);
+            totalExitValue = (TextView) findViewById(R.id.totalExitValue);
             lowStockWarning = (TextView) findViewById(R.id.lowStockWarning);
             lowStockList = (TextView) findViewById(R.id.lowStockList);
             categoriesList = (TextView) findViewById(R.id.categoriesList);
@@ -270,9 +274,9 @@ public class ReportsActivity extends AppCompatActivity {
         if(cursor.moveToFirst()) {
 
             String columnName = cursor.getString(0);
-            double columnAmount = parseWithDefault(cursor.getString(1), 0);
-            double columnValue = parseDoubleWithDefault(cursor.getString(2), 0.0);
-            double columnMinStock = parseWithDefault(cursor.getString(3), 0);
+            double columnAmount = CurrencyHelper.parseCurrency(cursor.getString(1), 0);
+            double columnValue = CurrencyHelper.parseCurrency(cursor.getString(2), 0.0);
+            double columnMinStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
             String columnCategory = cursor.getString(4);
 
             entries.add(new PieEntry((float)columnAmount, columnName));
@@ -299,9 +303,9 @@ public class ReportsActivity extends AppCompatActivity {
             while (cursor.moveToNext()) {
 
                 columnName = cursor.getString(0);
-                columnAmount = parseWithDefault(cursor.getString(1), 0);
-                columnValue = parseDoubleWithDefault(cursor.getString(2), 0.0);
-                columnMinStock = parseWithDefault(cursor.getString(3), 0);
+                columnAmount = CurrencyHelper.parseCurrency(cursor.getString(1), 0);
+                columnValue = CurrencyHelper.parseCurrency(cursor.getString(2), 0.0);
+                columnMinStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
                 columnCategory = cursor.getString(4);
 
                 if(columnAmount > higherAmoutProductValue) {
@@ -336,14 +340,18 @@ public class ReportsActivity extends AppCompatActivity {
         // Atualizar estatísticas gerais
         totalProducts.setText("Total de Produtos: " + cursorCount);
         totalItems.setText("Total de Itens: " + totalItemsCount);
-        totalValue.setText(String.format("Valor Total: $%.2f", totalValueSum));
+        totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         
         if(cursorCount > 0) {
             double avgValue = totalValueSum / cursorCount;
-            averageValue.setText(String.format("Valor Médio por Produto: $%.2f", avgValue));
+            averageValue.setText(getString(R.string.report_avg_value, CurrencyHelper.formatCurrency(this, avgValue)));
         } else {
-            averageValue.setText("Valor Médio: $0.00");
+            String sym = CurrencyHelper.getCurrencySymbol(this);
+            averageValue.setText(getString(R.string.report_avg_value_zero, sym));
         }
+
+        // Calcular valor total de entradas e saídas
+        calculateEntryExitTotals();
 
         // Configurar gráfico
         PieDataSet dataSet = new PieDataSet(entries, "Produtos");
@@ -468,12 +476,19 @@ public class ReportsActivity extends AppCompatActivity {
      */
     private void showEmptyState() {
         try {
+            String sym = CurrencyHelper.getCurrencySymbol(this);
             higher.setText("Sem informações disponíveis no momento.");
             lower.setText("");
             totalProducts.setText("Total de Produtos: 0");
             totalItems.setText("Total de Itens: 0");
-            totalValue.setText("Valor Total: $0.00");
-            averageValue.setText("Valor Médio: $0.00");
+            totalValue.setText(getString(R.string.report_total_value_zero, sym));
+            averageValue.setText(getString(R.string.report_avg_value_zero, sym));
+            if (totalEntryValue != null) {
+                totalEntryValue.setText(getString(R.string.total_entry_value_zero, sym));
+            }
+            if (totalExitValue != null) {
+                totalExitValue.setText(getString(R.string.total_exit_value_zero, sym));
+            }
             
             // Esconder avisos e seções opcionais
             if (dividerLowStock != null) {
@@ -503,27 +518,53 @@ public class ReportsActivity extends AppCompatActivity {
         }
     }
 
-    public static double parseWithDefault(String number, double defaultVal) {
+    /**
+     * Calcula e exibe os valores totais de entradas e saídas a partir do
+     * histórico de movimentações, multiplicando quantidade pelo valor
+     * unitário atual do produto.
+     */
+    private void calculateEntryExitTotals() {
+        double totalEntry = 0.0;
+        double totalExit = 0.0;
+        Cursor historyCursor = null;
         try {
-            if(number == null || number.isEmpty() || number.equals("null")) {
-                return defaultVal;
-            }
-            return Double.parseDouble(number);
-        } catch (NumberFormatException e) {
-            return defaultVal;
-        }
-    }
+            historyCursor = MainActivity.stock.rawQuery(
+                "SELECT h.change_type, h.quantity, e.value " +
+                "FROM EstoqueHistorico h " +
+                "LEFT JOIN Estoque e ON h.product_name = e.name",
+                null);
 
-    public static double parseDoubleWithDefault(String number, double defaultVal) {
-        try {
-            if(number == null || number.isEmpty() || number.equals("null")) {
-                return defaultVal;
+            if (historyCursor.moveToFirst()) {
+                do {
+                    String changeType = historyCursor.getString(0);
+                    double qty = CurrencyHelper.parseCurrency(historyCursor.getString(1), 0);
+                    double unitVal = CurrencyHelper.parseCurrency(historyCursor.getString(2), 0.0);
+                    double lineTotal = qty * unitVal;
+
+                    if ("entrada".equalsIgnoreCase(changeType) || "ENTRADA".equalsIgnoreCase(changeType)
+                            || "COMPRA".equalsIgnoreCase(changeType)) {
+                        totalEntry += lineTotal;
+                    } else if ("saida".equalsIgnoreCase(changeType) || "SAIDA".equalsIgnoreCase(changeType)
+                            || "VENDA".equalsIgnoreCase(changeType)) {
+                        totalExit += lineTotal;
+                    }
+                } while (historyCursor.moveToNext());
             }
-            // Remover símbolos de moeda e espaços
-            number = number.replace("$", "").replace(",", ".").trim();
-            return Double.parseDouble(number);
-        } catch (NumberFormatException e) {
-            return defaultVal;
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error calculating entry/exit totals", e);
+        } finally {
+            if (historyCursor != null) {
+                try { historyCursor.close(); } catch (Exception ignored) {}
+            }
+        }
+
+        if (totalEntryValue != null) {
+            totalEntryValue.setText(getString(R.string.total_entry_value,
+                    CurrencyHelper.formatCurrency(this, totalEntry)));
+        }
+        if (totalExitValue != null) {
+            totalExitValue.setText(getString(R.string.total_exit_value,
+                    CurrencyHelper.formatCurrency(this, totalExit)));
         }
     }
 
@@ -616,8 +657,8 @@ public class ReportsActivity extends AppCompatActivity {
             // Calcular totais
             if (cursor.moveToFirst()) {
                 do {
-                    double amount = parseWithDefault(cursor.getString(2), 0);
-                    double value = parseDoubleWithDefault(cursor.getString(3), 0.0);
+                    double amount = CurrencyHelper.parseCurrency(cursor.getString(2), 0);
+                    double value = CurrencyHelper.parseCurrency(cursor.getString(3), 0.0);
                     totalItems += amount;
                     totalValue += (amount * value);
                 } while (cursor.moveToNext());
@@ -677,10 +718,10 @@ public class ReportsActivity extends AppCompatActivity {
             yPosition += 20;
             canvas.drawText("Total de Itens: " + totalItems, margin + 10, yPosition, normalPaint);
             yPosition += 20;
-            canvas.drawText("Valor Total: " + String.format(Locale.getDefault(), "R$ %.2f", totalValue), margin + 10, yPosition, normalPaint);
+            canvas.drawText("Valor Total: " + CurrencyHelper.formatCurrency(this, totalValue), margin + 10, yPosition, normalPaint);
             yPosition += 20;
             if (totalProducts > 0) {
-                canvas.drawText("Valor Médio por Produto: " + String.format(Locale.getDefault(), "R$ %.2f", totalValue / totalProducts), margin + 10, yPosition, normalPaint);
+                canvas.drawText("Valor Médio por Produto: " + CurrencyHelper.formatCurrency(this, totalValue / totalProducts), margin + 10, yPosition, normalPaint);
                 yPosition += 20;
             }
             yPosition += 20;
@@ -713,8 +754,8 @@ public class ReportsActivity extends AppCompatActivity {
                     String location = cursor.getString(8);
                     String minStock = cursor.getString(9);
                     String unit = cursor.getString(10);
-                    double amount = parseWithDefault(cursor.getString(2), 0);
-                    double value = parseDoubleWithDefault(cursor.getString(3), 0.0);
+                    double amount = CurrencyHelper.parseCurrency(cursor.getString(2), 0);
+                    double value = CurrencyHelper.parseCurrency(cursor.getString(3), 0.0);
 
                     // Nome do produto
                     canvas.drawText(productNumber + ". " + truncateText(name, 60), margin, yPosition, headingPaint);
@@ -753,16 +794,16 @@ public class ReportsActivity extends AppCompatActivity {
                     yPosition += 15;
 
                     // Valor Unitário
-                    canvas.drawText("Valor Unitário: " + String.format(Locale.getDefault(), "R$ %.2f", value), margin + 20, yPosition, normalPaint);
+                    canvas.drawText("Valor Unitário: " + CurrencyHelper.formatCurrency(this, value), margin + 20, yPosition, normalPaint);
                     yPosition += 15;
 
                     // Valor Total
-                    canvas.drawText("Valor Total: " + String.format(Locale.getDefault(), "R$ %.2f", amount * value), margin + 20, yPosition, labelPaint);
+                    canvas.drawText("Valor Total: " + CurrencyHelper.formatCurrency(this, amount * value), margin + 20, yPosition, labelPaint);
                     yPosition += 15;
 
                     // Estoque Mínimo
                     if (minStock != null && !minStock.isEmpty() && !minStock.equals("null")) {
-                        double minStockDouble = parseWithDefault(minStock, 0);
+                        double minStockDouble = CurrencyHelper.parseCurrency(minStock, 0);
                         if (minStockDouble > 0) {
                             canvas.drawText("Estoque Mínimo: " + minStockDouble, margin + 20, yPosition, normalPaint);
                             yPosition += 15;

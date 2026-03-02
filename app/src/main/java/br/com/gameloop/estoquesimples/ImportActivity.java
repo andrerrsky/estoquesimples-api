@@ -152,7 +152,7 @@ public class ImportActivity extends AppCompatActivity {
      */
     private void setImportExportDescText(String text) {
         if (importExportDesc != null) {
-            setImportExportDescText(text);
+            importExportDesc.setText(text);
         } else {
             Log.e(TAG, "importExportDesc field is null, cannot set text: " + text);
         }

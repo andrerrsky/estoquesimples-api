@@ -272,6 +272,7 @@
                 android:layout_marginTop="8dp">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/editValueLayout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -285,6 +286,14 @@
                         android:digits="0123456789.,$" />
 
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <Spinner
+                    android:id="@+id/editCurrencySpinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="4dp"
+                    android:minWidth="64dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="0dp"

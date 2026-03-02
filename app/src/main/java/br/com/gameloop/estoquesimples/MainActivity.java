@@ -110,6 +110,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        CurrencyHelper.warmUp(this);
+
         emptyListItem = (TextView) findViewById(R.id.empty_list_item);
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
@@ -921,11 +923,11 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton("OK", (dialog, which) -> {
                 String value = input.getText().toString();
                 if (!value.isEmpty()) {
-                    try {
-                        double adjustment = Double.parseDouble(value);
-                        performBulkQuantityAdjustment(selectedProducts, adjustment);
-                    } catch (NumberFormatException e) {
+                    double adjustment = CurrencyHelper.parseCurrency(value, Double.NaN);
+                    if (Double.isNaN(adjustment)) {
                         Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
+                    } else {
+                        performBulkQuantityAdjustment(selectedProducts, adjustment);
                     }
                 }
             })
@@ -992,7 +994,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 cursor = stock.rawQuery("SELECT amount FROM Estoque WHERE name=?", new String[]{productName});
             if (cursor.moveToFirst()) {
-                double currentAmount = Double.parseDouble(cursor.getString(0));
+                double currentAmount = CurrencyHelper.parseCurrency(cursor.getString(0), 0);
                 double newAmount = Math.max(0, currentAmount + adjustment); // Não permitir quantidades negativas
                 
                 ContentValues values = new ContentValues();

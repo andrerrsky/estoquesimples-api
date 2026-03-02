@@ -24,7 +24,10 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +49,8 @@ public class EditActivity extends AppCompatActivity {
     private TextView name;
     private TextView amount;
     private TextView value;
+    private Spinner currencySpinner;
+    private com.google.android.material.textfield.TextInputLayout valueLayout;
     private TextView description;
     private TextView category;
     private TextView sku;
@@ -120,6 +125,10 @@ public class EditActivity extends AppCompatActivity {
         location = (TextView) findViewById(R.id.editLocation);
         minStock = (TextView) findViewById(R.id.editMinStock);
         unit = (TextView) findViewById(R.id.editUnit);
+        currencySpinner = (Spinner) findViewById(R.id.editCurrencySpinner);
+        valueLayout = findViewById(R.id.editValueLayout);
+
+        setupCurrencySpinner();
 
         // Verificar se os campos obrigatórios foram inicializados
         if (name == null) {
@@ -456,6 +465,39 @@ public class EditActivity extends AppCompatActivity {
         return true;
     }
 
+    private void setupCurrencySpinner() {
+        if (currencySpinner == null) return;
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, CurrencyHelper.AVAILABLE_CURRENCIES);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        currencySpinner.setAdapter(adapter);
+
+        String current = CurrencyHelper.getCurrencySymbol(this);
+        for (int i = 0; i < CurrencyHelper.AVAILABLE_CURRENCIES.length; i++) {
+            if (CurrencyHelper.AVAILABLE_CURRENCIES[i].equals(current)) {
+                currencySpinner.setSelection(i);
+                break;
+            }
+        }
+
+        if (valueLayout != null) {
+            valueLayout.setHint(getString(R.string.currency_label_value, current));
+        }
+
+        currencySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selected = CurrencyHelper.AVAILABLE_CURRENCIES[position];
+                CurrencyHelper.setCurrencySymbol(EditActivity.this, selected);
+                if (valueLayout != null) {
+                    valueLayout.setHint(getString(R.string.currency_label_value, selected));
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
     /**
      * Garante que o banco de dados está inicializado
      * @return true se o banco de dados está disponível, false caso contrário
@@ -631,7 +673,7 @@ public class EditActivity extends AppCompatActivity {
             ContentValues updateValues = new ContentValues();
             updateValues.put("name", name.getText().toString().trim());
             updateValues.put("amount", amount.getText().toString().replace(" ", "").trim());
-            updateValues.put("value", value.getText().toString().replace(" ", "").trim());
+            updateValues.put("value", CurrencyHelper.sanitizeForStorage(value.getText().toString()));
             updateValues.put("description", description != null ? description.getText().toString().trim() : "");
             
             // Novos campos com verificação null

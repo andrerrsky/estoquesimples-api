@@ -164,7 +164,8 @@ public class CustomListView extends ArrayAdapter<String> {
         amount.setText(amountText);
         
         // Valor
-        value.setText("$ " + values.get(position));
+        double parsedValue = CurrencyHelper.parseCurrency(values.get(position), 0.0);
+        value.setText(CurrencyHelper.formatCurrency(context, parsedValue));
 
         // Foto - com limite de tamanho para evitar crashes por bitmaps muito grandes
         if(photos.get(position) != null && !photos.get(position).isEmpty() && !photos.get(position).equals("null")) {
@@ -217,11 +218,11 @@ public class CustomListView extends ArrayAdapter<String> {
 
         // Alerta de estoque baixo
         try {
-            double currentAmount = Double.parseDouble(amounts.get(position));
+            double currentAmount = CurrencyHelper.parseCurrency(amounts.get(position), 0);
             minStockStr = minStocks.get(position);
             
             if(minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null")) {
-                double minStockValue = Double.parseDouble(minStockStr);
+                double minStockValue = CurrencyHelper.parseCurrency(minStockStr, 0);
                 
                 if(minStockValue > 0 && currentAmount <= minStockValue) {
                     lowStockBadge.setVisibility(View.VISIBLE);
@@ -348,22 +349,13 @@ public class CustomListView extends ArrayAdapter<String> {
                 Toast.makeText(context, "Informe a quantidade", Toast.LENGTH_SHORT).show();
                 return;
             }
-            double qty;
-            try {
-                qty = Double.parseDouble(qtyStr);
-            } catch (NumberFormatException e) {
-                Toast.makeText(context, "Quantidade inválida", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            double qty = CurrencyHelper.parseCurrency(qtyStr, -1);
             if (qty <= 0) {
                 Toast.makeText(context, "Quantidade deve ser maior que zero", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            double currentAmount = 0;
-            try {
-                currentAmount = Double.parseDouble(amounts.get(position));
-            } catch (NumberFormatException ignored) { }
+            double currentAmount = CurrencyHelper.parseCurrency(amounts.get(position), 0);
 
             double newAmount = isEntrada ? (currentAmount + qty) : (currentAmount - qty);
             if (!isEntrada && newAmount < 0) {

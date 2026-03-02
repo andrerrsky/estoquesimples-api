@@ -4,15 +4,15 @@ plugins {
 
 android {
     namespace 'br.com.gameloop.estoquesimples'
-    compileSdk 35
+    compileSdk 36
 
 
     defaultConfig {
         applicationId "br.com.gameloop.estoquesimples"
         minSdkVersion 23
-        targetSdkVersion 35
-        versionCode 12
-        versionName "12.0"
+        targetSdkVersion 36
+        versionCode 13
+        versionName "13.0"
     }
 
     buildTypes {
@@ -54,8 +54,8 @@ dependencies {
     // Using Material Design's BottomNavigationView instead of deprecated library
 
     // Ads and Billing
-    implementation 'com.appodeal.ads:sdk:3.10.0.0'
-    implementation 'com.android.billingclient:billing:8.0.0'
+    implementation 'com.appodeal.ads:sdk:3.12.0.1'
+    implementation 'com.android.billingclient:billing:8.3.0'
     
     // WorkManager for scheduled notifications
     implementation 'androidx.work:work-runtime:2.10.0'

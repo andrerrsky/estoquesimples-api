@@ -39,6 +39,7 @@ public class ProActivity extends AppCompatActivity implements PurchasesUpdatedLi
     private PremiumManager premiumManager;
     
     private Button btnBuyPro;
+    private TextView txtRestorePurchase;
     private ProgressBar progressBar;
     private TextView txtStatus;
     private View layoutPremiumActive;
@@ -56,17 +57,16 @@ public class ProActivity extends AppCompatActivity implements PurchasesUpdatedLi
 
         premiumManager = PremiumManager.getInstance(this);
         
-        // Inicializar views
         btnBuyPro = findViewById(R.id.btnBuyPro);
+        txtRestorePurchase = findViewById(R.id.txtRestorePurchase);
         progressBar = findViewById(R.id.progressBar);
         txtStatus = findViewById(R.id.txtStatus);
         layoutPremiumActive = findViewById(R.id.layoutPremiumActive);
         layoutPremiumInactive = findViewById(R.id.layoutPremiumInactive);
         
-        // Configurar botão de compra
         btnBuyPro.setOnClickListener(v -> initiatePurchase());
+        txtRestorePurchase.setOnClickListener(v -> restorePurchases());
         
-        // Inicializar billing client
         setupBillingClient();
         
         // Atualizar UI com base no status premium
@@ -121,23 +121,30 @@ public class ProActivity extends AppCompatActivity implements PurchasesUpdatedLi
             .setProductList(productList)
             .build();
 
-        billingClient.queryProductDetailsAsync(params, (billingResult, productDetailsList) -> {
-            List<ProductDetails> detailsList = productDetailsList.getProductDetailsList();
-            if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK && detailsList != null && !detailsList.isEmpty()) {
-                productDetails = detailsList.get(0);
-                Log.d(TAG, "Product details loaded: " + productDetails.getName());
-                runOnUiThread(() -> {
-                    btnBuyPro.setEnabled(true);
-                    showStatus("");
-                });
-            } else {
-                if (detailsList == null || detailsList.isEmpty()) {
-                    Log.e(TAG, "Product not found in Play Store");
-                    showStatus("Produto não disponível no momento.");
-                } else {
-                    Log.e(TAG, "Failed to load product details: " + billingResult.getDebugMessage());
-                    showStatus("Erro ao carregar informações do produto.");
+        billingClient.queryProductDetailsAsync(params, (billingResult, queryProductDetailsResult) -> {
+            if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                List<ProductDetails> detailsList = queryProductDetailsResult.getProductDetailsList();
+
+                if (queryProductDetailsResult.getUnfetchedProductList() != null
+                        && !queryProductDetailsResult.getUnfetchedProductList().isEmpty()) {
+                    Log.w(TAG, "Some products could not be fetched: "
+                            + queryProductDetailsResult.getUnfetchedProductList());
                 }
+
+                if (detailsList != null && !detailsList.isEmpty()) {
+                    productDetails = detailsList.get(0);
+                    Log.d(TAG, "Product details loaded: " + productDetails.getName());
+                    runOnUiThread(() -> {
+                        btnBuyPro.setEnabled(true);
+                        showStatus("");
+                    });
+                } else {
+                    Log.e(TAG, "Product not found in Play Store");
+                    runOnUiThread(() -> showStatus(getString(R.string.pro_product_unavailable)));
+                }
+            } else {
+                Log.e(TAG, "Failed to load product details: " + billingResult.getDebugMessage());
+                runOnUiThread(() -> showStatus(getString(R.string.pro_product_load_error)));
             }
         });
     }
@@ -196,17 +203,22 @@ public class ProActivity extends AppCompatActivity implements PurchasesUpdatedLi
         for (Purchase purchase : purchases) {
             if (purchase.getProducts().contains(Constants.PRODUCT_ID_PRO)) {
                 if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
-                    // Verificar se já foi reconhecida
                     if (!purchase.isAcknowledged()) {
                         acknowledgePurchase(purchase);
                     }
                     
-                    // Ativar premium
                     premiumManager.setPro(true);
                     
                     runOnUiThread(() -> {
                         showSuccessDialog();
                         updateUI();
+                    });
+                } else if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING) {
+                    Log.d(TAG, "Purchase is pending");
+                    runOnUiThread(() -> {
+                        Toast.makeText(this,
+                                getString(R.string.pro_purchase_pending),
+                                Toast.LENGTH_LONG).show();
                     });
                 }
             }
@@ -223,6 +235,60 @@ public class ProActivity extends AppCompatActivity implements PurchasesUpdatedLi
                 Log.d(TAG, "Purchase acknowledged");
             }
         });
+    }
+
+    private void restorePurchases() {
+        if (billingClient == null || !billingClient.isReady()) {
+            Toast.makeText(this, getString(R.string.pro_store_not_connected), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        progressBar.setVisibility(View.VISIBLE);
+        showStatus(getString(R.string.pro_restoring));
+
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build(),
+            (billingResult, purchases) -> {
+                runOnUiThread(() -> progressBar.setVisibility(View.GONE));
+
+                if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                    boolean foundPro = false;
+                    for (Purchase purchase : purchases) {
+                        if (purchase.getProducts().contains(Constants.PRODUCT_ID_PRO)
+                                && purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                            foundPro = true;
+                            if (!purchase.isAcknowledged()) {
+                                acknowledgePurchase(purchase);
+                            }
+                            premiumManager.setPro(true);
+                            runOnUiThread(() -> {
+                                showStatus("");
+                                showSuccessDialog();
+                                updateUI();
+                            });
+                            break;
+                        }
+                    }
+                    if (!foundPro) {
+                        runOnUiThread(() -> {
+                            showStatus("");
+                            Toast.makeText(ProActivity.this,
+                                    getString(R.string.pro_no_purchase_found),
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    }
+                } else {
+                    runOnUiThread(() -> {
+                        showStatus("");
+                        Toast.makeText(ProActivity.this,
+                                getString(R.string.pro_restore_error),
+                                Toast.LENGTH_LONG).show();
+                    });
+                }
+            }
+        );
     }
 
     private void showSuccessDialog() {

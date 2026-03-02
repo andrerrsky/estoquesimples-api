@@ -226,26 +226,30 @@ public class AdManager {
     }
     
     /**
-     * Mostra banners e MREC se o usuário não tiver premium
+     * Mostra banners e MREC se o usuário não tiver premium.
+     * Deferred via View.post() to avoid blocking the UI thread during
+     * onCreate, reducing ANR risk from ad SDK NumberFormat allocations.
      */
     public void showBannerAds(Activity activity, int bannerViewId, int mrecViewId) {
         if (premiumManager.hasPremiumAccess()) {
-            // Usuário tem premium, esconder anúncios
             hideBannerAds(activity, bannerViewId, mrecViewId);
             return;
         }
-        
-        // Mostrar anúncios
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            if (bannerViewId != 0) {
-                Appodeal.setBannerViewId(bannerViewId);
-                Appodeal.show(activity, Appodeal.BANNER_VIEW);
+
+        android.view.View decorView = activity.getWindow().getDecorView();
+        decorView.post(() -> {
+            if (activity.isFinishing()) return;
+            if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
+                if (bannerViewId != 0) {
+                    Appodeal.setBannerViewId(bannerViewId);
+                    Appodeal.show(activity, Appodeal.BANNER_VIEW);
+                }
+                if (mrecViewId != 0) {
+                    Appodeal.setMrecViewId(mrecViewId);
+                    Appodeal.show(activity, Appodeal.MREC);
+                }
             }
-            if (mrecViewId != 0) {
-                Appodeal.setMrecViewId(mrecViewId);
-                Appodeal.show(activity, Appodeal.MREC);
-            }
-        }
+        });
     }
     
     /**

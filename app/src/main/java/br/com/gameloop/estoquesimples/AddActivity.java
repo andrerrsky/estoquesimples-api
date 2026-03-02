@@ -26,8 +26,11 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.appodeal.ads.Appodeal;
@@ -48,6 +51,8 @@ public class AddActivity extends AppCompatActivity {
     private EditText productName;
     private EditText productAmount;
     private EditText productValue;
+    private Spinner currencySpinner;
+    private com.google.android.material.textfield.TextInputLayout valueLayout;
     private EditText productDescription;
     private EditText productCategory;
     private EditText productSku;
@@ -110,6 +115,10 @@ public class AddActivity extends AppCompatActivity {
         productMinStock = (EditText) findViewById(R.id.addMinStock);
         productUnit = (EditText) findViewById(R.id.addUnit);
         productPhoto = (ImageView) findViewById(R.id.addPhoto);
+        currencySpinner = (Spinner) findViewById(R.id.addCurrencySpinner);
+        valueLayout = findViewById(R.id.addValueLayout);
+
+        setupCurrencySpinner();
 
         // Verificar se os campos obrigatórios foram inicializados
         if (productName == null) {
@@ -337,7 +346,7 @@ public class AddActivity extends AppCompatActivity {
             ContentValues insertValues = new ContentValues();
             insertValues.put("name", productName.getText().toString().trim());
             insertValues.put("amount", productAmount.getText().toString().trim());
-            insertValues.put("value", productValue.getText().toString().trim());
+            insertValues.put("value", CurrencyHelper.sanitizeForStorage(productValue.getText().toString()));
             insertValues.put("description", productDescription != null ? productDescription.getText().toString().trim() : "");
             
             // Novos campos com verificação null
@@ -408,6 +417,39 @@ public class AddActivity extends AppCompatActivity {
             return false;
         }
         return true;
+    }
+
+    private void setupCurrencySpinner() {
+        if (currencySpinner == null) return;
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, CurrencyHelper.AVAILABLE_CURRENCIES);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        currencySpinner.setAdapter(adapter);
+
+        String current = CurrencyHelper.getCurrencySymbol(this);
+        for (int i = 0; i < CurrencyHelper.AVAILABLE_CURRENCIES.length; i++) {
+            if (CurrencyHelper.AVAILABLE_CURRENCIES[i].equals(current)) {
+                currencySpinner.setSelection(i);
+                break;
+            }
+        }
+
+        if (valueLayout != null) {
+            valueLayout.setHint(getString(R.string.currency_label_value, current));
+        }
+
+        currencySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selected = CurrencyHelper.AVAILABLE_CURRENCIES[position];
+                CurrencyHelper.setCurrencySymbol(AddActivity.this, selected);
+                if (valueLayout != null) {
+                    valueLayout.setHint(getString(R.string.currency_label_value, selected));
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     /**

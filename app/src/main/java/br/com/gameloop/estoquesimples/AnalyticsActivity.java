@@ -155,9 +155,9 @@ public class AnalyticsActivity extends AppCompatActivity {
             if (cursor.moveToFirst()) {
                 do {
                     String name = cursor.getString(0);
-                    double amount = parseWithDefault(cursor.getString(1), 0);
-                    double value = parseWithDefault(cursor.getString(2), 0.0);
-                    double minStock = parseWithDefault(cursor.getString(3), 0);
+                    double amount = CurrencyHelper.parseCurrency(cursor.getString(1), 0);
+                    double value = CurrencyHelper.parseCurrency(cursor.getString(2), 0.0);
+                    double minStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
                     String unit = cursor.getString(4);
                     
                     ProductAnalytics analytics = new ProductAnalytics(name);
@@ -515,19 +515,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         }
     }
     
-    /**
-     * Parse string para double com valor padrão
-     */
-    private double parseWithDefault(String value, double defaultVal) {
-        try {
-            if (value == null || value.isEmpty() || value.equals("null")) {
-                return defaultVal;
-            }
-            return Double.parseDouble(value);
-        } catch (NumberFormatException e) {
-            return defaultVal;
-        }
-    }
+    
     
     @Override
     protected void onResume() {

@@ -10,6 +10,14 @@
     
     <!-- Pro Activity -->
     <string name="pro_title">Versão PRO</string>
+    <string name="pro_restore_purchase">Já comprou? Restaurar compra</string>
+    <string name="pro_restoring">Verificando compras anteriores…</string>
+    <string name="pro_no_purchase_found">Nenhuma compra anterior encontrada para esta conta.</string>
+    <string name="pro_restore_error">Erro ao verificar compras. Tente novamente mais tarde.</string>
+    <string name="pro_store_not_connected">Aguarde a conexão com a loja…</string>
+    <string name="pro_purchase_pending">Sua compra está sendo processada. Você receberá o acesso PRO assim que o pagamento for confirmado.</string>
+    <string name="pro_product_unavailable">Produto não disponível no momento.</string>
+    <string name="pro_product_load_error">Erro ao carregar informações do produto.</string>
     
     <!-- Premium Card -->
     <string name="premium_card_title">✨ Modo Premium Ativo</string>
@@ -61,6 +69,18 @@
     <string name="analytics_fast_moving">⚡ PRODUTOS DE MOVIMENTO RÁPIDO</string>
     <string name="analytics_slow_moving">🐌 PRODUTOS DE MOVIMENTO LENTO</string>
     
+    <!-- Currency / Monetary Formatting -->
+    <string name="currency_selector_label">Moeda</string>
+    <string name="currency_label_value">Valor (%s) *</string>
+    <string name="report_total_value">Valor Total: %s</string>
+    <string name="report_avg_value">Valor Médio por Produto: %s</string>
+    <string name="total_entry_value">Valor Total de Entradas: %s</string>
+    <string name="total_exit_value">Valor Total de Saídas: %s</string>
+    <string name="report_total_value_zero">Valor Total: %s 0,00</string>
+    <string name="report_avg_value_zero">Valor Médio: %s 0,00</string>
+    <string name="total_entry_value_zero">Valor Total de Entradas: %s 0,00</string>
+    <string name="total_exit_value_zero">Valor Total de Saídas: %s 0,00</string>
+
     <!-- Premium Messages -->
     <string name="premium_required_title">Recurso Premium</string>
     <string name="premium_required_message">Este recurso está disponível apenas para usuários PRO ou durante o modo premium de 1 hora.</string>

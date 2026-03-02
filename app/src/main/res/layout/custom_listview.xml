@@ -83,9 +83,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical"
+                    android:layout_marginTop="6dp">
 
                     <!-- Quantidade -->
                     <LinearLayout
@@ -112,7 +111,8 @@
                             android:text="0"
                             android:textSize="14sp"
                             android:textStyle="bold"
-                            android:textColor="#333333" />
+                            android:textColor="#333333"
+                            android:singleLine="true" />
 
                         <TextView
                             android:id="@+id/unit"
@@ -127,10 +127,11 @@
 
                     <!-- Valor -->
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginLeft="12dp">
+                        android:layout_marginTop="4dp"
+                        android:gravity="center_vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -141,12 +142,15 @@
 
                         <TextView
                             android:id="@+id/value"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:text="$0.00"
-                            android:textSize="15sp"
+                            android:layout_weight="1"
+                            android:text="$ 0,00"
+                            android:textSize="14sp"
                             android:textColor="#4CAF50"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:singleLine="true"
+                            android:ellipsize="end" />
 
                     </LinearLayout>
 
