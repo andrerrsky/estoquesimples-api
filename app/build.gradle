@@ -14,8 +14,8 @@ android {
         // manter as barras do sistema com cor sólida (#225aa9) e ícones brancos.
         // Em targetSdk 36 esse opt-out é ignorado (edge-to-edge obrigatório).
         targetSdkVersion 35
-        versionCode 14
-        versionName "14.0"
+        versionCode 15
+        versionName "15.0"
     }
 
     buildTypes {

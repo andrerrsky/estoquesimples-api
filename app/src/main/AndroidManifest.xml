@@ -2,15 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissões de armazenamento para Android 12 e inferior -->
+    <!-- Gravação em armazenamento externo apenas para exportar PDF no Android 10 e inferior -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    
-    <!-- Permissões para Android 13+ -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
+        android:maxSdkVersion="29" />
+
+    <!--
+        A seleção de imagens usa o Android Photo Picker, que concede acesso
+        pontual sem exigir READ_MEDIA_IMAGES/READ_EXTERNAL_STORAGE. Por isso essas
+        permissões foram removidas para atender à política do Google Play.
+    -->
+
     <!-- Permissão de câmera -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

@@ -38,8 +38,13 @@ import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.squareup.picasso.Picasso;
 
+import androidx.activity.result.PickVisualMediaRequest;
+
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -80,7 +85,7 @@ public class AddActivity extends AppCompatActivity {
 
     // ActivityResultLaunchers para capturar resultados
     private ActivityResultLauncher<Intent> cameraLauncher;
-    private ActivityResultLauncher<Intent> galleryLauncher;
+    private ActivityResultLauncher<PickVisualMediaRequest> galleryLauncher;
     private ActivityResultLauncher<String[]> permissionLauncher;
     private ActivityResultLauncher<ScanOptions> barcodeLauncher;
 
@@ -234,12 +239,12 @@ public class AddActivity extends AppCompatActivity {
             }
         );
 
-        // Launcher para galeria
+        // Launcher para galeria (Android Photo Picker - não requer permissão)
         galleryLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    handleGalleryResult(result.getData());
+            new ActivityResultContracts.PickVisualMedia(),
+            uri -> {
+                if (uri != null) {
+                    handleGalleryResult(uri);
                 }
             }
         );
@@ -565,43 +570,23 @@ public class AddActivity extends AppCompatActivity {
     }
 
     public void addTakeGalleryPhoto(View v) {
-        if (checkAndRequestPermissions(false)) {
-            openGallery();
-        }
+        // O Android Photo Picker não exige permissão de acesso à mídia
+        openGallery();
     }
 
     /**
-     * Verifica e solicita permissões necessárias
-     * @param forCamera true se for para câmera, false para galeria
+     * Verifica e solicita permissões necessárias.
+     * Apenas a câmera exige permissão em tempo de execução; a galeria usa o
+     * Android Photo Picker, que concede acesso pontual sem permissão.
+     * @param forCamera true se for para câmera
      * @return true se todas as permissões já foram concedidas
      */
     private boolean checkAndRequestPermissions(boolean forCamera) {
         List<String> permissionsNeeded = new ArrayList<>();
 
-        // Permissão de câmera (apenas se for usar câmera)
         if (forCamera && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
                 != PackageManager.PERMISSION_GRANTED) {
             permissionsNeeded.add(Manifest.permission.CAMERA);
-        }
-
-        // Permissões de armazenamento
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ usa READ_MEDIA_IMAGES
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) 
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.READ_MEDIA_IMAGES);
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Android 6 a 12 usa READ_EXTERNAL_STORAGE
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) 
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            }
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2 && 
-                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) 
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
         }
 
         if (!permissionsNeeded.isEmpty()) {
@@ -669,8 +654,9 @@ public class AddActivity extends AppCompatActivity {
      * Abre a galeria de fotos
      */
     private void openGallery() {
-        Intent galleryIntent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        galleryLauncher.launch(galleryIntent);
+        galleryLauncher.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                .build());
     }
 
     /**
@@ -716,43 +702,58 @@ public class AddActivity extends AppCompatActivity {
     /**
      * Processa o resultado da galeria
      */
-    private void handleGalleryResult(Intent data) {
-        Uri selectedImage = data.getData();
-        
+    private void handleGalleryResult(Uri selectedImage) {
         if (selectedImage == null) {
             Toast.makeText(this, "Erro ao carregar esta imagem", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Cursor cursor = null;
-        try {
-            String[] filePathColumn = { MediaStore.Images.Media.DATA };
-            cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
-            
-            if (cursor != null && cursor.moveToFirst()) {
-                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-                String picturePath = cursor.getString(columnIndex);
+        // O Photo Picker concede acesso temporário à URI; copiamos para a pasta
+        // do app para que a imagem permaneça disponível nas próximas sessões.
+        String copiedPath = copyImageToAppFolder(selectedImage);
+        if (copiedPath != null) {
+            newPhotoPath = copiedPath;
+            displayPhoto(copiedPath);
+        } else {
+            Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
+        }
+    }
 
-                if (picturePath != null && !picturePath.isEmpty()) {
-                    newPhotoPath = picturePath;
-                    displayPhoto(picturePath);
-                } else {
-                    // Se não conseguiu o caminho, usa a URI diretamente
-                    newPhotoPath = selectedImage.toString();
-                    displayPhotoFromUri(selectedImage);
-                }
-            } else {
-                // Se cursor falhar, tenta usar URI diretamente
-                newPhotoPath = selectedImage.toString();
-                displayPhotoFromUri(selectedImage);
+    /**
+     * Copia a imagem selecionada (via Photo Picker) para a pasta interna do app
+     * e retorna o caminho do arquivo gerado, ou null em caso de falha.
+     */
+    private String copyImageToAppFolder(Uri sourceUri) {
+        if (imagesFolder == null) {
+            initializeImageFolder();
+            if (imagesFolder == null) {
+                Log.e(TAG, "imagesFolder is null in copyImageToAppFolder");
+                return null;
             }
+        }
+        if (!imagesFolder.exists()) {
+            imagesFolder.mkdirs();
+        }
+
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        File destFile = new File(imagesFolder, "es_" + timeStamp + ".jpg");
+
+        try (InputStream in = getContentResolver().openInputStream(sourceUri);
+             OutputStream out = new FileOutputStream(destFile)) {
+            if (in == null) {
+                Log.e(TAG, "Could not open input stream for picked image");
+                return null;
+            }
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            out.flush();
+            return destFile.getAbsolutePath();
         } catch (Exception e) {
-            Toast.makeText(this, "Erro ao carregar imagem: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            Log.e(TAG, "Erro ao processar imagem da galeria", e);
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
+            Log.e(TAG, "Erro ao copiar imagem selecionada", e);
+            return null;
         }
     }
 
