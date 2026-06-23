@@ -15,6 +15,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -44,6 +45,7 @@ public class CustomListView extends ArrayAdapter<String> {
     private static final String TAG = "CustomListView";
     private static final String IMAGE_TYPE = "image/*";
     private final SparseBooleanArray expandedPositions = new SparseBooleanArray();
+    private final boolean showProductImages;
 
     public CustomListView(Activity context, ArrayList<String> names, ArrayList<String> amounts, 
                          ArrayList<String> values, ArrayList<String> photos, ArrayList<String> categories,
@@ -62,6 +64,7 @@ public class CustomListView extends ArrayAdapter<String> {
         this.locations = locations;
         this.minStocks = minStocks;
         this.units = units;
+        this.showProductImages = SettingsActivity.isShowProductImages(context);
 
     }
 
@@ -154,12 +157,13 @@ public class CustomListView extends ArrayAdapter<String> {
         name.setText(names.get(position));
         
         // Quantidade com estoque mínimo (formato: "atual / minimo")
-        String amountText = amounts.get(position);
+        // Formata para evitar ".0" em números inteiros (ex.: "18" em vez de "18.0")
+        String amountText = CurrencyHelper.formatQuantity(amounts.get(position));
         String minStockStr = minStocks.get(position);
         boolean hasMinStock = minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null") && !minStockStr.equals("0");
         
         if(hasMinStock) {
-            amountText = amounts.get(position) + " / " + minStockStr;
+            amountText = amountText + " / " + CurrencyHelper.formatQuantity(minStockStr);
         }
         amount.setText(amountText);
         
@@ -167,23 +171,41 @@ public class CustomListView extends ArrayAdapter<String> {
         double parsedValue = CurrencyHelper.parseCurrency(values.get(position), 0.0);
         value.setText(CurrencyHelper.formatCurrency(context, parsedValue));
 
-        // Foto - com limite de tamanho para evitar crashes por bitmaps muito grandes
-        if(photos.get(position) != null && !photos.get(position).isEmpty() && !photos.get(position).equals("null")) {
-            try {
-                Picasso.get()
-                    .load("file://" + photos.get(position))
-                    .resize(800, 800) // Limita dimensões máximas a 800x800px
-                    .centerInside() // Mantém aspect ratio
-                    .onlyScaleDown() // Não aumenta imagens menores
-                    .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                    .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                    .into(photo);
-            } catch (Exception e) {
-                Log.e(TAG, "Erro ao carregar foto na posição " + position, e);
-                photo.setImageResource(R.drawable.package_icon);
+        // Configuração de exibição de imagens dos produtos
+        RelativeLayout photoContainer = (RelativeLayout) rowView.findViewById(R.id.photoContainer);
+        LinearLayout nameContainer = (LinearLayout) rowView.findViewById(R.id.listlinearlayout);
+        if (!showProductImages) {
+            // Ocultar a foto e colapsar o espaço para manter o alinhamento
+            if (photoContainer != null) {
+                photoContainer.setVisibility(View.GONE);
+            }
+            if (nameContainer != null && nameContainer.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) nameContainer.getLayoutParams();
+                lp.leftMargin = 0;
+                nameContainer.setLayoutParams(lp);
             }
         } else {
-            photo.setImageResource(R.drawable.package_icon);
+            if (photoContainer != null) {
+                photoContainer.setVisibility(View.VISIBLE);
+            }
+            // Foto - com limite de tamanho para evitar crashes por bitmaps muito grandes
+            if(photos.get(position) != null && !photos.get(position).isEmpty() && !photos.get(position).equals("null")) {
+                try {
+                    Picasso.get()
+                        .load("file://" + photos.get(position))
+                        .resize(800, 800) // Limita dimensões máximas a 800x800px
+                        .centerInside() // Mantém aspect ratio
+                        .onlyScaleDown() // Não aumenta imagens menores
+                        .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
+                        .error(R.drawable.package_icon) // Imagem de erro caso falhe
+                        .into(photo);
+                } catch (Exception e) {
+                    Log.e(TAG, "Erro ao carregar foto na posição " + position, e);
+                    photo.setImageResource(R.drawable.package_icon);
+                }
+            } else {
+                photo.setImageResource(R.drawable.package_icon);
+            }
         }
 
         // SKU
@@ -254,7 +276,7 @@ public class CustomListView extends ArrayAdapter<String> {
 
         minStockStr = minStocks.get(position);
         if(minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null")) {
-            detailMinStock.setText(minStockStr);
+            detailMinStock.setText(CurrencyHelper.formatQuantity(minStockStr));
         } else {
             detailMinStock.setText("-");
         }
@@ -331,8 +353,20 @@ public class CustomListView extends ArrayAdapter<String> {
         container.addView(inputQty);
 
         final EditText inputNote = new EditText(context);
-        inputNote.setHint("Observação (opcional)");
-        inputNote.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        if (isEntrada) {
+            inputNote.setHint("Observação (opcional)");
+            inputNote.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        } else {
+            // Saída para o cliente: campo de informações adicionais mais completo
+            inputNote.setHint("Observações / Informações adicionais\n(comprador, endereço, detalhes de entrega ou retirada...)");
+            inputNote.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+            inputNote.setMinLines(3);
+            inputNote.setMaxLines(6);
+            inputNote.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        }
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -363,10 +397,18 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
-            // Atualizar estoque
+            // Garantir que o banco está disponível antes de gravar
+            if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
+                Toast.makeText(context, "Erro: banco de dados não disponível.", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Database not available in showStockDialog");
+                return;
+            }
+
+            try {
+            // Atualizar estoque (armazenar sem ".0" para inteiros)
             android.content.ContentValues values = new android.content.ContentValues();
-            values.put("amount", String.valueOf(newAmount));
-            MainActivity.stock.update("Estoque", values, "name='" + productName + "'", null);
+            values.put("amount", CurrencyHelper.quantityForStorage(newAmount));
+            MainActivity.stock.update("Estoque", values, "name=?", new String[]{productName});
 
             // Inserir histórico
             android.content.ContentValues hist = new android.content.ContentValues();
@@ -381,8 +423,14 @@ public class CustomListView extends ArrayAdapter<String> {
             MainActivity.stock.insert("EstoqueHistorico", null, hist);
 
             // Atualizar lista
-            MainActivity.instance.updateList();
+            if (MainActivity.instance != null) {
+                MainActivity.instance.updateList();
+            }
             Toast.makeText(context, isEntrada ? "Entrada registrada" : "Saída registrada", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Log.e(TAG, "Erro ao registrar movimentação de estoque", e);
+                Toast.makeText(context, "Erro ao registrar movimentação.", Toast.LENGTH_SHORT).show();
+            }
         });
 
         builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());

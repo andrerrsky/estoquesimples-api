@@ -184,7 +184,7 @@ public class AdManager {
         });
         
         // Tentar mostrar o rewarded video
-        if (Appodeal.isLoaded(Appodeal.REWARDED_VIDEO)) {
+        if (Appodeal.canShow(Appodeal.REWARDED_VIDEO)) {
             Appodeal.show(activity, Appodeal.REWARDED_VIDEO);
         } else {
             // Não está carregado, mostrar mensagem
@@ -210,7 +210,7 @@ public class AdManager {
         resetInteractionCount();
         
         // Mostrar interstitial se disponível
-        if (Appodeal.isLoaded(Appodeal.INTERSTITIAL)) {
+        if (Appodeal.canShow(Appodeal.INTERSTITIAL)) {
             Appodeal.show(activity, Appodeal.INTERSTITIAL);
         } else {
             Log.d(TAG, "Interstitial not loaded yet");

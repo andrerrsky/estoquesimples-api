@@ -85,6 +85,38 @@ public final class CurrencyHelper {
     }
 
     /**
+     * Formats a quantity for display, omitting decimals when the value is a
+     * whole number (e.g. "18" instead of "18.0") and keeping up to two
+     * decimals when they actually exist (e.g. "18.5"). Uses the current
+     * locale's grouping/decimal separators.
+     */
+    public static String formatQuantity(double value) {
+        Locale locale = cachedLocale != null ? cachedLocale : Locale.US;
+        DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(locale);
+        DecimalFormat fmt = new DecimalFormat("#,##0.##", symbols);
+        return fmt.format(value);
+    }
+
+    /**
+     * Convenience overload that parses a stored quantity string (which may be
+     * a legacy value like "18.0") and formats it without trailing ".0".
+     */
+    public static String formatQuantity(String storedValue) {
+        return formatQuantity(parseCurrency(storedValue, 0));
+    }
+
+    /**
+     * Normalizes a quantity to a clean numeric string suitable for database
+     * storage, avoiding artifacts like "20.0" produced by String.valueOf on
+     * a double. Stores with dot as decimal separator and no grouping.
+     */
+    public static String quantityForStorage(double value) {
+        DecimalFormat storageFmt = new DecimalFormat("0.##");
+        storageFmt.setDecimalFormatSymbols(DecimalFormatSymbols.getInstance(Locale.US));
+        return storageFmt.format(value);
+    }
+
+    /**
      * Robustly parses a monetary string into a double, handling all legacy
      * formats stored in the database: raw numbers, comma decimals, currency
      * prefixes ($, R$, €, £, ¥), and mixed formats.

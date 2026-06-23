@@ -8,4 +8,5 @@
     <color name="red">#ff0000</color>
     <color name="bottom_nav_active">#FFFFFF</color>
     <color name="bottom_nav_inactive">#B3FFFFFF</color>
+    <color name="system_bar">#ff1c679d</color>
 </resources>

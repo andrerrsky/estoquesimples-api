@@ -7,6 +7,15 @@
     <string name="my_own_cancel">Depois :|</string>
     <string name="sim">Sim!</string>
     <string name="history_title">Histórico de Saída e Entrada</string>
+
+    <!-- Settings Activity -->
+    <string name="settings_title">Configurações</string>
+    <string name="settings_section_display">Exibição</string>
+    <string name="settings_show_images_title">Exibir imagens dos produtos</string>
+    <string name="settings_show_images_summary">Mostra ou oculta as fotos na listagem principal</string>
+    <string name="settings_section_currency">Moeda</string>
+    <string name="settings_default_currency_title">Moeda padrão</string>
+    <string name="settings_default_currency_summary">Usada automaticamente nas telas de criação e edição</string>
     
     <!-- Pro Activity -->
     <string name="pro_title">Versão PRO</string>

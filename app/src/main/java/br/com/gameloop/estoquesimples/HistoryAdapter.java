@@ -19,11 +19,11 @@ public class HistoryAdapter extends BaseAdapter {
     public static class HistoryItem {
         private String productName;
         private String type;
-        private int quantity;
+        private double quantity;
         private long timestamp;
         private String note;
 
-        public HistoryItem(String productName, String type, int quantity, long timestamp, String note) {
+        public HistoryItem(String productName, String type, double quantity, long timestamp, String note) {
             this.productName = productName;
             this.type = type;
             this.quantity = quantity;
@@ -39,7 +39,7 @@ public class HistoryAdapter extends BaseAdapter {
             return type;
         }
 
-        public int getQuantity() {
+        public double getQuantity() {
             return quantity;
         }
 
@@ -109,7 +109,7 @@ public class HistoryAdapter extends BaseAdapter {
         holder.productName.setText(item.getProductName());
 
         // Quantidade
-        holder.quantity.setText(String.valueOf(item.getQuantity()));
+        holder.quantity.setText(CurrencyHelper.formatQuantity(item.getQuantity()));
 
         // Data e hora
         String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));

@@ -78,6 +78,11 @@
             android:label="@string/analytics_title"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity 
+            android:name=".SettingsActivity"
+            android:label="@string/settings_title"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         
         <!-- ZXing Barcode Scanner Activity -->
         <activity

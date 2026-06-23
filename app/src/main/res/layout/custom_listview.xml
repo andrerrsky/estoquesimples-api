@@ -25,6 +25,7 @@
 
             <!-- Foto do Produto -->
             <RelativeLayout
+                android:id="@+id/photoContainer"
                 android:layout_width="70dp"
                 android:layout_height="70dp">
 

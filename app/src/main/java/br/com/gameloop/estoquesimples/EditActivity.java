@@ -428,6 +428,18 @@ public class EditActivity extends AppCompatActivity {
         return true;
     }
 
+    /**
+     * Normaliza uma quantidade armazenada para exibição no campo de edição:
+     * remove o ".0" de inteiros e não usa separador de milhar (o texto é
+     * gravado bruto ao salvar). Retorna "0" para valores nulos/vazios.
+     */
+    private static String formatAmountForEdit(String stored) {
+        if (stored == null || stored.trim().isEmpty() || stored.equalsIgnoreCase("null")) {
+            return "0";
+        }
+        return CurrencyHelper.quantityForStorage(CurrencyHelper.parseCurrency(stored, 0));
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
@@ -440,6 +452,9 @@ public class EditActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.menu_history) {
             Intent intent = new Intent(this, HistoryActivity.class);
             startActivity(intent);
+            return true;
+        } else if (item.getItemId() == R.id.menu_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -566,14 +581,16 @@ public class EditActivity extends AppCompatActivity {
 
                 // Usar valores padrão para campos nulos
                 description.setText(columnDescription != null ? columnDescription : "");
-                amount.setText(columnAmount != null ? columnAmount : "0");
+                // Quantidade/estoque mínimo: normalizar para não exibir ".0" em inteiros
+                // (sem separador de milhar, pois o texto é gravado bruto ao salvar)
+                amount.setText(formatAmountForEdit(columnAmount));
                 value.setText(columnValue != null ? columnValue : "0");
                 category.setText(columnCategory != null ? columnCategory : "");
                 sku.setText(columnSku != null ? columnSku : "");
                 barcode.setText(columnBarcode != null ? columnBarcode : "");
                 supplier.setText(columnSupplier != null ? columnSupplier : "");
                 location.setText(columnLocation != null ? columnLocation : "");
-                minStock.setText(columnMinStock != null ? columnMinStock : "0");
+                minStock.setText(formatAmountForEdit(columnMinStock));
                 unit.setText(columnUnit != null ? columnUnit : "");
 
                 // Carregar foto se disponível

@@ -18,6 +18,10 @@
         android:title="Histórico"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_settings"
+        android:title="@string/settings_title"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_about"
         android:title="Sobre"
         app:showAsAction="never" />

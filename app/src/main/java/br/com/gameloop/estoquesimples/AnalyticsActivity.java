@@ -407,7 +407,7 @@ public class AnalyticsActivity extends AppCompatActivity {
         
         StringBuilder text = new StringBuilder();
         text.append("📦 ").append(analytics.productName).append("\n\n");
-        text.append("Estoque atual: ").append(String.format("%.1f", analytics.currentStock))
+        text.append("Estoque atual: ").append(CurrencyHelper.formatQuantity(analytics.currentStock))
             .append(" ").append(analytics.unit).append("\n");
         
         if (analytics.avgDailyConsumption > 0) {

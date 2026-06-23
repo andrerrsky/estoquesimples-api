@@ -35,6 +35,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.PieData;
@@ -45,6 +47,10 @@ import com.github.mikephil.charting.utils.ColorTemplate;
 public class ReportsActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
+
+    private final ExecutorService pdfExecutor = Executors.newSingleThreadExecutor();
+    private android.app.ProgressDialog pdfProgressDialog;
+    private volatile boolean isExportingPdf = false;
 
     private PieChart chart;
     private PieData data;
@@ -197,6 +203,17 @@ public class ReportsActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        dismissPdfProgressDialog();
+        try {
+            pdfExecutor.shutdownNow();
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error shutting down PDF executor", e);
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.reports_menu, menu);
         return true;
@@ -281,8 +298,8 @@ public class ReportsActivity extends AppCompatActivity {
 
             entries.add(new PieEntry((float)columnAmount, columnName));
 
-            higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
-            lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
+            higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
+            lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
 
             higherAmoutProductValue = columnAmount;
             lowerAmoutProductValue = columnAmount;
@@ -292,7 +309,7 @@ public class ReportsActivity extends AppCompatActivity {
 
             // Verificar estoque baixo
             if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                lowStockProducts.add(columnName + " (" + columnAmount + "/" + columnMinStock + ")");
+                lowStockProducts.add(columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + "/" + CurrencyHelper.formatQuantity(columnMinStock) + ")");
             }
 
             // Contar por categoria
@@ -310,12 +327,12 @@ public class ReportsActivity extends AppCompatActivity {
 
                 if(columnAmount > higherAmoutProductValue) {
                     higherAmoutProductValue = columnAmount;
-                    higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
+                    higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
                 }
 
                 if(columnAmount < lowerAmoutProductValue) {
                     lowerAmoutProductValue = columnAmount;
-                    lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + columnAmount + ")</b>";
+                    lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
                 }
 
                 entries.add(new PieEntry((float)columnAmount, columnName));
@@ -325,7 +342,7 @@ public class ReportsActivity extends AppCompatActivity {
 
                 // Verificar estoque baixo
                 if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                    lowStockProducts.add(columnName + " (" + columnAmount + "/" + columnMinStock + ")");
+                    lowStockProducts.add(columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + "/" + CurrencyHelper.formatQuantity(columnMinStock) + ")");
                 }
 
                 // Contar por categoria
@@ -339,7 +356,7 @@ public class ReportsActivity extends AppCompatActivity {
 
         // Atualizar estatísticas gerais
         totalProducts.setText("Total de Produtos: " + cursorCount);
-        totalItems.setText("Total de Itens: " + totalItemsCount);
+        totalItems.setText("Total de Itens: " + CurrencyHelper.formatQuantity(totalItemsCount));
         totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         
         if(cursorCount > 0) {
@@ -599,9 +616,91 @@ public class ReportsActivity extends AppCompatActivity {
         }
     }
 
-    // Método principal de exportação de PDF usando API nativa do Android
+    // Método principal de exportação de PDF.
+    // A geração e gravação do arquivo é feita em uma thread de background
+    // (Executor) para evitar ANR por I/O na main thread.
     private void exportToPdf() {
+        if (isExportingPdf) {
+            Toast.makeText(this, "Exportação já em andamento...", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Garantir banco disponível na main thread (pode exibir Toast/inicializar UI)
+        if (!ensureDatabaseAvailable()) {
+            Toast.makeText(this, "Erro: Banco de dados não disponível para exportação", Toast.LENGTH_LONG).show();
+            Log.e("ReportsActivity", "Database is not available for PDF export");
+            return;
+        }
+
+        isExportingPdf = true;
+
+        // Mostrar indicador de progresso
+        pdfProgressDialog = new android.app.ProgressDialog(this);
+        pdfProgressDialog.setMessage("Gerando PDF, aguarde...");
+        pdfProgressDialog.setCancelable(false);
+        pdfProgressDialog.show();
+
+        pdfExecutor.execute(() -> {
+            File resultFile = null;
+            String errorMessage = null;
+            try {
+                resultFile = buildAndWritePdf();
+            } catch (SecurityException e) {
+                Log.e("ReportsActivity", "Permission error exporting PDF", e);
+                errorMessage = "Permissão negada ao salvar o PDF.";
+            } catch (IOException e) {
+                Log.e("ReportsActivity", "I/O error exporting PDF", e);
+                errorMessage = "Erro de armazenamento ao salvar o PDF: " + e.getMessage();
+            } catch (Exception e) {
+                Log.e("ReportsActivity", "Error exporting PDF", e);
+                errorMessage = "Erro ao exportar PDF: " + e.getMessage();
+            }
+
+            final File finalFile = resultFile;
+            final String finalError = errorMessage;
+            runOnUiThread(() -> {
+                isExportingPdf = false;
+                dismissPdfProgressDialog();
+
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+
+                if (finalFile != null) {
+                    showPdfExportedDialog(finalFile);
+                    try {
+                        AdManager.getInstance(ReportsActivity.this).registerInteraction(ReportsActivity.this);
+                    } catch (Exception e) {
+                        Log.e("ReportsActivity", "Error registering ad interaction", e);
+                    }
+                } else {
+                    Toast.makeText(ReportsActivity.this,
+                            finalError != null ? finalError : "Erro ao exportar PDF.",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    private void dismissPdfProgressDialog() {
         try {
+            if (pdfProgressDialog != null && pdfProgressDialog.isShowing()) {
+                pdfProgressDialog.dismiss();
+            }
+        } catch (Exception e) {
+            Log.e("ReportsActivity", "Error dismissing progress dialog", e);
+        } finally {
+            pdfProgressDialog = null;
+        }
+    }
+
+    /**
+     * Gera o documento PDF e o grava no armazenamento. Executado em background.
+     * @return o arquivo gerado
+     * @throws Exception em caso de falha de banco, armazenamento ou escrita
+     */
+    private File buildAndWritePdf() throws Exception {
+        {
             // Criar o diretório de destino
             File pdfDir;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -610,8 +709,8 @@ public class ReportsActivity extends AppCompatActivity {
                 pdfDir = new File(Environment.getExternalStorageDirectory(), "EstoqueSimples");
             }
             
-            if (!pdfDir.exists()) {
-                pdfDir.mkdirs();
+            if (!pdfDir.exists() && !pdfDir.mkdirs()) {
+                throw new IOException("Não foi possível criar a pasta de destino.");
             }
 
             // Criar nome do arquivo com data e hora
@@ -623,31 +722,26 @@ public class ReportsActivity extends AppCompatActivity {
             PdfDocument pdfDocument = new PdfDocument();
             
             // Verificar se o banco de dados está disponível
-            if (!ensureDatabaseAvailable()) {
-                Toast.makeText(this, "Erro: Banco de dados não disponível para exportação", Toast.LENGTH_LONG).show();
-                Log.e("ReportsActivity", "Database is not available for PDF export");
-                return;
+            if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
+                pdfDocument.close();
+                throw new IllegalStateException("Banco de dados não disponível para exportação");
             }
             
             // Buscar dados do banco
-            Cursor cursor = null;
+            Cursor cursor;
             try {
                 cursor = MainActivity.stock.rawQuery(
                     "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
                     null
                 );
             } catch (Exception e) {
-                Log.e("ReportsActivity", "Error querying database for PDF export", e);
-                Toast.makeText(this, "Erro ao acessar banco de dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 pdfDocument.close();
-                return;
+                throw new IllegalStateException("Erro ao acessar banco de dados: " + e.getMessage(), e);
             }
 
             if (cursor == null) {
-                Log.e("ReportsActivity", "Cursor is null after query");
-                Toast.makeText(this, "Erro ao buscar dados do banco", Toast.LENGTH_LONG).show();
                 pdfDocument.close();
-                return;
+                throw new IllegalStateException("Erro ao buscar dados do banco");
             }
 
             int totalProducts = cursor.getCount();
@@ -716,7 +810,7 @@ public class ReportsActivity extends AppCompatActivity {
 
             canvas.drawText("Total de Produtos: " + totalProducts, margin + 10, yPosition, normalPaint);
             yPosition += 20;
-            canvas.drawText("Total de Itens: " + totalItems, margin + 10, yPosition, normalPaint);
+            canvas.drawText("Total de Itens: " + CurrencyHelper.formatQuantity(totalItems), margin + 10, yPosition, normalPaint);
             yPosition += 20;
             canvas.drawText("Valor Total: " + CurrencyHelper.formatCurrency(this, totalValue), margin + 10, yPosition, normalPaint);
             yPosition += 20;
@@ -786,7 +880,7 @@ public class ReportsActivity extends AppCompatActivity {
                     }
 
                     // Quantidade
-                    String amountStr = "Quantidade: " + amount;
+                    String amountStr = "Quantidade: " + CurrencyHelper.formatQuantity(amount);
                     if (unit != null && !unit.isEmpty() && !unit.equals("null")) {
                         amountStr += " " + unit;
                     }
@@ -805,7 +899,7 @@ public class ReportsActivity extends AppCompatActivity {
                     if (minStock != null && !minStock.isEmpty() && !minStock.equals("null")) {
                         double minStockDouble = CurrencyHelper.parseCurrency(minStock, 0);
                         if (minStockDouble > 0) {
-                            canvas.drawText("Estoque Mínimo: " + minStockDouble, margin + 20, yPosition, normalPaint);
+                            canvas.drawText("Estoque Mínimo: " + CurrencyHelper.formatQuantity(minStockDouble), margin + 20, yPosition, normalPaint);
                             yPosition += 15;
                             if (amount <= minStockDouble) {
                                 Paint warningPaint = new Paint(normalPaint);
@@ -866,20 +960,11 @@ public class ReportsActivity extends AppCompatActivity {
             // Salvar o PDF
             try (FileOutputStream fos = new FileOutputStream(pdfFile)) {
                 pdfDocument.writeTo(fos);
+            } finally {
+                pdfDocument.close();
             }
-            pdfDocument.close();
 
-            // Mostrar dialog com opções após exportação bem-sucedida
-            showPdfExportedDialog(pdfFile);
-            
-            // Registrar interação para contagem de anúncios
-            AdManager.getInstance(this).registerInteraction(this);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this, 
-                "Erro ao exportar PDF: " + e.getMessage(), 
-                Toast.LENGTH_LONG).show();
+            return pdfFile;
         }
     }
 

@@ -340,7 +340,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         bottomNavigationView.setSelectedItemId(R.id.navigation_home);
-        
+
+        // Recriar a lista para refletir mudanças de configuração (ex.: exibir/ocultar imagens)
+        if (listAdapter != null) {
+            updateList();
+        }
+
         // Atualizar premium card e anúncios
         updatePremiumCard();
         if (adManager != null) {
@@ -632,6 +637,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void showSettingsActivity() {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        startActivity(intent);
+    }
+
     public void showAnalyticsActivity() {
         Intent intent = new Intent(this, AnalyticsActivity.class);
         startActivity(intent);
@@ -676,6 +686,9 @@ public class MainActivity extends AppCompatActivity {
             return true;
         } else if (itemId == R.id.menu_history) {
             showHistoryActivity();
+            return true;
+        } else if (itemId == R.id.menu_settings) {
+            showSettingsActivity();
             return true;
         } else if (itemId == R.id.menu_exit) {
             exitApp();
@@ -998,7 +1011,7 @@ public class MainActivity extends AppCompatActivity {
                 double newAmount = Math.max(0, currentAmount + adjustment); // Não permitir quantidades negativas
                 
                 ContentValues values = new ContentValues();
-                values.put("amount", String.valueOf(newAmount));
+                values.put("amount", CurrencyHelper.quantityForStorage(newAmount));
                 stock.update("Estoque", values, "name=?", new String[]{productName});
                 updated++;
             }

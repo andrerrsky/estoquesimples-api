@@ -9,10 +9,13 @@ android {
 
     defaultConfig {
         applicationId "br.com.gameloop.estoquesimples"
-        minSdkVersion 23
-        targetSdkVersion 36
-        versionCode 13
-        versionName "13.0"
+        minSdkVersion 24
+        // targetSdk 35: permite usar windowOptOutEdgeToEdgeEnforcement para
+        // manter as barras do sistema com cor sólida (#225aa9) e ícones brancos.
+        // Em targetSdk 36 esse opt-out é ignorado (edge-to-edge obrigatório).
+        targetSdkVersion 35
+        versionCode 14
+        versionName "14.0"
     }
 
     buildTypes {
@@ -23,6 +26,8 @@ android {
     }
 
     compileOptions {
+        // Necessário para o Appodeal SDK 4.x quando minSdk < 26
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
@@ -53,8 +58,17 @@ dependencies {
     // Bottom Navigation (Material Design replacement)
     // Using Material Design's BottomNavigationView instead of deprecated library
 
+    // Core library desugaring (requisito do Appodeal SDK 4.x com minSdk < 26)
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+
     // Ads and Billing
-    implementation 'com.appodeal.ads:sdk:3.12.0.1'
+    // Appodeal SDK 4.2.0 - estrutura modular: core + adapters por rede de anúncio.
+    // Conjunto: AdMob + AppLovin + bidding (BidMachine/Bidon).
+    implementation 'com.appodeal.ads.sdk:core:4.2.0'
+    implementation 'com.appodeal.ads.sdk.adapters:admob:24.7.0.0'
+    implementation 'com.appodeal.ads.sdk.adapters:applovin:13.5.1.0'
+    implementation 'com.appodeal.ads.sdk.adapters:bidmachine:3.7.1.0'
+    implementation 'com.appodeal.ads.sdk.adapters:bidon:0.13.0.0'
     implementation 'com.android.billingclient:billing:8.3.0'
     
     // WorkManager for scheduled notifications

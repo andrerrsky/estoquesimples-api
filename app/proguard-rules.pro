@@ -15,3 +15,18 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# ===== Appodeal SDK 4.x =====
+-keep class com.appodeal.ads.** { *; }
+-dontwarn com.appodeal.ads.**
+-keep class com.explorestack.** { *; }
+-dontwarn com.explorestack.**
+# Redes mediadas (AdMob/AppLovin/BidMachine/Bidon)
+-keep class com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**
+-keep class com.applovin.** { *; }
+-dontwarn com.applovin.**
+-keep class io.bidmachine.** { *; }
+-dontwarn io.bidmachine.**
+-keep class org.bidon.** { *; }
+-dontwarn org.bidon.**
