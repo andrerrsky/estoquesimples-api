@@ -6,19 +6,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
-import android.os.Environment;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
-import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.util.Log;
@@ -36,19 +30,12 @@ import android.widget.Toast;
 import com.appodeal.ads.Appodeal;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
-import com.squareup.picasso.Picasso;
 
 import androidx.activity.result.PickVisualMediaRequest;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class AddActivity extends AppCompatActivity {
@@ -86,8 +73,9 @@ public class AddActivity extends AppCompatActivity {
     // ActivityResultLaunchers para capturar resultados
     private ActivityResultLauncher<Intent> cameraLauncher;
     private ActivityResultLauncher<PickVisualMediaRequest> galleryLauncher;
-    private ActivityResultLauncher<String[]> permissionLauncher;
+    private ActivityResultLauncher<String> cameraPermissionLauncher;
     private ActivityResultLauncher<ScanOptions> barcodeLauncher;
+    private boolean pendingCameraLaunch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -188,28 +176,12 @@ public class AddActivity extends AppCompatActivity {
      * Inicializa o diretório de imagens
      */
     private void initializeImageFolder() {
-        try {
-            File externalFilesDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            if (externalFilesDir != null) {
-                imagesFolder = new File(externalFilesDir, "EstoqueSimples");
-                if (!imagesFolder.exists()) {
-                    boolean created = imagesFolder.mkdirs();
-                    if (!created) {
-                        Log.e(TAG, "Failed to create images folder");
-                    }
-                }
-            } else {
-                Log.e(TAG, "getExternalFilesDir returned null");
-                // Fallback para diretório interno
-                imagesFolder = new File(getFilesDir(), "EstoqueSimples");
-                if (!imagesFolder.exists()) {
-                    imagesFolder.mkdirs();
-                }
-            }
-            Log.d(TAG, "Images folder initialized at: " + imagesFolder.getAbsolutePath());
-        } catch (Exception e) {
-            Log.e(TAG, "Error initializing images folder", e);
+        imagesFolder = PhotoPathHelper.getImagesFolder(this);
+        if (imagesFolder == null) {
+            Log.e(TAG, "Failed to initialize images folder");
             Toast.makeText(this, "Erro ao inicializar pasta de imagens", Toast.LENGTH_SHORT).show();
+        } else {
+            Log.d(TAG, "Images folder initialized at: " + imagesFolder.getAbsolutePath());
         }
     }
 
@@ -249,20 +221,16 @@ public class AddActivity extends AppCompatActivity {
             }
         );
 
-        // Launcher para permissões múltiplas
-        permissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestMultiplePermissions(),
-            permissions -> {
-                boolean allGranted = true;
-                for (Boolean granted : permissions.values()) {
-                    if (!granted) {
-                        allGranted = false;
-                        break;
-                    }
-                }
-                
-                if (!allGranted) {
-                    Toast.makeText(this, "Permissões são necessárias para usar câmera e galeria", Toast.LENGTH_LONG).show();
+        // Launcher para permissão de câmera (única permissão necessária em runtime)
+        cameraPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            isGranted -> {
+                if (isGranted && pendingCameraLaunch) {
+                    pendingCameraLaunch = false;
+                    openCamera();
+                } else if (pendingCameraLaunch) {
+                    pendingCameraLaunch = false;
+                    Toast.makeText(this, "Permissão de câmera necessária para tirar fotos", Toast.LENGTH_LONG).show();
                 }
             }
         );
@@ -564,37 +532,18 @@ public class AddActivity extends AppCompatActivity {
     }
 
     public void addTakeCameraPhoto(View v) {
-        if (checkAndRequestPermissions(true)) {
-            openCamera();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            pendingCameraLaunch = true;
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+            return;
         }
+        openCamera();
     }
 
     public void addTakeGalleryPhoto(View v) {
-        // O Android Photo Picker não exige permissão de acesso à mídia
+        // O Android Photo Picker não exige permissão de acesso à mídia (API 19+ via AndroidX)
         openGallery();
-    }
-
-    /**
-     * Verifica e solicita permissões necessárias.
-     * Apenas a câmera exige permissão em tempo de execução; a galeria usa o
-     * Android Photo Picker, que concede acesso pontual sem permissão.
-     * @param forCamera true se for para câmera
-     * @return true se todas as permissões já foram concedidas
-     */
-    private boolean checkAndRequestPermissions(boolean forCamera) {
-        List<String> permissionsNeeded = new ArrayList<>();
-
-        if (forCamera && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
-                != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.CAMERA);
-        }
-
-        if (!permissionsNeeded.isEmpty()) {
-            permissionLauncher.launch(permissionsNeeded.toArray(new String[0]));
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -614,12 +563,6 @@ public class AddActivity extends AppCompatActivity {
             }
 
             Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            
-            // Verificar se há um app de câmera disponível
-            if (cameraIntent.resolveActivity(getPackageManager()) == null) {
-                Toast.makeText(this, "Nenhum aplicativo de câmera disponível", Toast.LENGTH_SHORT).show();
-                return;
-            }
 
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             lastPhotoName = "es_" + timeStamp + ".jpg";
@@ -638,8 +581,13 @@ public class AddActivity extends AppCompatActivity {
             cameraIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             cameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            cameraLauncher.launch(cameraIntent);
-            Log.d(TAG, "Camera intent launched successfully");
+            try {
+                cameraLauncher.launch(cameraIntent);
+                Log.d(TAG, "Camera intent launched successfully");
+            } catch (android.content.ActivityNotFoundException e) {
+                Log.e(TAG, "No camera app available", e);
+                Toast.makeText(this, "Nenhum aplicativo de câmera disponível", Toast.LENGTH_SHORT).show();
+            }
 
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "FileProvider error - check fileprovider configuration", e);
@@ -710,50 +658,12 @@ public class AddActivity extends AppCompatActivity {
 
         // O Photo Picker concede acesso temporário à URI; copiamos para a pasta
         // do app para que a imagem permaneça disponível nas próximas sessões.
-        String copiedPath = copyImageToAppFolder(selectedImage);
+        String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
         if (copiedPath != null) {
             newPhotoPath = copiedPath;
             displayPhoto(copiedPath);
         } else {
             Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * Copia a imagem selecionada (via Photo Picker) para a pasta interna do app
-     * e retorna o caminho do arquivo gerado, ou null em caso de falha.
-     */
-    private String copyImageToAppFolder(Uri sourceUri) {
-        if (imagesFolder == null) {
-            initializeImageFolder();
-            if (imagesFolder == null) {
-                Log.e(TAG, "imagesFolder is null in copyImageToAppFolder");
-                return null;
-            }
-        }
-        if (!imagesFolder.exists()) {
-            imagesFolder.mkdirs();
-        }
-
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        File destFile = new File(imagesFolder, "es_" + timeStamp + ".jpg");
-
-        try (InputStream in = getContentResolver().openInputStream(sourceUri);
-             OutputStream out = new FileOutputStream(destFile)) {
-            if (in == null) {
-                Log.e(TAG, "Could not open input stream for picked image");
-                return null;
-            }
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
-            }
-            out.flush();
-            return destFile.getAbsolutePath();
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao copiar imagem selecionada", e);
-            return null;
         }
     }
 
@@ -768,14 +678,7 @@ public class AddActivity extends AppCompatActivity {
                 return;
             }
 
-            Picasso.get()
-                .load("file://" + photoPath)
-                .resize(1200, 1200) // Limita dimensões máximas
-                .centerInside() // Mantém aspect ratio
-                .onlyScaleDown() // Não aumenta imagens menores
-                .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                .into(productPhoto);
+            ImageLoadHelper.loadDetailImage(this, photoPath, productPhoto);
             
             setupPhotoClickListener(photoPath);
         } catch (Exception e) {
@@ -795,14 +698,7 @@ public class AddActivity extends AppCompatActivity {
                 return;
             }
 
-            Picasso.get()
-                .load(uri)
-                .resize(1200, 1200) // Limita dimensões máximas
-                .centerInside() // Mantém aspect ratio
-                .onlyScaleDown() // Não aumenta imagens menores
-                .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                .into(productPhoto);
+            ImageLoadHelper.loadDetailImageFromUri(this, uri, productPhoto);
             
             setupPhotoClickListenerUri(uri);
         } catch (Exception e) {

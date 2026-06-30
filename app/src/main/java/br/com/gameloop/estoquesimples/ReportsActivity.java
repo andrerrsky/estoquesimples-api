@@ -1030,10 +1030,11 @@ public class ReportsActivity extends AppCompatActivity {
             intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            // Verificar se existe um app para abrir PDF
-            if (intent.resolveActivity(getPackageManager()) != null) {
+            // Tentar abrir; em Android 11+ resolveActivity pode falhar por package
+            // visibility mesmo havendo visualizador, então usamos try/catch.
+            try {
                 startActivity(intent);
-            } else {
+            } catch (android.content.ActivityNotFoundException e) {
                 Toast.makeText(this, 
                     "Nenhum aplicativo encontrado para abrir PDF.\nInstale um visualizador de PDF.", 
                     Toast.LENGTH_LONG).show();
@@ -1091,10 +1092,18 @@ public class ReportsActivity extends AppCompatActivity {
                 }
             }
 
-            // Tentar abrir
-            if (intent != null && intent.resolveActivity(getPackageManager()) != null) {
-                startActivity(intent);
-            } else {
+            // Tentar abrir; resolveActivity pode falhar no Android 11+ por package
+            // visibility, então tentamos abrir e caímos no fallback se não houver app.
+            boolean opened = false;
+            if (intent != null) {
+                try {
+                    startActivity(intent);
+                    opened = true;
+                } catch (android.content.ActivityNotFoundException e) {
+                    opened = false;
+                }
+            }
+            if (!opened) {
                 // Se não conseguir abrir a pasta, mostrar o caminho
                 Toast.makeText(this, 
                     "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
@@ -1146,10 +1155,11 @@ public class ReportsActivity extends AppCompatActivity {
             shareIntent.putExtra(Intent.EXTRA_TEXT, "Segue em anexo o relatório de estoque gerado pelo Estoque Simples.");
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            // Verificar se há apps para compartilhar
-            if (shareIntent.resolveActivity(getPackageManager()) != null) {
+            // O chooser sempre resolve quando há apps; usamos try/catch para
+            // cobrir o caso (raro) de nenhum app de compartilhamento disponível.
+            try {
                 startActivity(Intent.createChooser(shareIntent, "Compartilhar PDF via:"));
-            } else {
+            } catch (android.content.ActivityNotFoundException e) {
                 Toast.makeText(this, 
                     "Nenhum aplicativo disponível para compartilhar arquivos.", 
                     Toast.LENGTH_LONG).show();

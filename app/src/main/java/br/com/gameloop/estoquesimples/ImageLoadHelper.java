@@ -8,6 +8,8 @@ import android.widget.ImageView;
 
 import com.squareup.picasso.Picasso;
 
+import java.io.File;
+
 /**
  * Helper class para carregar imagens de forma segura e otimizada.
  * 
@@ -33,20 +35,30 @@ public class ImageLoadHelper {
      * @param imageView ImageView onde a imagem será exibida
      */
     public static void loadThumbnail(Context context, String imagePath, ImageView imageView) {
-        if (imagePath == null || imagePath.isEmpty() || imagePath.equals("null")) {
+        if (PhotoPathHelper.isEmptyPhotoReference(imagePath)) {
             imageView.setImageResource(R.drawable.package_icon);
             return;
         }
-        
+
+        if (PhotoPathHelper.isContentUri(imagePath)) {
+            loadDetailImageFromUri(context, Uri.parse(imagePath), imageView, THUMBNAIL_SIZE);
+            return;
+        }
+
         try {
-            Picasso.get()
-                .load("file://" + imagePath)
-                .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
-                .centerInside()
-                .onlyScaleDown()
-                .placeholder(R.drawable.package_icon)
-                .error(R.drawable.package_icon)
-                .into(imageView);
+            File file = new File(imagePath);
+            if (file.exists()) {
+                Picasso.get()
+                    .load(file)
+                    .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+                    .centerInside()
+                    .onlyScaleDown()
+                    .placeholder(R.drawable.package_icon)
+                    .error(R.drawable.package_icon)
+                    .into(imageView);
+            } else {
+                imageView.setImageResource(R.drawable.package_icon);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar thumbnail: " + imagePath, e);
             imageView.setImageResource(R.drawable.package_icon);
@@ -62,20 +74,30 @@ public class ImageLoadHelper {
      * @param imageView ImageView onde a imagem será exibida
      */
     public static void loadDetailImage(Context context, String imagePath, ImageView imageView) {
-        if (imagePath == null || imagePath.isEmpty() || imagePath.equals("null")) {
+        if (PhotoPathHelper.isEmptyPhotoReference(imagePath)) {
             imageView.setImageResource(R.drawable.package_icon);
             return;
         }
-        
+
+        if (PhotoPathHelper.isContentUri(imagePath)) {
+            loadDetailImageFromUri(context, Uri.parse(imagePath), imageView, DETAIL_SIZE);
+            return;
+        }
+
         try {
-            Picasso.get()
-                .load("file://" + imagePath)
-                .resize(DETAIL_SIZE, DETAIL_SIZE)
-                .centerInside()
-                .onlyScaleDown()
-                .placeholder(R.drawable.package_icon)
-                .error(R.drawable.package_icon)
-                .into(imageView);
+            File file = new File(imagePath);
+            if (file.exists()) {
+                Picasso.get()
+                    .load(file)
+                    .resize(DETAIL_SIZE, DETAIL_SIZE)
+                    .centerInside()
+                    .onlyScaleDown()
+                    .placeholder(R.drawable.package_icon)
+                    .error(R.drawable.package_icon)
+                    .into(imageView);
+            } else {
+                imageView.setImageResource(R.drawable.package_icon);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar imagem detalhada: " + imagePath, e);
             imageView.setImageResource(R.drawable.package_icon);
@@ -91,15 +113,19 @@ public class ImageLoadHelper {
      * @param imageView ImageView onde a imagem será exibida
      */
     public static void loadDetailImageFromUri(Context context, Uri uri, ImageView imageView) {
+        loadDetailImageFromUri(context, uri, imageView, DETAIL_SIZE);
+    }
+
+    private static void loadDetailImageFromUri(Context context, Uri uri, ImageView imageView, int maxSize) {
         if (uri == null) {
             imageView.setImageResource(R.drawable.package_icon);
             return;
         }
-        
+
         try {
             Picasso.get()
                 .load(uri)
-                .resize(DETAIL_SIZE, DETAIL_SIZE)
+                .resize(maxSize, maxSize)
                 .centerInside()
                 .onlyScaleDown()
                 .placeholder(R.drawable.package_icon)

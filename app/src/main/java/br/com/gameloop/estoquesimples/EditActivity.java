@@ -6,17 +6,13 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.util.Log;
@@ -33,19 +29,12 @@ import android.widget.Toast;
 
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
-import com.squareup.picasso.Picasso;
 
 import androidx.activity.result.PickVisualMediaRequest;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class EditActivity extends AppCompatActivity {
@@ -85,8 +74,9 @@ public class EditActivity extends AppCompatActivity {
     // ActivityResultLaunchers para capturar resultados
     private ActivityResultLauncher<Intent> cameraLauncher;
     private ActivityResultLauncher<PickVisualMediaRequest> galleryLauncher;
-    private ActivityResultLauncher<String[]> permissionLauncher;
+    private ActivityResultLauncher<String> cameraPermissionLauncher;
     private ActivityResultLauncher<ScanOptions> barcodeLauncher;
+    private boolean pendingCameraLaunch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -221,108 +211,15 @@ public class EditActivity extends AppCompatActivity {
     }
     
     /**
-     * Inicializa o diretório de imagens com validações robustas
+     * Inicializa o diretório de imagens
      */
     private void initializeImageFolder() {
-        Log.d(TAG, "initializeImageFolder called");
-        
-        try {
-            // Tentar usar diretório externo primeiro (preferível)
-            File externalFilesDir = null;
-            try {
-                externalFilesDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            } catch (Exception e) {
-                Log.e(TAG, "Error getting external files directory", e);
-            }
-            
-            if (externalFilesDir != null) {
-                Log.d(TAG, "External files dir available: " + externalFilesDir.getAbsolutePath());
-                
-                try {
-                    imagesFolder = new File(externalFilesDir, "EstoqueSimples");
-                } catch (NullPointerException e) {
-                    Log.e(TAG, "CRITICAL: NullPointerException creating imagesFolder with external dir", e);
-                    imagesFolder = null;
-                }
-                
-                if (imagesFolder != null) {
-                    if (!imagesFolder.exists()) {
-                        Log.d(TAG, "Images folder does not exist, creating: " + imagesFolder.getAbsolutePath());
-                        boolean created = false;
-                        try {
-                            created = imagesFolder.mkdirs();
-                        } catch (SecurityException e) {
-                            Log.e(TAG, "SecurityException creating images folder", e);
-                        }
-                        
-                        if (!created) {
-                            Log.e(TAG, "Failed to create images folder at external dir");
-                            imagesFolder = null; // Force fallback
-                        } else {
-                            Log.d(TAG, "Images folder created successfully");
-                        }
-                    } else {
-                        Log.d(TAG, "Images folder already exists");
-                    }
-                }
-            } else {
-                Log.w(TAG, "getExternalFilesDir returned null, will use internal storage");
-            }
-            
-            // Fallback para diretório interno se externo falhou
-            if (imagesFolder == null) {
-                Log.w(TAG, "Using fallback: internal files directory");
-                
-                File internalFilesDir = null;
-                try {
-                    internalFilesDir = getFilesDir();
-                } catch (Exception e) {
-                    Log.e(TAG, "CRITICAL: Error getting internal files directory", e);
-                }
-                
-                if (internalFilesDir != null) {
-                    try {
-                        imagesFolder = new File(internalFilesDir, "EstoqueSimples");
-                    } catch (NullPointerException e) {
-                        Log.e(TAG, "CRITICAL: NullPointerException creating imagesFolder with internal dir", e);
-                        imagesFolder = null;
-                    }
-                    
-                    if (imagesFolder != null) {
-                        if (!imagesFolder.exists()) {
-                            Log.d(TAG, "Creating images folder in internal storage: " + imagesFolder.getAbsolutePath());
-                            try {
-                                boolean created = imagesFolder.mkdirs();
-                                if (!created) {
-                                    Log.e(TAG, "CRITICAL: Failed to create images folder in internal storage");
-                                    imagesFolder = null;
-                                } else {
-                                    Log.d(TAG, "Images folder created in internal storage successfully");
-                                }
-                            } catch (SecurityException e) {
-                                Log.e(TAG, "CRITICAL: SecurityException creating images folder in internal storage", e);
-                                imagesFolder = null;
-                            }
-                        }
-                    }
-                } else {
-                    Log.e(TAG, "CRITICAL: Both external and internal files directories are null");
-                }
-            }
-            
-            // Log final do resultado
-            if (imagesFolder != null) {
-                Log.d(TAG, "Images folder initialized successfully at: " + imagesFolder.getAbsolutePath());
-                Log.d(TAG, "Images folder - exists: " + imagesFolder.exists() + ", canWrite: " + imagesFolder.canWrite());
-            } else {
-                Log.e(TAG, "CRITICAL: Failed to initialize images folder after all attempts");
-                Toast.makeText(this, "Erro crítico: Não foi possível inicializar pasta de imagens", Toast.LENGTH_LONG).show();
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Unexpected exception in initializeImageFolder: " + e.getClass().getName(), e);
-            Toast.makeText(this, "Erro crítico ao inicializar pasta de imagens: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            imagesFolder = null;
+        imagesFolder = PhotoPathHelper.getImagesFolder(this);
+        if (imagesFolder == null) {
+            Log.e(TAG, "CRITICAL: Failed to initialize images folder");
+            Toast.makeText(this, "Erro crítico: Não foi possível inicializar pasta de imagens", Toast.LENGTH_LONG).show();
+        } else {
+            Log.d(TAG, "Images folder initialized at: " + imagesFolder.getAbsolutePath());
         }
     }
 
@@ -390,20 +287,16 @@ public class EditActivity extends AppCompatActivity {
             }
         );
 
-        // Launcher para permissões múltiplas
-        permissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestMultiplePermissions(),
-            permissions -> {
-                boolean allGranted = true;
-                for (Boolean granted : permissions.values()) {
-                    if (!granted) {
-                        allGranted = false;
-                        break;
-                    }
-                }
-                
-                if (!allGranted) {
-                    Toast.makeText(this, "Permissões são necessárias para usar câmera e galeria", Toast.LENGTH_LONG).show();
+        // Launcher para permissão de câmera (única permissão necessária em runtime)
+        cameraPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            isGranted -> {
+                if (isGranted && pendingCameraLaunch) {
+                    pendingCameraLaunch = false;
+                    openCamera();
+                } else if (pendingCameraLaunch) {
+                    pendingCameraLaunch = false;
+                    Toast.makeText(this, "Permissão de câmera necessária para tirar fotos", Toast.LENGTH_LONG).show();
                 }
             }
         );
@@ -598,50 +491,29 @@ public class EditActivity extends AppCompatActivity {
                 minStock.setText(formatAmountForEdit(columnMinStock));
                 unit.setText(columnUnit != null ? columnUnit : "");
 
-                // Carregar foto se disponível
-                if (columnPhoto != null && !columnPhoto.isEmpty() && !columnPhoto.equals("null")) {
+                // Carregar foto se disponível (com migração de caminhos legados)
+                if (!PhotoPathHelper.isEmptyPhotoReference(columnPhoto)) {
                     try {
                         if (photo == null) {
                             Log.e(TAG, "photo field is null, cannot display photo");
                         } else {
-                            File photoFile = new File(columnPhoto);
-                            if (photoFile.exists()) {
-                                photo.setImageBitmap(BitmapFactory.decodeFile(columnPhoto));
-                                final String finalColumnPhoto = columnPhoto;
-                                photo.setOnClickListener(v -> {
-                                    try {
-                                        File file = new File(finalColumnPhoto);
-                                        
-                                        // Usar FileUriHelper para criar URI segura
-                                        Uri photoUri = FileUriHelper.getUriForFile(EditActivity.this, file);
-                                        
-                                        if (photoUri == null) {
-                                            Toast.makeText(EditActivity.this, "Erro ao criar referência para foto", Toast.LENGTH_SHORT).show();
-                                            Log.e(TAG, "Failed to create URI for photo");
-                                            return;
-                                        }
-                                        
-                                        // Verificar se a URI é segura
-                                        if (!FileUriHelper.isUriSafe(photoUri)) {
-                                            Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto", Toast.LENGTH_SHORT).show();
-                                            Log.e(TAG, "Created URI is not safe: " + photoUri);
-                                            return;
-                                        }
-                                        
-                                        Intent intent = new Intent(Intent.ACTION_VIEW);
-                                        intent.setDataAndType(photoUri, IMAGE_TYPE);
-                                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                                        startActivity(intent);
-                                    } catch (android.os.FileUriExposedException e) {
-                                        Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto. Por favor, atualize o aplicativo.", Toast.LENGTH_SHORT).show();
-                                        Log.e(TAG, "FileUriExposedException when opening photo", e);
-                                    } catch (Exception e) {
-                                        Toast.makeText(EditActivity.this, "Erro ao abrir foto", Toast.LENGTH_SHORT).show();
-                                        Log.e(TAG, "Error opening photo", e);
-                                    }
-                                });
+                            String displayPath = columnPhoto;
+                            if (PhotoPathHelper.needsMigration(this, columnPhoto)) {
+                                String migrated = PhotoPathHelper.migrateStoredPath(this, columnPhoto);
+                                if (migrated != null && !migrated.equals(columnPhoto)
+                                        && PhotoPathHelper.isInAppFolder(this, migrated)) {
+                                    displayPath = migrated;
+                                    newPhotoPath = migrated;
+                                    ContentValues photoUpdate = new ContentValues();
+                                    photoUpdate.put("photo", migrated);
+                                    MainActivity.stock.update("Estoque", photoUpdate, "name=?", new String[]{productName});
+                                }
+                            }
+                            ImageLoadHelper.loadDetailImage(this, displayPath, photo);
+                            if (PhotoPathHelper.isContentUri(displayPath)) {
+                                setupPhotoClickListenerUri(Uri.parse(displayPath));
                             } else {
-                                Log.w(TAG, "Photo file does not exist: " + columnPhoto);
+                                setupPhotoClickListener(displayPath);
                             }
                         }
                     } catch (Exception e) {
@@ -801,37 +673,18 @@ public class EditActivity extends AppCompatActivity {
     }
 
     public void editTakeCameraPhoto(View v) {
-        if (checkAndRequestPermissions(true)) {
-            openCamera();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            pendingCameraLaunch = true;
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+            return;
         }
+        openCamera();
     }
 
     public void editTakeGalleryPhoto(View v) {
-        // O Android Photo Picker não exige permissão de acesso à mídia
+        // O Android Photo Picker não exige permissão de acesso à mídia (API 19+ via AndroidX)
         openGallery();
-    }
-
-    /**
-     * Verifica e solicita permissões necessárias.
-     * Apenas a câmera exige permissão em tempo de execução; a galeria usa o
-     * Android Photo Picker, que concede acesso pontual sem permissão.
-     * @param forCamera true se for para câmera
-     * @return true se todas as permissões já foram concedidas
-     */
-    private boolean checkAndRequestPermissions(boolean forCamera) {
-        List<String> permissionsNeeded = new ArrayList<>();
-
-        if (forCamera && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
-                != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.CAMERA);
-        }
-
-        if (!permissionsNeeded.isEmpty()) {
-            permissionLauncher.launch(permissionsNeeded.toArray(new String[0]));
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -866,13 +719,6 @@ public class EditActivity extends AppCompatActivity {
             }
 
             Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            
-            // Verificar se há um app de câmera disponível
-            if (cameraIntent.resolveActivity(getPackageManager()) == null) {
-                Log.e(TAG, "No camera app available on device");
-                Toast.makeText(this, "Nenhum aplicativo de câmera disponível", Toast.LENGTH_LONG).show();
-                return;
-            }
 
             // Gerar nome único para a foto com validação
             String timeStamp = null;
@@ -944,6 +790,10 @@ public class EditActivity extends AppCompatActivity {
             try {
                 cameraLauncher.launch(cameraIntent);
                 Log.d(TAG, "Camera intent launched successfully with photo name: " + lastPhotoName);
+            } catch (android.content.ActivityNotFoundException e) {
+                Log.e(TAG, "No camera app available", e);
+                Toast.makeText(this, "Nenhum aplicativo de câmera disponível", Toast.LENGTH_LONG).show();
+                lastPhotoName = null;
             } catch (Exception e) {
                 Log.e(TAG, "Error launching camera intent", e);
                 Toast.makeText(this, "Erro ao abrir aplicativo de câmera", Toast.LENGTH_LONG).show();
@@ -1075,50 +925,12 @@ public class EditActivity extends AppCompatActivity {
 
         // O Photo Picker concede acesso temporário à URI; copiamos para a pasta
         // do app para que a imagem permaneça disponível nas próximas sessões.
-        String copiedPath = copyImageToAppFolder(selectedImage);
+        String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
         if (copiedPath != null) {
             newPhotoPath = copiedPath;
             displayPhoto(copiedPath);
         } else {
             Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * Copia a imagem selecionada (via Photo Picker) para a pasta interna do app
-     * e retorna o caminho do arquivo gerado, ou null em caso de falha.
-     */
-    private String copyImageToAppFolder(Uri sourceUri) {
-        if (imagesFolder == null) {
-            initializeImageFolder();
-            if (imagesFolder == null) {
-                Log.e(TAG, "imagesFolder is null in copyImageToAppFolder");
-                return null;
-            }
-        }
-        if (!imagesFolder.exists()) {
-            imagesFolder.mkdirs();
-        }
-
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        File destFile = new File(imagesFolder, "es_" + timeStamp + ".jpg");
-
-        try (InputStream in = getContentResolver().openInputStream(sourceUri);
-             OutputStream out = new FileOutputStream(destFile)) {
-            if (in == null) {
-                Log.e(TAG, "Could not open input stream for picked image");
-                return null;
-            }
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
-            }
-            out.flush();
-            return destFile.getAbsolutePath();
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao copiar imagem selecionada", e);
-            return null;
         }
     }
 
@@ -1133,14 +945,7 @@ public class EditActivity extends AppCompatActivity {
                 return;
             }
 
-            Picasso.get()
-                .load("file://" + photoPath)
-                .resize(1200, 1200) // Limita dimensões máximas
-                .centerInside() // Mantém aspect ratio
-                .onlyScaleDown() // Não aumenta imagens menores
-                .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                .into(photo);
+            ImageLoadHelper.loadDetailImage(this, photoPath, photo);
             
             setupPhotoClickListener(photoPath);
         } catch (Exception e) {
@@ -1160,14 +965,7 @@ public class EditActivity extends AppCompatActivity {
                 return;
             }
 
-            Picasso.get()
-                .load(uri)
-                .resize(1200, 1200) // Limita dimensões máximas
-                .centerInside() // Mantém aspect ratio
-                .onlyScaleDown() // Não aumenta imagens menores
-                .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                .into(photo);
+            ImageLoadHelper.loadDetailImageFromUri(this, uri, photo);
             
             setupPhotoClickListenerUri(uri);
         } catch (Exception e) {
@@ -1176,9 +974,6 @@ public class EditActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Configura o listener para visualizar a foto em tela cheia
-     */
     private void setupPhotoClickListener(String photoPath) {
         if (photo == null) {
             Log.e(TAG, "photo is null, cannot setup click listener");

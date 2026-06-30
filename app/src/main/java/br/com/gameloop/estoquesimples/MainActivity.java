@@ -292,11 +292,38 @@ public class MainActivity extends AppCompatActivity {
             }
             
             Log.d("MainActivity", "Database initialized successfully");
+            migrateProductPhotosAsync();
             
         } catch (Exception e) {
             Log.e("MainActivity", "Error initializing database", e);
             Toast.makeText(this, "Erro ao inicializar banco de dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    /**
+     * Migra fotos legadas (caminhos públicos ou content://) para a pasta privada do app.
+     * Executado em background para não bloquear a UI.
+     */
+    private void migrateProductPhotosAsync() {
+        if (stock == null || !stock.isOpen()) {
+            return;
+        }
+        final SQLiteDatabase db = stock;
+        new Thread(() -> {
+            try {
+                int migrated = PhotoPathHelper.migrateAllPhotosInDatabase(MainActivity.this, db);
+                if (migrated > 0) {
+                    Log.i("MainActivity", "Migrated " + migrated + " product photos to app storage");
+                    runOnUiThread(() -> {
+                        if (listAdapter != null) {
+                            updateList();
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error migrating product photos", e);
+            }
+        }).start();
     }
 
 

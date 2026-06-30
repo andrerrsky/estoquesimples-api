@@ -3,7 +3,6 @@ package br.com.gameloop.estoquesimples;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.util.Log;
 import android.util.SparseBooleanArray;
@@ -22,8 +21,6 @@ import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 import androidx.appcompat.app.AlertDialog;
-
-import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -122,33 +119,34 @@ public class CustomListView extends ArrayAdapter<String> {
             @Override
             public void onClick(View v) {
                 String photoPath = photos.get(finalPosition);
-                if(photoPath != null && !photoPath.isEmpty() && !photoPath.equals("null")) {
-                    try {
+                if (PhotoPathHelper.isEmptyPhotoReference(photoPath)) {
+                    return;
+                }
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    if (PhotoPathHelper.isContentUri(photoPath)) {
+                        intent.setDataAndType(Uri.parse(photoPath), IMAGE_TYPE);
+                    } else {
                         File photoFile = new File(photoPath);
-                        Intent intent = new Intent(Intent.ACTION_VIEW);
-                        
-                        // Verificar se o arquivo existe
                         if (photoFile.exists()) {
-                            // Usar FileProvider para criar URI segura
                             Uri photoUri = FileProvider.getUriForFile(
                                 context,
                                 context.getApplicationContext().getPackageName() + ".fileprovider",
                                 photoFile
                             );
                             intent.setDataAndType(photoUri, IMAGE_TYPE);
-                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         } else {
-                            // Se o arquivo não existir, tentar usar a URI diretamente (para URIs de content://)
-                            Uri photoUri = Uri.parse(photoPath);
-                            intent.setDataAndType(photoUri, IMAGE_TYPE);
-                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            Toast.makeText(context, "Arquivo de foto não encontrado", Toast.LENGTH_SHORT).show();
+                            return;
                         }
-                        
-                        context.startActivity(intent);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Erro ao abrir foto", e);
-                        Toast.makeText(context, "Erro ao abrir foto: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
+
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Erro ao abrir foto", e);
+                    Toast.makeText(context, "Erro ao abrir foto: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -188,24 +186,8 @@ public class CustomListView extends ArrayAdapter<String> {
             if (photoContainer != null) {
                 photoContainer.setVisibility(View.VISIBLE);
             }
-            // Foto - com limite de tamanho para evitar crashes por bitmaps muito grandes
-            if(photos.get(position) != null && !photos.get(position).isEmpty() && !photos.get(position).equals("null")) {
-                try {
-                    Picasso.get()
-                        .load("file://" + photos.get(position))
-                        .resize(800, 800) // Limita dimensões máximas a 800x800px
-                        .centerInside() // Mantém aspect ratio
-                        .onlyScaleDown() // Não aumenta imagens menores
-                        .placeholder(R.drawable.package_icon) // Placeholder durante carregamento
-                        .error(R.drawable.package_icon) // Imagem de erro caso falhe
-                        .into(photo);
-                } catch (Exception e) {
-                    Log.e(TAG, "Erro ao carregar foto na posição " + position, e);
-                    photo.setImageResource(R.drawable.package_icon);
-                }
-            } else {
-                photo.setImageResource(R.drawable.package_icon);
-            }
+            String photoPath = photos.get(position);
+            ImageLoadHelper.loadThumbnail(context, photoPath, photo);
         }
 
         // SKU
