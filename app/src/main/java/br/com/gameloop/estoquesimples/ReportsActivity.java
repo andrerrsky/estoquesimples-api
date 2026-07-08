@@ -75,6 +75,73 @@ public class ReportsActivity extends AppCompatActivity {
     private View categorySection;
     private View dividerLowStock;
     private Button btnExportPdf;
+    private Button btnReportMovements;
+    private Button btnReportExits;
+    private Button btnReportEntries;
+    private Button btnReportLowStock;
+    private Button btnReportCategory;
+    private Button btnReportFinancial;
+
+    // Tipo de relatório e período pendentes para exportação (usados também
+    // após concessão de permissão em onRequestPermissionsResult).
+    private ReportType pendingReportType = ReportType.COMPLETO;
+    private Period pendingPeriod = Period.TUDO;
+
+    /** Tipos de relatório disponíveis para exportação em PDF. */
+    private enum ReportType {
+        COMPLETO,
+        MOVIMENTACOES,
+        SAIDAS,
+        ENTRADAS,
+        ESTOQUE_BAIXO,
+        CATEGORIA,
+        FINANCEIRO
+    }
+
+    /** Períodos pré-definidos para relatórios baseados no histórico. */
+    private enum Period {
+        HOJE("Hoje"),
+        DIAS_7("Últimos 7 dias"),
+        DIAS_30("Últimos 30 dias"),
+        DIAS_90("Últimos 90 dias"),
+        TUDO("Todo o período");
+
+        private final String label;
+
+        Period(String label) {
+            this.label = label;
+        }
+
+        String getLabel() {
+            return label;
+        }
+
+        /**
+         * Retorna o timestamp (millis) a partir do qual as movimentações devem
+         * ser incluídas. Para TUDO retorna 0 (sem corte).
+         */
+        long cutoffMillis() {
+            switch (this) {
+                case HOJE: {
+                    java.util.Calendar c = java.util.Calendar.getInstance();
+                    c.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                    c.set(java.util.Calendar.MINUTE, 0);
+                    c.set(java.util.Calendar.SECOND, 0);
+                    c.set(java.util.Calendar.MILLISECOND, 0);
+                    return c.getTimeInMillis();
+                }
+                case DIAS_7:
+                    return System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000;
+                case DIAS_30:
+                    return System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000;
+                case DIAS_90:
+                    return System.currentTimeMillis() - 90L * 24 * 60 * 60 * 1000;
+                case TUDO:
+                default:
+                    return 0L;
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +171,12 @@ public class ReportsActivity extends AppCompatActivity {
             categorySection = findViewById(R.id.categorySection);
             dividerLowStock = findViewById(R.id.dividerLowStock);
             btnExportPdf = (Button) findViewById(R.id.btnExportPdf);
+            btnReportMovements = (Button) findViewById(R.id.btnReportMovements);
+            btnReportExits = (Button) findViewById(R.id.btnReportExits);
+            btnReportEntries = (Button) findViewById(R.id.btnReportEntries);
+            btnReportLowStock = (Button) findViewById(R.id.btnReportLowStock);
+            btnReportCategory = (Button) findViewById(R.id.btnReportCategory);
+            btnReportFinancial = (Button) findViewById(R.id.btnReportFinancial);
 
             // Verificar se os campos obrigatórios foram inicializados
             if (!areFieldsInitialized()) {
@@ -115,17 +188,62 @@ public class ReportsActivity extends AppCompatActivity {
 
             generateData();
 
-        // Configurar botão de exportação de PDF
+        // Configurar botões de exportação de PDF
         btnExportPdf.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (checkPermission()) {
-                    exportToPdf();
-                } else {
-                    requestPermission();
-                }
+                startReport(ReportType.COMPLETO);
             }
         });
+
+        if (btnReportMovements != null) {
+            btnReportMovements.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.MOVIMENTACOES);
+                }
+            });
+        }
+        if (btnReportExits != null) {
+            btnReportExits.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.SAIDAS);
+                }
+            });
+        }
+        if (btnReportEntries != null) {
+            btnReportEntries.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.ENTRADAS);
+                }
+            });
+        }
+        if (btnReportLowStock != null) {
+            btnReportLowStock.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.ESTOQUE_BAIXO);
+                }
+            });
+        }
+        if (btnReportCategory != null) {
+            btnReportCategory.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.CATEGORIA);
+                }
+            });
+        }
+        if (btnReportFinancial != null) {
+            btnReportFinancial.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startReport(ReportType.FINANCEIRO);
+                }
+            });
+        }
 
         // Configurar e mostrar MREC do Appodeal com AdManager
         initializeAppodealAds();
@@ -616,6 +734,67 @@ public class ReportsActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Ponto de entrada acionado pelos botões. Para relatórios baseados no
+     * histórico exibe o seletor de período; para relatórios de inventário
+     * (estoque baixo / categoria) exporta diretamente.
+     */
+    private void startReport(ReportType type) {
+        if (needsPeriod(type)) {
+            showPeriodDialog(type);
+        } else {
+            beginExport(type, Period.TUDO);
+        }
+    }
+
+    /** Indica se o tipo de relatório usa o filtro de período (histórico). */
+    private boolean needsPeriod(ReportType type) {
+        return type == ReportType.COMPLETO
+                || type == ReportType.MOVIMENTACOES
+                || type == ReportType.SAIDAS
+                || type == ReportType.ENTRADAS
+                || type == ReportType.FINANCEIRO;
+    }
+
+    /** Exibe um diálogo para escolha do período pré-definido. */
+    private void showPeriodDialog(final ReportType type) {
+        final Period[] periods = Period.values();
+        final String[] labels = new String[periods.length];
+        for (int i = 0; i < periods.length; i++) {
+            labels[i] = periods[i].getLabel();
+        }
+
+        // Pré-selecionar "Todo o período" por padrão.
+        int defaultIndex = periods.length - 1;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Selecione o período")
+                .setSingleChoiceItems(labels, defaultIndex, null)
+                .setPositiveButton("Gerar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        int selected = ((AlertDialog) dialog).getListView().getCheckedItemPosition();
+                        if (selected < 0 || selected >= periods.length) {
+                            selected = periods.length - 1;
+                        }
+                        beginExport(type, periods[selected]);
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    /** Registra o tipo/período pendentes e dispara a exportação (com permissão). */
+    private void beginExport(ReportType type, Period period) {
+        pendingReportType = type;
+        pendingPeriod = period;
+        if (checkPermission()) {
+            exportToPdf();
+        } else {
+            requestPermission();
+        }
+    }
+
     // Método principal de exportação de PDF.
     // A geração e gravação do arquivo é feita em uma thread de background
     // (Executor) para evitar ANR por I/O na main thread.
@@ -700,271 +879,809 @@ public class ReportsActivity extends AppCompatActivity {
      * @throws Exception em caso de falha de banco, armazenamento ou escrita
      */
     private File buildAndWritePdf() throws Exception {
-        {
-            // Criar o diretório de destino
-            File pdfDir;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                pdfDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "EstoqueSimples");
-            } else {
-                pdfDir = new File(Environment.getExternalStorageDirectory(), "EstoqueSimples");
+        ReportType type = pendingReportType != null ? pendingReportType : ReportType.COMPLETO;
+        Period period = pendingPeriod != null ? pendingPeriod : Period.TUDO;
+
+        // Criar o diretório de destino
+        File pdfDir;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            pdfDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "EstoqueSimples");
+        } else {
+            pdfDir = new File(Environment.getExternalStorageDirectory(), "EstoqueSimples");
+        }
+
+        if (!pdfDir.exists() && !pdfDir.mkdirs()) {
+            throw new IOException("Não foi possível criar a pasta de destino.");
+        }
+
+        // Criar nome do arquivo com data e hora
+        String timeStamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date());
+        File pdfFile = new File(pdfDir, fileNamePrefix(type) + timeStamp + ".pdf");
+
+        // Verificar se o banco de dados está disponível
+        if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
+            throw new IllegalStateException("Banco de dados não disponível para exportação");
+        }
+
+        PdfReportBuilder builder = new PdfReportBuilder();
+        try {
+            switch (type) {
+                case MOVIMENTACOES:
+                    buildMovementsReport(builder, period, null);
+                    break;
+                case SAIDAS:
+                    buildMovementsReport(builder, period, Boolean.FALSE);
+                    break;
+                case ENTRADAS:
+                    buildMovementsReport(builder, period, Boolean.TRUE);
+                    break;
+                case ESTOQUE_BAIXO:
+                    buildLowStockReport(builder);
+                    break;
+                case CATEGORIA:
+                    buildCategoryReport(builder);
+                    break;
+                case FINANCEIRO:
+                    buildFinancialReport(builder, period);
+                    break;
+                case COMPLETO:
+                default:
+                    buildCompleteReport(builder, period);
+                    break;
             }
-            
-            if (!pdfDir.exists() && !pdfDir.mkdirs()) {
-                throw new IOException("Não foi possível criar a pasta de destino.");
+            builder.footer();
+            return builder.finish(pdfFile);
+        } catch (Exception e) {
+            builder.discard();
+            throw e;
+        }
+    }
+
+    /** Prefixo do nome de arquivo por tipo de relatório. */
+    private String fileNamePrefix(ReportType type) {
+        switch (type) {
+            case MOVIMENTACOES:
+                return "Relatorio_Movimentacoes_";
+            case SAIDAS:
+                return "Relatorio_Saidas_";
+            case ENTRADAS:
+                return "Relatorio_Entradas_";
+            case ESTOQUE_BAIXO:
+                return "Relatorio_EstoqueBaixo_";
+            case CATEGORIA:
+                return "Relatorio_Categoria_";
+            case FINANCEIRO:
+                return "Relatorio_Financeiro_";
+            case COMPLETO:
+            default:
+                return "Relatorio_Completo_";
+        }
+    }
+
+    // =====================================================================
+    // Montagem do conteúdo de cada tipo de relatório
+    // =====================================================================
+
+    /** Relatório completo: inventário + movimentações + estoque baixo. */
+    private void buildCompleteReport(PdfReportBuilder b, Period period) {
+        b.title("RELATÓRIO COMPLETO DE ESTOQUE");
+        b.subtitle("Gerado em: " + nowStr());
+        b.subtitle("Período das movimentações: " + period.getLabel());
+        b.spacer(8);
+
+        drawInventorySummary(b);
+        drawMovementFinancialSummary(b, period);
+        drawLowStockSection(b);
+        drawDetailedProductList(b);
+        drawMovementsSection(b, period, null, "MOVIMENTAÇÕES NO PERÍODO");
+    }
+
+    /** Relatório de movimentações (todas, só entradas ou só saídas). */
+    private void buildMovementsReport(PdfReportBuilder b, Period period, Boolean entradaFilter) {
+        String title;
+        String header;
+        if (entradaFilter == null) {
+            title = "RELATÓRIO DE MOVIMENTAÇÕES";
+            header = "ENTRADAS E SAÍDAS";
+        } else if (entradaFilter) {
+            title = "RELATÓRIO DE ENTRADAS";
+            header = "ENTRADAS";
+        } else {
+            title = "RELATÓRIO DE SAÍDAS";
+            header = "SAÍDAS";
+        }
+
+        b.title(title);
+        b.subtitle("Gerado em: " + nowStr());
+        b.subtitle("Período: " + period.getLabel());
+        b.spacer(8);
+
+        if (entradaFilter == null) {
+            drawMovementFinancialSummary(b, period);
+        }
+        drawMovementsSection(b, period, entradaFilter, header);
+    }
+
+    /** Relatório de estoque baixo. */
+    private void buildLowStockReport(PdfReportBuilder b) {
+        b.title("RELATÓRIO DE ESTOQUE BAIXO");
+        b.subtitle("Gerado em: " + nowStr());
+        b.spacer(10);
+        drawLowStockSection(b);
+    }
+
+    /** Relatório de inventário agrupado por categoria com subtotais. */
+    private void buildCategoryReport(PdfReportBuilder b) {
+        b.title("RELATÓRIO POR CATEGORIA");
+        b.subtitle("Gerado em: " + nowStr());
+        b.spacer(10);
+
+        Cursor c = null;
+        try {
+            c = MainActivity.stock.rawQuery(
+                    "SELECT name, amount, value, category, unit FROM Estoque " +
+                            "ORDER BY category COLLATE NOCASE, name COLLATE NOCASE",
+                    null);
+
+            if (c == null || !c.moveToFirst()) {
+                b.text("Nenhum produto cadastrado.", 10);
+                return;
             }
 
-            // Criar nome do arquivo com data e hora
-            String timeStamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date());
-            String fileName = "Relatorio_Estoque_" + timeStamp + ".pdf";
-            File pdfFile = new File(pdfDir, fileName);
+            String currentCat = null;
+            double catItems = 0, catValue = 0;
+            int catCount = 0;
+            double grandItems = 0, grandValue = 0;
+            int grandCount = 0;
 
-            // Criar o documento PDF
-            PdfDocument pdfDocument = new PdfDocument();
-            
-            // Verificar se o banco de dados está disponível
-            if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
-                pdfDocument.close();
-                throw new IllegalStateException("Banco de dados não disponível para exportação");
-            }
-            
-            // Buscar dados do banco
-            Cursor cursor;
-            try {
-                cursor = MainActivity.stock.rawQuery(
-                    "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
-                    null
-                );
-            } catch (Exception e) {
-                pdfDocument.close();
-                throw new IllegalStateException("Erro ao acessar banco de dados: " + e.getMessage(), e);
-            }
+            do {
+                String name = c.getString(0);
+                double amount = CurrencyHelper.parseCurrency(c.getString(1), 0);
+                double value = CurrencyHelper.parseCurrency(c.getString(2), 0.0);
+                String cat = c.getString(3);
+                if (!present(cat)) {
+                    cat = "Sem categoria";
+                }
+                String unit = unitSuffix(c.getString(4));
 
-            if (cursor == null) {
-                pdfDocument.close();
-                throw new IllegalStateException("Erro ao buscar dados do banco");
-            }
+                if (currentCat == null || !currentCat.equals(cat)) {
+                    if (currentCat != null) {
+                        drawCategorySubtotal(b, catCount, catItems, catValue);
+                    }
+                    currentCat = cat;
+                    catItems = 0;
+                    catValue = 0;
+                    catCount = 0;
+                    b.heading(cat);
+                }
 
-            int totalProducts = cursor.getCount();
-            double totalItems = 0;
-            double totalValue = 0.0;
+                b.text("• " + name + " — " + fq(amount) + unit + " x " + fc(value)
+                        + " = " + fc(amount * value), 10);
 
-            // Calcular totais
-            if (cursor.moveToFirst()) {
+                catItems += amount;
+                catValue += amount * value;
+                catCount++;
+                grandItems += amount;
+                grandValue += amount * value;
+                grandCount++;
+            } while (c.moveToNext());
+
+            drawCategorySubtotal(b, catCount, catItems, catValue);
+
+            b.spacer(6);
+            b.divider();
+            b.label("TOTAL GERAL: " + grandCount + " produto(s), " + fq(grandItems)
+                    + " itens, " + fc(grandValue), 10);
+        } finally {
+            closeCursor(c);
+        }
+    }
+
+    /** Relatório financeiro: valores do inventário, top produtos e saldo. */
+    private void buildFinancialReport(PdfReportBuilder b, Period period) {
+        b.title("RELATÓRIO FINANCEIRO / VALOR DE INVENTÁRIO");
+        b.subtitle("Gerado em: " + nowStr());
+        b.subtitle("Período das movimentações: " + period.getLabel());
+        b.spacer(8);
+
+        drawInventorySummary(b);
+
+        b.heading("PRODUTOS COM MAIOR VALOR EM ESTOQUE");
+        Cursor c = null;
+        try {
+            c = MainActivity.stock.rawQuery("SELECT name, amount, value, unit FROM Estoque", null);
+            List<ProductValue> list = new ArrayList<>();
+            if (c != null && c.moveToFirst()) {
                 do {
-                    double amount = CurrencyHelper.parseCurrency(cursor.getString(2), 0);
-                    double value = CurrencyHelper.parseCurrency(cursor.getString(3), 0.0);
-                    totalItems += amount;
-                    totalValue += (amount * value);
-                } while (cursor.moveToNext());
+                    ProductValue pv = new ProductValue();
+                    pv.name = c.getString(0);
+                    pv.amount = CurrencyHelper.parseCurrency(c.getString(1), 0);
+                    double value = CurrencyHelper.parseCurrency(c.getString(2), 0.0);
+                    pv.unit = c.getString(3);
+                    pv.totalValue = pv.amount * value;
+                    list.add(pv);
+                } while (c.moveToNext());
             }
 
-            // Configurar paints
-            Paint titlePaint = new Paint();
-            titlePaint.setTextSize(24);
+            if (list.isEmpty()) {
+                b.text("Nenhum produto cadastrado.", 10);
+            } else {
+                java.util.Collections.sort(list, new java.util.Comparator<ProductValue>() {
+                    @Override
+                    public int compare(ProductValue a, ProductValue z) {
+                        return Double.compare(z.totalValue, a.totalValue);
+                    }
+                });
+                int limit = Math.min(10, list.size());
+                for (int i = 0; i < limit; i++) {
+                    ProductValue pv = list.get(i);
+                    b.text((i + 1) + ". " + pv.name + " — " + fq(pv.amount) + unitSuffix(pv.unit)
+                            + " = " + fc(pv.totalValue), 10);
+                }
+            }
+        } finally {
+            closeCursor(c);
+        }
+
+        b.spacer(10);
+        drawMovementFinancialSummary(b, period);
+    }
+
+    // =====================================================================
+    // Seções reutilizáveis
+    // =====================================================================
+
+    /** RESUMO GERAL: total de produtos, itens, valor total e médio. */
+    private void drawInventorySummary(PdfReportBuilder b) {
+        b.heading("RESUMO GERAL");
+        Cursor c = null;
+        int totalProducts = 0;
+        double totalItems = 0, totalValue = 0.0;
+        try {
+            c = MainActivity.stock.rawQuery("SELECT amount, value FROM Estoque", null);
+            if (c != null) {
+                totalProducts = c.getCount();
+                if (c.moveToFirst()) {
+                    do {
+                        double amount = CurrencyHelper.parseCurrency(c.getString(0), 0);
+                        double value = CurrencyHelper.parseCurrency(c.getString(1), 0.0);
+                        totalItems += amount;
+                        totalValue += (amount * value);
+                    } while (c.moveToNext());
+                }
+            }
+        } finally {
+            closeCursor(c);
+        }
+
+        b.text("Total de Produtos: " + totalProducts, 10);
+        b.text("Total de Itens: " + fq(totalItems), 10);
+        b.text("Valor Total do Estoque: " + fc(totalValue), 10);
+        if (totalProducts > 0) {
+            b.text("Valor Médio por Produto: " + fc(totalValue / totalProducts), 10);
+        }
+        b.spacer(8);
+    }
+
+    /** RESUMO FINANCEIRO DE MOVIMENTAÇÕES: entradas, saídas e saldo no período. */
+    private void drawMovementFinancialSummary(PdfReportBuilder b, Period period) {
+        b.heading("RESUMO FINANCEIRO DE MOVIMENTAÇÕES");
+        b.small("Período: " + period.getLabel(), 10);
+
+        double totalEntry = 0.0, totalExit = 0.0;
+        int entryCount = 0, exitCount = 0;
+        Cursor c = null;
+        try {
+            c = MainActivity.stock.rawQuery(
+                    "SELECT h.change_type, h.quantity, e.value " +
+                            "FROM EstoqueHistorico h LEFT JOIN Estoque e ON h.product_name = e.name " +
+                            "WHERE h.timestamp >= ?",
+                    new String[]{String.valueOf(period.cutoffMillis())});
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String changeType = c.getString(0);
+                    double qty = CurrencyHelper.parseCurrency(c.getString(1), 0);
+                    double val = CurrencyHelper.parseCurrency(c.getString(2), 0.0);
+                    double line = qty * val;
+                    if (isEntrada(changeType)) {
+                        totalEntry += line;
+                        entryCount++;
+                    } else if (isSaida(changeType)) {
+                        totalExit += line;
+                        exitCount++;
+                    }
+                } while (c.moveToNext());
+            }
+        } finally {
+            closeCursor(c);
+        }
+
+        b.colored("Entradas (" + entryCount + "): " + fc(totalEntry), 10, true);
+        b.colored("Saídas (" + exitCount + "): " + fc(totalExit), 10, false);
+        b.label("Saldo (Entradas - Saídas): " + fc(totalEntry - totalExit), 10);
+        b.small("* Valores estimados com o preço unitário atual dos produtos.", 10);
+        b.spacer(8);
+    }
+
+    /** PRODUTOS COM ESTOQUE BAIXO: itens com amount <= min_stock. */
+    private void drawLowStockSection(PdfReportBuilder b) {
+        b.heading("PRODUTOS COM ESTOQUE BAIXO");
+        Cursor c = null;
+        int count = 0;
+        try {
+            c = MainActivity.stock.rawQuery(
+                    "SELECT name, amount, min_stock, supplier, location, unit FROM Estoque " +
+                            "ORDER BY name COLLATE NOCASE",
+                    null);
+            if (c != null && c.moveToFirst()) {
+                do {
+                    double amount = CurrencyHelper.parseCurrency(c.getString(1), 0);
+                    double min = CurrencyHelper.parseCurrency(c.getString(2), 0);
+                    if (min > 0 && amount <= min) {
+                        count++;
+                        String name = c.getString(0);
+                        String supplier = c.getString(3);
+                        String location = c.getString(4);
+                        String unit = unitSuffix(c.getString(5));
+
+                        b.itemTitle(count + ". " + name);
+                        b.colored("Atual: " + fq(amount) + unit + "   |   Mínimo: "
+                                + fq(min) + unit, 20, false);
+                        double missing = min - amount;
+                        if (missing < 0) missing = 0;
+                        b.text("Faltam para o mínimo: " + fq(missing) + unit, 20);
+                        if (present(supplier)) {
+                            b.text("Fornecedor: " + supplier, 20);
+                        }
+                        if (present(location)) {
+                            b.text("Localização: " + location, 20);
+                        }
+                        b.spacer(6);
+                    }
+                } while (c.moveToNext());
+            }
+        } finally {
+            closeCursor(c);
+        }
+
+        if (count == 0) {
+            b.text("Nenhum produto com estoque baixo no momento.", 10);
+        } else {
+            b.spacer(2);
+            b.label("Total: " + count + " produto(s) para reposição.", 10);
+        }
+        b.spacer(8);
+    }
+
+    /** LISTA DETALHADA DE PRODUTOS. */
+    private void drawDetailedProductList(PdfReportBuilder b) {
+        b.heading("LISTA DETALHADA DE PRODUTOS");
+        Cursor c = null;
+        try {
+            c = MainActivity.stock.rawQuery(
+                    "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit " +
+                            "FROM Estoque ORDER BY name COLLATE NOCASE",
+                    null);
+            if (c == null || !c.moveToFirst()) {
+                b.text("Nenhum produto cadastrado no momento.", 10);
+                b.spacer(8);
+                return;
+            }
+
+            int n = 1;
+            do {
+                String name = c.getString(0);
+                String description = c.getString(1);
+                double amount = CurrencyHelper.parseCurrency(c.getString(2), 0);
+                double value = CurrencyHelper.parseCurrency(c.getString(3), 0.0);
+                String category = c.getString(4);
+                String sku = c.getString(5);
+                String barcode = c.getString(6);
+                String supplier = c.getString(7);
+                String location = c.getString(8);
+                String minStock = c.getString(9);
+                String unit = c.getString(10);
+
+                b.itemTitle(n + ". " + name);
+                if (present(description)) {
+                    b.small("Descrição: " + description, 20);
+                }
+                if (present(category)) {
+                    b.text("Categoria: " + category, 20);
+                }
+                if (present(sku)) {
+                    b.text("SKU: " + sku, 20);
+                }
+                if (present(barcode)) {
+                    b.text("Código de Barras: " + barcode, 20);
+                }
+                b.text("Quantidade: " + fq(amount) + unitSuffix(unit), 20);
+                b.text("Valor Unitário: " + fc(value), 20);
+                b.label("Valor Total: " + fc(amount * value), 20);
+                if (present(minStock)) {
+                    double min = CurrencyHelper.parseCurrency(minStock, 0);
+                    if (min > 0) {
+                        b.text("Estoque Mínimo: " + fq(min) + unitSuffix(unit), 20);
+                        if (amount <= min) {
+                            b.colored("Status: ⚠ ESTOQUE BAIXO", 20, false);
+                        }
+                    }
+                }
+                if (present(supplier)) {
+                    b.text("Fornecedor: " + supplier, 20);
+                }
+                if (present(location)) {
+                    b.text("Localização: " + location, 20);
+                }
+                b.spacer(10);
+                n++;
+            } while (c.moveToNext());
+        } finally {
+            closeCursor(c);
+        }
+    }
+
+    /**
+     * Extrato de movimentações do histórico no período. entradaFilter:
+     * null = todas, TRUE = só entradas, FALSE = só saídas.
+     */
+    private void drawMovementsSection(PdfReportBuilder b, Period period, Boolean entradaFilter, String header) {
+        b.heading(header);
+        b.small("Período: " + period.getLabel(), 10);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+        Cursor c = null;
+        int count = 0;
+        double qtyEntrada = 0, qtySaida = 0, valEntrada = 0, valSaida = 0;
+        try {
+            c = MainActivity.stock.rawQuery(
+                    "SELECT h.product_name, h.change_type, h.quantity, h.timestamp, h.note, e.value, e.unit " +
+                            "FROM EstoqueHistorico h LEFT JOIN Estoque e ON h.product_name = e.name " +
+                            "WHERE h.timestamp >= ? ORDER BY h.timestamp DESC",
+                    new String[]{String.valueOf(period.cutoffMillis())});
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String changeType = c.getString(1);
+                    boolean entrada = isEntrada(changeType);
+                    boolean saida = isSaida(changeType);
+
+                    if (entradaFilter != null) {
+                        if (entradaFilter && !entrada) continue;
+                        if (!entradaFilter && !saida) continue;
+                    }
+
+                    String product = c.getString(0);
+                    double qty = CurrencyHelper.parseCurrency(c.getString(2), 0);
+                    long ts = c.getLong(3);
+                    String note = c.getString(4);
+                    double val = CurrencyHelper.parseCurrency(c.getString(5), 0.0);
+                    String unit = unitSuffix(c.getString(6));
+                    double lineVal = qty * val;
+
+                    count++;
+                    String label = entrada ? "ENTRADA" : (saida ? "SAÍDA" : changeType);
+                    b.movementItem(count, sdf.format(new Date(ts)), product, label,
+                            fq(qty) + unit, fc(lineVal), note, entrada);
+
+                    if (entrada) {
+                        qtyEntrada += qty;
+                        valEntrada += lineVal;
+                    } else if (saida) {
+                        qtySaida += qty;
+                        valSaida += lineVal;
+                    }
+                } while (c.moveToNext());
+            }
+        } finally {
+            closeCursor(c);
+        }
+
+        if (count == 0) {
+            b.text("Nenhuma movimentação no período selecionado.", 10);
+            b.spacer(8);
+            return;
+        }
+
+        b.spacer(4);
+        b.divider();
+        if (entradaFilter == null || entradaFilter) {
+            b.colored("Total de entradas: " + fq(qtyEntrada) + " itens (" + fc(valEntrada) + ")", 10, true);
+        }
+        if (entradaFilter == null || !entradaFilter) {
+            b.colored("Total de saídas: " + fq(qtySaida) + " itens (" + fc(valSaida) + ")", 10, false);
+        }
+        b.small("* Valores estimados com o preço unitário atual dos produtos.", 10);
+        b.spacer(8);
+    }
+
+    private void drawCategorySubtotal(PdfReportBuilder b, int count, double items, double value) {
+        b.small("Subtotal: " + count + " produto(s), " + fq(items) + " itens, " + fc(value), 12);
+        b.spacer(6);
+    }
+
+    // =====================================================================
+    // Helpers
+    // =====================================================================
+
+    private String nowStr() {
+        return new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
+    }
+
+    private String fc(double value) {
+        return CurrencyHelper.formatCurrency(this, value);
+    }
+
+    private String fq(double value) {
+        return CurrencyHelper.formatQuantity(value);
+    }
+
+    private boolean present(String s) {
+        return s != null && !s.isEmpty() && !s.equals("null");
+    }
+
+    private String unitSuffix(String unit) {
+        return present(unit) ? " " + unit : "";
+    }
+
+    private boolean isEntrada(String changeType) {
+        return "entrada".equalsIgnoreCase(changeType) || "compra".equalsIgnoreCase(changeType);
+    }
+
+    private boolean isSaida(String changeType) {
+        return "saida".equalsIgnoreCase(changeType) || "venda".equalsIgnoreCase(changeType);
+    }
+
+    private void closeCursor(Cursor c) {
+        if (c != null) {
+            try {
+                c.close();
+            } catch (Exception e) {
+                Log.e("ReportsActivity", "Error closing cursor", e);
+            }
+        }
+    }
+
+    /** Estrutura auxiliar para ordenar produtos por valor em estoque. */
+    private static class ProductValue {
+        String name;
+        String unit;
+        double amount;
+        double totalValue;
+    }
+
+    /**
+     * Motor de desenho de PDF reutilizável: gerencia página A4, paginação,
+     * paints e helpers de escrita (título, seção, texto, movimentações e rodapé).
+     */
+    private static class PdfReportBuilder {
+        private final PdfDocument document = new PdfDocument();
+        private final int pageWidth = 595;   // A4 width in points
+        private final int pageHeight = 842;  // A4 height in points
+        private final int margin = 40;
+        private int yPosition;
+        private int pageNumber = 0;
+        private PdfDocument.Page page;
+        private Canvas canvas;
+        private boolean finished = false;
+
+        private final Paint titlePaint = new Paint();
+        private final Paint subtitlePaint = new Paint();
+        private final Paint headingPaint = new Paint();
+        private final Paint itemPaint = new Paint();
+        private final Paint normalPaint = new Paint();
+        private final Paint smallPaint = new Paint();
+        private final Paint labelPaint = new Paint();
+        private final Paint greenPaint = new Paint();
+        private final Paint redPaint = new Paint();
+        private final Paint footerPaint = new Paint();
+
+        PdfReportBuilder() {
+            titlePaint.setTextSize(22);
             titlePaint.setColor(Color.BLACK);
-            titlePaint.setTextAlign(Paint.Align.CENTER);
             titlePaint.setFakeBoldText(true);
+            titlePaint.setTextAlign(Paint.Align.CENTER);
+            titlePaint.setAntiAlias(true);
 
-            Paint headingPaint = new Paint();
-            headingPaint.setTextSize(16);
-            headingPaint.setColor(Color.BLACK);
+            subtitlePaint.setTextSize(10);
+            subtitlePaint.setColor(Color.DKGRAY);
+            subtitlePaint.setTextAlign(Paint.Align.CENTER);
+            subtitlePaint.setAntiAlias(true);
+
+            headingPaint.setTextSize(15);
+            headingPaint.setColor(Color.parseColor("#1C679D"));
             headingPaint.setFakeBoldText(true);
+            headingPaint.setAntiAlias(true);
 
-            Paint normalPaint = new Paint();
-            normalPaint.setTextSize(12);
+            itemPaint.setTextSize(12);
+            itemPaint.setColor(Color.BLACK);
+            itemPaint.setFakeBoldText(true);
+            itemPaint.setAntiAlias(true);
+
+            normalPaint.setTextSize(11);
             normalPaint.setColor(Color.BLACK);
+            normalPaint.setAntiAlias(true);
 
-            Paint smallPaint = new Paint();
-            smallPaint.setTextSize(10);
+            smallPaint.setTextSize(9);
             smallPaint.setColor(Color.DKGRAY);
+            smallPaint.setAntiAlias(true);
 
-            Paint labelPaint = new Paint();
             labelPaint.setTextSize(11);
             labelPaint.setColor(Color.BLACK);
             labelPaint.setFakeBoldText(true);
+            labelPaint.setAntiAlias(true);
 
-            // Largura e altura da página
-            int pageWidth = 595; // A4 width in points
-            int pageHeight = 842; // A4 height in points
-            int margin = 40;
-            int yPosition = margin + 30;
-            int pageNumber = 1;
+            greenPaint.setTextSize(11);
+            greenPaint.setColor(Color.parseColor("#2E7D32"));
+            greenPaint.setFakeBoldText(true);
+            greenPaint.setAntiAlias(true);
 
-            // Criar primeira página
-            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create();
-            PdfDocument.Page page = pdfDocument.startPage(pageInfo);
-            Canvas canvas = page.getCanvas();
+            redPaint.setTextSize(11);
+            redPaint.setColor(Color.parseColor("#C62828"));
+            redPaint.setFakeBoldText(true);
+            redPaint.setAntiAlias(true);
 
-            // Título
-            canvas.drawText("RELATÓRIO DE ESTOQUE", pageWidth / 2, yPosition, titlePaint);
-            yPosition += 30;
+            footerPaint.setTextSize(9);
+            footerPaint.setColor(Color.DKGRAY);
+            footerPaint.setTextAlign(Paint.Align.CENTER);
+            footerPaint.setAntiAlias(true);
 
-            // Data de geração
-            String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
-            canvas.drawText("Gerado em: " + dateStr, pageWidth / 2, yPosition, smallPaint);
-            yPosition += 40;
+            newPage();
+        }
 
-            // Resumo Geral
-            canvas.drawText("RESUMO GERAL", margin, yPosition, headingPaint);
-            yPosition += 25;
-
-            canvas.drawText("Total de Produtos: " + totalProducts, margin + 10, yPosition, normalPaint);
-            yPosition += 20;
-            canvas.drawText("Total de Itens: " + CurrencyHelper.formatQuantity(totalItems), margin + 10, yPosition, normalPaint);
-            yPosition += 20;
-            canvas.drawText("Valor Total: " + CurrencyHelper.formatCurrency(this, totalValue), margin + 10, yPosition, normalPaint);
-            yPosition += 20;
-            if (totalProducts > 0) {
-                canvas.drawText("Valor Médio por Produto: " + CurrencyHelper.formatCurrency(this, totalValue / totalProducts), margin + 10, yPosition, normalPaint);
-                yPosition += 20;
+        private void newPage() {
+            if (page != null) {
+                document.finishPage(page);
             }
-            yPosition += 20;
+            pageNumber++;
+            PdfDocument.PageInfo info =
+                    new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create();
+            page = document.startPage(info);
+            canvas = page.getCanvas();
+            yPosition = margin + 20;
+        }
 
-            // Lista detalhada de produtos
-            if (totalProducts > 0) {
-                canvas.drawText("LISTA DETALHADA DE PRODUTOS", margin, yPosition, headingPaint);
-                yPosition += 30;
-
-                cursor.moveToPosition(-1);
-                int productNumber = 1;
-
-                while (cursor.moveToNext()) {
-                    // Verificar se precisa de nova página
-                    if (yPosition > pageHeight - 100) {
-                        pdfDocument.finishPage(page);
-                        pageNumber++;
-                        pageInfo = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create();
-                        page = pdfDocument.startPage(pageInfo);
-                        canvas = page.getCanvas();
-                        yPosition = margin + 30;
-                    }
-
-                    String name = cursor.getString(0);
-                    String description = cursor.getString(1);
-                    String category = cursor.getString(4);
-                    String sku = cursor.getString(5);
-                    String barcode = cursor.getString(6);
-                    String supplier = cursor.getString(7);
-                    String location = cursor.getString(8);
-                    String minStock = cursor.getString(9);
-                    String unit = cursor.getString(10);
-                    double amount = CurrencyHelper.parseCurrency(cursor.getString(2), 0);
-                    double value = CurrencyHelper.parseCurrency(cursor.getString(3), 0.0);
-
-                    // Nome do produto
-                    canvas.drawText(productNumber + ". " + truncateText(name, 60), margin, yPosition, headingPaint);
-                    yPosition += 20;
-
-                    // Descrição
-                    if (description != null && !description.isEmpty() && !description.equals("null")) {
-                        canvas.drawText("Descrição: " + truncateText(description, 50), margin + 20, yPosition, smallPaint);
-                        yPosition += 15;
-                    }
-
-                    // Categoria
-                    if (category != null && !category.isEmpty() && !category.equals("null")) {
-                        canvas.drawText("Categoria: " + category, margin + 20, yPosition, normalPaint);
-                        yPosition += 15;
-                    }
-
-                    // SKU
-                    if (sku != null && !sku.isEmpty() && !sku.equals("null")) {
-                        canvas.drawText("SKU: " + sku, margin + 20, yPosition, normalPaint);
-                        yPosition += 15;
-                    }
-
-                    // Código de Barras
-                    if (barcode != null && !barcode.isEmpty() && !barcode.equals("null")) {
-                        canvas.drawText("Código de Barras: " + barcode, margin + 20, yPosition, normalPaint);
-                        yPosition += 15;
-                    }
-
-                    // Quantidade
-                    String amountStr = "Quantidade: " + CurrencyHelper.formatQuantity(amount);
-                    if (unit != null && !unit.isEmpty() && !unit.equals("null")) {
-                        amountStr += " " + unit;
-                    }
-                    canvas.drawText(amountStr, margin + 20, yPosition, normalPaint);
-                    yPosition += 15;
-
-                    // Valor Unitário
-                    canvas.drawText("Valor Unitário: " + CurrencyHelper.formatCurrency(this, value), margin + 20, yPosition, normalPaint);
-                    yPosition += 15;
-
-                    // Valor Total
-                    canvas.drawText("Valor Total: " + CurrencyHelper.formatCurrency(this, amount * value), margin + 20, yPosition, labelPaint);
-                    yPosition += 15;
-
-                    // Estoque Mínimo
-                    if (minStock != null && !minStock.isEmpty() && !minStock.equals("null")) {
-                        double minStockDouble = CurrencyHelper.parseCurrency(minStock, 0);
-                        if (minStockDouble > 0) {
-                            canvas.drawText("Estoque Mínimo: " + CurrencyHelper.formatQuantity(minStockDouble), margin + 20, yPosition, normalPaint);
-                            yPosition += 15;
-                            if (amount <= minStockDouble) {
-                                Paint warningPaint = new Paint(normalPaint);
-                                warningPaint.setColor(Color.RED);
-                                canvas.drawText("Status: ⚠ ESTOQUE BAIXO", margin + 20, yPosition, warningPaint);
-                                yPosition += 15;
-                            }
-                        }
-                    }
-
-                    // Fornecedor
-                    if (supplier != null && !supplier.isEmpty() && !supplier.equals("null")) {
-                        canvas.drawText("Fornecedor: " + truncateText(supplier, 50), margin + 20, yPosition, normalPaint);
-                        yPosition += 15;
-                    }
-
-                    // Localização
-                    if (location != null && !location.isEmpty() && !location.equals("null")) {
-                        canvas.drawText("Localização: " + location, margin + 20, yPosition, normalPaint);
-                        yPosition += 15;
-                    }
-
-                    yPosition += 15; // Espaço entre produtos
-                    productNumber++;
-                }
-            } else {
-                canvas.drawText("Nenhum produto cadastrado no momento.", pageWidth / 2, yPosition, normalPaint);
+        void ensureSpace(int needed) {
+            if (yPosition + needed > pageHeight - 55) {
+                newPage();
             }
+        }
 
-            // Fechar cursor no finally
-            if (cursor != null) {
-                try {
-                    cursor.close();
-                } catch (Exception e) {
-                    Log.e("ReportsActivity", "Error closing cursor in PDF export", e);
-                }
-            }
+        void title(String text) {
+            ensureSpace(30);
+            canvas.drawText(text, pageWidth / 2f, yPosition, titlePaint);
+            yPosition += 26;
+        }
 
-            // Adicionar rodapé na última página
-            if (yPosition > pageHeight - 80) {
-                pdfDocument.finishPage(page);
-                pageNumber++;
-                pageInfo = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create();
-                page = pdfDocument.startPage(pageInfo);
-                canvas = page.getCanvas();
-                yPosition = margin + 30;
-            }
+        void subtitle(String text) {
+            ensureSpace(16);
+            canvas.drawText(text, pageWidth / 2f, yPosition, subtitlePaint);
+            yPosition += 15;
+        }
 
-            yPosition = pageHeight - 60;
+        void heading(String text) {
+            ensureSpace(34);
+            yPosition += 6;
+            canvas.drawText(text, margin, yPosition, headingPaint);
+            yPosition += 8;
             canvas.drawLine(margin, yPosition, pageWidth - margin, yPosition, smallPaint);
-            yPosition += 15;
-            canvas.drawText("Relatório gerado pelo Estoque Simples", pageWidth / 2, yPosition, smallPaint);
-            yPosition += 15;
-            canvas.drawText("© 2025 GameLoop", pageWidth / 2, yPosition, smallPaint);
+            yPosition += 16;
+        }
 
-            pdfDocument.finishPage(page);
+        void itemTitle(String text) {
+            ensureSpace(22);
+            canvas.drawText(truncateSingle(text, 70), margin, yPosition, itemPaint);
+            yPosition += 16;
+        }
 
-            // Salvar o PDF
-            try (FileOutputStream fos = new FileOutputStream(pdfFile)) {
-                pdfDocument.writeTo(fos);
-            } finally {
-                pdfDocument.close();
+        void text(String text, int indent) {
+            wrappedText(text, normalPaint, indent);
+        }
+
+        void small(String text, int indent) {
+            wrappedText(text, smallPaint, indent);
+        }
+
+        void label(String text, int indent) {
+            wrappedText(text, labelPaint, indent);
+        }
+
+        void colored(String text, int indent, boolean green) {
+            wrappedText(text, green ? greenPaint : redPaint, indent);
+        }
+
+        void divider() {
+            ensureSpace(12);
+            canvas.drawLine(margin, yPosition, pageWidth - margin, yPosition, smallPaint);
+            yPosition += 10;
+        }
+
+        void spacer(int px) {
+            yPosition += px;
+            if (yPosition > pageHeight - 55) {
+                newPage();
             }
+        }
 
-            return pdfFile;
+        void wrappedText(String text, Paint paint, int indent) {
+            if (text == null) return;
+            int lineHeight = (int) (paint.getTextSize() + 4);
+            int maxWidth = pageWidth - margin - (margin + indent);
+            if (maxWidth < 60) maxWidth = 60;
+            String[] paras = text.split("\n", -1);
+            for (String para : paras) {
+                if (para.isEmpty()) {
+                    yPosition += lineHeight;
+                    continue;
+                }
+                String remaining = para;
+                while (remaining.length() > 0) {
+                    int count = paint.breakText(remaining, true, maxWidth, null);
+                    if (count <= 0) count = 1;
+                    ensureSpace(lineHeight);
+                    canvas.drawText(remaining.substring(0, count), margin + indent, yPosition, paint);
+                    yPosition += lineHeight;
+                    remaining = remaining.substring(count);
+                }
+            }
+        }
+
+        void movementItem(int number, String date, String product, String typeLabel,
+                           String qtyText, String valueText, String note, boolean entrada) {
+            ensureSpace(60);
+            canvas.drawText(number + ". " + truncateSingle(product, 60), margin, yPosition, itemPaint);
+            yPosition += 15;
+            canvas.drawText(typeLabel + "  •  " + date, margin + 12, yPosition, entrada ? greenPaint : redPaint);
+            yPosition += 14;
+            canvas.drawText("Quantidade: " + qtyText + "     Valor estimado: " + valueText,
+                    margin + 12, yPosition, normalPaint);
+            yPosition += 14;
+            if (note != null && !note.trim().isEmpty() && !note.equals("null")) {
+                canvas.drawText("Observações:", margin + 12, yPosition, labelPaint);
+                yPosition += 13;
+                wrappedText(note.trim(), smallPaint, 24);
+            }
+            yPosition += 8;
+        }
+
+        void footer() {
+            int y = pageHeight - 30;
+            canvas.drawLine(margin, y - 12, pageWidth - margin, y - 12, smallPaint);
+            canvas.drawText("Relatório gerado pelo Estoque Simples", pageWidth / 2f, y, footerPaint);
+        }
+
+        File finish(File file) throws IOException {
+            if (!finished) {
+                if (page != null) {
+                    document.finishPage(page);
+                }
+                finished = true;
+            }
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                document.writeTo(fos);
+            } finally {
+                document.close();
+            }
+            return file;
+        }
+
+        void discard() {
+            try {
+                if (!finished && page != null) {
+                    document.finishPage(page);
+                }
+            } catch (Exception ignored) {
+            }
+            try {
+                document.close();
+            } catch (Exception ignored) {
+            }
+            finished = true;
+        }
+
+        private static String truncateSingle(String text, int maxLength) {
+            if (text == null) return "";
+            if (text.length() <= maxLength) return text;
+            return text.substring(0, Math.max(0, maxLength - 3)) + "...";
         }
     }
 
@@ -1175,13 +1892,6 @@ public class ReportsActivity extends AppCompatActivity {
                 "Erro ao compartilhar PDF: " + e.getMessage(), 
                 Toast.LENGTH_LONG).show();
         }
-    }
-
-    // Método auxiliar para truncar texto
-    private String truncateText(String text, int maxLength) {
-        if (text == null) return "";
-        if (text.length() <= maxLength) return text;
-        return text.substring(0, maxLength - 3) + "...";
     }
 
 }

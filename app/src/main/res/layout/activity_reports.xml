@@ -44,19 +44,114 @@
 
         </FrameLayout>
 
-        <!-- Botão Exportar PDF -->
+        <!-- Botão Relatório Completo -->
         <Button
             android:id="@+id/btnExportPdf"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📄 Exportar Relatório em PDF"
+            android:text="@string/report_btn_complete"
             android:textColor="#FFFFFF"
             android:background="@color/colorActionBar"
             android:padding="14dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="12dp"
             android:textSize="16sp"
             android:textStyle="bold"
             android:elevation="4dp" />
+
+        <!-- Outros Relatórios -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/report_section_others"
+            android:textStyle="bold"
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnReportMovements"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_movements"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
+
+        <Button
+            android:id="@+id/btnReportExits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_exits"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
+
+        <Button
+            android:id="@+id/btnReportEntries"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_entries"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
+
+        <Button
+            android:id="@+id/btnReportLowStock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_low_stock"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
+
+        <Button
+            android:id="@+id/btnReportCategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_category"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
+
+        <Button
+            android:id="@+id/btnReportFinancial"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_financial"
+            android:textColor="#FFFFFF"
+            android:background="@color/colorActionBar2"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:elevation="2dp" />
 
         <!-- Cards de Estatísticas Resumidas -->
         <TextView

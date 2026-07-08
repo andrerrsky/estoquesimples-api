@@ -90,6 +90,16 @@
     <string name="total_entry_value_zero">Valor Total de Entradas: %s 0,00</string>
     <string name="total_exit_value_zero">Valor Total de Saídas: %s 0,00</string>
 
+    <!-- Report Buttons (Reports Activity) -->
+    <string name="report_section_others">Outros Relatórios</string>
+    <string name="report_btn_complete">📄 Relatório Completo (PDF)</string>
+    <string name="report_btn_movements">🔁 Movimentações (Entradas e Saídas)</string>
+    <string name="report_btn_exits">📤 Saídas Detalhado</string>
+    <string name="report_btn_entries">📥 Entradas Detalhado</string>
+    <string name="report_btn_low_stock">⚠️ Estoque Baixo</string>
+    <string name="report_btn_category">🗂️ Por Categoria</string>
+    <string name="report_btn_financial">💰 Financeiro / Valor de Inventário</string>
+
     <!-- Premium Messages -->
     <string name="premium_required_title">Recurso Premium</string>
     <string name="premium_required_message">Este recurso está disponível apenas para usuários PRO ou durante o modo premium de 1 hora.</string>
