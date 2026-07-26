@@ -14,7 +14,6 @@ import android.os.Environment;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import android.text.Html;
 import android.util.Log;
@@ -41,7 +40,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class ImportActivity extends AppCompatActivity {
+public class ImportActivity extends BaseActivity {
 
     private TextView status;
     private TextView importDesc2;

@@ -14,15 +14,12 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <!-- Barras do sistema com fundo #225aa9 e ícones/textos brancos -->
+        <!-- Cores das barras em APIs anteriores ao edge-to-edge obrigatório.
+             Em Android 15+/targetSdk 36 o tratamento fica em EdgeToEdgeHelper. -->
         <item name="android:statusBarColor">@color/system_bar</item>
         <item name="android:navigationBarColor">@color/system_bar</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <!-- Desativa o edge-to-edge forçado (Android 15/targetSdk 35) para que
-             as cores explícitas das barras sejam respeitadas e a action bar
-             não fique sobreposta pela status bar. -->
-        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
     </style>
 
     <style name="MyActionBar" parent="@style/Widget.AppCompat.Light.ActionBar.Solid.Inverse">

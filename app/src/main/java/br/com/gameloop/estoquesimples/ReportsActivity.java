@@ -15,7 +15,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -44,7 +43,7 @@ import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.utils.ColorTemplate;
 
-public class ReportsActivity extends AppCompatActivity {
+public class ReportsActivity extends BaseActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 100;
 

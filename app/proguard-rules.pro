@@ -16,6 +16,21 @@
 #   public *;
 #}
 
+# ===== Relatórios de falha legíveis (Play Console) =====
+# Mantém nomes de arquivo e números de linha nos stack traces ofuscados.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# ===== Picasso / OkHttp / Okio =====
+-dontwarn com.squareup.okhttp.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.codehaus.mojo.animal_sniffer.*
+-dontwarn javax.annotation.**
+
+# ===== Google Play Billing =====
+-keep class com.android.vending.billing.** { *; }
+
 # ===== Appodeal SDK 4.x =====
 -keep class com.appodeal.ads.** { *; }
 -dontwarn com.appodeal.ads.**

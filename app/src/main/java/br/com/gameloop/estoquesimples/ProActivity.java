@@ -12,7 +12,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.BillingClient;
@@ -30,7 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class ProActivity extends AppCompatActivity implements PurchasesUpdatedListener {
+public class ProActivity extends BaseActivity implements PurchasesUpdatedListener {
 
     private static final String TAG = "ProActivity";
     

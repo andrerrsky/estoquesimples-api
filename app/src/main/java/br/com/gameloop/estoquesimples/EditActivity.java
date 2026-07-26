@@ -12,7 +12,6 @@ import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.util.Log;
@@ -37,7 +36,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-public class EditActivity extends AppCompatActivity {
+public class EditActivity extends BaseActivity {
 
     private ImageView photo;
     private TextView name;

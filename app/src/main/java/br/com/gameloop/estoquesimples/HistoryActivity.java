@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
 import android.util.Log;
-import androidx.appcompat.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ListView;
@@ -14,7 +13,7 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class HistoryActivity extends AppCompatActivity {
+public class HistoryActivity extends BaseActivity {
 
     private ListView historyList;
 

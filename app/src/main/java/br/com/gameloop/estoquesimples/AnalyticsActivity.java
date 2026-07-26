@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import android.util.Log;
 import android.view.Menu;
@@ -32,7 +31,7 @@ import java.util.Map;
  * - Recomendações de reabastecimento
  * - Produtos de movimento rápido/lento
  */
-public class AnalyticsActivity extends AppCompatActivity {
+public class AnalyticsActivity extends BaseActivity {
 
     private static final String TAG = "AnalyticsActivity";
     

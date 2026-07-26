@@ -5,23 +5,32 @@ plugins {
 android {
     namespace 'br.com.gameloop.estoquesimples'
     compileSdk 36
+    // Necessário para extrair/empacotar símbolos nativos (ndk.debugSymbolLevel).
+    ndkVersion "27.0.12077973"
 
 
     defaultConfig {
         applicationId "br.com.gameloop.estoquesimples"
         minSdkVersion 24
-        // targetSdk 35: permite usar windowOptOutEdgeToEdgeEnforcement para
-        // manter as barras do sistema com cor sólida (#225aa9) e ícones brancos.
-        // Em targetSdk 36 esse opt-out é ignorado (edge-to-edge obrigatório).
-        targetSdkVersion 35
-        versionCode 17
-        versionName "17"
+        // targetSdk 36: requisito do Google Play (Android 16).
+        // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
+        targetSdkVersion 36
+        versionCode 21
+        versionName "21"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8 ativo: reduz o tamanho do app e gera o mapping.txt de
+            // desofuscação, embutido automaticamente no AAB para o Play Console.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Símbolos nativos (ex.: lib do AppLovin) embutidos no AAB para
+            // simbolicar crashes/ANRs nativos no Play Console / Android Vitals.
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
         }
     }
 
@@ -38,11 +47,26 @@ android {
     }
 }
 
+// Gera native-debug-symbols.zip para upload manual no Play Console.
+// Necessário porque o único .so do app (AppLovin) já vem stripped do vendor;
+// o AGP não consegue embutir símbolos no AAB automaticamente nesse caso.
+tasks.register('packageNativeDebugSymbols', Zip) {
+    dependsOn('mergeReleaseNativeLibs')
+    from("$buildDir/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib")
+    archiveFileName = 'native-debug-symbols.zip'
+    destinationDirectory = file("$buildDir/outputs/native-debug-symbols/release")
+}
+
+tasks.matching { it.name == 'bundleRelease' || it.name == 'assembleRelease' }.configureEach {
+    finalizedBy('packageNativeDebugSymbols')
+}
+
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     
     // AndroidX Libraries
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.activity:activity:1.9.3'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'com.google.android.material:material:1.13.0'
     

@@ -10,7 +10,6 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 
 /**
@@ -22,7 +21,7 @@ import androidx.appcompat.widget.SwitchCompat;
  * Todas as preferências são salvas em SharedPreferences (sem qualquer impacto
  * no banco de dados dos usuários).
  */
-public class SettingsActivity extends AppCompatActivity {
+public class SettingsActivity extends BaseActivity {
 
     private static final String TAG = "SettingsActivity";
     private static final String PREFS_NAME = "EstoqueSimplesPrefs";
