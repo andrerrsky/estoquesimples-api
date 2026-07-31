@@ -14,6 +14,8 @@
         android:layout_alignParentTop="true"
         android:background="@android:color/white"
         android:elevation="4dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
         app:iconifiedByDefault="false"
         app:queryHint="Buscar produtos..."
         android:paddingLeft="8dp"
@@ -133,16 +135,17 @@
         app:itemTextColor="@color/bottom_navigation_selector"
         app:labelVisibilityMode="labeled" />
 
+    <!-- Mesma região do ListView: NÃO cobrir SearchView/banner (bug targetSdk 36). -->
     <TextView
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@+id/premiumCard"
+        android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
         android:text=""
-        android:layout_centerInParent="true"
-        android:gravity="center_vertical|center|center_horizontal"
+        android:gravity="center"
         android:paddingLeft="@dimen/activity_horizontal_margin"
-        android:paddingRight="@dimen/activity_horizontal_margin">
-    </TextView>
+        android:paddingRight="@dimen/activity_horizontal_margin" />
 
 </RelativeLayout>

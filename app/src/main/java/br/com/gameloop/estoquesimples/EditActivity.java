@@ -583,22 +583,18 @@ public class EditActivity extends BaseActivity {
             }
 
             // Usar query parametrizada para segurança (prevenir SQL injection)
-            int rowsAffected = MainActivity.stock.update("Estoque", updateValues, "name=?", new String[]{productName});
+            int rowsAffected;
+            synchronized (MainActivity.DB_LOCK) {
+                rowsAffected = MainActivity.stock.update("Estoque", updateValues, "name=?", new String[]{productName});
+            }
 
             if (rowsAffected > 0) {
-                // Atualizar lista se MainActivity está disponível
+                setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.updateList();
+                    MainActivity.instance.markListDirty(true);
                 }
 
                 Toast.makeText(EditActivity.this, "Produto atualizado com sucesso.", Toast.LENGTH_SHORT).show();
-                
-                // Registrar interação para contagem de anúncios
-                try {
-                    AdManager.getInstance(this).registerInteraction(this);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error registering ad interaction", e);
-                }
                 
                 // Verificar e agendar notificações de estoque baixo
                 try {
@@ -607,6 +603,7 @@ public class EditActivity extends BaseActivity {
                     Log.e(TAG, "Error checking low stock notifications", e);
                 }
 
+                // Anúncios/interação são registrados na MainActivity ao retornar.
                 finish();
             } else {
                 Toast.makeText(EditActivity.this, "Erro: Produto não encontrado para atualização.", Toast.LENGTH_SHORT).show();

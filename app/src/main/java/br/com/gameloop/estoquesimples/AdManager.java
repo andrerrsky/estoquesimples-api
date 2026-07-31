@@ -68,8 +68,17 @@ public class AdManager {
         if (activity == null || activity.isFinishing()) {
             return;
         }
+        if (android.os.Build.VERSION.SDK_INT >= 17 && activity.isDestroyed()) {
+            return;
+        }
         
         activity.runOnUiThread(() -> {
+            if (activity.isFinishing()) {
+                return;
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 17 && activity.isDestroyed()) {
+                return;
+            }
             AlertDialog.Builder builder = new AlertDialog.Builder(activity);
             builder.setTitle("Aproveite sem Anúncios!");
             builder.setMessage("Você pode:\n\n" +

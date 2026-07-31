@@ -7,12 +7,15 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -39,6 +42,9 @@ public class MainActivity extends BaseActivity {
     public static MainActivity instance;
 
     public static SQLiteDatabase stock;
+
+    /** Serializa acesso ao SQLite (UI + migração de fotos em background). */
+    public static final Object DB_LOCK = new Object();
 
     public ListView listView;
     public TextView emptyListItem;
@@ -89,6 +95,29 @@ public class MainActivity extends BaseActivity {
     private ImageButton btnClosePremiumCard;
     private Handler premiumUpdateHandler;
     private Runnable premiumUpdateRunnable;
+
+    /** Pedido de refresh ao voltar de Add/Edit/Import (evita atualizar Activity pausada). */
+    private boolean pendingListRefresh;
+    private boolean pendingClearSearch;
+    private boolean pendingAdInteraction;
+
+    private final ActivityResultLauncher<Intent> addProductLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    pendingClearSearch = true;
+                    pendingAdInteraction = true;
+                }
+                pendingListRefresh = true;
+            });
+
+    private final ActivityResultLauncher<Intent> editProductLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    pendingClearSearch = true;
+                    pendingAdInteraction = true;
+                }
+                pendingListRefresh = true;
+            });
 
     public void onAppODealInitialized() {
         appODealInitialized = true;
@@ -165,6 +194,9 @@ public class MainActivity extends BaseActivity {
         // SearchView setup:
         searchView = (SearchView) findViewById(R.id.searchView);
         if (searchView != null) {
+            searchView.setIconifiedByDefault(false);
+            searchView.setIconified(false);
+            searchView.clearFocus();
             searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                 @Override
                 public boolean onQueryTextSubmit(String query) {
@@ -310,11 +342,14 @@ public class MainActivity extends BaseActivity {
         final SQLiteDatabase db = stock;
         new Thread(() -> {
             try {
-                int migrated = PhotoPathHelper.migrateAllPhotosInDatabase(MainActivity.this, db);
+                int migrated;
+                synchronized (DB_LOCK) {
+                    migrated = PhotoPathHelper.migrateAllPhotosInDatabase(MainActivity.this, db);
+                }
                 if (migrated > 0) {
                     Log.i("MainActivity", "Migrated " + migrated + " product photos to app storage");
                     runOnUiThread(() -> {
-                        if (listAdapter != null) {
+                        if (!isFinishing() && listAdapter != null) {
                             updateList();
                         }
                     });
@@ -365,11 +400,35 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        bottomNavigationView.setSelectedItemId(R.id.navigation_home);
+        if (bottomNavigationView != null) {
+            bottomNavigationView.setSelectedItemId(R.id.navigation_home);
+        }
 
-        // Recriar a lista para refletir mudanças de configuração (ex.: exibir/ocultar imagens)
-        if (listAdapter != null) {
+        if (searchView != null) {
+            // Garante que a barra de busca continue expandida após trocas de foco/IME.
+            searchView.setIconified(false);
+            if (pendingClearSearch) {
+                searchView.setQuery("", false);
+                searchView.clearFocus();
+                pendingClearSearch = false;
+            }
+        }
+
+        // Sempre recarrega ao voltar (cadastro/edição/importação) e em todo resume.
+        if (listAdapter != null || pendingListRefresh) {
+            pendingListRefresh = false;
             updateList();
+        }
+
+        if (pendingAdInteraction) {
+            pendingAdInteraction = false;
+            if (adManager != null) {
+                try {
+                    adManager.registerInteraction(this);
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error registering deferred ad interaction", e);
+                }
+            }
         }
 
         // Atualizar premium card e anúncios
@@ -389,9 +448,33 @@ public class MainActivity extends BaseActivity {
     protected void onDestroy() {
         super.onDestroy();
         stopPremiumUpdateTimer();
+        if (instance == this) {
+            instance = null;
+        }
+    }
+
+    /**
+     * Marca que a listagem precisa ser recarregada ao voltar para a Main.
+     * Preferível a chamar {@link #updateList()} com a Activity pausada.
+     */
+    public void markListDirty(boolean clearSearch) {
+        pendingListRefresh = true;
+        if (clearSearch) {
+            pendingClearSearch = true;
+        }
     }
 
     public void updateList() {
+        if (isFinishing()) {
+            return;
+        }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread(this::updateList);
+            return;
+        }
+        if (listView == null) {
+            return;
+        }
 
         getListValues();
         
@@ -409,6 +492,9 @@ public class MainActivity extends BaseActivity {
     }
 
     public void filterList(String query) {
+        if (listView == null) {
+            return;
+        }
         
         clearFilteredArrays();
         
@@ -488,10 +574,21 @@ public class MainActivity extends BaseActivity {
     }
 
     public void getListValues() {
+        // Carrega em listas temporárias e só troca se a query tiver sucesso,
+        // evitando listagem vazia quando há falha transitória (ex.: lock do SQLite).
+        ArrayList<String> newNames = new ArrayList<>();
+        ArrayList<String> newDescriptions = new ArrayList<>();
+        ArrayList<String> newAmounts = new ArrayList<>();
+        ArrayList<String> newValues = new ArrayList<>();
+        ArrayList<String> newPhotos = new ArrayList<>();
+        ArrayList<String> newCategories = new ArrayList<>();
+        ArrayList<String> newSkus = new ArrayList<>();
+        ArrayList<String> newBarcodes = new ArrayList<>();
+        ArrayList<String> newSuppliers = new ArrayList<>();
+        ArrayList<String> newLocations = new ArrayList<>();
+        ArrayList<String> newMinStocks = new ArrayList<>();
+        ArrayList<String> newUnits = new ArrayList<>();
 
-        clearArrays();
-
-        // Verificar se o banco de dados está disponível
         if (stock == null || !stock.isOpen()) {
             Log.e("MainActivity", "Database is not available in getListValues");
             Toast.makeText(this, "Erro: Banco de dados não disponível", Toast.LENGTH_SHORT).show();
@@ -500,41 +597,42 @@ public class MainActivity extends BaseActivity {
 
         Cursor cursor = null;
         try {
-            cursor = stock.rawQuery("SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", null);
+            synchronized (DB_LOCK) {
+                cursor = stock.rawQuery(
+                        "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque ORDER BY id DESC",
+                        null);
 
-            if (cursor != null && cursor.moveToFirst()) {
-
-                do {
-
-                    String columnName = cursor.getString(0);
-                    String columnDescription = cursor.getString(1);
-                    String columnAmount = cursor.getString(2);
-                    String columnValue = cursor.getString(3);
-                    String columnPhoto = cursor.getString(4);
-                    String columnCategory = cursor.getString(5);
-                    String columnSku = cursor.getString(6);
-                    String columnBarcode = cursor.getString(7);
-                    String columnSupplier = cursor.getString(8);
-                    String columnLocation = cursor.getString(9);
-                    String columnMinStock = cursor.getString(10);
-                    String columnUnit = cursor.getString(11);
-
-                    names.add(columnName);
-                    descriptions.add(columnDescription);
-                    amounts.add(columnAmount);
-                    values.add(columnValue);
-                    photos.add(columnPhoto);
-                    categories.add(columnCategory);
-                    skus.add(columnSku);
-                    barcodes.add(columnBarcode);
-                    suppliers.add(columnSupplier);
-                    locations.add(columnLocation);
-                    minStocks.add(columnMinStock);
-                    units.add(columnUnit);
-
-                } while (cursor.moveToNext());
-
+                if (cursor != null && cursor.moveToFirst()) {
+                    do {
+                        newNames.add(cursor.getString(0));
+                        newDescriptions.add(cursor.getString(1));
+                        newAmounts.add(cursor.getString(2));
+                        newValues.add(cursor.getString(3));
+                        newPhotos.add(cursor.getString(4));
+                        newCategories.add(cursor.getString(5));
+                        newSkus.add(cursor.getString(6));
+                        newBarcodes.add(cursor.getString(7));
+                        newSuppliers.add(cursor.getString(8));
+                        newLocations.add(cursor.getString(9));
+                        newMinStocks.add(cursor.getString(10));
+                        newUnits.add(cursor.getString(11));
+                    } while (cursor.moveToNext());
+                }
             }
+
+            clearArrays();
+            names.addAll(newNames);
+            descriptions.addAll(newDescriptions);
+            amounts.addAll(newAmounts);
+            values.addAll(newValues);
+            photos.addAll(newPhotos);
+            categories.addAll(newCategories);
+            skus.addAll(newSkus);
+            barcodes.addAll(newBarcodes);
+            suppliers.addAll(newSuppliers);
+            locations.addAll(newLocations);
+            minStocks.addAll(newMinStocks);
+            units.addAll(newUnits);
         } catch (Exception e) {
             Log.e("MainActivity", "Error loading product list", e);
             Toast.makeText(this, "Erro ao carregar lista de produtos", Toast.LENGTH_SHORT).show();
@@ -582,7 +680,10 @@ public class MainActivity extends BaseActivity {
                             }
                             
                             // Usar query parametrizada para prevenir SQL injection
-                            int rowsDeleted = stock.delete("Estoque", "name=?", new String[]{finalProductName});
+                            int rowsDeleted;
+                            synchronized (DB_LOCK) {
+                                rowsDeleted = stock.delete("Estoque", "name=?", new String[]{finalProductName});
+                            }
                             
                             if (rowsDeleted > 0) {
                                 updateList();
@@ -617,8 +718,10 @@ public class MainActivity extends BaseActivity {
         Cursor cursor = null;
         try {
             // Usar query parametrizada para prevenir SQL injection
-            cursor = stock.rawQuery("SELECT * FROM Estoque WHERE name=?", new String[]{productName});
-            return cursor != null && cursor.getCount() > 0;
+            synchronized (DB_LOCK) {
+                cursor = stock.rawQuery("SELECT * FROM Estoque WHERE name=?", new String[]{productName});
+                return cursor != null && cursor.getCount() > 0;
+            }
         } catch (Exception e) {
             Log.e("MainActivity", "Error checking if product exists", e);
             return false;
@@ -632,7 +735,7 @@ public class MainActivity extends BaseActivity {
     public void showAddActivity() {
 
         Intent intent = new Intent(this, AddActivity.class);
-        startActivity(intent);
+        addProductLauncher.launch(intent);
 
     }
 
@@ -640,7 +743,7 @@ public class MainActivity extends BaseActivity {
 
         Intent intent = new Intent(this, EditActivity.class);
         intent.putExtra("productName", productName);
-        startActivity(intent);
+        editProductLauncher.launch(intent);
 
     }
 

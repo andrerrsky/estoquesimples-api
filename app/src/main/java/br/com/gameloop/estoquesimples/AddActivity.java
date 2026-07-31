@@ -337,22 +337,18 @@ public class AddActivity extends BaseActivity {
                 insertValues.put("photo", newPhotoPath);
             }
 
-            long rowId = MainActivity.stock.insert("Estoque", null, insertValues);
+            long rowId;
+            synchronized (MainActivity.DB_LOCK) {
+                rowId = MainActivity.stock.insert("Estoque", null, insertValues);
+            }
 
             if (rowId != -1) {
-                // Atualizar lista se MainActivity está disponível
+                setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.updateList();
+                    MainActivity.instance.markListDirty(true);
                 }
 
                 Toast.makeText(AddActivity.this, "Produto adicionado com sucesso!", Toast.LENGTH_LONG).show();
-                
-                // Registrar interação para contagem de anúncios
-                try {
-                    AdManager.getInstance(this).registerInteraction(this);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error registering ad interaction", e);
-                }
                 
                 // Verificar e agendar notificações de estoque baixo
                 try {
@@ -361,6 +357,8 @@ public class AddActivity extends BaseActivity {
                     Log.e(TAG, "Error checking low stock notifications", e);
                 }
 
+                // Anúncios/interação são registrados na MainActivity ao retornar
+                // (evita dialog + finish() na mesma Activity e listagem desatualizada).
                 finish();
             } else {
                 Toast.makeText(AddActivity.this, "Erro ao adicionar produto no banco de dados.", Toast.LENGTH_SHORT).show();

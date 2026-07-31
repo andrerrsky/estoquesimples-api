@@ -15,8 +15,8 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 21
-        versionName "21"
+        versionCode 22
+        versionName "22"
     }
 
     buildTypes {

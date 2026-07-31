@@ -50,7 +50,8 @@
 
         <activity 
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize|stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -58,16 +59,20 @@
         </activity>
         <activity 
             android:name=".AddActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity 
             android:name=".EditActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity 
             android:name=".ReportsActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity 
             android:name=".ImportActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity 
             android:name=".AboutActivity"
             android:exported="false"
@@ -90,7 +95,8 @@
             android:name=".SettingsActivity"
             android:label="@string/settings_title"
             android:exported="false"
-            android:parentActivityName=".MainActivity" />
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
         
         <!-- ZXing Barcode Scanner Activity -->
         <activity

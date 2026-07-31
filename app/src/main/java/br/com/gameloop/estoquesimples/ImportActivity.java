@@ -363,8 +363,7 @@ public class ImportActivity extends BaseActivity {
 
             MainActivity.instance.openOrCreateDB();
             MainActivity.instance.prepareList();
-            MainActivity.instance.getListValues();
-            MainActivity.instance.updateList();
+            MainActivity.instance.markListDirty(true);
 
             setImportExportDescText("Banco de dados importado com sucesso!\n\nOs produtos já estão disponíveis na lista.");
             Toast.makeText(this, "Banco de dados importado com sucesso!", Toast.LENGTH_SHORT).show();
@@ -485,10 +484,12 @@ public class ImportActivity extends BaseActivity {
         }
 
         try {
-            MainActivity.stock.insert("Estoque", null, insertValues);
+            synchronized (MainActivity.DB_LOCK) {
+                MainActivity.stock.insert("Estoque", null, insertValues);
+            }
 
             if (MainActivity.instance != null) {
-                MainActivity.instance.updateList();
+                MainActivity.instance.markListDirty(true);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error inserting product into database", e);

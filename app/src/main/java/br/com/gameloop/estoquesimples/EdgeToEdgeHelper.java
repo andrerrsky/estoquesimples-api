@@ -16,7 +16,8 @@ import androidx.core.view.WindowInsetsCompat;
 /**
  * Compatibilidade com o edge-to-edge obrigatório a partir do targetSdk 36
  * (Android 16). Mantém ActionBar e conteúdo fora das barras do sistema,
- * com a mesma cor sólida usada anteriormente (#1c679d).
+ * com a mesma cor sólida usada anteriormente (#1c679d), e reage ao IME
+ * para que campos no topo (ex.: SearchView) não sumam ao abrir o teclado.
  */
 public final class EdgeToEdgeHelper {
 
@@ -55,17 +56,26 @@ public final class EdgeToEdgeHelper {
         applyThemeWindowBackground(activity, content);
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
+            // systemBars + cutout + ime: com adjustResize o teclado reduz a
+            // área útil em vez de empurrar o topo (SearchView) para fora da tela.
             Insets insets = windowInsets.getInsets(
                     WindowInsetsCompat.Type.systemBars()
                             | WindowInsetsCompat.Type.displayCutout()
+                            | WindowInsetsCompat.Type.ime()
             );
             v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
 
-            // Evita padding duplo em layouts com fitsSystemWindows, mas preserva IME.
-            return new WindowInsetsCompat.Builder(windowInsets)
+            // Zera os insets já aplicados na raiz para evitar padding duplo.
+            WindowInsetsCompat remaining = new WindowInsetsCompat.Builder(windowInsets)
                     .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.NONE)
                     .setInsets(WindowInsetsCompat.Type.displayCutout(), Insets.NONE)
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
                     .build();
+
+            // Repassa para a implementação do AppCompat: o ActionBarOverlayLayout
+            // depende de receber os insets para deslocar o conteúdo abaixo da
+            // ActionBar. Sem isso, a ActionBar cobre o topo da tela (SearchView).
+            return ViewCompat.onApplyWindowInsets(v, remaining);
         });
         ViewCompat.requestApplyInsets(root);
     }

@@ -390,19 +390,21 @@ public class CustomListView extends ArrayAdapter<String> {
             // Atualizar estoque (armazenar sem ".0" para inteiros)
             android.content.ContentValues values = new android.content.ContentValues();
             values.put("amount", CurrencyHelper.quantityForStorage(newAmount));
-            MainActivity.stock.update("Estoque", values, "name=?", new String[]{productName});
+            synchronized (MainActivity.DB_LOCK) {
+                MainActivity.stock.update("Estoque", values, "name=?", new String[]{productName});
 
-            // Inserir histórico
-            android.content.ContentValues hist = new android.content.ContentValues();
-            hist.put("product_name", productName);
-            hist.put("change_type", isEntrada ? "entrada" : "saida");
-            hist.put("quantity", qty);
-            hist.put("timestamp", System.currentTimeMillis());
-            String note = inputNote.getText().toString().trim();
-            if (!note.isEmpty()) {
-                hist.put("note", note);
+                // Inserir histórico
+                android.content.ContentValues hist = new android.content.ContentValues();
+                hist.put("product_name", productName);
+                hist.put("change_type", isEntrada ? "entrada" : "saida");
+                hist.put("quantity", qty);
+                hist.put("timestamp", System.currentTimeMillis());
+                String note = inputNote.getText().toString().trim();
+                if (!note.isEmpty()) {
+                    hist.put("note", note);
+                }
+                MainActivity.stock.insert("EstoqueHistorico", null, hist);
             }
-            MainActivity.stock.insert("EstoqueHistorico", null, hist);
 
             // Atualizar lista
             if (MainActivity.instance != null) {
