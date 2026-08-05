@@ -1,8 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+
+    <!--
+      Tráfego em texto claro segue permitido no geral porque os SDKs de anúncio
+      ainda dependem disso em alguns casos, e desligar de uma vez quebraria a
+      monetização sem aviso.
+    -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+
+    <!--
+      A API é a exceção: por ela passam senhas, tokens de sessão e o estoque
+      inteiro do usuário. Uma configuração equivocada que apontasse a base para
+      http:// expor ia tudo isso em qualquer rede Wi-Fi pública. Aqui o sistema
+      operacional recusa a conexão antes que ela aconteça.
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">estoquesimples.app</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
 </network-security-config>

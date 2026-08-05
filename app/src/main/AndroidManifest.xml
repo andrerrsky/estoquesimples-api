@@ -91,6 +91,27 @@
             android:label="@string/analytics_title"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".AccountActivity"
+            android:label="Conta e sincronização"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ConflictsActivity"
+            android:label="Conflitos"
+            android:exported="false"
+            android:parentActivityName=".AccountActivity" />
+        <activity
+            android:name=".TeamActivity"
+            android:label="Equipe"
+            android:exported="false"
+            android:parentActivityName=".AccountActivity" />
+        <activity
+            android:name=".SubscriptionActivity"
+            android:label="Assinatura da nuvem"
+            android:exported="false"
+            android:parentActivityName=".AccountActivity" />
         <activity 
             android:name=".SettingsActivity"
             android:label="@string/settings_title"

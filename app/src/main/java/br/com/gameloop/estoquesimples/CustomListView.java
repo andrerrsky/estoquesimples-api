@@ -1,5 +1,9 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.ProductRepository;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -371,14 +375,6 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
-            double currentAmount = CurrencyHelper.parseCurrency(amounts.get(position), 0);
-
-            double newAmount = isEntrada ? (currentAmount + qty) : (currentAmount - qty);
-            if (!isEntrada && newAmount < 0) {
-                Toast.makeText(context, "Quantidade insuficiente em estoque", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
             // Garantir que o banco está disponível antes de gravar
             if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
                 Toast.makeText(context, "Erro: banco de dados não disponível.", Toast.LENGTH_SHORT).show();
@@ -386,24 +382,33 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
-            try {
-            // Atualizar estoque (armazenar sem ".0" para inteiros)
-            android.content.ContentValues values = new android.content.ContentValues();
-            values.put("amount", CurrencyHelper.quantityForStorage(newAmount));
-            synchronized (MainActivity.DB_LOCK) {
-                MainActivity.stock.update("Estoque", values, "name=?", new String[]{productName});
+            // O produto é endereçado pelo identificador estável. Pelo nome,
+            // dois produtos homônimos seriam movimentados juntos.
+            ProductRepository products = new ProductRepository(MainActivity.stock);
+            String productUuid = products.findUuidByName(productName);
+            if (productUuid == null) {
+                Toast.makeText(context, "Produto não encontrado.", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-                // Inserir histórico
-                android.content.ContentValues hist = new android.content.ContentValues();
-                hist.put("product_name", productName);
-                hist.put("change_type", isEntrada ? "entrada" : "saida");
-                hist.put("quantity", qty);
-                hist.put("timestamp", System.currentTimeMillis());
-                String note = inputNote.getText().toString().trim();
-                if (!note.isEmpty()) {
-                    hist.put("note", note);
-                }
-                MainActivity.stock.insert("EstoqueHistorico", null, hist);
+            // A quantidade atual não é mais lida da lista da tela: o
+            // repositório lê do banco dentro da transação. Com o valor da tela,
+            // duas saídas seguidas partiam do mesmo saldo e uma anulava a outra.
+            MovementRepository movements = new MovementRepository(MainActivity.stock);
+            String note = inputNote.getText().toString().trim();
+
+            MovementRepository.Result result;
+            synchronized (MainActivity.DB_LOCK) {
+                result = movements.apply(
+                        productUuid,
+                        isEntrada ? MovementRepository.ENTRADA : MovementRepository.SAIDA,
+                        isEntrada ? qty : -qty,
+                        note);
+            }
+
+            if (!result.success) {
+                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show();
+                return;
             }
 
             // Atualizar lista
@@ -411,10 +416,6 @@ public class CustomListView extends ArrayAdapter<String> {
                 MainActivity.instance.updateList();
             }
             Toast.makeText(context, isEntrada ? "Entrada registrada" : "Saída registrada", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                Log.e(TAG, "Erro ao registrar movimentação de estoque", e);
-                Toast.makeText(context, "Erro ao registrar movimentação.", Toast.LENGTH_SHORT).show();
-            }
         });
 
         builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());

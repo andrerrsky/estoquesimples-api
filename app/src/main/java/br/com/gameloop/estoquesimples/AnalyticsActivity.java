@@ -1,5 +1,8 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
@@ -149,15 +152,17 @@ public class AnalyticsActivity extends BaseActivity {
         Cursor cursor = null;
         try {
             cursor = MainActivity.stock.rawQuery(
-                "SELECT name, amount, value, min_stock, unit FROM Estoque", null);
+                "SELECT uuid, name, amount, value, min_stock, unit FROM Estoque WHERE "
+                    + LocalDb.ACTIVE_PRODUCTS, null);
             
             if (cursor.moveToFirst()) {
                 do {
-                    String name = cursor.getString(0);
-                    double amount = CurrencyHelper.parseCurrency(cursor.getString(1), 0);
-                    double value = CurrencyHelper.parseCurrency(cursor.getString(2), 0.0);
-                    double minStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
-                    String unit = cursor.getString(4);
+                    String uuid = cursor.getString(0);
+                    String name = cursor.getString(1);
+                    double amount = CurrencyHelper.parseCurrency(cursor.getString(2), 0);
+                    double value = CurrencyHelper.parseCurrency(cursor.getString(3), 0.0);
+                    double minStock = CurrencyHelper.parseCurrency(cursor.getString(4), 0);
+                    String unit = cursor.getString(5);
                     
                     ProductAnalytics analytics = new ProductAnalytics(name);
                     analytics.currentStock = amount;
@@ -165,7 +170,10 @@ public class AnalyticsActivity extends BaseActivity {
                     analytics.minStock = minStock;
                     analytics.unit = unit != null && !unit.isEmpty() && !unit.equals("null") ? unit : "un";
                     
-                    productAnalyticsMap.put(name, analytics);
+                    // A chave é o uuid: indexar por nome fazia um produto
+                    // renomeado aparecer sem nenhuma movimentação, e a previsão
+                    // de reposição dele saía como "sem dados".
+                    productAnalyticsMap.put(uuid, analytics);
                 } while (cursor.moveToNext());
             }
         } finally {
@@ -183,28 +191,29 @@ public class AnalyticsActivity extends BaseActivity {
             long ninetyDaysAgo = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000);
             
             cursor = MainActivity.stock.rawQuery(
-                "SELECT product_name, change_type, quantity, timestamp FROM EstoqueHistorico WHERE timestamp > ? ORDER BY timestamp DESC",
+                "SELECT product_uuid, change_type, quantity, timestamp FROM EstoqueHistorico "
+                    + "WHERE timestamp > ? AND deleted_at IS NULL ORDER BY timestamp DESC",
                 new String[]{String.valueOf(ninetyDaysAgo)});
             
             if (cursor.moveToFirst()) {
                 do {
-                    String productName = cursor.getString(0);
+                    String productUuid = cursor.getString(0);
                     String changeType = cursor.getString(1);
-                    int quantity = cursor.getInt(2);
+                    double quantity = cursor.getDouble(2);
                     long timestamp = cursor.getLong(3);
                     
-                    ProductAnalytics analytics = productAnalyticsMap.get(productName);
+                    ProductAnalytics analytics = productAnalyticsMap.get(productUuid);
                     if (analytics != null) {
-                        // Adicionar movimentação
                         analytics.movements.add(new StockMovement(changeType, quantity, timestamp));
-                        
-                        // Contar saídas (consumo)
-                        if ("SAIDA".equalsIgnoreCase(changeType) || "VENDA".equalsIgnoreCase(changeType)) {
-                            analytics.totalOutflow += quantity;
-                        }
-                        // Contar entradas
-                        else if ("ENTRADA".equalsIgnoreCase(changeType) || "COMPRA".equalsIgnoreCase(changeType)) {
-                            analytics.totalInflow += quantity;
+
+                        // O efeito no saldo decide o lado: um ajuste para menos
+                        // é consumo tanto quanto uma saída, e a previsão de
+                        // reposição ficava otimista por ignorá-lo.
+                        double effect = MovementRepository.signedQuantity(changeType, quantity);
+                        if (effect < 0) {
+                            analytics.totalOutflow += -effect;
+                        } else {
+                            analytics.totalInflow += effect;
                         }
                     }
                 } while (cursor.moveToNext());
@@ -506,7 +515,7 @@ public class AnalyticsActivity extends BaseActivity {
                 return MainActivity.stock != null && MainActivity.stock.isOpen();
             }
             
-            MainActivity.stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            MainActivity.stock = LocalDb.open(this);
             return MainActivity.stock != null && MainActivity.stock.isOpen();
         } catch (Exception e) {
             Log.e(TAG, "Error ensuring database availability", e);
@@ -595,10 +604,10 @@ public class AnalyticsActivity extends BaseActivity {
      */
     private static class StockMovement {
         String type;
-        int quantity;
+        double quantity;
         long timestamp;
         
-        StockMovement(String type, int quantity, long timestamp) {
+        StockMovement(String type, double quantity, long timestamp) {
             this.type = type;
             this.quantity = quantity;
             this.timestamp = timestamp;

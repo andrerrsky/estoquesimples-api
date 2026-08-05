@@ -15,11 +15,21 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 22
-        versionName "22"
+        versionCode 23
+        versionName "23"
+
+        // Endereço da API e versão do protocolo de sincronização. Ficam aqui
+        // para que o app de depuração possa apontar para outro ambiente sem
+        // alterar código, e para que a versão do protocolo acompanhe o binário.
+        buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.app\""
+        buildConfigField "int", "SYNC_PROTOCOL", "1"
     }
 
     buildTypes {
+        debug {
+            buildConfigField "String", "API_BASE_URL", "\"https://api-dev.estoquesimples.app\""
+        }
+
         release {
             // R8 ativo: reduz o tamanho do app e gera o mapping.txt de
             // desofuscação, embutido automaticamente no AAB para o Play Console.
@@ -95,6 +105,11 @@ dependencies {
     implementation 'com.appodeal.ads.sdk.adapters:bidon:0.13.0.0'
     implementation 'com.android.billingclient:billing:8.3.0'
     
+    // Armazenamento das credenciais de sincronização. O refresh token não pode
+    // ficar em SharedPreferences comum: com allowBackup ativo ele sairia do
+    // aparelho no backup do Android.
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
     // WorkManager for scheduled notifications
     implementation 'androidx.work:work-runtime:2.10.0'
     implementation 'com.google.guava:guava:31.1-android'

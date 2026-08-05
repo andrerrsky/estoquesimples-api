@@ -1,5 +1,9 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.ProductRepository;
+
 import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -337,12 +341,13 @@ public class AddActivity extends BaseActivity {
                 insertValues.put("photo", newPhotoPath);
             }
 
-            long rowId;
+            String newUuid;
             synchronized (MainActivity.DB_LOCK) {
-                rowId = MainActivity.stock.insert("Estoque", null, insertValues);
+                newUuid = new ProductRepository(MainActivity.stock)
+                        .create(insertValues, MovementRepository.CADASTRO);
             }
 
-            if (rowId != -1) {
+            if (newUuid != null) {
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
                     MainActivity.instance.markListDirty(true);
@@ -444,11 +449,9 @@ public class AddActivity extends BaseActivity {
 
             // Se não conseguiu, tentar abrir diretamente
             Log.w(TAG, "MainActivity.stock is null, attempting to initialize database");
-            SQLiteDatabase db = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            SQLiteDatabase db = LocalDb.open(this);
             if (db != null && db.isOpen()) {
                 MainActivity.stock = db;
-                // Criar tabelas se necessário
-                db.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
                 return true;
             }
             

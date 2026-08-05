@@ -1,5 +1,10 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.ProductRepository;
+import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
+
 import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -191,6 +196,10 @@ public class MainActivity extends BaseActivity {
         // Iniciar verificação de estoque baixo e agendamento de notificações
         LowStockScheduler.checkAndScheduleNotifications(this);
 
+        // Decide em segundo plano se este aparelho sincroniza. Enquanto a
+        // resposta não chega, o app opera exatamente como sempre operou.
+        SyncBootstrap.start(this);
+
         // SearchView setup:
         searchView = (SearchView) findViewById(R.id.searchView);
         if (searchView != null) {
@@ -265,66 +274,28 @@ public class MainActivity extends BaseActivity {
 
     }
 
+    /**
+     * Abre o banco local.
+     *
+     * A criação de tabelas e a evolução do schema saíram daqui e passaram a
+     * viver em {@link LocalDb}. Antes, cada tela repetia os CREATE e os ALTER
+     * por conta própria, e o schema real de um aparelho dependia de qual tela
+     * o usuário tinha aberto. Agora existe uma versão de schema explícita e um
+     * caminho de migração único.
+     */
     public void openOrCreateDB() {
         try {
-            stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
-            
+            stock = LocalDb.open(this);
+
             if (stock == null) {
                 Log.e("MainActivity", "Failed to open or create database");
                 Toast.makeText(this, "Erro crítico: Não foi possível inicializar o banco de dados", Toast.LENGTH_LONG).show();
                 return;
             }
-            
-            stock.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
-            // Histórico de movimentações de estoque
-            stock.execSQL("CREATE TABLE IF NOT EXISTS EstoqueHistorico(id INTEGER PRIMARY KEY AUTOINCREMENT, product_name VARCHAR, change_type VARCHAR, quantity INTEGER, timestamp INTEGER, note VARCHAR);");
-            
-            // Adicionar colunas novas se a tabela já existir (migração)
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN category VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column category already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN sku VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column sku already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN barcode VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column barcode already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN supplier VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column supplier already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN location VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column location already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN min_stock VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column min_stock already exists");
-            }
-            
-            try {
-                stock.execSQL("ALTER TABLE Estoque ADD COLUMN unit VARCHAR");
-            } catch (Exception e) { 
-                Log.d("MainActivity", "Column unit already exists");
-            }
-            
+
             Log.d("MainActivity", "Database initialized successfully");
             migrateProductPhotosAsync();
-            
+
         } catch (Exception e) {
             Log.e("MainActivity", "Error initializing database", e);
             Toast.makeText(this, "Erro ao inicializar banco de dados: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -599,7 +570,8 @@ public class MainActivity extends BaseActivity {
         try {
             synchronized (DB_LOCK) {
                 cursor = stock.rawQuery(
-                        "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque ORDER BY id DESC",
+                        "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit "
+                                + "FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY id DESC",
                         null);
 
                 if (cursor != null && cursor.moveToFirst()) {
@@ -679,13 +651,21 @@ public class MainActivity extends BaseActivity {
                                 return;
                             }
                             
-                            // Usar query parametrizada para prevenir SQL injection
-                            int rowsDeleted;
+                            // Exclusão suave por identificador estável.
+                            //
+                            // Apagar a linha deixava o histórico órfão de forma
+                            // definitiva, e apagar por nome removia junto todos
+                            // os produtos homônimos. Marcando como excluído, o
+                            // produto some das listas, os relatórios históricos
+                            // continuam corretos e nada é perdido.
+                            boolean rowsDeleted;
                             synchronized (DB_LOCK) {
-                                rowsDeleted = stock.delete("Estoque", "name=?", new String[]{finalProductName});
+                                ProductRepository products = new ProductRepository(stock);
+                                String uuid = products.findUuidByName(finalProductName);
+                                rowsDeleted = uuid != null && products.softDelete(uuid);
                             }
-                            
-                            if (rowsDeleted > 0) {
+
+                            if (rowsDeleted) {
                                 updateList();
                                 Toast.makeText(MainActivity.this, "Produto removido com sucesso!", Toast.LENGTH_LONG).show();
                                 
@@ -715,20 +695,13 @@ public class MainActivity extends BaseActivity {
             return false;
         }
 
-        Cursor cursor = null;
         try {
-            // Usar query parametrizada para prevenir SQL injection
             synchronized (DB_LOCK) {
-                cursor = stock.rawQuery("SELECT * FROM Estoque WHERE name=?", new String[]{productName});
-                return cursor != null && cursor.getCount() > 0;
+                return new ProductRepository(stock).existsByName(productName);
             }
         } catch (Exception e) {
             Log.e("MainActivity", "Error checking if product exists", e);
             return false;
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
     }
 
@@ -815,6 +788,12 @@ public class MainActivity extends BaseActivity {
             return true;
         } else if (itemId == R.id.menu_history) {
             showHistoryActivity();
+            return true;
+        } else if (itemId == R.id.menu_account) {
+            startActivity(new Intent(this, AccountActivity.class));
+            return true;
+        } else if (itemId == R.id.menu_subscription) {
+            startActivity(new Intent(this, SubscriptionActivity.class));
             return true;
         } else if (itemId == R.id.menu_settings) {
             showSettingsActivity();
@@ -1131,29 +1110,28 @@ public class MainActivity extends BaseActivity {
         }
         
         int updated = 0;
+        ProductRepository repository = new ProductRepository(stock);
+        MovementRepository movements = new MovementRepository(stock);
+
         for (String productName : products) {
-            Cursor cursor = null;
             try {
-                cursor = stock.rawQuery("SELECT amount FROM Estoque WHERE name=?", new String[]{productName});
-            if (cursor.moveToFirst()) {
-                double currentAmount = CurrencyHelper.parseCurrency(cursor.getString(0), 0);
-                double newAmount = Math.max(0, currentAmount + adjustment); // Não permitir quantidades negativas
-                
-                ContentValues values = new ContentValues();
-                values.put("amount", CurrencyHelper.quantityForStorage(newAmount));
-                stock.update("Estoque", values, "name=?", new String[]{productName});
-                updated++;
-            }
+                String uuid = repository.findUuidByName(productName);
+                if (uuid == null) {
+                    continue;
+                }
+
+                // O ajuste em massa passa pelo repositório de movimentações
+                // para que a mudança de saldo também vire um evento. Alterar a
+                // quantidade sem registrar o motivo é o que hoje impede
+                // reconstruir o estoque a partir do histórico.
+                double target = Math.max(0, repository.currentAmount(uuid) + adjustment);
+                MovementRepository.Result result = movements.setAbsolute(
+                        uuid, MovementRepository.AJUSTE, target, "Ajuste em massa");
+                if (result.success) {
+                    updated++;
+                }
             } catch (Exception e) {
                 Log.e("MainActivity", "Error adjusting quantity for product: " + productName, e);
-            } finally {
-                if (cursor != null) {
-                    try {
-                        cursor.close();
-                    } catch (Exception e) {
-                        Log.e("MainActivity", "Error closing cursor", e);
-                    }
-                }
             }
         }
         
@@ -1173,12 +1151,14 @@ public class MainActivity extends BaseActivity {
         }
         
         int updated = 0;
+        ProductRepository repository = new ProductRepository(stock);
         for (String productName : products) {
             try {
+                String uuid = repository.findUuidByName(productName);
+                if (uuid == null) continue;
                 ContentValues values = new ContentValues();
                 values.put("category", category);
-                int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
-                if (rows > 0) updated++;
+                if (repository.update(uuid, values)) updated++;
             } catch (Exception e) {
                 Log.e("MainActivity", "Error updating category for product: " + productName, e);
             }
@@ -1200,12 +1180,14 @@ public class MainActivity extends BaseActivity {
         }
         
         int updated = 0;
+        ProductRepository repository = new ProductRepository(stock);
         for (String productName : products) {
             try {
+                String uuid = repository.findUuidByName(productName);
+                if (uuid == null) continue;
                 ContentValues values = new ContentValues();
                 values.put("supplier", supplier);
-                int rows = stock.update("Estoque", values, "name=?", new String[]{productName});
-                if (rows > 0) updated++;
+                if (repository.update(uuid, values)) updated++;
             } catch (Exception e) {
                 Log.e("MainActivity", "Error updating supplier for product: " + productName, e);
             }

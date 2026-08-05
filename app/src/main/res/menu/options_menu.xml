@@ -18,6 +18,14 @@
         android:title="Histórico"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_account"
+        android:title="Conta e sincronização"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_subscription"
+        android:title="Assinatura da nuvem"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_settings"
         android:title="@string/settings_title"
         app:showAsAction="never" />

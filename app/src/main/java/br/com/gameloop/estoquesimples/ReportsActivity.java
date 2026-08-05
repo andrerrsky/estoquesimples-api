@@ -1,5 +1,8 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+
 import android.Manifest;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -397,7 +400,7 @@ public class ReportsActivity extends BaseActivity {
 
         Cursor cursor = null;
         try {
-            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category FROM Estoque", null);
+            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
 
         int cursorCount = cursor.getCount();
         double totalItemsCount = 0;
@@ -589,7 +592,7 @@ public class ReportsActivity extends BaseActivity {
 
             // Última tentativa: tentar abrir o banco de dados diretamente
             Log.d("ReportsActivity", "Attempting to open database directly");
-            MainActivity.stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            MainActivity.stock = LocalDb.open(this);
             
             if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
                 Log.d("ReportsActivity", "Database opened successfully");
@@ -664,8 +667,8 @@ public class ReportsActivity extends BaseActivity {
         try {
             historyCursor = MainActivity.stock.rawQuery(
                 "SELECT h.change_type, h.quantity, e.value " +
-                "FROM EstoqueHistorico h " +
-                "LEFT JOIN Estoque e ON h.product_name = e.name",
+                "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
+                "WHERE h.deleted_at IS NULL",
                 null);
 
             if (historyCursor.moveToFirst()) {
@@ -673,13 +676,11 @@ public class ReportsActivity extends BaseActivity {
                     String changeType = historyCursor.getString(0);
                     double qty = CurrencyHelper.parseCurrency(historyCursor.getString(1), 0);
                     double unitVal = CurrencyHelper.parseCurrency(historyCursor.getString(2), 0.0);
-                    double lineTotal = qty * unitVal;
+                    double lineTotal = Math.abs(qty) * unitVal;
 
-                    if ("entrada".equalsIgnoreCase(changeType) || "ENTRADA".equalsIgnoreCase(changeType)
-                            || "COMPRA".equalsIgnoreCase(changeType)) {
+                    if (isEntrada(changeType, qty)) {
                         totalEntry += lineTotal;
-                    } else if ("saida".equalsIgnoreCase(changeType) || "SAIDA".equalsIgnoreCase(changeType)
-                            || "VENDA".equalsIgnoreCase(changeType)) {
+                    } else if (isSaida(changeType, qty)) {
                         totalExit += lineTotal;
                     }
                 } while (historyCursor.moveToNext());
@@ -1019,7 +1020,7 @@ public class ReportsActivity extends BaseActivity {
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT name, amount, value, category, unit FROM Estoque " +
-                            "ORDER BY category COLLATE NOCASE, name COLLATE NOCASE",
+                            "WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY category COLLATE NOCASE, name COLLATE NOCASE",
                     null);
 
             if (c == null || !c.moveToFirst()) {
@@ -1088,7 +1089,7 @@ public class ReportsActivity extends BaseActivity {
         b.heading("PRODUTOS COM MAIOR VALOR EM ESTOQUE");
         Cursor c = null;
         try {
-            c = MainActivity.stock.rawQuery("SELECT name, amount, value, unit FROM Estoque", null);
+            c = MainActivity.stock.rawQuery("SELECT name, amount, value, unit FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
             List<ProductValue> list = new ArrayList<>();
             if (c != null && c.moveToFirst()) {
                 do {
@@ -1137,7 +1138,7 @@ public class ReportsActivity extends BaseActivity {
         int totalProducts = 0;
         double totalItems = 0, totalValue = 0.0;
         try {
-            c = MainActivity.stock.rawQuery("SELECT amount, value FROM Estoque", null);
+            c = MainActivity.stock.rawQuery("SELECT amount, value FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
             if (c != null) {
                 totalProducts = c.getCount();
                 if (c.moveToFirst()) {
@@ -1173,19 +1174,19 @@ public class ReportsActivity extends BaseActivity {
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT h.change_type, h.quantity, e.value " +
-                            "FROM EstoqueHistorico h LEFT JOIN Estoque e ON h.product_name = e.name " +
-                            "WHERE h.timestamp >= ?",
+                            "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
+                            "WHERE h.timestamp >= ? AND h.deleted_at IS NULL",
                     new String[]{String.valueOf(period.cutoffMillis())});
             if (c != null && c.moveToFirst()) {
                 do {
                     String changeType = c.getString(0);
                     double qty = CurrencyHelper.parseCurrency(c.getString(1), 0);
                     double val = CurrencyHelper.parseCurrency(c.getString(2), 0.0);
-                    double line = qty * val;
-                    if (isEntrada(changeType)) {
+                    double line = Math.abs(qty) * val;
+                    if (isEntrada(changeType, qty)) {
                         totalEntry += line;
                         entryCount++;
-                    } else if (isSaida(changeType)) {
+                    } else if (isSaida(changeType, qty)) {
                         totalExit += line;
                         exitCount++;
                     }
@@ -1210,7 +1211,7 @@ public class ReportsActivity extends BaseActivity {
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT name, amount, min_stock, supplier, location, unit FROM Estoque " +
-                            "ORDER BY name COLLATE NOCASE",
+                            "WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY name COLLATE NOCASE",
                     null);
             if (c != null && c.moveToFirst()) {
                 do {
@@ -1259,7 +1260,7 @@ public class ReportsActivity extends BaseActivity {
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT name, description, amount, value, category, sku, barcode, supplier, location, min_stock, unit " +
-                            "FROM Estoque ORDER BY name COLLATE NOCASE",
+                            "FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY name COLLATE NOCASE",
                     null);
             if (c == null || !c.moveToFirst()) {
                 b.text("Nenhum produto cadastrado no momento.", 10);
@@ -1335,14 +1336,15 @@ public class ReportsActivity extends BaseActivity {
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT h.product_name, h.change_type, h.quantity, h.timestamp, h.note, e.value, e.unit " +
-                            "FROM EstoqueHistorico h LEFT JOIN Estoque e ON h.product_name = e.name " +
-                            "WHERE h.timestamp >= ? ORDER BY h.timestamp DESC",
+                            "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
+                            "WHERE h.timestamp >= ? AND h.deleted_at IS NULL ORDER BY h.timestamp DESC",
                     new String[]{String.valueOf(period.cutoffMillis())});
             if (c != null && c.moveToFirst()) {
                 do {
                     String changeType = c.getString(1);
-                    boolean entrada = isEntrada(changeType);
-                    boolean saida = isSaida(changeType);
+                    double qty = CurrencyHelper.parseCurrency(c.getString(2), 0);
+                    boolean entrada = isEntrada(changeType, qty);
+                    boolean saida = isSaida(changeType, qty);
 
                     if (entradaFilter != null) {
                         if (entradaFilter && !entrada) continue;
@@ -1350,23 +1352,23 @@ public class ReportsActivity extends BaseActivity {
                     }
 
                     String product = c.getString(0);
-                    double qty = CurrencyHelper.parseCurrency(c.getString(2), 0);
                     long ts = c.getLong(3);
                     String note = c.getString(4);
                     double val = CurrencyHelper.parseCurrency(c.getString(5), 0.0);
                     String unit = unitSuffix(c.getString(6));
-                    double lineVal = qty * val;
+                    double absQty = Math.abs(qty);
+                    double lineVal = absQty * val;
 
                     count++;
-                    String label = entrada ? "ENTRADA" : (saida ? "SAÍDA" : changeType);
-                    b.movementItem(count, sdf.format(new Date(ts)), product, label,
-                            fq(qty) + unit, fc(lineVal), note, entrada);
+                    b.movementItem(count, sdf.format(new Date(ts)), product,
+                            MovementDisplay.label(changeType),
+                            fq(absQty) + unit, fc(lineVal), note, entrada);
 
                     if (entrada) {
-                        qtyEntrada += qty;
+                        qtyEntrada += absQty;
                         valEntrada += lineVal;
                     } else if (saida) {
-                        qtySaida += qty;
+                        qtySaida += absQty;
                         valSaida += lineVal;
                     }
                 } while (c.moveToNext());
@@ -1422,12 +1424,19 @@ public class ReportsActivity extends BaseActivity {
         return present(unit) ? " " + unit : "";
     }
 
-    private boolean isEntrada(String changeType) {
-        return "entrada".equalsIgnoreCase(changeType) || "compra".equalsIgnoreCase(changeType);
+    /**
+     * Classifica a movimentação pelo efeito real no saldo.
+     *
+     * A lista fixa de tipos que existia aqui ignorava cadastro, importação,
+     * edição e ajuste, então esses eventos sumiam dos relatórios — o total de
+     * entradas não batia com o estoque que o usuário via na tela.
+     */
+    private boolean isEntrada(String changeType, double quantity) {
+        return MovementRepository.signedQuantity(changeType, quantity) > 0;
     }
 
-    private boolean isSaida(String changeType) {
-        return "saida".equalsIgnoreCase(changeType) || "venda".equalsIgnoreCase(changeType);
+    private boolean isSaida(String changeType, double quantity) {
+        return MovementRepository.signedQuantity(changeType, quantity) < 0;
     }
 
     private void closeCursor(Cursor c) {

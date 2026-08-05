@@ -1,5 +1,10 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.OutboxRepository;
+import br.com.gameloop.estoquesimples.data.ProductRepository;
+
 import android.Manifest;
 import android.content.ContentValues;
 import android.content.DialogInterface;
@@ -265,6 +270,24 @@ public class ImportActivity extends BaseActivity {
     }
 
     public void importDBFile(View v) {
+        // Substituir o arquivo apaga a fila de operações junto com os dados.
+        // O que ainda não subiu deixaria de existir aqui e nunca teria chegado
+        // à nuvem — desaparecendo dos dois lados de uma vez.
+        int pendentes = new OutboxRepository(MainActivity.stock).pendingCount();
+        if (pendentes > 0) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Sincronize antes de substituir")
+                    .setMessage(pendentes + (pendentes == 1
+                            ? " alteração ainda não foi enviada para a nuvem."
+                            : " alterações ainda não foram enviadas para a nuvem.")
+                            + " Substituir o banco agora faria você perdê-la"
+                            + (pendentes == 1 ? "" : "s") + " definitivamente.\n\n"
+                            + "Sincronize primeiro pela tela de conta e tente de novo.")
+                    .setPositiveButton("Entendi", null)
+                    .show();
+            return;
+        }
+
         new AlertDialog.Builder(this)
                 .setTitle("Atenção")
                 .setMessage("Se você importar um outro banco de dados o atual será perdido, tem certeza que deseja fazer isso?")
@@ -485,7 +508,10 @@ public class ImportActivity extends BaseActivity {
 
         try {
             synchronized (MainActivity.DB_LOCK) {
-                MainActivity.stock.insert("Estoque", null, insertValues);
+                if (new ProductRepository(MainActivity.stock)
+                        .create(insertValues, MovementRepository.IMPORTACAO) == null) {
+                    throw new IllegalStateException("Error inserting into database");
+                }
             }
 
             if (MainActivity.instance != null) {
@@ -607,7 +633,8 @@ public class ImportActivity extends BaseActivity {
             Cursor cursor = null;
             try {
                 cursor = MainActivity.stock.rawQuery(
-                    "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque", 
+                    "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit "
+                            + "FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, 
                     null
                 );
             } catch (Exception e) {
@@ -752,11 +779,9 @@ public class ImportActivity extends BaseActivity {
 
             // Última tentativa: tentar abrir o banco de dados diretamente
             Log.d(TAG, "Attempting to open database directly");
-            MainActivity.stock = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
-            
+            MainActivity.stock = LocalDb.open(this);
+
             if (MainActivity.stock != null && MainActivity.stock.isOpen()) {
-                // Criar tabela se necessário
-                MainActivity.stock.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
                 Log.d(TAG, "Database opened successfully");
                 return true;
             }

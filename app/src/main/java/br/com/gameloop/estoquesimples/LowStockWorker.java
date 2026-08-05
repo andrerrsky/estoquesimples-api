@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -67,11 +69,11 @@ public class LowStockWorker extends Worker {
 
         try {
             // Abrir banco de dados
-            db = getApplicationContext().openOrCreateDatabase("estoque", Context.MODE_PRIVATE, null);
+            db = LocalDb.open(getApplicationContext());
 
             // Buscar produtos com estoque baixo
             cursor = db.rawQuery(
-                "SELECT name, amount, min_stock FROM Estoque WHERE min_stock > 0",
+                "SELECT name, amount, min_stock FROM Estoque WHERE min_stock > 0 AND " + LocalDb.ACTIVE_PRODUCTS,
                 null
             );
 
@@ -92,9 +94,8 @@ public class LowStockWorker extends Worker {
             if (cursor != null) {
                 cursor.close();
             }
-            if (db != null && db.isOpen()) {
-                db.close();
-            }
+            // LocalDb.open() devolve a conexão compartilhada do processo.
+            // Fechá-la aqui derruba a UI e qualquer sync em andamento.
         }
 
         return lowStockProducts;

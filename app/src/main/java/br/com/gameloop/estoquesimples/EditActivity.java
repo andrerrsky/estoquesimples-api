@@ -1,5 +1,10 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.ProductRepository;
+import br.com.gameloop.estoquesimples.data.Quantities;
+
 import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -56,6 +61,15 @@ public class EditActivity extends BaseActivity {
     private String errorFeedback;
 
     public String productName;
+
+    /**
+     * Identificador estável do produto em edição.
+     *
+     * Resolvido uma única vez ao abrir a tela. Guardar o nome não serve:
+     * renomear o produto mudaria a chave no meio da própria edição, que é
+     * exatamente como o histórico ficava órfão.
+     */
+    private String productUuid;
 
     private File imagesFolder;
     private String lastPhotoName;
@@ -429,11 +443,9 @@ public class EditActivity extends BaseActivity {
 
             // Se não conseguiu, tentar abrir diretamente
             Log.w(TAG, "MainActivity.stock is null, attempting to initialize database");
-            SQLiteDatabase db = openOrCreateDatabase("estoque", MODE_PRIVATE, null);
+            SQLiteDatabase db = LocalDb.open(this);
             if (db != null && db.isOpen()) {
                 MainActivity.stock = db;
-                // Criar tabelas se necessário
-                db.execSQL("CREATE TABLE IF NOT EXISTS Estoque(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR, description VARCHAR, amount VARCHAR, value VARCHAR, photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR);");
                 return true;
             }
             
@@ -455,12 +467,18 @@ public class EditActivity extends BaseActivity {
             return false;
         }
 
+        productUuid = new ProductRepository(MainActivity.stock).findUuidByName(productName);
+        if (productUuid == null) {
+            Log.e(TAG, "Produto sem identificador: " + productName);
+            return false;
+        }
+
         Cursor cursor = null;
         try {
-            // Usar query parametrizada para prevenir SQL injection
             cursor = MainActivity.stock.rawQuery(
-                "SELECT description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit FROM Estoque WHERE name=?", 
-                new String[]{productName}
+                "SELECT description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit "
+                    + "FROM Estoque WHERE uuid=?",
+                new String[]{productUuid}
             );
 
             if (cursor != null && cursor.moveToFirst()) {
@@ -505,7 +523,7 @@ public class EditActivity extends BaseActivity {
                                     newPhotoPath = migrated;
                                     ContentValues photoUpdate = new ContentValues();
                                     photoUpdate.put("photo", migrated);
-                                    MainActivity.stock.update("Estoque", photoUpdate, "name=?", new String[]{productName});
+                                    MainActivity.stock.update("Estoque", photoUpdate, "uuid=?", new String[]{productUuid});
                                 }
                             }
                             ImageLoadHelper.loadDetailImage(this, displayPath, photo);
@@ -563,9 +581,15 @@ public class EditActivity extends BaseActivity {
         }
 
         try {
+            // A quantidade não entra no ContentValues: ela só muda através de
+            // uma movimentação, para que o histórico continue explicando o
+            // saldo. Editar o campo direto era a última forma de alterar
+            // estoque sem deixar rastro.
+            double targetAmount = Quantities.parse(
+                    amount.getText().toString().replace(" ", "").trim());
+
             ContentValues updateValues = new ContentValues();
             updateValues.put("name", name.getText().toString().trim());
-            updateValues.put("amount", amount.getText().toString().replace(" ", "").trim());
             updateValues.put("value", CurrencyHelper.sanitizeForStorage(value.getText().toString()));
             updateValues.put("description", description != null ? description.getText().toString().trim() : "");
             
@@ -582,13 +606,39 @@ public class EditActivity extends BaseActivity {
                 updateValues.put("photo", newPhotoPath);
             }
 
-            // Usar query parametrizada para segurança (prevenir SQL injection)
-            int rowsAffected;
+            // Atualização endereçada pelo identificador estável: renomear o
+            // produto deixa de desligá-lo do próprio histórico, e produtos
+            // homônimos deixam de ser alterados juntos.
+            boolean saved;
+            String amountError = null;
             synchronized (MainActivity.DB_LOCK) {
-                rowsAffected = MainActivity.stock.update("Estoque", updateValues, "name=?", new String[]{productName});
+                SQLiteDatabase db = MainActivity.stock;
+                db.beginTransaction();
+                try {
+                    saved = new ProductRepository(db).update(productUuid, updateValues);
+                    if (saved) {
+                        MovementRepository.Result adjustment = new MovementRepository(db)
+                                .setAbsolute(productUuid, MovementRepository.EDICAO,
+                                        targetAmount, null);
+                        if (!adjustment.success) {
+                            saved = false;
+                            amountError = adjustment.message;
+                        }
+                    }
+                    if (saved) {
+                        db.setTransactionSuccessful();
+                    }
+                } finally {
+                    db.endTransaction();
+                }
             }
 
-            if (rowsAffected > 0) {
+            if (amountError != null) {
+                Toast.makeText(EditActivity.this, amountError, Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (saved) {
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
                     MainActivity.instance.markListDirty(true);

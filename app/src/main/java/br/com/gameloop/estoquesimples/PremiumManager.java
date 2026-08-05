@@ -15,10 +15,12 @@ public class PremiumManager {
     private static final long ONE_HOUR_IN_MILLIS = 60L * 60 * 1000; // 1 hora em milissegundos
     
     private SharedPreferences prefs;
+    private final Context appContext;
     private static PremiumManager instance;
     
     private PremiumManager(Context context) {
-        prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        appContext = context.getApplicationContext();
+        prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
     
     public static synchronized PremiumManager getInstance(Context context) {
@@ -89,10 +91,31 @@ public class PremiumManager {
     }
     
     /**
-     * Verifica se o usuário tem acesso premium (PRO permanente OU temporário de 1 hora)
+     * Verifica se o usuário tem acesso premium.
+     *
+     * Três origens independentes: a compra antiga e definitiva, a liberação
+     * temporária por anúncio, e a assinatura da nuvem. Quem paga a assinatura
+     * não deveria continuar vendo anúncios só porque nunca comprou a versão
+     * antiga — e a compra antiga continua valendo para sempre, sem exigir conta.
      */
     public boolean hasPremiumAccess() {
-        return isPro() || isTempPremiumActive();
+        return isPro() || isTempPremiumActive() || hasCloudSubscription();
+    }
+
+    /**
+     * Assinatura ativa validada pelo servidor.
+     *
+     * Lê apenas o retrato local, sem rede: este método é chamado a cada
+     * exibição de anúncio e não pode bloquear a interface. O retrato tem prazo
+     * de validade próprio, então uma assinatura cancelada deixa de valer mesmo
+     * que o aparelho nunca mais se conecte.
+     */
+    public boolean hasCloudSubscription() {
+        try {
+            return new br.com.gameloop.estoquesimples.sync.EntitlementManager(appContext).canSync();
+        } catch (Exception e) {
+            return false;
+        }
     }
     
     /**

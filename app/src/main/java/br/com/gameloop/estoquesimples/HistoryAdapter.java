@@ -1,7 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,18 +16,25 @@ import java.util.Locale;
 public class HistoryAdapter extends BaseAdapter {
 
     public static class HistoryItem {
+        private String uuid;
         private String productName;
         private String type;
         private double quantity;
         private long timestamp;
         private String note;
 
-        public HistoryItem(String productName, String type, double quantity, long timestamp, String note) {
+        public HistoryItem(String uuid, String productName, String type, double quantity,
+                           long timestamp, String note) {
+            this.uuid = uuid;
             this.productName = productName;
             this.type = type;
             this.quantity = quantity;
             this.timestamp = timestamp;
             this.note = note;
+        }
+
+        public String getUuid() {
+            return uuid;
         }
 
         public String getProductName() {
@@ -96,20 +102,16 @@ public class HistoryAdapter extends BaseAdapter {
 
         HistoryItem item = items.get(position);
 
-        // Configurar tipo (Entrada/Saída)
-        boolean isEntrada = "entrada".equalsIgnoreCase(item.getType());
-        holder.typeSign.setText(isEntrada ? "+" : "-");
-        holder.typeLabel.setText(isEntrada ? "ENTRADA" : "SAÍDA");
-        
-        // Cores diferentes para entrada e saída
-        int backgroundColor = isEntrada ? Color.parseColor("#4CAF50") : Color.parseColor("#FF5722");
-        holder.typeBadge.setBackgroundColor(backgroundColor);
+        holder.typeSign.setText(MovementDisplay.sign(item.getType(), item.getQuantity()));
+        holder.typeLabel.setText(MovementDisplay.label(item.getType()));
+        holder.typeBadge.setBackgroundColor(MovementDisplay.color(item.getType(), item.getQuantity()));
 
         // Nome do produto
         holder.productName.setText(item.getProductName());
 
         // Quantidade
-        holder.quantity.setText(CurrencyHelper.formatQuantity(item.getQuantity()));
+        // O sinal já está no selo ao lado; repeti-lo no número mostraria "--5".
+        holder.quantity.setText(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())));
 
         // Data e hora
         String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));
