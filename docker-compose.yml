@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: estoquesimples-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: estoque
+      POSTGRES_PASSWORD: estoque
+      POSTGRES_DB: estoquesimples
+    # 5433 no host para não colidir com um Postgres local já instalado.
+    ports:
+      - '5433:5432'
+    volumes:
+      - estoquesimples-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U estoque -d estoquesimples']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  estoquesimples-pgdata:

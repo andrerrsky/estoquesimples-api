@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Segredos: nunca versionar. Use .env.example como referência.
+.env
+.env.*
+!.env.example
+
+# Credenciais de conta de serviço do Google Play
+*service-account*.json
+gcp-*.json
+
+.DS_Store
+.vscode/
+.idea/

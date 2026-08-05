@@ -1,0 +1,75 @@
+name: Exercício de restauração
+
+# Semanal, e sob demanda. O objetivo não é testar o Postgres: é garantir que o
+# procedimento de restauração continua funcionando com o schema atual, e que
+# quem precisar executá-lo às três da manhã tenha um roteiro já exercitado.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estoque
+          POSTGRES_PASSWORD: estoque
+          POSTGRES_DB: estoquesimples_origem
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U estoque"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ORIGEM: postgres://estoque:estoque@localhost:5432/estoquesimples_origem
+      DESTINO: postgres://estoque:estoque@localhost:5432/estoquesimples_restaurado
+      PGPASSWORD: estoque
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A versão do cliente precisa acompanhar a do servidor: pg_restore antigo
+      # recusa dumps gerados por um servidor mais novo, e descobrir isso durante
+      # um incidente custa horas.
+      - name: Cliente do Postgres 16
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Schema e dados de exercício
+        run: npx tsx src/platform/db/migrate.ts up && npx tsx scripts/seed-drill.ts
+        env:
+          DATABASE_URL: ${{ env.ORIGEM }}
+
+      - name: Gerar o dump
+        run: pg_dump --format=custom --file=backup.dump "$ORIGEM"
+
+      - name: Banco descartável para a restauração
+        run: psql "$ORIGEM" -c 'CREATE DATABASE estoquesimples_restaurado'
+
+      - name: Restaurar e conferir
+        run: npm run backup:verify -- --dump backup.dump --target "$DESTINO"
+
+      - name: Guardar o dump do exercício
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-dump
+          path: backup.dump
+          retention-days: 3

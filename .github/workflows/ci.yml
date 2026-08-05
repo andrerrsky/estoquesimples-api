@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Postgres real no CI: RLS, índices únicos parciais e SKIP LOCKED não têm
+    # como ser exercitados contra um substituto.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estoque
+          POSTGRES_PASSWORD: estoque
+          POSTGRES_DB: estoquesimples_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U estoque"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://estoque:estoque@localhost:5432/estoquesimples_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verificação de tipos
+        run: npm run typecheck
+
+      - name: Testes
+        run: npm test
+
+      - name: Build de produção
+        run: npm run build
+
+      - name: Documento OpenAPI gera sem erro
+        run: npm run --silent openapi > /dev/null
+        env:
+          DATABASE_URL: postgres://estoque:estoque@localhost:5432/estoquesimples_test
