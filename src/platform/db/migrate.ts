@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +20,22 @@ import { getEnv } from '../config/env.js';
  *   NNNN_nome.down.sql (opcional; sem ele a migration é irreversível)
  */
 
-const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
+/**
+ * `tsc` não copia `.sql`. Em produção o processo roda de `dist/`, então o
+ * diretório ao lado do `.js` só existe depois do `cp` do `npm run build`.
+ * O fallback em `src/` cobre a imagem do Nixpacks (o fonte permanece em /app)
+ * e o `tsx` do desenvolvimento.
+ */
+function resolveMigrationsDir(): string {
+  const candidates = [
+    join(dirname(fileURLToPath(import.meta.url)), 'migrations'),
+    join(process.cwd(), 'dist/platform/db/migrations'),
+    join(process.cwd(), 'src/platform/db/migrations'),
+  ];
+  return candidates.find((dir) => existsSync(dir)) ?? candidates[0]!;
+}
+
+const MIGRATIONS_DIR = resolveMigrationsDir();
 const ADVISORY_LOCK_KEY = 8_273_641_002;
 
 /**
@@ -123,6 +139,11 @@ export async function migrateUp(
   log: (message: string) => void = console.log,
 ): Promise<MigrationRunResult> {
   const migrations = await loadMigrations();
+  if (migrations.length === 0) {
+    throw new Error(
+      `Nenhuma migration encontrada em ${MIGRATIONS_DIR}. O build precisa copiar os .sql para dist/.`,
+    );
+  }
   const client = await pool.connect();
   const applied: number[] = [];
 
