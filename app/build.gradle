@@ -15,19 +15,19 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 23
-        versionName "23"
+        versionCode 24
+        versionName "24"
 
         // Endereço da API e versão do protocolo de sincronização. Ficam aqui
         // para que o app de depuração possa apontar para outro ambiente sem
         // alterar código, e para que a versão do protocolo acompanhe o binário.
-        buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.app\""
+        buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
         buildConfigField "int", "SYNC_PROTOCOL", "1"
     }
 
     buildTypes {
         debug {
-            buildConfigField "String", "API_BASE_URL", "\"https://api-dev.estoquesimples.app\""
+            buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
         }
 
         release {

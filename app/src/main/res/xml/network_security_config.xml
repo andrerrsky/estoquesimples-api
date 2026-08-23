@@ -19,6 +19,7 @@
       operacional recusa a conexão antes que ela aconteça.
     -->
     <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">estoquesimples.com.br</domain>
         <domain includeSubdomains="true">estoquesimples.app</domain>
         <trust-anchors>
             <certificates src="system" />
