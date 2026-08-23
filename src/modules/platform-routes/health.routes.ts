@@ -13,6 +13,34 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
   const { db, dbHandle, env } = app.services;
 
   /**
+   * Identificação mínima: quem abre a URL no navegador não deveria ver um 404
+   * e achar que o serviço está fora do ar.
+   */
+  routes.get(
+    '/',
+    {
+      schema: {
+        tags: ['infra'],
+        summary: 'Identificação do serviço',
+        response: {
+          200: z.object({
+            service: z.string(),
+            docs: z.string(),
+            health: z.string(),
+            ready: z.string(),
+          }),
+        },
+      },
+    },
+    async () => ({
+      service: 'estoquesimples-api',
+      docs: '/docs',
+      health: '/health',
+      ready: '/ready',
+    }),
+  );
+
+  /**
    * Liveness: responde sem tocar no banco.
    *
    * Se dependesse do Postgres, uma indisponibilidade momentânea do banco faria
