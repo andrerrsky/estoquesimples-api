@@ -4,7 +4,11 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
@@ -32,6 +36,7 @@ import br.com.gameloop.estoquesimples.billing.PendingPurchase;
 import br.com.gameloop.estoquesimples.sync.AccountService;
 import br.com.gameloop.estoquesimples.sync.ApiException;
 import br.com.gameloop.estoquesimples.sync.EntitlementManager;
+import br.com.gameloop.estoquesimples.sync.PasswordPolicy;
 import br.com.gameloop.estoquesimples.sync.RemoteConfig;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
@@ -48,6 +53,8 @@ import br.com.gameloop.estoquesimples.sync.TeamClient;
  */
 public class AccountActivity extends BaseActivity {
 
+    private static final String TAG = "AccountActivity";
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -61,6 +68,11 @@ public class AccountActivity extends BaseActivity {
     private EditText nameField;
     private EditText emailField;
     private EditText passwordField;
+    private View passwordRules;
+    private TextView ruleLength;
+    private TextView ruleCommon;
+    private TextView ruleRepeated;
+    private TextView ruleEmail;
     private Button primaryButton;
     private Button toggleModeButton;
 
@@ -98,11 +110,25 @@ public class AccountActivity extends BaseActivity {
         nameField = findViewById(R.id.nameField);
         emailField = findViewById(R.id.emailField);
         passwordField = findViewById(R.id.passwordField);
+        passwordRules = findViewById(R.id.passwordRules);
+        ruleLength = findViewById(R.id.ruleLength);
+        ruleCommon = findViewById(R.id.ruleCommon);
+        ruleRepeated = findViewById(R.id.ruleRepeated);
+        ruleEmail = findViewById(R.id.ruleEmail);
         primaryButton = findViewById(R.id.primaryButton);
         toggleModeButton = findViewById(R.id.toggleModeButton);
 
         primaryButton.setOnClickListener(v -> submitCredentials());
         toggleModeButton.setOnClickListener(v -> toggleMode());
+        TextWatcher regrasAoDigitar = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                refreshPasswordRules();
+            }
+        };
+        passwordField.addTextChangedListener(regrasAoDigitar);
+        emailField.addTextChangedListener(regrasAoDigitar);
 
         findViewById(R.id.syncNowButton).setOnClickListener(v -> syncNow());
         findViewById(R.id.conflictsButton).setOnClickListener(v ->
@@ -219,9 +245,23 @@ public class AccountActivity extends BaseActivity {
     private void toggleMode() {
         registerMode = !registerMode;
         nameField.setVisibility(registerMode ? View.VISIBLE : View.GONE);
+        passwordRules.setVisibility(registerMode ? View.VISIBLE : View.GONE);
         primaryButton.setText(registerMode ? "Criar conta" : "Entrar");
         toggleModeButton.setText(registerMode ? "Já tenho conta" : "Ainda não tenho conta");
         showMessage(null);
+        if (registerMode) {
+            refreshPasswordRules();
+        }
+    }
+
+    private void refreshPasswordRules() {
+        if (!registerMode || passwordRules.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        String senha = passwordField.getText() == null ? "" : passwordField.getText().toString();
+        String email = emailField.getText() == null ? "" : emailField.getText().toString().trim();
+        PasswordPolicy.render(ruleLength, ruleCommon, ruleRepeated, ruleEmail,
+                PasswordPolicy.check(senha, email), !senha.isEmpty());
     }
 
     // -------------------------------------------------------------------------
@@ -241,6 +281,14 @@ public class AccountActivity extends BaseActivity {
             showMessage("Informe seu nome.");
             return;
         }
+        if (registerMode) {
+            PasswordPolicy.Result regras = PasswordPolicy.check(senha, email);
+            refreshPasswordRules();
+            if (!regras.isValid()) {
+                showMessage(regras.problems.get(0));
+                return;
+            }
+        }
 
         setBusy(true);
         executor.execute(() -> {
@@ -253,6 +301,9 @@ public class AccountActivity extends BaseActivity {
                 List<AccountService.Workspace> workspaces = accounts.listWorkspaces();
 
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     // A senha não fica em memória depois do uso: a tela pode
                     // permanecer aberta em segundo plano por muito tempo.
@@ -261,9 +312,24 @@ public class AccountActivity extends BaseActivity {
                 });
 
             } catch (ApiException e) {
+                Log.w(TAG, "autenticação recusada: " + e.getCode(), e);
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     showMessage(e.userMessage());
+                });
+            } catch (Exception e) {
+                // Sem este catch o executor morre em silêncio, o spinner fica
+                // para sempre e o logcat filtrado pelo pacote não mostra nada.
+                Log.e(TAG, "falha inesperada ao autenticar", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível falar com o servidor. Tente de novo.");
                 });
             }
         });
@@ -326,13 +392,29 @@ public class AccountActivity extends BaseActivity {
             try {
                 AccountService.Workspace workspace = accounts.createWorkspace(nome);
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     selectWorkspace(workspace);
                 });
             } catch (ApiException e) {
+                Log.w(TAG, "falha ao criar empresa: " + e.getCode(), e);
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     showMessage(e.userMessage());
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "falha inesperada ao criar empresa", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível criar a empresa. Tente de novo.");
                 });
             }
         });
@@ -429,36 +511,62 @@ public class AccountActivity extends BaseActivity {
 
     /** Convidado sem conta: nome e senha são criados aqui mesmo. */
     private void promptInviteAccount(String codigo, TeamClient.Preview preview, String resumo) {
-        LinearLayout caixa = new LinearLayout(this);
-        caixa.setOrientation(LinearLayout.VERTICAL);
-        int margem = (int) (20 * getResources().getDisplayMetrics().density);
-        caixa.setPadding(margem, margem / 2, margem, 0);
+        View caixa = LayoutInflater.from(this).inflate(R.layout.dialog_invite_account, null);
+        EditText nome = caixa.findViewById(R.id.inviteNameField);
+        EditText senha = caixa.findViewById(R.id.invitePasswordField);
+        View regras = caixa.findViewById(R.id.invitePasswordRules);
+        if (regras == null) {
+            regras = caixa.findViewById(R.id.passwordRules);
+        }
+        regras.setVisibility(View.VISIBLE);
+        TextView ruleLengthInvite = caixa.findViewById(R.id.ruleLength);
+        TextView ruleCommonInvite = caixa.findViewById(R.id.ruleCommon);
+        TextView ruleRepeatedInvite = caixa.findViewById(R.id.ruleRepeated);
+        TextView ruleEmailInvite = caixa.findViewById(R.id.ruleEmail);
+        String emailConvite = preview.email != null ? preview.email : "";
 
-        EditText nome = new EditText(this);
-        nome.setHint("Seu nome");
-        caixa.addView(nome);
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                String digitada = senha.getText() == null ? "" : senha.getText().toString();
+                PasswordPolicy.render(ruleLengthInvite, ruleCommonInvite, ruleRepeatedInvite,
+                        ruleEmailInvite, PasswordPolicy.check(digitada, emailConvite),
+                        !digitada.isEmpty());
+            }
+        };
+        senha.addTextChangedListener(watcher);
+        PasswordPolicy.render(ruleLengthInvite, ruleCommonInvite, ruleRepeatedInvite,
+                ruleEmailInvite, PasswordPolicy.check("", emailConvite), false);
 
-        EditText senha = new EditText(this);
-        senha.setHint("Crie uma senha");
-        senha.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        caixa.addView(senha);
-
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Criar sua conta")
                 .setMessage(resumo + "\n\nO e-mail do convite já fica confirmado.")
                 .setView(caixa)
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Entrar na empresa", (dialog, which) -> {
-                    String texto = nome.getText().toString().trim();
-                    String segredo = senha.getText().toString();
-                    if (TextUtils.isEmpty(texto) || TextUtils.isEmpty(segredo)) {
-                        showMessage("Informe seu nome e crie uma senha.");
-                        return;
-                    }
-                    acceptInvite(codigo, texto, segredo);
-                })
-                .show();
+                .setPositiveButton("Entrar na empresa", null)
+                .create();
+        dialog.setOnShowListener(shown -> {
+            Button confirmar = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            confirmar.setOnClickListener(v -> {
+                String texto = nome.getText() == null ? "" : nome.getText().toString().trim();
+                String segredo = senha.getText() == null ? "" : senha.getText().toString();
+                if (TextUtils.isEmpty(texto) || TextUtils.isEmpty(segredo)) {
+                    showMessage("Informe seu nome e crie uma senha.");
+                    return;
+                }
+                PasswordPolicy.Result resultado = PasswordPolicy.check(segredo, emailConvite);
+                PasswordPolicy.render(ruleLengthInvite, ruleCommonInvite, ruleRepeatedInvite,
+                        ruleEmailInvite, resultado, true);
+                if (!resultado.isValid()) {
+                    showMessage(resultado.problems.get(0));
+                    return;
+                }
+                dialog.dismiss();
+                acceptInvite(codigo, texto, segredo);
+            });
+        });
+        dialog.show();
 
         if (preview.email != null) {
             emailField.setText(preview.email);

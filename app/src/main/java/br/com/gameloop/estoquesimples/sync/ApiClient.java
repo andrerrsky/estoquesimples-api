@@ -103,8 +103,10 @@ public final class ApiClient {
     private Response execute(String method, String path, JSONObject body,
                              String accessToken, String idempotencyKey) throws ApiException {
         HttpURLConnection connection = null;
+        Thread watchdog = null;
         try {
             URL url = new URL(baseUrl + path);
+            Log.i(TAG, method + " " + url);
             connection = (HttpURLConnection) url.openConnection();
 
             // A API só é acessada por HTTPS. O app ainda permite tráfego em
@@ -118,7 +120,9 @@ public final class ApiClient {
             connection.setRequestMethod(method);
             connection.setConnectTimeout(TIMEOUT_CONEXAO_MS);
             connection.setReadTimeout(TIMEOUT_LEITURA_MS);
+            connection.setInstanceFollowRedirects(true);
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Connection", "close");
             connection.setRequestProperty("X-Sync-Protocol", String.valueOf(protocolVersion));
             connection.setRequestProperty("X-App-Version", BuildConfig.VERSION_NAME);
 
@@ -128,6 +132,20 @@ public final class ApiClient {
             if (idempotencyKey != null) {
                 connection.setRequestProperty("Idempotency-Key", idempotencyKey);
             }
+
+            // Em HTTP/2 o timeout do HttpURLConnection às vezes é ignorado.
+            // Cortar a conexão desbloqueia getResponseCode().
+            final HttpURLConnection toWatch = connection;
+            watchdog = new Thread(() -> {
+                try {
+                    Thread.sleep(TIMEOUT_CONEXAO_MS + TIMEOUT_LEITURA_MS + 5_000L);
+                    toWatch.disconnect();
+                } catch (InterruptedException ignored) {
+                    // Pedido terminou a tempo.
+                }
+            }, "api-watchdog");
+            watchdog.setDaemon(true);
+            watchdog.start();
 
             if (body != null) {
                 connection.setDoOutput(true);
@@ -152,10 +170,13 @@ public final class ApiClient {
 
         } catch (ApiException e) {
             throw e;
-        } catch (IOException e) {
-            Log.w(TAG, method + " " + path + " falhou: " + e.getMessage());
+        } catch (Exception e) {
+            Log.w(TAG, method + " " + path + " falhou: " + e.getMessage(), e);
             throw ApiException.network(e);
         } finally {
+            if (watchdog != null) {
+                watchdog.interrupt();
+            }
             if (connection != null) {
                 connection.disconnect();
             }
