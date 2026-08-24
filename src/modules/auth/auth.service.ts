@@ -660,7 +660,10 @@ export class AuthService {
       });
     } catch (error) {
       this.services.logger?.error(
-        { err: error },
+        {
+          err: error,
+          motivo: error instanceof Error ? error.message : String(error),
+        },
         'cadastro concluído, mas o e-mail de verificação não saiu',
       );
     }

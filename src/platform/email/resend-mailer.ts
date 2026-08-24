@@ -34,7 +34,12 @@ export class ResendMailer implements Mailer {
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500);
       this.logger.error(
-        { kind: message.kind, to: maskEmail(message.to), status: response.status },
+        {
+          kind: message.kind,
+          to: maskEmail(message.to),
+          status: response.status,
+          detail,
+        },
         'falha ao enviar e-mail via Resend',
       );
       throw new Error(`Resend respondeu ${response.status}: ${detail}`);
