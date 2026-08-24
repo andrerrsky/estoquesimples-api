@@ -72,7 +72,7 @@ export class AuthService {
 
     const passwordHash = await hashPassword(input.password);
 
-    return this.db.transaction(async (tx) => {
+    const created = await this.db.transaction(async (tx) => {
       const existing = await tx
         .select({ id: users.id })
         .from(users)
@@ -103,13 +103,20 @@ export class AuthService {
         ipAddress: meta.ipAddress,
       });
 
-      // Verificação de e-mail é opcional para entrar, mas exigida para
-      // convidar membros. Emitida já no cadastro para o usuário poder
-      // confirmar quando quiser.
-      await this.sendEmailVerification(tx, user.id, user.email);
+      const verificationToken = await this.sendEmailVerification(tx, user.id, user.email);
 
-      return this.buildAuthSuccess(user, session, deviceId);
+      return {
+        auth: await this.buildAuthSuccess(user, session, deviceId),
+        email: user.email,
+        verificationToken,
+      };
     });
+
+    // Fora da transação: se o Resend travar, o cadastro já está gravado e a
+    // API ainda responde. Esperar o provedor com a transação aberta deixava
+    // o app em loading infinito.
+    await this.deliverVerificationEmail(created.email, created.verificationToken);
+    return created.auth;
   }
 
   /**
@@ -622,7 +629,7 @@ export class AuthService {
   // Verificação de e-mail
   // -------------------------------------------------------------------------
 
-  private async sendEmailVerification(tx: Transaction, userId: string, email: string): Promise<void> {
+  private async sendEmailVerification(tx: Transaction, userId: string, email: string): Promise<string> {
     const token = generateToken();
     await tx.insert(emailVerificationTokens).values({
       userId,
@@ -630,16 +637,33 @@ export class AuthService {
       tokenHash: hashToken(token),
       expiresAt: addHours(new Date(), this.env.EMAIL_VERIFICATION_TTL_HOURS),
     });
+    return token;
+  }
 
-    await this.services.mailer.send({
-      to: email,
-      kind: 'email_verification',
-      subject: 'Confirme seu e-mail - Estoque Simples',
-      text:
-        'Use o código abaixo para confirmar seu e-mail:\n\n' +
-        `${token}\n\n` +
-        `O código vale por ${this.env.EMAIL_VERIFICATION_TTL_HOURS} horas.`,
-    });
+  /**
+   * Dispara o e-mail depois que a transação já commitou.
+   *
+   * Falha de provedor não pode desfazer o cadastro nem segurar a resposta HTTP:
+   * o usuário reenvia pela conta. Sem timeout no fetch, um Resend mudo prendia
+   * o POST /register até o cliente desistir.
+   */
+  private async deliverVerificationEmail(email: string, token: string): Promise<void> {
+    try {
+      await this.services.mailer.send({
+        to: email,
+        kind: 'email_verification',
+        subject: 'Confirme seu e-mail - Estoque Simples',
+        text:
+          'Use o código abaixo para confirmar seu e-mail:\n\n' +
+          `${token}\n\n` +
+          `O código vale por ${this.env.EMAIL_VERIFICATION_TTL_HOURS} horas.`,
+      });
+    } catch (error) {
+      this.services.logger?.error(
+        { err: error },
+        'cadastro concluído, mas o e-mail de verificação não saiu',
+      );
+    }
   }
 
   async resendEmailVerification(userId: string): Promise<void> {
@@ -652,14 +676,24 @@ export class AuthService {
     const user = found[0];
     if (!user || user.verifiedAt) return;
 
-    await this.db.transaction(async (tx) => {
+    const token = await this.db.transaction(async (tx) => {
       await tx
         .update(emailVerificationTokens)
         .set({ usedAt: new Date() })
         .where(
           and(eq(emailVerificationTokens.userId, user.id), isNull(emailVerificationTokens.usedAt)),
         );
-      await this.sendEmailVerification(tx, user.id, user.email);
+      return this.sendEmailVerification(tx, user.id, user.email);
+    });
+
+    await this.services.mailer.send({
+      to: user.email,
+      kind: 'email_verification',
+      subject: 'Confirme seu e-mail - Estoque Simples',
+      text:
+        'Use o código abaixo para confirmar seu e-mail:\n\n' +
+        `${token}\n\n` +
+        `O código vale por ${this.env.EMAIL_VERIFICATION_TTL_HOURS} horas.`,
     });
   }
 

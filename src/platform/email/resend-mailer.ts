@@ -21,6 +21,8 @@ export class ResendMailer implements Mailer {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
+      // Sem isto, um DNS/TLS mudo no Resend prende o POST /register para sempre.
+      signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({
         from: this.from,
         to: [message.to],
