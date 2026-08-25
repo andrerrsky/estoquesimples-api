@@ -38,6 +38,9 @@ async function confirmarEmail(user: RegisteredUser): Promise<void> {
   );
 }
 
+/**
+ * Cria a empresa sem vincular assinatura. Convidar equipe não depende da nuvem.
+ */
 async function criarEmpresa(user: RegisteredUser, name = 'Minha Loja'): Promise<string> {
   const response = await context.app.inject({
     method: 'POST',

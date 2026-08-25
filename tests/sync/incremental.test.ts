@@ -51,6 +51,19 @@ function activePurchase(): SubscriptionPurchaseV2 {
   };
 }
 
+async function criarEmpresa(user: RegisteredUser, name = 'Minha Loja'): Promise<string> {
+  const response = await context.app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: user.authHeader,
+    payload: { name },
+  });
+  if (response.statusCode !== 201) {
+    throw new Error(`Falha ao criar workspace: ${response.statusCode} ${response.body}`);
+  }
+  return response.json().id;
+}
+
 async function setupWorkspace(user: RegisteredUser): Promise<string> {
   const created = await context.app.inject({
     method: 'POST',
@@ -144,6 +157,19 @@ async function pull(user: RegisteredUser, workspaceId: string, cursor = 0, limit
 }
 
 describe('envio incremental', () => {
+  it('recusa envio e leitura da nuvem sem assinatura ativa', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await criarEmpresa(user);
+
+    const enviado = await push(user, workspaceId, [upsertProduto()]);
+    expect(enviado.statusCode).toBe(403);
+    expect(enviado.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+
+    const baixado = await pull(user, workspaceId, 0);
+    expect(baixado.statusCode).toBe(403);
+    expect(baixado.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+  });
+
   it('aplica um produto novo e devolve a versão gravada', async () => {
     const user = await registerUser(context);
     const workspaceId = await setupWorkspace(user);

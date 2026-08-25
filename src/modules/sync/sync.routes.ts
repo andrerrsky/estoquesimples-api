@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -62,8 +62,16 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
    * checagem, um app antigo enviaria dados num formato que o servidor
    * interpretaria pela metade — e o resultado seria corrupção silenciosa em
    * vez de um erro que o usuário entende.
+   *
+   * A assinatura é conferida no servidor, nunca a partir do que o app diz.
+   * Conta, equipe e diagnóstico do aparelho não passam por aqui: só o envio
+   * e a leitura da nuvem.
+   *
+   * O workspaceId vem do contexto já autorizado, não do parâmetro cru da URL.
    */
-  async function assertCanSync(workspaceId: string, protocolHeader: unknown): Promise<void> {
+  async function assertCanSync(request: FastifyRequest): Promise<void> {
+    const { workspaceId } = requireWorkspaceContext(request);
+
     if (!env.FEATURE_SYNC_ENABLED) {
       throw new AppError(
         503,
@@ -72,6 +80,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
+    const protocolHeader = request.headers['x-sync-protocol'];
     const clientProtocol = Number(protocolHeader ?? 0);
     if (
       !Number.isInteger(clientProtocol) ||
@@ -96,7 +105,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       throw new AppError(
         403,
         ErrorCode.SUBSCRIPTION_REQUIRED,
-        'A assinatura da empresa não está ativa. Nada foi apagado do aparelho.',
+        'A sincronização na nuvem exige assinatura. Nada foi apagado do aparelho.',
         { extra: { state: entitlement.state } },
       );
     }
@@ -122,7 +131,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const auth = requireAuth(request);
       const { workspaceId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       const result = await inWorkspace(request, (tx) =>
         uploads.start(tx, workspaceId, auth.userId, request.body),
@@ -150,7 +159,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId, uploadId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       const itens = request.body.products.length + request.body.movements.length;
       if (itens > env.SYNC_MAX_BATCH_ITEMS) {
@@ -187,7 +196,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { workspaceId, uploadId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       return inWorkspace(request, (tx) =>
         uploads.complete(tx, workspaceId, uploadId, request.body),
@@ -215,7 +224,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       const contexto = requireWorkspaceContext(request);
 
@@ -244,7 +253,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       return inWorkspace(request, (tx) =>
         sync.pull(
@@ -277,7 +286,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { workspaceId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       return inWorkspace(request, async (tx) => {
         const lista = await conflicts.list(tx, workspaceId, request.query);
@@ -302,7 +311,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId, conflictId } = request.params;
-      await assertCanSync(workspaceId, request.headers['x-sync-protocol']);
+      await assertCanSync(request);
 
       return inWorkspace(request, (tx) =>
         conflicts.resolve(tx, workspaceId, auth.userId, conflictId, request.body.escolha),
