@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerBillingRoutes } from '../../modules/billing/billing.routes.js';
 import { registerInviteRoutes } from '../../modules/invites/invites.routes.js';
+import { registerExportRoutes } from '../../modules/export/export.routes.js';
 import { registerSyncRoutes } from '../../modules/sync/sync.routes.js';
 import { registerOpsRoutes } from '../../modules/ops/ops.routes.js';
 import { registerHealthRoutes } from '../../modules/platform-routes/health.routes.js';
@@ -129,6 +130,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerInviteRoutes, { prefix: '/v1' });
   await app.register(registerBillingRoutes, { prefix: '/v1' });
   await app.register(registerSyncRoutes, { prefix: '/v1' });
+  await app.register(registerExportRoutes, { prefix: '/v1' });
 
   return app;
 }

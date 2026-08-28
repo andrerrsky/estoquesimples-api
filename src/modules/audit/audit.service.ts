@@ -45,6 +45,8 @@ export const AuditAction = {
   SYNC_CONFLICT_RESOLVED: 'sync.conflict_resolved',
   SYNC_RESYNC_REQUIRED: 'sync.resync_required',
 
+  DATA_EXPORTED: 'data.exported',
+
   PRODUCT_DELETED: 'product.deleted',
   PRODUCT_RESTORED: 'product.restored',
   STOCK_ADJUSTED: 'stock.adjusted',
