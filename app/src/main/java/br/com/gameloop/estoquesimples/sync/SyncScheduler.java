@@ -58,9 +58,19 @@ public final class SyncScheduler {
         }
     }
 
-    /** Dispara uma sincronização agora, se houver rede. */
+    /**
+     * Dispara uma sincronização agora, se houver rede e assinatura ativa.
+     *
+     * A fila local continua independente: este método só pede o envio à nuvem.
+     * Sem direito de sincronizar, o botão da tela de conta explica o motivo;
+     * daqui o trabalho simplesmente não entra na fila do WorkManager.
+     */
     public static void syncNow(Context context) {
         if (!SyncGate.isActive()) {
+            return;
+        }
+        if (!new EntitlementManager(context).canSync()) {
+            Log.i(TAG, "sincronização imediata ignorada: a empresa não tem assinatura ativa");
             return;
         }
         try {

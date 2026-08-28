@@ -266,6 +266,43 @@ public final class TeamClient {
         return device;
     }
 
+    /**
+     * O que aquele papel pode fazer, em linguagem de quem administra a empresa.
+     *
+     * Espelha as permissões do servidor sem listar chaves técnicas. Quem
+     * convida precisa entender a diferença antes de escolher, não depois.
+     */
+    public static String descricaoDoPapel(String role) {
+        if (role == null) {
+            return "";
+        }
+        switch (role) {
+            case "proprietario":
+                return "Controle total, inclusive assinatura, transferência e exclusão da empresa.";
+            case "administrador":
+                return "Gerencia produtos, movimentações e equipe. Não transfere nem exclui a empresa e não cuida da assinatura.";
+            case "gerente":
+                return "Gerencia produtos e movimentações. Vê quem está na equipe, mas não convida nem remove pessoas.";
+            case "operador":
+                return "Cadastra e edita produtos e registra entradas e saídas. Não exclui produtos nem gerencia a equipe.";
+            case "consulta":
+                return "Apenas visualiza o estoque. Não altera cadastros nem movimentações.";
+            default:
+                return "";
+        }
+    }
+
+    /** Texto do aviso que explica os papéis que o convite pode oferecer. */
+    public static String textoAjudaPapeis() {
+        StringBuilder texto = new StringBuilder();
+        texto.append("O proprietário é quem criou a empresa e não entra por convite.\n\n");
+        for (String papel : PAPEIS) {
+            texto.append(papelLegivel(papel)).append('\n');
+            texto.append(descricaoDoPapel(papel)).append("\n\n");
+        }
+        return texto.toString().trim();
+    }
+
     /** Rótulo do papel em português, para a tela não expor a chave técnica. */
     public static String papelLegivel(String role) {
         if (role == null) {

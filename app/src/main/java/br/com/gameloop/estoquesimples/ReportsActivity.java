@@ -44,7 +44,6 @@ import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
-import com.github.mikephil.charting.utils.ColorTemplate;
 
 public class ReportsActivity extends BaseActivity {
 
@@ -55,6 +54,7 @@ public class ReportsActivity extends BaseActivity {
     private volatile boolean isExportingPdf = false;
 
     private PieChart chart;
+    private View chartEmptyState;
     private PieData data;
 
     private String higherAmoutProductText;
@@ -158,6 +158,7 @@ public class ReportsActivity extends BaseActivity {
 
             // Inicializar views de forma segura
             chart = (PieChart) findViewById(R.id.chart);
+            chartEmptyState = findViewById(R.id.chartEmptyState);
             higher = (TextView) findViewById(R.id.higher);
             lower = (TextView) findViewById(R.id.lower);
             totalProducts = (TextView) findViewById(R.id.totalProducts);
@@ -350,8 +351,8 @@ public class ReportsActivity extends BaseActivity {
             Intent intent = new Intent(this, AnalyticsActivity.class);
             startActivity(intent);
             return true;
-        } else if (itemId == R.id.menu_go_pro) {
-            showProActivity();
+        } else if (itemId == R.id.menu_subscription) {
+            SubscriptionActivity.open(this);
             return true;
         } else if (itemId == R.id.menu_about) {
             Intent intent = new Intent(this, AboutActivity.class);
@@ -366,11 +367,6 @@ public class ReportsActivity extends BaseActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-    
-    private void showProActivity() {
-        Intent intent = new Intent(this, ProActivity.class);
-        startActivity(intent);
     }
     
     private void exitApp() {
@@ -416,7 +412,9 @@ public class ReportsActivity extends BaseActivity {
             double columnMinStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
             String columnCategory = cursor.getString(4);
 
-            entries.add(new PieEntry((float)columnAmount, columnName));
+            if (columnAmount > 0) {
+                entries.add(new PieEntry((float) columnAmount, columnName));
+            }
 
             higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
             lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
@@ -455,7 +453,9 @@ public class ReportsActivity extends BaseActivity {
                     lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
                 }
 
-                entries.add(new PieEntry((float)columnAmount, columnName));
+                if (columnAmount > 0) {
+                    entries.add(new PieEntry((float) columnAmount, columnName));
+                }
                 
                 totalItemsCount += columnAmount;
                 totalValueSum += (columnAmount * columnValue);
@@ -490,19 +490,36 @@ public class ReportsActivity extends BaseActivity {
         // Calcular valor total de entradas e saídas
         calculateEntryExitTotals();
 
-        // Configurar gráfico
-        PieDataSet dataSet = new PieDataSet(entries, "Produtos");
-        dataSet.setColors(ColorTemplate.MATERIAL_COLORS);
-        dataSet.setValueTextSize(12f);
+        // Configurar gráfico. Fatias com quantidade zero não desenham nada —
+        // o MPAndroidChart trata isso como dados válidos e deixa o card em
+        // branco, então o estado vazio é um overlay próprio.
+        if (entries.isEmpty()) {
+            mostrarDistribuicaoVazia();
+        } else {
+            mostrarDistribuicaoGrafico();
+            PieDataSet dataSet = new PieDataSet(entries, "Produtos");
+            dataSet.setColors(
+                    ContextCompat.getColor(this, R.color.color_brand),
+                    ContextCompat.getColor(this, R.color.color_success),
+                    ContextCompat.getColor(this, R.color.color_warning),
+                    ContextCompat.getColor(this, R.color.color_error),
+                    ContextCompat.getColor(this, R.color.color_brand_dark),
+                    ContextCompat.getColor(this, R.color.color_text_muted)
+            );
+            dataSet.setValueTextSize(12f);
+            dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
+            dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
 
-        data = new PieData(dataSet);
-        
-        chart.setData(data);
-        chart.setUsePercentValues(false);
-        chart.getDescription().setEnabled(false);
-        chart.setDrawEntryLabels(true);
-        chart.setEntryLabelTextSize(11f);
-        chart.animateY(1000);
+            data = new PieData(dataSet);
+
+            chart.setData(data);
+            chart.setUsePercentValues(false);
+            chart.getDescription().setEnabled(false);
+            chart.setDrawEntryLabels(true);
+            chart.setEntryLabelTextSize(11f);
+            chart.setEntryLabelColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
+            chart.animateY(1000);
+        }
 
         // Análise de estoque
         if(cursorCount > 0) {
@@ -521,7 +538,7 @@ public class ReportsActivity extends BaseActivity {
                 lowStockWarning.setVisibility(android.view.View.VISIBLE);
                 lowStockList.setVisibility(android.view.View.VISIBLE);
                 
-                lowStockWarning.setText("⚠ Alerta: " + lowStockProducts.size() + " produto(s) com estoque baixo");
+                lowStockWarning.setText("Alerta: " + lowStockProducts.size() + " produto(s) com estoque baixo");
                 
                 StringBuilder lowStockText = new StringBuilder();
                 for(String product : lowStockProducts) {
@@ -645,13 +662,28 @@ public class ReportsActivity extends BaseActivity {
             }
             
             // Limpar gráfico
-            if (chart != null) {
-                chart.clear();
-                chart.setNoDataText("Nenhum dado disponível");
-                chart.invalidate();
-            }
+            mostrarDistribuicaoVazia();
         } catch (Exception e) {
             Log.e("ReportsActivity", "Error showing empty state", e);
+        }
+    }
+
+    private void mostrarDistribuicaoVazia() {
+        if (chart != null) {
+            chart.clear();
+            chart.setVisibility(View.GONE);
+        }
+        if (chartEmptyState != null) {
+            chartEmptyState.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void mostrarDistribuicaoGrafico() {
+        if (chartEmptyState != null) {
+            chartEmptyState.setVisibility(View.GONE);
+        }
+        if (chart != null) {
+            chart.setVisibility(View.VISIBLE);
         }
     }
 

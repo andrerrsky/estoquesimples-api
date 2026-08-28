@@ -1,7 +1,8 @@
 package br.com.gameloop.estoquesimples.sync;
 
-import android.graphics.Color;
 import android.widget.TextView;
+
+import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,10 +20,6 @@ public final class PasswordPolicy {
 
     public static final int MIN_LENGTH = 10;
     public static final int MAX_LENGTH = 200;
-
-    private static final int COR_NEUTRA = Color.parseColor("#757575");
-    private static final int COR_OK = Color.parseColor("#2E7D32");
-    private static final int COR_FALHA = Color.parseColor("#C62828");
 
     private static final Set<String> COMMON = Set.of(
             "12345678",
@@ -107,13 +104,16 @@ public final class PasswordPolicy {
     private static void paint(TextView view, boolean ok, boolean started, String label) {
         if (!started) {
             view.setText("○  " + label);
-            view.setTextColor(COR_NEUTRA);
+            view.setTextColor(ContextCompat.getColor(view.getContext(),
+                    br.com.gameloop.estoquesimples.R.color.color_text_muted));
         } else if (ok) {
             view.setText("✓  " + label);
-            view.setTextColor(COR_OK);
+            view.setTextColor(ContextCompat.getColor(view.getContext(),
+                    br.com.gameloop.estoquesimples.R.color.color_success));
         } else {
             view.setText("✗  " + label);
-            view.setTextColor(COR_FALHA);
+            view.setTextColor(ContextCompat.getColor(view.getContext(),
+                    br.com.gameloop.estoquesimples.R.color.color_error));
         }
     }
 }

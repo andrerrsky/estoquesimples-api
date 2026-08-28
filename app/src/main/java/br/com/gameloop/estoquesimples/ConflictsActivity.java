@@ -56,7 +56,7 @@ public final class ConflictsActivity extends Activity {
         emptyView = findViewById(R.id.emptyView);
         progress = findViewById(R.id.progress);
 
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        adapter = new ArrayAdapter<>(this, R.layout.item_simple_text, new ArrayList<>());
         listView.setAdapter(adapter);
         listView.setOnItemClickListener((parent, view, position, id) -> {
             if (position < conflitos.size()) {

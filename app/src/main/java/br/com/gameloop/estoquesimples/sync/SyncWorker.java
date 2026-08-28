@@ -80,7 +80,8 @@ public final class SyncWorker extends Worker {
         if (!entitlements.canSync()) {
             recordStatus(context, entitlements.isStale()
                     ? "Não foi possível confirmar a assinatura. Os dados seguem no aparelho."
-                    : "A assinatura da empresa não está ativa.");
+                    : "A sincronização na nuvem exige assinatura. Abra Assinatura para liberar. "
+                            + "Os dados seguem no aparelho.");
             return Result.success();
         }
 

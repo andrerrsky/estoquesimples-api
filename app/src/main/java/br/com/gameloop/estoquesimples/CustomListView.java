@@ -23,6 +23,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.appcompat.app.AlertDialog;
 
@@ -176,6 +177,9 @@ public class CustomListView extends ArrayAdapter<String> {
         // Configuração de exibição de imagens dos produtos
         RelativeLayout photoContainer = (RelativeLayout) rowView.findViewById(R.id.photoContainer);
         LinearLayout nameContainer = (LinearLayout) rowView.findViewById(R.id.listlinearlayout);
+        if (nameContainer != null) {
+            nameContainer.setOnClickListener(toggleListener);
+        }
         if (!showProductImages) {
             // Ocultar a foto e colapsar o espaço para manter o alinhamento
             if (photoContainer != null) {
@@ -206,14 +210,21 @@ public class CustomListView extends ArrayAdapter<String> {
         if(categories.get(position) != null && !categories.get(position).isEmpty() && !categories.get(position).equals("null")) {
             category.setText(categories.get(position));
             category.setVisibility(View.VISIBLE);
-            
-            // Mostrar divider apenas se SKU também estiver visível
+
             if(sku.getVisibility() == View.VISIBLE) {
                 skuDivider.setVisibility(View.VISIBLE);
+            } else {
+                skuDivider.setVisibility(View.GONE);
             }
         } else {
             category.setVisibility(View.GONE);
             skuDivider.setVisibility(View.GONE);
+        }
+
+        View metaRow = rowView.findViewById(R.id.metaRow);
+        if (metaRow != null) {
+            boolean showMeta = sku.getVisibility() == View.VISIBLE || category.getVisibility() == View.VISIBLE;
+            metaRow.setVisibility(showMeta ? View.VISIBLE : View.GONE);
         }
 
         // Unidade - ocultar quando houver barra de estoque mínimo
@@ -234,18 +245,18 @@ public class CustomListView extends ArrayAdapter<String> {
                 
                 if(minStockValue > 0 && currentAmount <= minStockValue) {
                     lowStockBadge.setVisibility(View.VISIBLE);
-                    amount.setTextColor(0xFFFF5722); // Laranja/vermelho para alerta
+                    amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
                 } else {
                     lowStockBadge.setVisibility(View.GONE);
-                    amount.setTextColor(0xFF666666); // Cinza normal
+                    amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
                 }
             } else {
                 lowStockBadge.setVisibility(View.GONE);
-                amount.setTextColor(0xFF666666);
+                amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
             }
         } catch (NumberFormatException e) {
             lowStockBadge.setVisibility(View.GONE);
-            amount.setTextColor(0xFF666666);
+            amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
         }
 
         // Estado expandido/colapsado

@@ -226,6 +226,90 @@ public final class MovementRepository {
         }
     }
 
+    public boolean exists(String uuid) {
+        if (uuid == null) {
+            return false;
+        }
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM " + LocalDb.TABLE_MOVEMENTS + " WHERE uuid=? LIMIT 1",
+                    new String[]{uuid});
+            return cursor.moveToFirst();
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao verificar movimentação", e);
+            return false;
+        } finally {
+            LocalDb.closeQuietly(cursor);
+        }
+    }
+
+    /**
+     * Recria um evento de histórico vindo de um arquivo, sem gerar uuid novo.
+     *
+     * Reimportar o mesmo JSON precisa ser inócuo: se o evento já existe, o
+     * saldo não pode ser aplicado de novo. A quantidade chega com sinal, no
+     * mesmo contrato da API, e é gravada na convenção local (saída positiva
+     * com o tipo dizendo o sentido).
+     *
+     * <p>Não recusa saldo negativo. Um ledger antigo pode passar por zero no
+     * meio do caminho se a ordem original não for exatamente a que o arquivo
+     * traz; recusar aqui deixaria o histórico pela metade.
+     */
+    public Result importLedgerEvent(String movementUuid, String productUuid, String productName,
+                                    String changeType, double signedQuantity, String note,
+                                    long occurredAt) {
+        if (movementUuid == null || !ProductRepository.isUuid(movementUuid)) {
+            movementUuid = UUID.randomUUID().toString();
+        }
+        if (exists(movementUuid)) {
+            return Result.ok(productUuid == null ? 0d : currentAmount(productUuid), movementUuid);
+        }
+        if (changeType == null || changeType.trim().isEmpty()) {
+            return Result.fail("Tipo de movimentação ausente.");
+        }
+
+        db.beginTransaction();
+        try {
+            double stored = keepsSign(changeType) ? signedQuantity : Math.abs(signedQuantity);
+            double effect = signedQuantity(changeType, stored);
+            double newAmount = 0d;
+
+            if (productUuid != null) {
+                Snapshot atual = readForUpdate(productUuid);
+                if (atual != null) {
+                    newAmount = atual.amount + effect;
+                    if (productName == null || productName.trim().isEmpty()) {
+                        productName = atual.name;
+                    }
+                    ContentValues product = new ContentValues();
+                    product.put("amount", Quantities.forStorage(newAmount));
+                    product.put("updated_at", occurredAt > 0 ? occurredAt : System.currentTimeMillis());
+                    db.update(LocalDb.TABLE_PRODUCTS, product, "uuid=?",
+                            new String[]{productUuid});
+                }
+            }
+
+            String gravado = insertMovement(movementUuid, productUuid, productName, changeType,
+                    stored, note, occurredAt > 0 ? occurredAt : System.currentTimeMillis());
+            if (gravado == null) {
+                return Result.fail("Não foi possível registrar a movimentação importada.");
+            }
+            db.setTransactionSuccessful();
+            return Result.ok(newAmount, gravado);
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao importar movimentação", e);
+            return Result.fail("Erro ao importar movimentação.");
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private double currentAmount(String productUuid) {
+        Snapshot atual = readForUpdate(productUuid);
+        return atual == null ? 0d : atual.amount;
+    }
+
     /**
      * Grava a movimentação de saldo inicial de um produto recém-criado.
      *
@@ -391,8 +475,12 @@ public final class MovementRepository {
      */
     private String insertMovement(String productUuid, String productName, String changeType,
                                   double quantity, String note, long timestamp) {
-        String movementUuid = UUID.randomUUID().toString();
+        return insertMovement(UUID.randomUUID().toString(), productUuid, productName,
+                changeType, quantity, note, timestamp);
+    }
 
+    private String insertMovement(String movementUuid, String productUuid, String productName,
+                                  String changeType, double quantity, String note, long timestamp) {
         double stored = keepsSign(changeType) ? quantity : Math.abs(quantity);
 
         ContentValues values = new ContentValues();

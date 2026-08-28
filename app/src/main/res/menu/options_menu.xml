@@ -10,10 +10,6 @@
         android:title="Análise de Estoque"
         app:showAsAction="never" />
     <item
-        android:id="@+id/menu_go_pro"
-        android:title="Versão Profissional"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/menu_history"
         android:title="Histórico"
         app:showAsAction="never" />
@@ -23,7 +19,7 @@
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_subscription"
-        android:title="Assinatura da nuvem"
+        android:title="@string/menu_subscription"
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_settings"

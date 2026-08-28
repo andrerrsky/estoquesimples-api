@@ -65,6 +65,7 @@ public class AccountActivity extends BaseActivity {
     private TextView syncStatus;
     private TextView messageView;
     private ProgressBar progress;
+    private View nameLayout;
     private EditText nameField;
     private EditText emailField;
     private EditText passwordField;
@@ -75,6 +76,7 @@ public class AccountActivity extends BaseActivity {
     private TextView ruleEmail;
     private Button primaryButton;
     private Button toggleModeButton;
+    private TextView legalNotice;
 
     private SessionManager session;
     private AccountService accounts;
@@ -96,7 +98,13 @@ public class AccountActivity extends BaseActivity {
         accounts = new AccountService(this);
 
         bindViews();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         render();
+        refreshEntitlementIfSignedIn();
     }
 
     private void bindViews() {
@@ -107,6 +115,7 @@ public class AccountActivity extends BaseActivity {
         syncStatus = findViewById(R.id.syncStatus);
         messageView = findViewById(R.id.messageView);
         progress = findViewById(R.id.progress);
+        nameLayout = findViewById(R.id.nameLayout);
         nameField = findViewById(R.id.nameField);
         emailField = findViewById(R.id.emailField);
         passwordField = findViewById(R.id.passwordField);
@@ -117,6 +126,8 @@ public class AccountActivity extends BaseActivity {
         ruleEmail = findViewById(R.id.ruleEmail);
         primaryButton = findViewById(R.id.primaryButton);
         toggleModeButton = findViewById(R.id.toggleModeButton);
+        legalNotice = findViewById(R.id.legalNotice);
+        LegalDocuments.bindCadastroNotice(legalNotice);
 
         primaryButton.setOnClickListener(v -> submitCredentials());
         toggleModeButton.setOnClickListener(v -> toggleMode());
@@ -136,10 +147,12 @@ public class AccountActivity extends BaseActivity {
         findViewById(R.id.teamButton).setOnClickListener(v ->
                 startActivity(new Intent(this, TeamActivity.class)));
         findViewById(R.id.subscriptionButton).setOnClickListener(v ->
-                startActivity(new Intent(this, SubscriptionActivity.class)));
+                SubscriptionActivity.open(this));
         findViewById(R.id.inviteCodeButton).setOnClickListener(v -> promptInviteCode());
         findViewById(R.id.diagnosticsButton).setOnClickListener(v -> showDiagnostics());
         findViewById(R.id.logoutButton).setOnClickListener(v -> confirmLogout());
+        findViewById(R.id.verifyEmailButton).setOnClickListener(v ->
+                EmailVerificationUi.prompt(this, accounts, executor, main, this::render));
     }
 
     // -------------------------------------------------------------------------
@@ -175,7 +188,54 @@ public class AccountActivity extends BaseActivity {
             findViewById(R.id.teamButton).setVisibility(temEmpresa ? View.VISIBLE : View.GONE);
             findViewById(R.id.subscriptionButton).setVisibility(
                     temEmpresa ? View.VISIBLE : View.GONE);
+            findViewById(R.id.verifyEmailButton).setVisibility(
+                    session.needsEmailVerification() ? View.VISIBLE : View.GONE);
+            if (!session.isEmailVerified()) {
+                refreshEmailStatus();
+            }
         }
+    }
+
+    private void refreshEmailStatus() {
+        executor.execute(() -> {
+            try {
+                accounts.refreshProfile();
+                main.post(() -> {
+                    if (isFinishing() || !session.isSignedIn()) {
+                        return;
+                    }
+                    findViewById(R.id.verifyEmailButton).setVisibility(
+                            session.needsEmailVerification() ? View.VISIBLE : View.GONE);
+                });
+            } catch (ApiException ignored) {
+                // Sem o perfil a tela continua útil; o convite confirma no servidor.
+            }
+        });
+    }
+
+    /**
+     * Atualiza o retrato da assinatura ao abrir a tela.
+     *
+     * Sem isso, quem nunca abriu Assinatura ficava com o cache vazio e o botão
+     * de sincronizar fingia ter funcionado: o worker nem chegava a rodar.
+     */
+    private void refreshEntitlementIfSignedIn() {
+        if (!session.isSignedIn() || session.workspaceId() == null) {
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                new EntitlementManager(this).refresh();
+                main.post(() -> {
+                    if (isFinishing() || !session.isSignedIn()) {
+                        return;
+                    }
+                    render();
+                });
+            } catch (ApiException ignored) {
+                // O retrato local continua na tela; a próxima tentativa atualiza.
+            }
+        });
     }
 
     /**
@@ -200,6 +260,10 @@ public class AccountActivity extends BaseActivity {
             texto.append("Não foi possível confirmar a assinatura recentemente.\n");
         } else if (!entitlements.canSync()) {
             texto.append(entitlements.stateLegivel()).append("\n");
+            if (PremiumManager.getInstance(this).isPro()) {
+                texto.append("A antiga Versão PRO continua válida neste aparelho ")
+                        .append("(recursos premium e sem anúncios). A nuvem exige assinatura.\n");
+            }
             texto.append("Abra Assinatura para liberar a sincronização na nuvem.\n");
         } else {
             texto.append(entitlements.stateLegivel()).append("\n");
@@ -244,10 +308,11 @@ public class AccountActivity extends BaseActivity {
 
     private void toggleMode() {
         registerMode = !registerMode;
-        nameField.setVisibility(registerMode ? View.VISIBLE : View.GONE);
+        nameLayout.setVisibility(registerMode ? View.VISIBLE : View.GONE);
         passwordRules.setVisibility(registerMode ? View.VISIBLE : View.GONE);
         primaryButton.setText(registerMode ? "Criar conta" : "Entrar");
         toggleModeButton.setText(registerMode ? "Já tenho conta" : "Ainda não tenho conta");
+        legalNotice.setVisibility(registerMode ? View.VISIBLE : View.GONE);
         showMessage(null);
         if (registerMode) {
             refreshPasswordRules();
@@ -368,12 +433,24 @@ public class AccountActivity extends BaseActivity {
     private void promptCreateWorkspace() {
         EditText campo = new EditText(this);
         campo.setHint("Nome da empresa");
+        campo.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // O setView do AlertDialog cola o conteúdo nas bordas; o título e a
+        // mensagem já vêm com recuo. Sem este padding a linha do input atravessa
+        // a caixa inteira.
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int margem = (int) (24 * getResources().getDisplayMetrics().density);
+        caixa.setPadding(margem, margem / 2, margem, 0);
+        caixa.addView(campo);
 
         new AlertDialog.Builder(this)
                 .setTitle("Criar empresa")
                 .setMessage("Seu estoque será guardado nesta empresa. "
                         + "Depois você pode convidar outras pessoas para acessá-la.")
-                .setView(campo)
+                .setView(caixa)
                 .setCancelable(false)
                 .setPositiveButton("Criar", (dialog, which) -> {
                     String nome = campo.getText().toString().trim();
@@ -423,12 +500,41 @@ public class AccountActivity extends BaseActivity {
     private void selectWorkspace(AccountService.Workspace workspace) {
         accounts.selectWorkspace(workspace);
         render();
-        // Reavalia o SyncGate (assinatura, protocolo, sessão) e só então agenda.
-        // Chamar syncNow com o portão fechado adiava a primeira sincronização
-        // em até 15 minutos.
-        SyncBootstrap.start(this);
-        Toast.makeText(this, "Conta conectada. A primeira sincronização vai começar.",
-                Toast.LENGTH_LONG).show();
+        setBusy(true);
+        executor.execute(() -> {
+            boolean podeSincronizar = false;
+            try {
+                podeSincronizar = new EntitlementManager(this).refresh();
+            } catch (ApiException ignored) {
+                podeSincronizar = new EntitlementManager(this).canSync();
+            }
+            final boolean syncLiberada = podeSincronizar;
+            main.post(() -> {
+                if (isFinishing()) {
+                    return;
+                }
+                setBusy(false);
+                // Reavalia o SyncGate (assinatura, protocolo, sessão) e só então agenda.
+                // Chamar syncNow com o portão fechado adiava a primeira sincronização
+                // em até 15 minutos.
+                SyncBootstrap.start(this);
+                render();
+                Toast.makeText(this, mensagemAposEntrar(syncLiberada), Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    private String mensagemAposEntrar(boolean syncLiberada) {
+        StringBuilder texto = new StringBuilder("Conta conectada.");
+        if (session.needsEmailVerification()) {
+            texto.append(" Confirme o e-mail com o código que enviamos para convidar pessoas.");
+        }
+        if (syncLiberada) {
+            texto.append(" A primeira sincronização vai começar.");
+        } else {
+            texto.append(" A sincronização na nuvem exige assinatura.");
+        }
+        return texto.toString();
     }
 
     // -------------------------------------------------------------------------
@@ -519,6 +625,10 @@ public class AccountActivity extends BaseActivity {
             regras = caixa.findViewById(R.id.passwordRules);
         }
         regras.setVisibility(View.VISIBLE);
+        TextView legalConvite = caixa.findViewById(R.id.inviteLegalNotice);
+        if (legalConvite != null) {
+            LegalDocuments.bindInviteNotice(legalConvite);
+        }
         TextView ruleLengthInvite = caixa.findViewById(R.id.ruleLength);
         TextView ruleCommonInvite = caixa.findViewById(R.id.ruleCommon);
         TextView ruleRepeatedInvite = caixa.findViewById(R.id.ruleRepeated);
@@ -629,11 +739,93 @@ public class AccountActivity extends BaseActivity {
     }
 
     private void syncNow() {
+        if (session.workspaceId() == null) {
+            Toast.makeText(this, "Escolha uma empresa para sincronizar.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        RemoteConfig config = new RemoteConfig(this);
+        if (!config.isSyncEnabled()) {
+            Toast.makeText(this,
+                    "A sincronização está temporariamente desativada. Os dados seguem neste aparelho.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!config.isProtocolSupported()) {
+            Toast.makeText(this,
+                    "Atualize o app pela Play Store para voltar a sincronizar.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        EntitlementManager entitlements = new EntitlementManager(this);
+        if (entitlements.canSync()) {
+            solicitarSincronizacao();
+            return;
+        }
+
+        setBusy(true);
+        executor.execute(() -> {
+            try {
+                entitlements.refresh();
+            } catch (ApiException ignored) {
+                // Sem rede, vale o retrato local — que já disse que não há direito.
+            }
+            main.post(() -> {
+                if (isFinishing()) {
+                    return;
+                }
+                setBusy(false);
+                if (entitlements.canSync()) {
+                    solicitarSincronizacao();
+                } else if (entitlements.isStale()) {
+                    Toast.makeText(AccountActivity.this,
+                            "Não foi possível confirmar a assinatura. Tente de novo com internet. "
+                                    + "Os dados seguem neste aparelho.",
+                            Toast.LENGTH_LONG).show();
+                    render();
+                } else {
+                    informarAssinaturaObrigatoria();
+                }
+            });
+        });
+    }
+
+    private void solicitarSincronizacao() {
+        // O bootstrap reavalia o interruptor (sessão + assinatura). Sem isso,
+        // um toque logo após o login encontrava o portão ainda fechado e o
+        // toast de "solicitada" não correspondia a trabalho nenhum.
+        SyncBootstrap.start(this);
         SyncScheduler.syncNow(this);
         Toast.makeText(this, "Sincronização solicitada.", Toast.LENGTH_SHORT).show();
         // Um atraso curto dá tempo do worker registrar o resultado antes de a
         // tela reler o estado.
         main.postDelayed(this::render, 1500);
+    }
+
+    /**
+     * O botão continua visível de propósito: escondê-lo faria a pessoa achar
+     * que a nuvem não existe. O diálogo diz o que falta e leva à assinatura.
+     */
+    private void informarAssinaturaObrigatoria() {
+        String mensagem;
+        if (PremiumManager.getInstance(this).isPro()) {
+            mensagem = "Você já possui a antiga Versão PRO: recursos premium e sem anúncios neste aparelho. "
+                    + "A sincronização na nuvem é exclusiva da assinatura. "
+                    + "Nada foi enviado nem apagado.";
+        } else {
+            mensagem = "A sincronização na nuvem é exclusiva para assinantes. "
+                    + "Sua conta, a equipe e os dados deste aparelho continuam "
+                    + "disponíveis. Nada foi enviado nem apagado.";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Assinatura necessária")
+                .setMessage(mensagem)
+                .setNegativeButton("Agora não", null)
+                .setPositiveButton("Ver assinatura", (dialog, which) ->
+                        SubscriptionActivity.open(this))
+                .show();
+        render();
     }
 
     private void showDiagnostics() {
@@ -776,6 +968,10 @@ public class AccountActivity extends BaseActivity {
         progress.setVisibility(busy ? View.VISIBLE : View.GONE);
         primaryButton.setEnabled(!busy);
         toggleModeButton.setEnabled(!busy);
+        View syncNowButton = findViewById(R.id.syncNowButton);
+        if (syncNowButton != null) {
+            syncNowButton.setEnabled(!busy);
+        }
     }
 
     private void showMessage(String mensagem) {

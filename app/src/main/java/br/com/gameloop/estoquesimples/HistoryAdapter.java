@@ -1,12 +1,15 @@
 package br.com.gameloop.estoquesimples;
 
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import androidx.core.content.ContextCompat;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -104,7 +107,12 @@ public class HistoryAdapter extends BaseAdapter {
 
         holder.typeSign.setText(MovementDisplay.sign(item.getType(), item.getQuantity()));
         holder.typeLabel.setText(MovementDisplay.label(item.getType()));
-        holder.typeBadge.setBackgroundColor(MovementDisplay.color(item.getType(), item.getQuantity()));
+        android.graphics.drawable.Drawable raw = ContextCompat.getDrawable(context, R.drawable.bg_type_badge);
+        if (raw instanceof GradientDrawable) {
+            GradientDrawable badge = (GradientDrawable) raw.mutate();
+            badge.setColor(MovementDisplay.color(context, item.getType(), item.getQuantity()));
+            holder.typeBadge.setBackground(badge);
+        }
 
         // Nome do produto
         holder.productName.setText(item.getProductName());

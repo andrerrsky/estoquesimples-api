@@ -8,7 +8,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -115,6 +118,10 @@ public final class LocalBackup {
             Log.e(TAG, "cópia inexistente ou vazia");
             return false;
         }
+        if (!isOwnedCopy(context, copia)) {
+            Log.e(TAG, "cópia fora da pasta de backups ou inválida");
+            return false;
+        }
 
         File destino = context.getDatabasePath(LocalDb.DATABASE_NAME);
 
@@ -141,12 +148,147 @@ public final class LocalBackup {
         return true;
     }
 
+    /**
+     * Confirma que o arquivo está dentro da pasta privada de cópias.
+     *
+     * Restaurar a partir de um caminho arbitrário permitiria que um arquivo
+     * escolhido em outro lugar (ou um nome com {@code ..}) substituísse o
+     * banco. A lista da tela só oferece o que {@link #list} devolve, mas a
+     * checagem fica aqui para não depender de quem chama.
+     */
+    public static boolean isOwnedCopy(Context context, File copia) {
+        if (copia == null) {
+            return false;
+        }
+        try {
+            File pasta = new File(context.getFilesDir(), PASTA).getCanonicalFile();
+            File alvo = copia.getCanonicalFile();
+            String prefixo = pasta.getPath() + "/";
+            return alvo.getPath().startsWith(prefixo) && alvo.isFile() && alvo.getName().endsWith(".db");
+        } catch (IOException e) {
+            Log.w(TAG, "não foi possível validar o caminho da cópia", e);
+            return false;
+        }
+    }
+
+    /**
+     * Consolida o WAL e copia o banco para o destino escolhido pelo usuário.
+     */
+    public static boolean exportTo(SQLiteDatabase db, OutputStream destino) {
+        try {
+            db.execSQL("PRAGMA wal_checkpoint(FULL)");
+        } catch (Exception e) {
+            Log.w(TAG, "não foi possível consolidar o diário antes da exportação", e);
+        }
+
+        File origem = new File(db.getPath());
+        try (FileInputStream entrada = new FileInputStream(origem)) {
+            copy(entrada, destino);
+            destino.flush();
+            return true;
+        } catch (IOException e) {
+            Log.e(TAG, "falha ao exportar o banco", e);
+            return false;
+        }
+    }
+
+    /**
+     * Substitui o banco local pelo conteúdo do fluxo.
+     *
+     * Recusa arquivo que não começa com o cabeçalho SQLite, copia o estado
+     * atual para a pasta de backups e apaga {@code -wal}/{@code -shm} para o
+     * diário antigo não se aplicar sobre o arquivo novo.
+     *
+     * @return {@code true} se o arquivo foi substituído. Quem chama precisa
+     *         reabrir a conexão ({@code MainActivity.openOrCreateDB}).
+     */
+    public static boolean importFrom(Context context, InputStream origem) {
+        File temp = new File(context.getCacheDir(), "estoque-import.tmp");
+        try {
+            try (FileOutputStream saida = new FileOutputStream(temp)) {
+                copy(origem, saida);
+            }
+            if (!isSqliteFile(temp)) {
+                Log.e(TAG, "arquivo não é um banco SQLite");
+                return false;
+            }
+
+            try {
+                LocalBackup.create(context, LocalDb.open(context), "antes-de-restaurar");
+            } catch (Exception e) {
+                Log.w(TAG, "não foi possível guardar o estado atual antes de importar", e);
+            }
+
+            LocalDb.closeForFileSwap();
+
+            File destino = context.getDatabasePath(LocalDb.DATABASE_NAME);
+            try (FileChannel entrada = new FileInputStream(temp).getChannel();
+                 FileChannel saida = new FileOutputStream(destino).getChannel()) {
+                saida.transferFrom(entrada, 0, entrada.size());
+            }
+
+            deleteQuietly(new File(destino.getPath() + "-wal"));
+            deleteQuietly(new File(destino.getPath() + "-shm"));
+            Log.i(TAG, "banco substituído a partir de arquivo externo");
+            return true;
+        } catch (IOException e) {
+            Log.e(TAG, "falha ao importar o banco", e);
+            return false;
+        } finally {
+            deleteQuietly(temp);
+        }
+    }
+
+    private static boolean isSqliteFile(File arquivo) throws IOException {
+        if (arquivo == null || arquivo.length() < 16L) {
+            return false;
+        }
+        byte[] header = new byte[16];
+        try (FileInputStream in = new FileInputStream(arquivo)) {
+            if (in.read(header) < 16) {
+                return false;
+            }
+        }
+        return new String(header, StandardCharsets.US_ASCII)
+                .startsWith("SQLite format 3");
+    }
+
+    private static void copy(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+        }
+    }
+
     /** Rótulo legível de uma cópia, para a lista de restauração. */
     public static String describe(File copia) {
         String data = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
                 .format(new Date(copia.lastModified()));
         long kb = Math.max(1L, copia.length() / 1024L);
-        return data + " · " + kb + " KB";
+        String motivo = motivoFromName(copia.getName());
+        return data + (motivo.isEmpty() ? "" : " · " + motivo) + " · " + kb + " KB";
+    }
+
+    private static String motivoFromName(String name) {
+        if (name == null || !name.endsWith(".db")) {
+            return "";
+        }
+        String stem = name.substring(0, name.length() - 3);
+        int lastDash = stem.lastIndexOf('-');
+        if (lastDash < 0 || lastDash == stem.length() - 1) {
+            return "";
+        }
+        switch (stem.substring(lastDash + 1)) {
+            case "carga-inicial":
+                return "antes da 1ª sincronização";
+            case "recarga-completa":
+                return "antes da recarga";
+            case "antes-de-restaurar":
+                return "antes de restaurar";
+            default:
+                return "";
+        }
     }
 
     private static void deleteQuietly(File arquivo) {

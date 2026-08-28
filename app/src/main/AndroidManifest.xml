@@ -109,7 +109,12 @@
             android:parentActivityName=".AccountActivity" />
         <activity
             android:name=".SubscriptionActivity"
-            android:label="Assinatura da nuvem"
+            android:label="@string/subscription_title"
+            android:exported="false"
+            android:parentActivityName=".AccountActivity" />
+        <activity
+            android:name=".LegalActivity"
+            android:label="Política e termos"
             android:exported="false"
             android:parentActivityName=".AccountActivity" />
         <activity 

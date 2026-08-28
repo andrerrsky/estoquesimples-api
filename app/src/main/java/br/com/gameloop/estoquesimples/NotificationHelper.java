@@ -67,7 +67,7 @@ public class NotificationHelper {
         );
 
         // Construir a notificação
-        String title = "⚠ Alerta de Estoque Baixo";
+        String title = "Alerta de estoque baixo";
         String message;
         
         if (count == 1) {

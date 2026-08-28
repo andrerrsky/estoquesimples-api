@@ -33,9 +33,11 @@ import br.com.gameloop.estoquesimples.Constants;
 /**
  * Invólucro do BillingClient para a assinatura mensal.
  *
- * Diferente do produto vitalício {@code pro} (INAPP), assinaturas exigem
- * {@code offerToken} do base plan. O app <b>não</b> faz acknowledge: quem
- * confirma a compra é o servidor depois de validar na Play Developer API.
+ * A compra única antiga ({@code pro}) não é vendida por aqui: só a assinatura
+ * ({@code assinatura} / {@code plano-basico}). Quem já comprou {@code pro}
+ * é reconhecido em {@code LegacyProBilling}. O app <b>não</b> faz acknowledge
+ * da assinatura: quem confirma a compra é o servidor depois de validar na
+ * Play Developer API.
  */
 public final class PlayBilling implements PurchasesUpdatedListener {
 
@@ -109,11 +111,20 @@ public final class PlayBilling implements PurchasesUpdatedListener {
                     if (connectionListener != null) {
                         connectionListener.onReady();
                     }
-                } else {
-                    Log.e(TAG, "conexão com a loja falhou: " + billingResult.getDebugMessage());
-                    if (connectionListener != null) {
-                        connectionListener.onError("Não foi possível conectar à Play Store.");
-                    }
+                    return;
+                }
+
+                Log.e(TAG, "conexão com a loja falhou: code="
+                        + billingResult.getResponseCode()
+                        + " " + billingResult.getDebugMessage());
+
+                // Com reconexão automática, SERVICE_UNAVAILABLE / NETWORK_ERROR
+                // aparecem no primeiro handshake e a loja sobe logo em seguida.
+                // Tratar isso como erro definitivo faz a tela acusar falha
+                // enquanto o spinner ainda carrega o estado real.
+                if (connectionListener != null && isPermanentSetupFailure(
+                        billingResult.getResponseCode())) {
+                    connectionListener.onError("Não foi possível conectar à Play Store.");
                 }
             }
 
@@ -276,6 +287,18 @@ public final class PlayBilling implements PurchasesUpdatedListener {
         } catch (Exception ignored) {
         }
         return result.get();
+    }
+
+    /**
+     * Falha de setup que não se resolve sozinha com a reconexão automática.
+     *
+     * Sem Play Store, conta Google ou configuração do Billing, insistir só
+     * atrasaria o aviso. Os demais códigos costumam ser o primeiro handshake.
+     */
+    private static boolean isPermanentSetupFailure(int code) {
+        return code == BillingClient.BillingResponseCode.BILLING_UNAVAILABLE
+                || code == BillingClient.BillingResponseCode.DEVELOPER_ERROR
+                || code == BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED;
     }
 
     /** Primeira compra PURCHASED do produto de assinatura, se houver. */

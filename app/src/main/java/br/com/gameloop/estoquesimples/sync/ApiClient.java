@@ -67,11 +67,16 @@ public final class ApiClient {
     }
 
     public Response get(String path, String accessToken) throws ApiException {
-        return execute("GET", path, null, accessToken, null);
+        return execute("GET", path, null, accessToken, null, TIMEOUT_LEITURA_MS);
+    }
+
+    /** GET de arquivo grande (cópia JSON da nuvem), com leitura mais longa. */
+    public Response getLarge(String path, String accessToken) throws ApiException {
+        return execute("GET", path, null, accessToken, null, 120_000);
     }
 
     public Response post(String path, JSONObject body, String accessToken) throws ApiException {
-        return execute("POST", path, body, accessToken, null);
+        return execute("POST", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
     }
 
     /**
@@ -79,11 +84,11 @@ public final class ApiClient {
      * cliente: {@link HttpURLConnection} recusa PATCH com ProtocolException.
      */
     public Response put(String path, JSONObject body, String accessToken) throws ApiException {
-        return execute("PUT", path, body, accessToken, null);
+        return execute("PUT", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
     }
 
     public Response delete(String path, String accessToken) throws ApiException {
-        return execute("DELETE", path, null, accessToken, null);
+        return execute("DELETE", path, null, accessToken, null, TIMEOUT_LEITURA_MS);
     }
 
     /**
@@ -97,11 +102,13 @@ public final class ApiClient {
     public Response postIdempotent(String path, JSONObject body, String accessToken,
                                    String idempotencyKey) throws ApiException {
         return execute("POST", path, body, accessToken,
-                idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString());
+                idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString(),
+                TIMEOUT_LEITURA_MS);
     }
 
     private Response execute(String method, String path, JSONObject body,
-                             String accessToken, String idempotencyKey) throws ApiException {
+                             String accessToken, String idempotencyKey, int readTimeoutMs)
+            throws ApiException {
         HttpURLConnection connection = null;
         Thread watchdog = null;
         try {
@@ -119,7 +126,7 @@ public final class ApiClient {
 
             connection.setRequestMethod(method);
             connection.setConnectTimeout(TIMEOUT_CONEXAO_MS);
-            connection.setReadTimeout(TIMEOUT_LEITURA_MS);
+            connection.setReadTimeout(readTimeoutMs);
             connection.setInstanceFollowRedirects(true);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Connection", "close");
@@ -136,9 +143,10 @@ public final class ApiClient {
             // Em HTTP/2 o timeout do HttpURLConnection às vezes é ignorado.
             // Cortar a conexão desbloqueia getResponseCode().
             final HttpURLConnection toWatch = connection;
+            final int waitMs = TIMEOUT_CONEXAO_MS + readTimeoutMs + 5_000;
             watchdog = new Thread(() -> {
                 try {
-                    Thread.sleep(TIMEOUT_CONEXAO_MS + TIMEOUT_LEITURA_MS + 5_000L);
+                    Thread.sleep(waitMs);
                     toWatch.disconnect();
                 } catch (InterruptedException ignored) {
                     // Pedido terminou a tempo.

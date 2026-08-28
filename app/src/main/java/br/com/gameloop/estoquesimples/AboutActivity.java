@@ -2,11 +2,11 @@ package br.com.gameloop.estoquesimples;
 
 import android.content.Intent;
 import android.net.Uri;
-import androidx.cardview.widget.CardView;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 public class AboutActivity extends BaseActivity {
 
@@ -17,7 +17,6 @@ public class AboutActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_about);
 
-        // Habilitar botão de voltar na action bar
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle("Sobre");
@@ -27,38 +26,44 @@ public class AboutActivity extends BaseActivity {
 
         Button btnContact = findViewById(R.id.btnContact);
         Button btnGoPro = findViewById(R.id.btnGoPro);
-        CardView cardGoPro = findViewById(R.id.cardGoPro);
+        View cardLegal = findViewById(R.id.cardLegal);
 
-        btnContact.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                openEmailApp();
-            }
-        });
+        btnContact.setOnClickListener(v -> openEmailApp());
+        btnGoPro.setOnClickListener(v -> SubscriptionActivity.open(this));
 
-        // Configurar botão Go Pro
-        btnGoPro.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showProActivity();
-            }
-        });
-
-        // Esconder card Go Pro se o usuário já for premium
-        if (premiumManager.isPro()) {
-            cardGoPro.setVisibility(View.GONE);
+        if (cardLegal != null) {
+            cardLegal.setOnClickListener(v -> LegalDocuments.open(this, LegalDocuments.PAGE_TERMOS));
         }
+
+        updateSubscriptionCard();
     }
-    
+
     @Override
     protected void onResume() {
         super.onResume();
-        // Atualizar visibilidade do card Go Pro
-        CardView cardGoPro = findViewById(R.id.cardGoPro);
-        if (premiumManager.isPro()) {
+        updateSubscriptionCard();
+    }
+
+    private void updateSubscriptionCard() {
+        View cardGoPro = findViewById(R.id.cardGoPro);
+        TextView title = findViewById(R.id.subscriptionCardTitle);
+        TextView subtitle = findViewById(R.id.subscriptionCardSubtitle);
+        Button cta = findViewById(R.id.btnGoPro);
+
+        if (premiumManager.hasCloudSubscription()) {
             cardGoPro.setVisibility(View.GONE);
+            return;
+        }
+
+        cardGoPro.setVisibility(View.VISIBLE);
+        if (premiumManager.isPro()) {
+            title.setText("Sincronize na nuvem");
+            subtitle.setText("Sua Versão PRO já remove anúncios. A assinatura adiciona sincronização entre aparelhos.");
+            cta.setText("Conhecer o plano");
         } else {
-            cardGoPro.setVisibility(View.VISIBLE);
+            title.setText("Assinatura");
+            subtitle.setText("Sincronize na nuvem, desbloqueie recursos e remova anúncios");
+            cta.setText("Conhecer o plano");
         }
     }
 
@@ -83,10 +88,4 @@ public class AboutActivity extends BaseActivity {
         }
         return super.onOptionsItemSelected(item);
     }
-    
-    private void showProActivity() {
-        Intent intent = new Intent(this, ProActivity.class);
-        startActivity(intent);
-    }
 }
-

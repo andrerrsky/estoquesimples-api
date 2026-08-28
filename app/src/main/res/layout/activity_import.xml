@@ -4,140 +4,172 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-
+    android:background="@color/color_surface"
     tools:context="br.com.gameloop.estoquesimples.ImportActivity">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingLeft="@dimen/activity_horizontal_margin"
-        android:paddingRight="@dimen/activity_horizontal_margin"
-        android:paddingTop="@dimen/activity_vertical_margin"
-        android:paddingBottom="@dimen/activity_vertical_margin" >
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:text="Importar um arquivo de outra aplicação"
-            android:id="@+id/importFileTitle"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="16dp"
-            android:layout_marginRight="16dp"
-            android:layout_marginLeft="16dp"
-            android:textStyle="bold" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
 
-        <TextView
-            android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Planilha (CSV)"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:id="@+id/importDesc2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+            <Button
+                android:id="@+id/buttonImport"
+                style="@style/Widget.Estoque.Button.Primary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:text="Importar CSV ou JSON"
+                android:onClick="importFile" />
+
+            <Button
+                android:id="@+id/buttonExportCSV"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Exportar produtos (CSV)"
+                android:onClick="exportCSVFile" />
+
+            <Button
+                android:id="@+id/buttonExportMovementsCSV"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Exportar movimentações (CSV)"
+                android:onClick="exportMovementsCsvFile" />
+
+            <TextView
+                android:id="@+id/importStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textStyle="bold"
+                android:textColor="@color/color_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:text="Você pode importar arquivos com a seguinte estrutura:"
-            android:id="@+id/importDesc1"
-            android:gravity="center_horizontal"
-            android:textAlignment="center"
-            android:layout_centerHorizontal="true"
-            android:layout_below="@+id/importFileTitle"
-            android:layout_marginLeft="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginRight="16dp" />
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
 
-        <TextView
-            android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cópia portátil (JSON)"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Mesmo formato da nuvem: produtos e histórico, com os identificadores estáveis. A importação mescla com o cadastro atual (por SKU, código de barras ou nome) e não duplica movimentações já gravadas. Para substituir o aparelho inteiro, use o arquivo .db. A foto fica de fora — é um caminho só deste aparelho."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+            <Button
+                android:id="@+id/buttonExportJson"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:text="Exportar JSON"
+                android:onClick="exportJsonFile" />
+
+            <Button
+                android:id="@+id/buttonExportCloud"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Baixar cópia da nuvem"
+                android:onClick="exportCloudJson" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:text="Nome, Descrição, Quantidade, Valor (separados por virgula simples)\nSendo 1 item por linha\nFormatos .txt ou .csv"
-            android:id="@+id/importDesc2"
-            android:layout_below="@+id/importDesc1"
-            android:layout_centerHorizontal="true"
-            android:gravity="center_horizontal"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
 
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Selecionar Arquivo"
-            android:id="@+id/buttonImport"
-            android:layout_below="@+id/importDesc2"
-            android:layout_centerHorizontal="true"
-            android:onClick="importFile"
-            android:layout_marginTop="16dp" />
+            <TextView
+                android:id="@+id/importExportTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Banco deste aparelho"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:id="@+id/importStatus"
-            android:layout_below="@+id/buttonImport"
-            android:layout_centerHorizontal="true"
-            android:textStyle="bold"
-            android:layout_margin="16dp"
-            android:gravity="center_horizontal" />
+            <TextView
+                android:id="@+id/importExportDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Arquivo .db nativo, com tudo o que está neste aparelho (incluindo a fila de sincronização). Use para backup local. Substituir o banco apaga o estoque atual."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:text="Importar ou exportar um banco de dados existente"
-            android:id="@+id/importExportTitle"
-            android:layout_below="@+id/buttonImport"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="16dp"
-            android:textStyle="bold"
-            android:layout_marginRight="26dp"
-            android:layout_marginLeft="26dp"
-            android:gravity="center"
-            android:textAlignment="center" />
+            <Button
+                android:id="@+id/buttonImportDB"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:text="Importar banco de dados"
+                android:onClick="importDBFile" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:text="Você pode importar ou exportar um banco de dados existente.\n\nRecomendamos que você exporte e salve seu banco de dados sempre que possível para não perder as informações armazenadas.\n\n• Exportar Banco de Dados: Backup completo (arquivo .db)\n• Exportar para CSV/TXT: Planilha com todos os dados dos produtos (arquivo .csv)"
-            android:id="@+id/importExportDesc"
-            android:layout_below="@+id/importExportTitle"
-            android:layout_centerHorizontal="true"
-            android:gravity="center_horizontal"
-            android:layout_marginLeft="26dp"
-            android:layout_marginRight="26dp"
-            android:layout_marginTop="16dp" />
+            <Button
+                android:id="@+id/buttonExportDB"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Exportar banco de dados"
+                android:onClick="exportDBFile" />
 
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Importar Banco de Dados"
-            android:id="@+id/buttonImportDB"
-            android:layout_below="@+id/importExportDesc"
-            android:layout_centerHorizontal="true"
-            android:onClick="importDBFile"
-            android:layout_marginTop="6dp" />
+            <Button
+                android:id="@+id/buttonRestoreBackup"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Restaurar cópia automática"
+                android:onClick="restoreAutomaticBackup" />
+        </LinearLayout>
 
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Exportar Banco de Dados"
-            android:id="@+id/buttonExportDB"
-            android:layout_below="@+id/buttonImportDB"
-            android:layout_centerHorizontal="true"
-            android:onClick="exportDBFile"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Exportar para CSV/TXT"
-            android:id="@+id/buttonExportCSV"
-            android:layout_below="@+id/buttonExportDB"
-            android:layout_centerHorizontal="true"
-            android:onClick="exportCSVFile"
-            android:layout_marginBottom="16dp" />
-
-        <!-- MREC Ad -->
         <FrameLayout
             android:id="@+id/mrecContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@+id/buttonExportCSV"
-            android:layout_centerHorizontal="true"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/section_gap"
             android:visibility="visible">
 
             <com.appodeal.ads.MrecView
@@ -145,11 +177,8 @@
                 android:layout_width="300dp"
                 android:layout_height="250dp"
                 android:layout_gravity="center"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp" />
-
+                android:layout_marginTop="@dimen/section_gap"
+                android:layout_marginBottom="@dimen/section_gap" />
         </FrameLayout>
-
-    </RelativeLayout>
-
+    </LinearLayout>
 </ScrollView>

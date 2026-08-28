@@ -4,10 +4,8 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
+    android:background="@color/color_surface">
 
-    android:background="#FFFFFF">
-
-    <!-- Banner Ad -->
     <FrameLayout
         android:id="@+id/bannerContainer"
         android:layout_width="match_parent"
@@ -20,7 +18,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:layout_marginBottom="6dp" />
-
     </FrameLayout>
 
     <TextView
@@ -28,21 +25,21 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:text="Nenhuma movimentação de entrada ou saída registrada ainda"
-        android:textColor="#999999"
-        android:textSize="15sp"
+        android:textAppearance="@style/TextAppearance.Estoque.Empty"
         android:gravity="center"
         android:visibility="gone"
-        android:padding="24dp"
-        android:layout_margin="12dp" />
+        android:padding="24dp" />
 
     <ListView
         android:id="@+id/historyList"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:divider="#EEEEEE"
-        android:dividerHeight="1dp"
-        android:padding="12dp" />
+        android:divider="@android:color/transparent"
+        android:dividerHeight="@dimen/list_item_spacing"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/field_gap"
+        android:paddingBottom="@dimen/field_gap"
+        android:clipToPadding="false" />
 
 </LinearLayout>
-
-

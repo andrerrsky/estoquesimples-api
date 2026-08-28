@@ -103,6 +103,52 @@ public final class ProductRepository {
         return findUuidByName(name) != null;
     }
 
+    public boolean existsByUuid(String uuid) {
+        return findByUuid(uuid) != null;
+    }
+
+    /**
+     * SKU preenchido é o melhor âncora para reimportar uma planilha: o nome
+     * muda, o código de barras às vezes falta, o SKU é o que a loja já usa
+     * para o mesmo item. SKU vazio não casa com ninguém — senão todos os
+     * produtos sem código virariam o mesmo.
+     */
+    public String findUuidBySku(String sku) {
+        return findUuidByNonEmpty("sku", sku);
+    }
+
+    public String findUuidByBarcode(String barcode) {
+        return findUuidByNonEmpty("barcode", barcode);
+    }
+
+    private String findUuidByNonEmpty(String column, String value) {
+        if (!"sku".equals(column) && !"barcode".equals(column)) {
+            return null;
+        }
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT uuid FROM " + LocalDb.TABLE_PRODUCTS
+                            + " WHERE " + column + "=? AND TRIM(" + column + ") <> '' AND "
+                            + LocalDb.ACTIVE_PRODUCTS
+                            + " ORDER BY id LIMIT 1",
+                    new String[]{trimmed});
+            return cursor.moveToFirst() ? cursor.getString(0) : null;
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao resolver produto por " + column, e);
+            return null;
+        } finally {
+            LocalDb.closeQuietly(cursor);
+        }
+    }
+
     /**
      * Verifica duplicidade de nome ignorando um produto específico. Usada na
      * edição, onde manter o próprio nome não pode contar como conflito.
@@ -158,7 +204,10 @@ public final class ProductRepository {
      * quantas vezes for preciso sem duplicar nada do outro lado.
      */
     public String insert(ContentValues values) {
-        String uuid = UUID.randomUUID().toString();
+        String uuid = values.getAsString("uuid");
+        if (uuid == null || uuid.trim().isEmpty() || !isUuid(uuid)) {
+            uuid = UUID.randomUUID().toString();
+        }
         values.put("uuid", uuid);
         values.put("updated_at", System.currentTimeMillis());
         values.put("rev", 0);
@@ -342,6 +391,18 @@ public final class ProductRepository {
         return new OutboxRepository(db).enqueue(
                 OutboxRepository.ENTITY_PRODUTO, uuid,
                 OutboxRepository.OP_UPSERT, baseRev, payload.toString()) != null;
+    }
+
+    static boolean isUuid(String value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            UUID.fromString(value.trim());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private long revOf(String uuid) {

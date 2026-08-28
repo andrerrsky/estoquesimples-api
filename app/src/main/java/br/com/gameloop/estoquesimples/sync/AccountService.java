@@ -121,6 +121,33 @@ public final class AccountService {
     }
 
     /**
+     * Atualiza nome, e-mail e se o endereço já foi confirmado.
+     *
+     * O token de acesso não carrega essa confirmação; sem consultar o perfil,
+     * uma conta recém-criada parece dona da empresa e ainda assim não consegue
+     * convidar ninguém.
+     */
+    public void refreshProfile() throws ApiException {
+        session.storeUser(api.get("/v1/me", session.accessToken()).body);
+    }
+
+    public void confirmEmail(String token) throws ApiException {
+        try {
+            JSONObject body = new JSONObject();
+            body.put("token", token);
+            api.post("/v1/auth/verify-email", body, null);
+            session.setEmailVerified(true);
+        } catch (JSONException e) {
+            throw new ApiException(0, "PAYLOAD_INVALIDO",
+                    "Não foi possível montar a confirmação.", null);
+        }
+    }
+
+    public void resendVerification() throws ApiException {
+        api.post("/v1/auth/resend-verification", new JSONObject(), session.accessToken());
+    }
+
+    /**
      * Encerra a sessão.
      *
      * A revogação no servidor é tentada, mas a saída local acontece de qualquer

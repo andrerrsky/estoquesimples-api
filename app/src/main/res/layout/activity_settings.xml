@@ -3,123 +3,93 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-
-    android:background="#F5F5F5">
+    android:background="@color/color_surface">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
 
-        <!-- Seção: Exibição -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_display"
-            android:textColor="@color/system_bar"
-            android:textStyle="bold"
-            android:textSize="14sp"
-            android:textAllCaps="true"
-            android:layout_marginBottom="8dp" />
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
 
-        <androidx.cardview.widget.CardView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp"
-            xmlns:app="http://schemas.android.com/apk/res-auto">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingRight="@dimen/field_gap">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_show_images_title"
-                        android:textColor="#212121"
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_show_images_summary"
-                        android:textColor="#757575"
-                        android:textSize="13sp"
-                        android:layout_marginTop="2dp" />
-
-                </LinearLayout>
-
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/switchShowImages"
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:checked="true" />
+                    android:text="@string/settings_show_images_title"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section" />
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_show_images_summary"
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                    android:layout_marginTop="2dp" />
             </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchShowImages"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
 
-        <!-- Seção: Moeda -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_currency"
-            android:textColor="@color/system_bar"
-            android:textStyle="bold"
-            android:textSize="14sp"
-            android:textAllCaps="true"
-            android:layout_marginBottom="8dp" />
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
 
-        <androidx.cardview.widget.CardView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp"
-            xmlns:app="http://schemas.android.com/apk/res-auto">
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact">
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:text="@string/settings_default_currency_title"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_default_currency_title"
-                    android:textColor="#212121"
-                    android:textSize="16sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_default_currency_summary"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="@dimen/field_gap" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_default_currency_summary"
-                    android:textColor="#757575"
-                    android:textSize="13sp"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="8dp" />
-
-                <Spinner
-                    android:id="@+id/spinnerDefaultCurrency"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
+            <Spinner
+                android:id="@+id/spinnerDefaultCurrency"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
     </LinearLayout>
-
 </ScrollView>

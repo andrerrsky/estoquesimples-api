@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/field_gap"
+        android:paddingRight="@dimen/field_gap"
+        android:paddingTop="4dp"
+        android:background="@color/color_surface_content">
+
+        <LinearLayout
+            android:id="@+id/tabTermos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:paddingTop="14dp">
+
+            <TextView
+                android:id="@+id/tabTermosLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Termos de uso"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textStyle="bold"
+                android:textColor="@color/color_brand" />
+
+            <View
+                android:id="@+id/tabTermosIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginTop="12dp"
+                android:background="@color/color_brand" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabPrivacidade"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:paddingTop="14dp">
+
+            <TextView
+                android:id="@+id/tabPrivacidadeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Privacidade"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textStyle="bold"
+                android:textColor="@color/color_text_muted" />
+
+            <View
+                android:id="@+id/tabPrivacidadeIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginTop="12dp"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/legalContent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:id="@+id/legalFallback"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/legalFallbackText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="@dimen/screen_padding_horizontal"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:lineSpacingExtra="4dp" />
+        </ScrollView>
+    </FrameLayout>
+</LinearLayout>

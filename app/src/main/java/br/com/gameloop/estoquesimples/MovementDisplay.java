@@ -1,6 +1,8 @@
 package br.com.gameloop.estoquesimples;
 
-import android.graphics.Color;
+import android.content.Context;
+
+import androidx.core.content.ContextCompat;
 
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 
@@ -14,10 +16,6 @@ import br.com.gameloop.estoquesimples.data.MovementRepository;
  * tela invente a sua própria tradução.
  */
 final class MovementDisplay {
-
-    private static final int VERDE = Color.parseColor("#4CAF50");
-    private static final int VERMELHO = Color.parseColor("#FF5722");
-    private static final int AZUL = Color.parseColor("#3F51B5");
 
     private MovementDisplay() {
     }
@@ -66,11 +64,13 @@ final class MovementDisplay {
         return effect < 0 ? "-" : "=";
     }
 
-    static int color(String changeType, double quantity) {
+    static int color(Context context, String changeType, double quantity) {
         double effect = MovementRepository.signedQuantity(changeType, quantity);
         if (effect > 0) {
-            return VERDE;
+            return ContextCompat.getColor(context, R.color.color_success);
         }
-        return effect < 0 ? VERMELHO : AZUL;
+        return effect < 0
+                ? ContextCompat.getColor(context, R.color.color_error)
+                : ContextCompat.getColor(context, R.color.color_brand);
     }
 }

@@ -16,7 +16,10 @@ public class ApiException extends Exception {
     public static final String NAO_AUTENTICADO = "UNAUTHENTICATED";
     public static final String PERMISSAO_DESATUALIZADA = "AUTH_PERMISSION_STALE";
     public static final String SEM_PERMISSAO = "FORBIDDEN";
+    public static final String EMAIL_NAO_CONFIRMADO = "AUTH_EMAIL_NOT_VERIFIED";
     public static final String ASSINATURA_INATIVA = "SUBSCRIPTION_INACTIVE";
+    /** Código atual da API; o anterior fica como alias por aparelhos antigos. */
+    public static final String ASSINATURA_OBRIGATORIA = "SUBSCRIPTION_REQUIRED";
     /**
      * O ponto de leitura deste aparelho não vale mais e a nuvem precisa ser
      * relida do zero. O texto tem de ser exatamente o que o servidor manda: a
@@ -105,6 +108,16 @@ public class ApiException extends Exception {
         return statusCode == 401 && !isPermissionStale();
     }
 
+    /**
+     * A conta existe, mas o e-mail ainda não foi confirmado.
+     *
+     * Convidar alguém dispara e-mail em nome da empresa; o servidor recusa
+     * isso até a confirmação. Não é falta de papel de proprietário.
+     */
+    public boolean isEmailUnverified() {
+        return EMAIL_NAO_CONFIRMADO.equals(code);
+    }
+
     /** Mensagem pronta para exibição, sem jargão de protocolo. */
     public String userMessage() {
         if (SEM_REDE.equals(code)) {
@@ -126,13 +139,32 @@ public class ApiException extends Exception {
         if (isPermissionStale()) {
             return "Seu papel na empresa mudou. Estamos atualizando seu acesso.";
         }
+        if (EMAIL_NAO_CONFIRMADO.equals(code)) {
+            String message = getMessage();
+            return message != null && !message.isEmpty()
+                    ? message
+                    : "Confirme seu e-mail antes de convidar outras pessoas.";
+        }
+        if ("AUTH_TOKEN_INVALID".equals(code)) {
+            String message = getMessage();
+            return message != null && !message.isEmpty()
+                    ? message
+                    : "Código inválido ou expirado.";
+        }
         if (statusCode == 401) {
             return "Sua sessão expirou. Entre novamente para continuar sincronizando.";
         }
         if (statusCode == 403) {
-            return ASSINATURA_INATIVA.equals(code)
-                    ? "A assinatura da empresa não está ativa. Os dados continuam no aparelho."
-                    : "Você não tem permissão para esta ação. Peça ao proprietário da empresa.";
+            if (ASSINATURA_INATIVA.equals(code) || ASSINATURA_OBRIGATORIA.equals(code)) {
+                return "A sincronização na nuvem exige assinatura. Os dados continuam no aparelho.";
+            }
+            if (isEmailUnverified()) {
+                String message = getMessage();
+                return message != null && !message.isEmpty()
+                        ? message
+                        : "Confirme seu e-mail antes de convidar outras pessoas.";
+            }
+            return "Você não tem permissão para esta ação. Peça ao proprietário da empresa.";
         }
         if (statusCode == 426) {
             return "Esta versão do app é antiga demais para sincronizar. Atualize pela Play Store.";

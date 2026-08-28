@@ -31,6 +31,7 @@ public final class SessionManager {
     private static final String CHAVE_USUARIO_ID = "usuario_id";
     private static final String CHAVE_USUARIO_EMAIL = "usuario_email";
     private static final String CHAVE_USUARIO_NOME = "usuario_nome";
+    private static final String CHAVE_USUARIO_EMAIL_VERIFICADO = "usuario_email_verificado";
     private static final String CHAVE_WORKSPACE_ID = "workspace_id";
     private static final String CHAVE_WORKSPACE_NOME = "workspace_nome";
     private static final String CHAVE_PAPEL = "papel";
@@ -113,6 +114,26 @@ public final class SessionManager {
 
     public String userName() {
         return read(CHAVE_USUARIO_NOME);
+    }
+
+    /**
+     * Se o e-mail desta conta já foi confirmado.
+     *
+     * Vale o que o servidor devolveu no último login, cadastro ou
+     * {@code GET /v1/me}. Sem essa informação o app não assume nada — o
+     * convite continua falando com o servidor.
+     */
+    public boolean isEmailVerified() {
+        return "1".equals(read(CHAVE_USUARIO_EMAIL_VERIFICADO));
+    }
+
+    /** O servidor já disse que este endereço ainda não foi confirmado. */
+    public boolean needsEmailVerification() {
+        return "0".equals(read(CHAVE_USUARIO_EMAIL_VERIFICADO));
+    }
+
+    public synchronized void setEmailVerified(boolean verified) {
+        write(CHAVE_USUARIO_EMAIL_VERIFICADO, verified ? "1" : "0");
     }
 
     public String workspaceId() {
@@ -215,11 +236,22 @@ public final class SessionManager {
 
         JSONObject user = payload.optJSONObject("user");
         if (user != null) {
-            write(CHAVE_USUARIO_ID, user.optString("id", null));
-            write(CHAVE_USUARIO_EMAIL, user.optString("email", null));
-            write(CHAVE_USUARIO_NOME, user.optString("name", null));
+            storeUser(user);
         }
 
+    }
+
+    /**
+     * Atualiza o perfil a partir de {@code GET /v1/me} ou do objeto {@code user}
+     * da autenticação.
+     */
+    public synchronized void storeUser(JSONObject user) {
+        write(CHAVE_USUARIO_ID, user.optString("id", null));
+        write(CHAVE_USUARIO_EMAIL, user.optString("email", null));
+        write(CHAVE_USUARIO_NOME, user.optString("name", null));
+        if (user.has("emailVerified")) {
+            setEmailVerified(user.optBoolean("emailVerified", false));
+        }
     }
 
     /**

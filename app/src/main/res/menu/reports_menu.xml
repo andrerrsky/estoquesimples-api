@@ -6,8 +6,8 @@
         android:title="Análise de Estoque"
         app:showAsAction="never" />
     <item
-        android:id="@+id/menu_go_pro"
-        android:title="Versão Profissional"
+        android:id="@+id/menu_subscription"
+        android:title="@string/menu_subscription"
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_history"

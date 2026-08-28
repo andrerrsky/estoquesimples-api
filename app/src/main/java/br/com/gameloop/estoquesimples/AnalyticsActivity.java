@@ -3,19 +3,19 @@ package br.com.gameloop.estoquesimples;
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
-import androidx.appcompat.app.AlertDialog;
-import androidx.cardview.widget.CardView;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.core.content.ContextCompat;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -41,7 +41,6 @@ public class AnalyticsActivity extends BaseActivity {
     private PremiumManager premiumManager;
     private LinearLayout contentLayout;
     private LinearLayout lockedLayout;
-    private TextView tvLockedMessage;
     
     // Analytics data structures
     private Map<String, ProductAnalytics> productAnalyticsMap;
@@ -62,7 +61,6 @@ public class AnalyticsActivity extends BaseActivity {
         // Inicializar views
         contentLayout = findViewById(R.id.analyticsContentLayout);
         lockedLayout = findViewById(R.id.analyticsLockedLayout);
-        tvLockedMessage = findViewById(R.id.tvAnalyticsLockedMessage);
         
         // Verificar acesso premium
         if (premiumManager.hasPremiumAccess()) {
@@ -81,27 +79,9 @@ public class AnalyticsActivity extends BaseActivity {
     private void showLockedScreen() {
         contentLayout.setVisibility(View.GONE);
         lockedLayout.setVisibility(View.VISIBLE);
-        
-        // Configurar mensagem
-        tvLockedMessage.setText("🔒 Recurso Exclusivo Premium\n\n" +
-                "A Análise Avançada de Estoque oferece:\n\n" +
-                "📊 Previsão de esgotamento de produtos\n" +
-                "📈 Taxa de rotatividade de estoque\n" +
-                "💡 Recomendações de reabastecimento\n" +
-                "⚡ Produtos de movimento rápido/lento\n" +
-                "📉 Análise de tendências de consumo\n\n" +
-                "Torne-se PRO ou ative 1 hora grátis para acessar!");
-        
-        // Botão para ir à tela PRO
-        findViewById(R.id.btnGoProFromAnalytics).setOnClickListener(v -> {
-            Intent intent = new Intent(this, ProActivity.class);
-            startActivity(intent);
-        });
-        
-        // Botão para assistir vídeo e ganhar 1 hora
-        findViewById(R.id.btnWatchAdForAnalytics).setOnClickListener(v -> {
-            showRewardedVideoOffer();
-        });
+
+        findViewById(R.id.btnGoProFromAnalytics).setOnClickListener(v ->
+                SubscriptionActivity.open(this));
     }
     
     /**
@@ -311,33 +291,30 @@ public class AnalyticsActivity extends BaseActivity {
         
         // Mostrar produtos que precisam reabastecimento urgente
         if (!urgentProducts.isEmpty()) {
-            addHeaderCard(container, "⚠️ REABASTECIMENTO URGENTE", "#F44336");
+            addHeaderCard(container, getString(R.string.analytics_urgent_restock), R.color.color_error);
             for (ProductAnalytics analytics : urgentProducts) {
-                addProductCard(container, analytics, "#FFEBEE");
+                addProductCard(container, analytics);
             }
         }
-        
-        // Mostrar produtos que precisam reabastecimento em breve
+
         if (!soonProducts.isEmpty()) {
-            addHeaderCard(container, "🔔 REABASTECER EM BREVE", "#FF9800");
+            addHeaderCard(container, getString(R.string.analytics_soon_restock), R.color.color_warning);
             for (ProductAnalytics analytics : soonProducts) {
-                addProductCard(container, analytics, "#FFF3E0");
+                addProductCard(container, analytics);
             }
         }
-        
-        // Mostrar produtos de movimento rápido
+
         if (!fastMovingProducts.isEmpty()) {
-            addHeaderCard(container, "⚡ PRODUTOS DE MOVIMENTO RÁPIDO", "#4CAF50");
+            addHeaderCard(container, getString(R.string.analytics_fast_moving), R.color.color_success);
             for (ProductAnalytics analytics : fastMovingProducts) {
-                addProductCard(container, analytics, "#E8F5E9");
+                addProductCard(container, analytics);
             }
         }
-        
-        // Mostrar produtos de movimento lento
+
         if (!slowMovingProducts.isEmpty()) {
-            addHeaderCard(container, "🐌 PRODUTOS DE MOVIMENTO LENTO", "#2196F3");
+            addHeaderCard(container, getString(R.string.analytics_slow_moving), R.color.color_brand);
             for (ProductAnalytics analytics : slowMovingProducts) {
-                addProductCard(container, analytics, "#E3F2FD");
+                addProductCard(container, analytics);
             }
         }
         
@@ -358,137 +335,112 @@ public class AnalyticsActivity extends BaseActivity {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 0, 0, 24);
+        params.setMargins(0, 0, 0, dp(16));
         summaryView.setLayoutParams(params);
-        summaryView.setPadding(32, 32, 32, 32);
-        summaryView.setBackgroundColor(android.graphics.Color.parseColor("#E3F2FD"));
-        summaryView.setTextSize(16);
-        summaryView.setTextColor(android.graphics.Color.parseColor("#1976D2"));
-        
-        String summary = "📊 RESUMO DA ANÁLISE\n\n" +
+        int pad = dp(18);
+        summaryView.setPadding(pad, pad, pad, pad);
+        summaryView.setBackgroundResource(R.drawable.bg_surface);
+        summaryView.setTextAppearance(R.style.TextAppearance_Estoque_Body);
+        summaryView.setTextColor(ContextCompat.getColor(this, R.color.color_text));
+
+        String summary = getString(R.string.analytics_summary_title) + "\n\n" +
                 "Produtos analisados: " + productAnalyticsMap.size() + "\n" +
                 "Reabastecimento urgente: " + urgent + "\n" +
                 "Reabastecer em breve: " + soon + "\n" +
                 "Movimento rápido: " + fast + "\n" +
                 "Movimento lento: " + slow;
-        
+
         summaryView.setText(summary);
         container.addView(summaryView);
     }
-    
-    /**
-     * Adiciona um card de cabeçalho
-     */
-    private void addHeaderCard(LinearLayout container, String title, String color) {
+
+    private void addHeaderCard(LinearLayout container, String title, int colorRes) {
         TextView headerView = new TextView(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 16, 0, 8);
+        params.setMargins(0, dp(16), 0, dp(8));
         headerView.setLayoutParams(params);
-        headerView.setPadding(16, 16, 16, 16);
-        headerView.setBackgroundColor(android.graphics.Color.parseColor(color));
-        headerView.setTextSize(18);
-        headerView.setTextColor(android.graphics.Color.WHITE);
-        headerView.setTypeface(null, android.graphics.Typeface.BOLD);
+        headerView.setTextAppearance(R.style.TextAppearance_Estoque_Section);
+        headerView.setTextColor(ContextCompat.getColor(this, colorRes));
         headerView.setText(title);
-        
         container.addView(headerView);
     }
-    
-    /**
-     * Adiciona um card de produto com análise
-     */
-    private void addProductCard(LinearLayout container, ProductAnalytics analytics, String bgColor) {
+
+    private void addProductCard(LinearLayout container, ProductAnalytics analytics) {
         TextView cardView = new TextView(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 0, 0, 12);
+        params.setMargins(0, 0, 0, dp(10));
         cardView.setLayoutParams(params);
-        cardView.setPadding(24, 24, 24, 24);
-        cardView.setBackgroundColor(android.graphics.Color.parseColor(bgColor));
-        cardView.setTextSize(14);
-        cardView.setTextColor(android.graphics.Color.parseColor("#212121"));
-        
+        int pad = dp(16);
+        cardView.setPadding(pad, pad, pad, pad);
+        cardView.setBackgroundResource(R.drawable.bg_surface);
+        cardView.setTextAppearance(R.style.TextAppearance_Estoque_Supporting);
+        cardView.setTextColor(ContextCompat.getColor(this, R.color.color_text));
+
         StringBuilder text = new StringBuilder();
-        text.append("📦 ").append(analytics.productName).append("\n\n");
+        text.append(analytics.productName).append("\n\n");
         text.append("Estoque atual: ").append(CurrencyHelper.formatQuantity(analytics.currentStock))
             .append(" ").append(analytics.unit).append("\n");
-        
+
         if (analytics.avgDailyConsumption > 0) {
             text.append("Consumo médio: ").append(String.format("%.1f", analytics.avgDailyConsumption))
                 .append(" ").append(analytics.unit).append("/dia\n");
         }
-        
+
         if (analytics.daysUntilStockOut > 0) {
             text.append("Dias até esgotar: ").append(String.format("%.0f", analytics.daysUntilStockOut))
                 .append(" dias\n");
-            
-            // Calcular data aproximada de esgotamento
-            long stockOutTimestamp = System.currentTimeMillis() + 
+
+            long stockOutTimestamp = System.currentTimeMillis() +
                 (long)(analytics.daysUntilStockOut * 24 * 60 * 60 * 1000);
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
             text.append("Previsão de esgotamento: ").append(sdf.format(new Date(stockOutTimestamp)))
                 .append("\n");
         }
-        
+
         text.append("Velocidade: ").append(analytics.movementSpeed).append("\n");
-        
+
         if (analytics.turnoverRate > 0) {
             text.append("Taxa de rotatividade: ").append(String.format("%.2fx", analytics.turnoverRate)).append("\n");
         }
-        
+
         if (analytics.needsRestocking) {
-            text.append("\n💡 Recomendação: Reabastecer em breve!");
+            text.append("\n").append(getString(R.string.analytics_recommendation));
         }
-        
+
         cardView.setText(text.toString());
         container.addView(cardView);
     }
-    
-    /**
-     * Adiciona card informando que não há dados suficientes
-     */
+
     private void addNoDataCard(LinearLayout container) {
         TextView noDataView = new TextView(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 32, 0, 32);
+        params.setMargins(0, dp(16), 0, dp(16));
         noDataView.setLayoutParams(params);
-        noDataView.setPadding(32, 32, 32, 32);
-        noDataView.setBackgroundColor(android.graphics.Color.parseColor("#FFF3E0"));
-        noDataView.setTextSize(16);
-        noDataView.setTextColor(android.graphics.Color.parseColor("#E65100"));
+        int pad = dp(18);
+        noDataView.setPadding(pad, pad, pad, pad);
+        noDataView.setBackgroundResource(R.drawable.bg_surface_muted);
+        noDataView.setTextAppearance(R.style.TextAppearance_Estoque_Supporting);
+        noDataView.setTextColor(ContextCompat.getColor(this, R.color.color_text_muted));
         noDataView.setGravity(android.view.Gravity.CENTER);
-        
-        noDataView.setText("📊 DADOS INSUFICIENTES\n\n" +
-                "Não há dados suficientes para gerar análises.\n\n" +
-                "Continue registrando entradas e saídas no histórico para que possamos calcular:\n" +
-                "• Previsões de esgotamento\n" +
-                "• Taxa de rotatividade\n" +
-                "• Recomendações personalizadas");
-        
+
+        noDataView.setText(getString(R.string.analytics_insufficient_title) + "\n\n" +
+                getString(R.string.analytics_no_data));
+
         container.addView(noDataView);
     }
-    
-    /**
-     * Mostra oferta de vídeo recompensado
-     */
-    private void showRewardedVideoOffer() {
-        new AlertDialog.Builder(this)
-            .setTitle("🎬 1 Hora Sem Anúncios")
-            .setMessage("Assista um vídeo curto e ganhe 1 HORA completa sem anúncios + acesso à Análise de Estoque!\n\nDeseja continuar?")
-            .setPositiveButton("Assistir", (dialog, which) -> {
-                AdManager adManager = AdManager.getInstance(this);
-                adManager.showRewardedVideoForPremium(this);
-            })
-            .setNegativeButton("Agora Não", null)
-            .show();
+
+    private int dp(int value) {
+        return Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics()));
     }
     
     /**
@@ -553,9 +505,8 @@ public class AnalyticsActivity extends BaseActivity {
         if (itemId == android.R.id.home) {
             onBackPressed();
             return true;
-        } else if (itemId == R.id.menu_go_pro) {
-            Intent intent = new Intent(this, ProActivity.class);
-            startActivity(intent);
+        } else if (itemId == R.id.menu_subscription) {
+            SubscriptionActivity.open(this);
             return true;
         } else if (itemId == R.id.menu_about) {
             Intent intent = new Intent(this, AboutActivity.class);

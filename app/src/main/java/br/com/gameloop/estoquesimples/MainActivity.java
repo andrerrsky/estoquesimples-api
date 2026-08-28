@@ -3,6 +3,7 @@ package br.com.gameloop.estoquesimples;
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
+import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
 
 import android.content.ContentValues;
@@ -15,17 +16,16 @@ import android.database.sqlite.SQLiteDatabase;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
-import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Looper;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -93,13 +93,12 @@ public class MainActivity extends BaseActivity {
     // Premium and Ad management
     private PremiumManager premiumManager;
     private AdManager adManager;
-    private CardView premiumCard;
+    private View premiumCard;
+    private View bannerContainer;
     private TextView premiumCardTitle;
     private TextView premiumCardMessage;
     private Button btnPremiumCardAction;
     private ImageButton btnClosePremiumCard;
-    private Handler premiumUpdateHandler;
-    private Runnable premiumUpdateRunnable;
 
     /** Pedido de refresh ao voltar de Add/Edit/Import (evita atualizar Activity pausada). */
     private boolean pendingListRefresh;
@@ -127,10 +126,9 @@ public class MainActivity extends BaseActivity {
     public void onAppODealInitialized() {
         appODealInitialized = true;
 
-        // Usar AdManager para controlar exibição de anúncios
-        if (adManager != null) {
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
+        // Usar AdManager para controlar exibição de anúncios, sem empilhar
+        // o banner com o card PRO quando ele estiver na tela.
+        syncHomeBannerWithPremiumCard();
     }
 
     public boolean isAppODealInitialized() {
@@ -164,13 +162,14 @@ public class MainActivity extends BaseActivity {
 
         // Inicializar premium card
         premiumCard = findViewById(R.id.premiumCard);
+        bannerContainer = findViewById(R.id.bannerContainer);
         premiumCardTitle = findViewById(R.id.premiumCardTitle);
         premiumCardMessage = findViewById(R.id.premiumCardMessage);
         btnPremiumCardAction = findViewById(R.id.btnPremiumCardAction);
         btnClosePremiumCard = findViewById(R.id.btnClosePremiumCard);
         
         if (btnPremiumCardAction != null) {
-            btnPremiumCardAction.setOnClickListener(v -> onPremiumCardActionClicked());
+            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
         } else {
             Log.e("MainActivity", "btnPremiumCardAction is null");
         }
@@ -189,9 +188,9 @@ public class MainActivity extends BaseActivity {
         getListValues();
         updateList();
         
-        // Atualizar premium card
+        // Atualizar card da assinatura e reconhecer compra PRO antiga, se houver
         updatePremiumCard();
-        startPremiumUpdateTimer();
+        startLegacyProRecognition();
         
         // Iniciar verificação de estoque baixo e agendamento de notificações
         LowStockScheduler.checkAndScheduleNotifications(this);
@@ -206,6 +205,7 @@ public class MainActivity extends BaseActivity {
             searchView.setIconifiedByDefault(false);
             searchView.setIconified(false);
             searchView.clearFocus();
+            flattenSearchViewPadding(searchView);
             searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                 @Override
                 public boolean onQueryTextSubmit(String query) {
@@ -262,7 +262,7 @@ public class MainActivity extends BaseActivity {
         Appodeal.setBannerViewId(R.id.appodealBannerView);
         Appodeal.setMrecViewId(R.id.appodealMrecView);
 
-        int adTypes = Appodeal.INTERSTITIAL | Appodeal.BANNER_VIEW | Appodeal.REWARDED_VIDEO | Appodeal.MREC;
+        int adTypes = Appodeal.INTERSTITIAL | Appodeal.BANNER_VIEW | Appodeal.MREC;
 
         Appodeal.initialize(this, Constants.APPODEAL_KEY, adTypes, new ApdInitializationCallback() {
             @Override
@@ -404,21 +404,11 @@ public class MainActivity extends BaseActivity {
 
         // Atualizar premium card e anúncios
         updatePremiumCard();
-        if (adManager != null) {
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
-    }
-    
-    @Override
-    protected void onPause() {
-        super.onPause();
-        stopPremiumUpdateTimer();
     }
     
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopPremiumUpdateTimer();
         if (instance == this) {
             instance = null;
         }
@@ -780,9 +770,6 @@ public class MainActivity extends BaseActivity {
         } else if (itemId == R.id.menu_analytics) {
             showAnalyticsActivity();
             return true;
-        } else if (itemId == R.id.menu_go_pro) {
-            showProActivity();
-            return true;
         } else if (itemId == R.id.menu_about) {
             showAboutActivity();
             return true;
@@ -793,7 +780,7 @@ public class MainActivity extends BaseActivity {
             startActivity(new Intent(this, AccountActivity.class));
             return true;
         } else if (itemId == R.id.menu_subscription) {
-            startActivity(new Intent(this, SubscriptionActivity.class));
+            SubscriptionActivity.open(this);
             return true;
         } else if (itemId == R.id.menu_settings) {
             showSettingsActivity();
@@ -829,139 +816,97 @@ public class MainActivity extends BaseActivity {
     }
     
     /**
-     * Atualiza o card de premium de acordo com o status do usuário
+     * Atualiza o card de assinatura de acordo com o status do usuário.
      */
     public void updatePremiumCard() {
         if (premiumManager == null || premiumCard == null) {
             return;
         }
-        
+
+        boolean hasSubscription = premiumManager.hasCloudSubscription();
         boolean isPro = premiumManager.isPro();
-        boolean isTempActive = premiumManager.isTempPremiumActive();
-        boolean isCardDismissed = prefs.getBoolean("premiumCardDismissed", false);
-        
-        if (isPro) {
-            // Usuário é PRO permanente, esconder o card
+        boolean isCardDismissed = prefs != null && prefs.getBoolean("premiumCardDismissed", false);
+
+        if (hasSubscription || isCardDismissed) {
             premiumCard.setVisibility(View.GONE);
-        } else if (isCardDismissed) {
-            // Usuário fechou o card, esconder
-            premiumCard.setVisibility(View.GONE);
-        } else if (isTempActive) {
-            // Modo temporário ativo, mostrar tempo restante
+        } else if (isPro) {
+            premiumCard.setVisibility(View.VISIBLE);
+            premiumCardTitle.setText(R.string.premium_card_legacy_title);
+            premiumCardMessage.setText(R.string.premium_card_legacy_message);
+            btnPremiumCardAction.setText(R.string.premium_card_upgrade);
+            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
+        } else {
             premiumCard.setVisibility(View.VISIBLE);
             premiumCardTitle.setText(R.string.premium_card_title);
-            premiumCardMessage.setText(getString(R.string.premium_card_time_remaining, 
-                                                premiumManager.getFormattedRemainingTime()));
+            premiumCardMessage.setText(R.string.premium_card_message);
             btnPremiumCardAction.setText(R.string.premium_card_upgrade);
-            btnPremiumCardAction.setOnClickListener(v -> showProActivity());
-        } else {
-            // Usuário não tem premium, aplicar sistema de chance (1 em 3)
-            boolean shouldShow = shouldShowPremiumCard();
-            
-            if (shouldShow) {
-                premiumCard.setVisibility(View.VISIBLE);
-                premiumCardTitle.setText(R.string.premium_card_watch_ad_title);
-                premiumCardMessage.setText(R.string.premium_card_watch_ad_message);
-                btnPremiumCardAction.setText(R.string.premium_card_watch_ad_button);
-                btnPremiumCardAction.setOnClickListener(v -> onPremiumCardActionClicked());
-            } else {
-                premiumCard.setVisibility(View.GONE);
-            }
+            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
         }
+
+        syncHomeBannerWithPremiumCard();
     }
-    
+
     /**
-     * Sistema de chance: card aparece 1 em 3 vezes
-     * @return true se o card deve ser exibido
+     * O card de assinatura e o banner não cabem juntos: com o convite visível
+     * o anúncio de cima some; sem o card, o banner volta ao lugar.
      */
-    private boolean shouldShowPremiumCard() {
-        // Gera um número aleatório entre 0 e 2 (0, 1, 2)
-        // Se for 0, mostra o card (chance de 1 em 3)
-        java.util.Random random = new java.util.Random();
-        int chance = random.nextInt(3);
-        return chance == 0;
+    private void syncHomeBannerWithPremiumCard() {
+        boolean cardVisible = premiumCard != null && premiumCard.getVisibility() == View.VISIBLE;
+        if (cardVisible) {
+            if (adManager != null) {
+                adManager.hideBannerAds(this, R.id.appodealBannerView, 0);
+            } else if (bannerContainer != null) {
+                bannerContainer.setVisibility(View.GONE);
+            }
+            // showBannerAds agenda o Appodeal no próximo frame; esconder de
+            // novo depois disso evita o banner reaparecer por cima do card.
+            getWindow().getDecorView().post(() -> {
+                if (isFinishing() || premiumCard == null
+                        || premiumCard.getVisibility() != View.VISIBLE) {
+                    return;
+                }
+                if (adManager != null) {
+                    adManager.hideBannerAds(this, R.id.appodealBannerView, 0);
+                }
+            });
+            return;
+        }
+        if (bannerContainer != null) {
+            bannerContainer.setVisibility(View.VISIBLE);
+        }
+        if (adManager != null) {
+            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
+        }
     }
     
     /**
      * Handler para o clique no botão de fechar o card
      */
     private void onClosePremiumCardClicked() {
-        // Salvar que o card foi fechado
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putBoolean("premiumCardDismissed", true);
-        editor.apply();
-        
-        // Esconder o card
+        if (prefs != null) {
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putBoolean("premiumCardDismissed", true);
+            editor.apply();
+        }
+
         premiumCard.setVisibility(View.GONE);
-        
-        Toast.makeText(this, "Você pode ativar o modo sem anúncios pelo menu 'Versão Profissional'", Toast.LENGTH_SHORT).show();
+        syncHomeBannerWithPremiumCard();
+
+        Toast.makeText(this, "Você pode assinar pelo menu Assinatura", Toast.LENGTH_SHORT).show();
     }
-    
+
     /**
-     * Handler para o clique no botão do card de premium
+     * Consulta a Play Store por uma compra única antiga, sem oferecer venda.
      */
-    private void onPremiumCardActionClicked() {
-        if (premiumManager.isTempPremiumActive()) {
-            // Já está em modo temporário, levar para tela PRO
-            showProActivity();
-        } else {
-            // Oferecer assistir rewarded video
-            showRewardedVideoOffer();
+    private void startLegacyProRecognition() {
+        if (premiumManager != null && premiumManager.isPro()) {
+            return;
         }
-    }
-    
-    /**
-     * Mostra oferta para assistir rewarded video
-     */
-    private void showRewardedVideoOffer() {
-        new AlertDialog.Builder(this)
-            .setTitle("🎬 1 Hora Sem Anúncios")
-            .setMessage("Assista um vídeo curto e ganhe 1 HORA completa sem anúncios!\n\nDeseja continuar?")
-            .setPositiveButton("Assistir", (dialog, which) -> {
-                // Usar o AdManager para mostrar rewarded video
-                if (adManager != null) {
-                    adManager.showRewardedVideoForPremium(this);
-                }
-            })
-            .setNegativeButton("Agora Não", null)
-            .show();
-    }
-    
-    /**
-     * Inicia o timer para atualizar o card de premium
-     */
-    private void startPremiumUpdateTimer() {
-        stopPremiumUpdateTimer();
-        
-        premiumUpdateHandler = new Handler();
-        premiumUpdateRunnable = new Runnable() {
-            @Override
-            public void run() {
+        LegacyProBilling.runQuery(this, false, (result, message) -> {
+            if (result == LegacyProBilling.Result.RECOGNIZED) {
                 updatePremiumCard();
-                if (premiumUpdateHandler != null) {
-                    premiumUpdateHandler.postDelayed(this, 60000); // Atualizar a cada minuto
-                }
             }
-        };
-        
-        premiumUpdateHandler.postDelayed(premiumUpdateRunnable, 60000);
-    }
-    
-    /**
-     * Para o timer de atualização do card de premium
-     */
-    private void stopPremiumUpdateTimer() {
-        if (premiumUpdateHandler != null && premiumUpdateRunnable != null) {
-            premiumUpdateHandler.removeCallbacks(premiumUpdateRunnable);
-        }
-    }
-    
-    /**
-     * Mostra a tela PRO
-     */
-    private void showProActivity() {
-        Intent intent = new Intent(this, ProActivity.class);
-        startActivity(intent);
+        });
     }
     
     /**
@@ -1195,6 +1140,35 @@ public class MainActivity extends BaseActivity {
         
         updateList();
         Toast.makeText(this, getString(R.string.bulk_edit_success, updated), Toast.LENGTH_SHORT).show();
+    }
+
+    private void flattenSearchViewPadding(SearchView searchView) {
+        View frame = searchView.findViewById(androidx.appcompat.R.id.search_edit_frame);
+        if (frame != null && frame.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) frame.getLayoutParams();
+            lp.setMarginStart(0);
+            lp.setMarginEnd(0);
+            lp.leftMargin = 0;
+            lp.rightMargin = 0;
+            frame.setLayoutParams(lp);
+        }
+
+        View plate = searchView.findViewById(androidx.appcompat.R.id.search_plate);
+        if (plate != null) {
+            plate.setBackground(null);
+            plate.setPadding(0, 0, 0, 0);
+        }
+
+        View mag = searchView.findViewById(androidx.appcompat.R.id.search_mag_icon);
+        if (mag != null) {
+            mag.setPadding(0, 0, 0, 0);
+            if (mag.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) mag.getLayoutParams();
+                lp.setMarginStart(0);
+                lp.leftMargin = 0;
+                mag.setLayoutParams(lp);
+            }
+        }
     }
 
 }

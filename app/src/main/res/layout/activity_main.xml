@@ -5,23 +5,21 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/color_surface"
     tools:context="br.com.gameloop.estoquesimples.MainActivity">
 
     <androidx.appcompat.widget.SearchView
         android:id="@+id/searchView"
+        style="@style/Widget.Estoque.SearchView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:background="@android:color/white"
-        android:elevation="4dp"
         android:focusable="true"
         android:focusableInTouchMode="true"
         app:iconifiedByDefault="false"
         app:queryHint="Buscar produtos..."
-        android:paddingLeft="8dp"
-        android:paddingRight="8dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp" />
+        app:queryBackground="@android:color/transparent"
+        app:submitBackground="@android:color/transparent" />
 
     <FrameLayout
         android:id="@+id/bannerContainer"
@@ -39,34 +37,33 @@
 
     </FrameLayout>
 
-    <!-- Premium Card -->
-    <androidx.cardview.widget.CardView
+    <LinearLayout
         android:id="@+id/premiumCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@+id/bannerContainer"
-        android:layout_marginLeft="16dp"
-        android:layout_marginRight="16dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:elevation="4dp"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginTop="@dimen/field_gap"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_surface"
+        android:orientation="vertical"
+        android:padding="@dimen/group_padding_compact"
         android:visibility="gone">
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="16dp">
+            android:layout_height="wrap_content">
 
-            <!-- Botão X para fechar -->
             <ImageButton
                 android:id="@+id/btnClosePremiumCard"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_alignParentTop="true"
                 android:layout_alignParentRight="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:padding="2dp"
+                android:padding="8dp"
                 android:contentDescription="Fechar" />
 
             <LinearLayout
@@ -79,41 +76,30 @@
                     android:id="@+id/premiumCardTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/premium_card_watch_ad_title"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="#333333"
-                    android:layout_marginBottom="8dp" />
+                    android:text="@string/premium_card_title"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section"
+                    android:layout_marginBottom="@dimen/field_gap" />
 
                 <TextView
                     android:id="@+id/premiumCardMessage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/premium_card_watch_ad_message"
-                    android:textSize="14sp"
-                    android:textColor="#666666"
+                    android:text="@string/premium_card_message"
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
                     android:layout_marginBottom="12dp" />
 
-                <LinearLayout
+                <Button
+                    android:id="@+id/btnPremiumCardAction"
+                    style="@style/Widget.Estoque.Button.Primary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="end">
-
-                    <Button
-                        android:id="@+id/btnPremiumCardAction"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/premium_card_watch_ad_button"
-                        android:textSize="14sp" />
-
-                </LinearLayout>
+                    android:text="@string/premium_card_upgrade" />
 
             </LinearLayout>
 
         </RelativeLayout>
 
-    </androidx.cardview.widget.CardView>
+    </LinearLayout>
 
     <ListView
         android:id="@+id/listView"
@@ -121,21 +107,27 @@
         android:layout_height="match_parent"
         android:layout_below="@+id/premiumCard"
         android:layout_above="@+id/bottomNavigation"
-        android:paddingLeft="@dimen/activity_horizontal_margin"
-        android:paddingRight="@dimen/activity_horizontal_margin"
-        android:clipToPadding="false" />
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/field_gap"
+        android:paddingBottom="@dimen/field_gap"
+        android:clipToPadding="false"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="@dimen/list_item_spacing"
+        android:background="@color/color_surface" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
+        android:background="@drawable/bg_bottom_nav"
+        app:elevation="0dp"
         app:menu="@menu/bottom_navigation_menu"
         app:itemIconTint="@color/bottom_navigation_selector"
         app:itemTextColor="@color/bottom_navigation_selector"
         app:labelVisibilityMode="labeled" />
 
-    <!-- Mesma região do ListView: NÃO cobrir SearchView/banner (bug targetSdk 36). -->
     <TextView
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
@@ -144,8 +136,9 @@
         android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
         android:text=""
+        android:textAppearance="@style/TextAppearance.Estoque.Empty"
         android:gravity="center"
-        android:paddingLeft="@dimen/activity_horizontal_margin"
-        android:paddingRight="@dimen/activity_horizontal_margin" />
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal" />
 
 </RelativeLayout>

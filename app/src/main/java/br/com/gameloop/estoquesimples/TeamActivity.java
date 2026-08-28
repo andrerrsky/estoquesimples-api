@@ -1,11 +1,10 @@
 package br.com.gameloop.estoquesimples;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -16,11 +15,15 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import br.com.gameloop.estoquesimples.sync.AccountService;
 import br.com.gameloop.estoquesimples.sync.ApiException;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.TeamClient;
@@ -32,7 +35,7 @@ import br.com.gameloop.estoquesimples.sync.TeamClient;
  * administra, um convite em aberto é acesso concedido esperando ser usado, e
  * separá-lo em outra aba faria convites esquecidos passarem despercebidos.
  */
-public final class TeamActivity extends Activity {
+public final class TeamActivity extends BaseActivity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -41,10 +44,12 @@ public final class TeamActivity extends Activity {
     private final List<TeamClient.Invite> convites = new ArrayList<>();
 
     private TeamClient client;
+    private AccountService accounts;
     private SessionManager session;
     private ListView listView;
     private ProgressBar progress;
     private TextView messageView;
+    private TextView verifyEmailNotice;
     private ArrayAdapter<String> adapter;
 
     @Override
@@ -52,22 +57,39 @@ public final class TeamActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_team);
 
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Equipe");
+        }
+
         session = SessionManager.get(this);
         client = new TeamClient(this);
-        setTitle(session.workspaceName() != null ? session.workspaceName() : "Equipe");
+        accounts = new AccountService(this);
 
         listView = findViewById(R.id.teamList);
         progress = findViewById(R.id.progress);
         messageView = findViewById(R.id.messageView);
+        verifyEmailNotice = findViewById(R.id.verifyEmailNotice);
 
         Button convidar = findViewById(R.id.inviteButton);
         convidar.setOnClickListener(v -> promptConvite());
+        verifyEmailNotice.setOnClickListener(v ->
+                EmailVerificationUi.prompt(this, accounts, executor, main, this::atualizarAvisoDeEmail));
 
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        adapter = new ArrayAdapter<>(this, R.layout.item_simple_text, new ArrayList<>());
         listView.setAdapter(adapter);
         listView.setOnItemClickListener((parent, view, position, id) -> abrirAcoes(position));
 
         carregar();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
@@ -84,6 +106,12 @@ public final class TeamActivity extends Activity {
         setBusy(true);
         executor.execute(() -> {
             try {
+                try {
+                    accounts.refreshProfile();
+                } catch (ApiException ignored) {
+                    // A lista da equipe ainda pode ser mostrada; a confirmação
+                    // de e-mail é exigida de novo na hora do convite.
+                }
                 List<TeamClient.Member> lista = client.members();
                 List<TeamClient.Invite> pendentes = new ArrayList<>();
                 for (TeamClient.Invite convite : client.invites()) {
@@ -125,6 +153,12 @@ public final class TeamActivity extends Activity {
                     + " · " + TeamClient.papelLegivel(convite.role));
         }
         adapter.notifyDataSetChanged();
+        atualizarAvisoDeEmail();
+    }
+
+    private void atualizarAvisoDeEmail() {
+        verifyEmailNotice.setVisibility(
+                session.needsEmailVerification() ? View.VISIBLE : View.GONE);
     }
 
     // -------------------------------------------------------------------------
@@ -132,6 +166,14 @@ public final class TeamActivity extends Activity {
     // -------------------------------------------------------------------------
 
     private void promptConvite() {
+        if (session.needsEmailVerification()) {
+            EmailVerificationUi.prompt(this, accounts, executor, main, () -> {
+                atualizarAvisoDeEmail();
+                promptConvite();
+            });
+            return;
+        }
+
         LinearLayout caixa = new LinearLayout(this);
         caixa.setOrientation(LinearLayout.VERTICAL);
         int margem = (int) (20 * getResources().getDisplayMetrics().density);
@@ -150,6 +192,9 @@ public final class TeamActivity extends Activity {
 
         Button papel = new Button(this);
         papel.setText("Papel: " + rotulos[escolhido[0]]);
+        papel.setBackgroundResource(R.drawable.bg_button_secondary);
+        papel.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        papel.setAllCaps(false);
         papel.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle("Papel na empresa")
                 .setItems(rotulos, (dialog, which) -> {
@@ -158,6 +203,15 @@ public final class TeamActivity extends Activity {
                 })
                 .show());
         caixa.addView(papel);
+
+        TextView ajuda = new TextView(this);
+        ajuda.setText("O que cada papel pode fazer?");
+        ajuda.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        ajuda.setTextSize(14);
+        ajuda.setPadding(0, (int) (8 * getResources().getDisplayMetrics().density), 0, 0);
+        ajuda.setPaintFlags(ajuda.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+        ajuda.setOnClickListener(v -> mostrarAjudaPapeis());
+        caixa.addView(ajuda);
 
         new AlertDialog.Builder(this)
                 .setTitle("Convidar pessoa")
@@ -176,6 +230,14 @@ public final class TeamActivity extends Activity {
                 .show();
     }
 
+    private void mostrarAjudaPapeis() {
+        new AlertDialog.Builder(this)
+                .setTitle("Papéis na equipe")
+                .setMessage(TeamClient.textoAjudaPapeis())
+                .setPositiveButton("Entendi", null)
+                .show();
+    }
+
     private void convidar(String email, String papel) {
         setBusy(true);
         executor.execute(() -> {
@@ -188,6 +250,13 @@ public final class TeamActivity extends Activity {
             } catch (ApiException e) {
                 main.post(() -> {
                     setBusy(false);
+                    if (e.isEmailUnverified()) {
+                        session.setEmailVerified(false);
+                        atualizarAvisoDeEmail();
+                        EmailVerificationUi.prompt(this, accounts, executor, main,
+                                () -> convidar(email, papel));
+                        return;
+                    }
                     showMessage(e.userMessage());
                 });
             }
