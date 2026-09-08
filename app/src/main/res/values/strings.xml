@@ -20,17 +20,16 @@
     <!-- Assinatura (oferta atual) -->
     <string name="subscription_title">Assinatura</string>
     <string name="subscription_hero_title">Leve seu estoque para a nuvem</string>
-    <string name="subscription_hero_subtitle">Sincronize entre aparelhos, proteja seus dados, desbloqueie os recursos premium e remova os anúncios.</string>
+    <string name="subscription_hero_subtitle">Sincronize entre aparelhos, proteja seus dados e desbloqueie a Análise Avançada de Estoque.</string>
     <string name="subscription_hero_title_active">Assinatura ativa</string>
-    <string name="subscription_hero_subtitle_active">Seus dados podem sincronizar na nuvem. Recursos premium e sem anúncios estão liberados.</string>
+    <string name="subscription_hero_subtitle_active">Seus dados podem sincronizar na nuvem. A Análise Avançada de Estoque está liberada.</string>
     <string name="subscription_hero_title_legacy_pro">Leve sua Versão PRO para a nuvem</string>
-    <string name="subscription_hero_subtitle_legacy_pro">Você já tem recursos premium e sem anúncios. A assinatura adiciona sincronização entre aparelhos e proteção na nuvem.</string>
+    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos e proteção na nuvem.</string>
     <string name="subscription_benefits_title">O que a assinatura inclui</string>
     <string name="subscription_benefit_sync">• Sincronize o estoque na nuvem e use os dados em outros aparelhos</string>
     <string name="subscription_benefit_devices">• Trabalhe com a equipe na mesma empresa, quando aplicável</string>
     <string name="subscription_benefit_backup">• Mantenha os dados protegidos e sincronizados</string>
     <string name="subscription_benefit_premium">• Desbloqueie todas as funcionalidades premium</string>
-    <string name="subscription_benefit_ads">• Remova os anúncios</string>
     <string name="subscription_cta">Assinar</string>
     <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
     <string name="subscription_price_month">%1$s / mês</string>
@@ -40,9 +39,9 @@
     <string name="subscription_retry">Tentar novamente</string>
     <string name="subscription_legal">A cobrança é feita pela Google Play na conta Google deste aparelho. Cancelamento e forma de pagamento ficam no Google Play. Cancelar a assinatura não apaga os dados deste aparelho — só para de sincronizar.</string>
     <string name="subscription_legacy_title">Já adquiriu a antiga Versão PRO?</string>
-    <string name="subscription_legacy_body">Essa compra não está mais à venda. Se você já a fez, recupere-a aqui para manter os recursos premium e a ausência de anúncios. A sincronização em nuvem continua exigindo assinatura.</string>
+    <string name="subscription_legacy_body">Essa compra não está mais à venda. Se você já a fez, recupere-a aqui para manter os recursos premium. A sincronização em nuvem continua exigindo assinatura.</string>
     <string name="subscription_legacy_restore">Recuperar compra antiga</string>
-    <string name="subscription_legacy_active">Sua antiga Versão PRO está ativa neste aparelho. Recursos premium e sem anúncios permanecem. A sincronização em nuvem exige assinatura.</string>
+    <string name="subscription_legacy_active">Sua antiga Versão PRO está ativa neste aparelho. Os recursos premium permanecem. A sincronização em nuvem exige assinatura.</string>
     <string name="subscription_legacy_recognized">Compra antiga reconhecida. Seus benefícios PRO foram restaurados neste aparelho.</string>
     <string name="menu_subscription">Assinatura</string>
 
@@ -53,13 +52,6 @@
     <string name="pro_store_not_connected">Aguarde a conexão com a loja…</string>
     <string name="pro_purchase_pending">Sua compra antiga ainda está sendo processada. O acesso PRO entra quando o pagamento for confirmado.</string>
 
-    <!-- Premium Card -->
-    <string name="premium_card_title">Sincronize na nuvem</string>
-    <string name="premium_card_message">Assine para usar o estoque em outros aparelhos, proteger os dados e remover anúncios.</string>
-    <string name="premium_card_upgrade">Conhecer o plano</string>
-    <string name="premium_card_legacy_title">Leve a Versão PRO para a nuvem</string>
-    <string name="premium_card_legacy_message">Você já não vê anúncios. A assinatura adiciona sincronização entre aparelhos.</string>
-    
     <!-- Advanced Reports Feature -->
     <string name="advanced_reports_title">Relatórios Avançados</string>
     <string name="advanced_reports_description">Gráficos detalhados e análises profundas do seu estoque</string>

@@ -28,7 +28,7 @@
                     android:id="@+id/photo"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@drawable/package_icon"
+                    android:src="@drawable/ic_package"
                     android:scaleType="centerCrop"
                     android:background="@drawable/bg_photo"
                     android:clipToOutline="true"
@@ -165,39 +165,64 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginTop="6dp"
-                    android:gravity="center_vertical">
+                    android:baselineAligned="false">
 
-                    <TextView
-                        android:id="@+id/sku"
+                    <LinearLayout
+                        android:id="@+id/skuGroup"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:minWidth="0dp"
-                        android:text="SKU-001"
-                        android:textAppearance="@style/TextAppearance.Estoque.Caption"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:visibility="gone" />
+                        android:orientation="vertical"
+                        android:visibility="gone">
 
-                    <TextView
-                        android:id="@+id/skuDivider"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=" • "
-                        android:textAppearance="@style/TextAppearance.Estoque.Caption"
-                        android:visibility="gone" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="SKU"
+                            android:textAppearance="@style/TextAppearance.Estoque.Caption" />
 
-                    <TextView
-                        android:id="@+id/category"
+                        <TextView
+                            android:id="@+id/sku"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="SKU-001"
+                            android:textSize="13sp"
+                            android:textColor="@color/color_text"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/categoryGroup"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:minWidth="0dp"
-                        android:text="Categoria"
-                        android:textAppearance="@style/TextAppearance.Estoque.Caption"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:visibility="gone" />
+                        android:orientation="vertical"
+                        android:layout_marginStart="8dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Categoria"
+                            android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+
+                        <TextView
+                            android:id="@+id/category"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Categoria"
+                            android:textSize="13sp"
+                            android:textColor="@color/color_text"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -230,7 +255,7 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:id="@+id/delete"
-                    android:src="@drawable/delete_icon"
+                    android:src="@drawable/ic_delete"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:scaleType="fitCenter"
                     android:padding="@dimen/field_gap"
@@ -240,7 +265,7 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:id="@+id/edit"
-                    android:src="@drawable/edit_icon"
+                    android:src="@drawable/ic_edit"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:scaleType="fitCenter"
                     android:padding="@dimen/field_gap"

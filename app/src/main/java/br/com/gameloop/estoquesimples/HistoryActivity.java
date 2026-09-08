@@ -33,29 +33,6 @@ public class HistoryActivity extends BaseActivity {
         historyList.setEmptyView(emptyView);
 
         loadHistory();
-        
-        // Configurar e mostrar anúncios com AdManager
-        initializeAppodealAds();
-    }
-    
-    /**
-     * Inicializa e exibe os anúncios usando AdManager
-     */
-    private void initializeAppodealAds() {
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
-    }
-    
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Atualizar anúncios baseado no status premium
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
     }
 
     private void loadHistory() {

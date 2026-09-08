@@ -89,7 +89,8 @@ public class CustomListView extends ArrayAdapter<String> {
         TextView sku = (TextView) rowView.findViewById(R.id.sku);
         TextView unit = (TextView) rowView.findViewById(R.id.unit);
         TextView lowStockBadge = (TextView) rowView.findViewById(R.id.lowStockBadge);
-        TextView skuDivider = (TextView) rowView.findViewById(R.id.skuDivider);
+        View skuGroup = rowView.findViewById(R.id.skuGroup);
+        View categoryGroup = rowView.findViewById(R.id.categoryGroup);
 
         final int finalPosition = position;
 
@@ -199,32 +200,22 @@ public class CustomListView extends ArrayAdapter<String> {
         }
 
         // SKU
-        if(skus.get(position) != null && !skus.get(position).isEmpty() && !skus.get(position).equals("null")) {
+        boolean hasSku = skus.get(position) != null && !skus.get(position).isEmpty() && !skus.get(position).equals("null");
+        if (hasSku) {
             sku.setText(skus.get(position));
-            sku.setVisibility(View.VISIBLE);
-        } else {
-            sku.setVisibility(View.GONE);
         }
+        skuGroup.setVisibility(hasSku ? View.VISIBLE : View.GONE);
 
         // Categoria
-        if(categories.get(position) != null && !categories.get(position).isEmpty() && !categories.get(position).equals("null")) {
+        boolean hasCategory = categories.get(position) != null && !categories.get(position).isEmpty() && !categories.get(position).equals("null");
+        if (hasCategory) {
             category.setText(categories.get(position));
-            category.setVisibility(View.VISIBLE);
-
-            if(sku.getVisibility() == View.VISIBLE) {
-                skuDivider.setVisibility(View.VISIBLE);
-            } else {
-                skuDivider.setVisibility(View.GONE);
-            }
-        } else {
-            category.setVisibility(View.GONE);
-            skuDivider.setVisibility(View.GONE);
         }
+        categoryGroup.setVisibility(hasCategory ? View.VISIBLE : View.GONE);
 
         View metaRow = rowView.findViewById(R.id.metaRow);
         if (metaRow != null) {
-            boolean showMeta = sku.getVisibility() == View.VISIBLE || category.getVisibility() == View.VISIBLE;
-            metaRow.setVisibility(showMeta ? View.VISIBLE : View.GONE);
+            metaRow.setVisibility((hasSku || hasCategory) ? View.VISIBLE : View.GONE);
         }
 
         // Unidade - ocultar quando houver barra de estoque mínimo

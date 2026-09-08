@@ -21,9 +21,9 @@ import br.com.gameloop.estoquesimples.BuildConfig;
 /**
  * Cliente HTTP da API.
  *
- * Escrito sobre {@code HttpURLConnection} de propósito: o app já carrega um SDK
- * de anúncios grande, e uma biblioteca HTTP a mais aumentaria o tamanho do APK
- * para resolver um problema que aqui tem meia dúzia de chamadas. O que importa
+ * Escrito sobre {@code HttpURLConnection} de propósito: uma biblioteca HTTP a
+ * mais aumentaria o tamanho do APK para resolver um problema que aqui tem meia
+ * dúzia de chamadas. O que importa
  * — tempo limite, um único ponto de tratamento de erro e recusa de conexão sem
  * TLS — está tudo abaixo.
  */

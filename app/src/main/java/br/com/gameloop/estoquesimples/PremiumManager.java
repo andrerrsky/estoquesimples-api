@@ -4,15 +4,17 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * Direitos locais de premium (anúncios e recursos da antiga Versão PRO).
+ * Direitos locais de premium (recursos da antiga Versão PRO e da assinatura).
  *
- * Três estados independentes:
+ * O app é livre e sem anúncios para todo mundo. Três estados independentes
+ * decidem só o que fica de fora do uso local — a Análise de Estoque — e a
+ * sincronização na nuvem:
  * <ul>
- *   <li>gratuito — anúncios e recursos premium bloqueados; sem nuvem;</li>
- *   <li>compra única antiga ({@code isPro}) — premium e sem anúncios para sempre,
- *       sem sincronização em nuvem;</li>
- *   <li>assinatura ativa ({@code hasCloudSubscription}) — premium, sem anúncios
- *       e sincronização em nuvem.</li>
+ *   <li>gratuito — tudo local liberado; Análise de Estoque e nuvem bloqueadas;</li>
+ *   <li>compra única antiga ({@code isPro}) — Análise de Estoque liberada para
+ *       sempre, sem sincronização em nuvem;</li>
+ *   <li>assinatura ativa ({@code hasCloudSubscription}) — Análise de Estoque e
+ *       sincronização em nuvem.</li>
  * </ul>
  * Quem tem os dois acumula os benefícios. Cancelar a assinatura tira só a nuvem.
  */
@@ -62,7 +64,7 @@ public class PremiumManager {
     }
 
     /**
-     * Acesso aos recursos premium e remoção de anúncios.
+     * Acesso aos recursos premium (hoje, a Análise de Estoque).
      *
      * Vale para a compra antiga e para a assinatura. Não libera sincronização.
      */
@@ -74,9 +76,10 @@ public class PremiumManager {
      * Assinatura ativa validada pelo servidor.
      *
      * Lê apenas o retrato local, sem rede: este método é chamado a cada
-     * exibição de anúncio e não pode bloquear a interface. O retrato tem prazo
-     * de validade próprio, então uma assinatura cancelada deixa de valer mesmo
-     * que o aparelho nunca mais se conecte.
+     * abertura/retomada de tela que depende do status premium e não pode
+     * bloquear a interface. O retrato tem prazo de validade próprio, então uma
+     * assinatura cancelada deixa de valer mesmo que o aparelho nunca mais se
+     * conecte.
      */
     public boolean hasCloudSubscription() {
         try {

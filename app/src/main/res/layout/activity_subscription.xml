@@ -82,13 +82,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/subscription_benefit_premium"
-                android:textAppearance="@style/TextAppearance.Estoque.Body"
-                android:layout_marginBottom="@dimen/row_gap" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/subscription_benefit_ads"
                 android:textAppearance="@style/TextAppearance.Estoque.Body" />
         </LinearLayout>
 

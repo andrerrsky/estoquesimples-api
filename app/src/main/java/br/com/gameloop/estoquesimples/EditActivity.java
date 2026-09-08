@@ -208,21 +208,8 @@ public class EditActivity extends BaseActivity {
             }
         }
 
-        // Configurar e mostrar MREC do Appodeal com AdManager
-        initializeAppodealAds();
+    }
 
-    }
-    
-    /**
-     * Inicializa e exibe os anúncios usando AdManager
-     */
-    private void initializeAppodealAds() {
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, R.id.appodealMrecView);
-        }
-    }
-    
     /**
      * Inicializa o diretório de imagens
      */
@@ -248,16 +235,6 @@ public class EditActivity extends BaseActivity {
         }
     }
     
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Atualizar anúncios baseado no status premium
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, R.id.appodealMrecView);
-        }
-    }
-
     /**
      * Inicializa os launchers para capturar resultados de câmera, galeria e permissões
      */
@@ -653,7 +630,6 @@ public class EditActivity extends BaseActivity {
                     Log.e(TAG, "Error checking low stock notifications", e);
                 }
 
-                // Anúncios/interação são registrados na MainActivity ao retornar.
                 finish();
             } else {
                 Toast.makeText(EditActivity.this, "Erro: Produto não encontrado para atualização.", Toast.LENGTH_SHORT).show();

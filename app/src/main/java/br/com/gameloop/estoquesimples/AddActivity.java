@@ -30,7 +30,6 @@ import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.Toast;
 
-import com.appodeal.ads.Appodeal;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
@@ -170,9 +169,6 @@ public class AddActivity extends BaseActivity {
             }
         }
 
-        // Configurar e mostrar o MREC do Appodeal
-        initializeAppodealMrec();
-
     }
 
     /**
@@ -255,22 +251,6 @@ public class AddActivity extends BaseActivity {
                 }
             }
         );
-    }
-
-    /**
-     * Inicializa e exibe o anúncio MREC do Appodeal
-     */
-    private void initializeAppodealMrec() {
-        // Verificar se o Appodeal já foi inicializado na MainActivity
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            // Usar AdManager para controlar banner e MREC
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, R.id.appodealMrecView);
-            
-            Log.d(TAG, "Banner e MREC configurados na AddActivity");
-        } else {
-            Log.d(TAG, "Appodeal ainda não foi inicializado, anúncios não serão exibidos");
-        }
     }
 
     @Override
@@ -362,8 +342,8 @@ public class AddActivity extends BaseActivity {
                     Log.e(TAG, "Error checking low stock notifications", e);
                 }
 
-                // Anúncios/interação são registrados na MainActivity ao retornar
-                // (evita dialog + finish() na mesma Activity e listagem desatualizada).
+                // finish() direto em vez de dialog: evita ficar nesta Activity com a
+                // listagem desatualizada até o usuário fechar o aviso.
                 finish();
             } else {
                 Toast.makeText(AddActivity.this, "Erro ao adicionar produto no banco de dados.", Toast.LENGTH_SHORT).show();

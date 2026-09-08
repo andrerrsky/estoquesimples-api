@@ -248,9 +248,6 @@ public class ReportsActivity extends BaseActivity {
             });
         }
 
-        // Configurar e mostrar MREC do Appodeal com AdManager
-        initializeAppodealAds();
-
         } catch (Exception e) {
             Log.e("ReportsActivity", "Critical error in onCreate", e);
             Toast.makeText(this, "Erro ao inicializar tela de relatórios: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -303,25 +300,6 @@ public class ReportsActivity extends BaseActivity {
         return allInitialized;
     }
 
-    /**
-     * Inicializa e exibe os anúncios usando AdManager
-     */
-    private void initializeAppodealAds() {
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, R.id.appodealMrecView);
-        }
-    }
-    
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Atualizar anúncios baseado no status premium
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, R.id.appodealMrecView);
-        }
-    }
 
     @Override
     protected void onDestroy() {
@@ -879,11 +857,6 @@ public class ReportsActivity extends BaseActivity {
 
                 if (finalFile != null) {
                     showPdfExportedDialog(finalFile);
-                    try {
-                        AdManager.getInstance(ReportsActivity.this).registerInteraction(ReportsActivity.this);
-                    } catch (Exception e) {
-                        Log.e("ReportsActivity", "Error registering ad interaction", e);
-                    }
                 } else {
                     Toast.makeText(ReportsActivity.this,
                             finalError != null ? finalError : "Erro ao exportar PDF.",

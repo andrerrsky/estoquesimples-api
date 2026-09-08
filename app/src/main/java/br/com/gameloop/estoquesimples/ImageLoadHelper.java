@@ -36,7 +36,7 @@ public class ImageLoadHelper {
      */
     public static void loadThumbnail(Context context, String imagePath, ImageView imageView) {
         if (PhotoPathHelper.isEmptyPhotoReference(imagePath)) {
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
             return;
         }
 
@@ -53,15 +53,15 @@ public class ImageLoadHelper {
                     .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
                     .centerInside()
                     .onlyScaleDown()
-                    .placeholder(R.drawable.package_icon)
-                    .error(R.drawable.package_icon)
+                    .placeholder(R.drawable.ic_package)
+                    .error(R.drawable.ic_package)
                     .into(imageView);
             } else {
-                imageView.setImageResource(R.drawable.package_icon);
+                imageView.setImageResource(R.drawable.ic_package);
             }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar thumbnail: " + imagePath, e);
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
         }
     }
     
@@ -75,7 +75,7 @@ public class ImageLoadHelper {
      */
     public static void loadDetailImage(Context context, String imagePath, ImageView imageView) {
         if (PhotoPathHelper.isEmptyPhotoReference(imagePath)) {
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
             return;
         }
 
@@ -92,15 +92,15 @@ public class ImageLoadHelper {
                     .resize(DETAIL_SIZE, DETAIL_SIZE)
                     .centerInside()
                     .onlyScaleDown()
-                    .placeholder(R.drawable.package_icon)
-                    .error(R.drawable.package_icon)
+                    .placeholder(R.drawable.ic_package)
+                    .error(R.drawable.ic_package)
                     .into(imageView);
             } else {
-                imageView.setImageResource(R.drawable.package_icon);
+                imageView.setImageResource(R.drawable.ic_package);
             }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar imagem detalhada: " + imagePath, e);
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
         }
     }
     
@@ -118,7 +118,7 @@ public class ImageLoadHelper {
 
     private static void loadDetailImageFromUri(Context context, Uri uri, ImageView imageView, int maxSize) {
         if (uri == null) {
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
             return;
         }
 
@@ -128,12 +128,12 @@ public class ImageLoadHelper {
                 .resize(maxSize, maxSize)
                 .centerInside()
                 .onlyScaleDown()
-                .placeholder(R.drawable.package_icon)
-                .error(R.drawable.package_icon)
+                .placeholder(R.drawable.ic_package)
+                .error(R.drawable.ic_package)
                 .into(imageView);
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar imagem da URI: " + uri, e);
-            imageView.setImageResource(R.drawable.package_icon);
+            imageView.setImageResource(R.drawable.ic_package);
         }
     }
     

@@ -2,19 +2,19 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/navigation_home"
-        android:icon="@drawable/home_icon"
+        android:icon="@drawable/ic_home"
         android:title="Inicio" />
     <item
         android:id="@+id/navigation_new"
-        android:icon="@drawable/new_icon"
+        android:icon="@drawable/ic_add"
         android:title="Novo Produto" />
     <item
         android:id="@+id/navigation_reports"
-        android:icon="@drawable/report_icon"
+        android:icon="@drawable/ic_reports"
         android:title="Relatórios" />
     <item
         android:id="@+id/navigation_import"
-        android:icon="@drawable/import_icon"
+        android:icon="@drawable/ic_import_export"
         android:title="Imp/Exp" />
 </menu>
 

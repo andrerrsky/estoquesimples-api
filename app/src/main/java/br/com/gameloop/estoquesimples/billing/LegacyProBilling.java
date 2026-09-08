@@ -26,8 +26,8 @@ import br.com.gameloop.estoquesimples.PremiumManager;
  * Reconhece a compra única antiga ({@code pro}), sem oferecer novas compras.
  *
  * A oferta comercial desse produto saiu do aplicativo. Quem já comprou
- * continua com os benefícios daquela versão — recursos premium e sem
- * anúncios — e precisa restaurar ou ter a compra consultada na Play Store.
+ * continua com os benefícios daquela versão — recursos premium — e precisa
+ * restaurar ou ter a compra consultada na Play Store.
  * Sincronização em nuvem nunca entra neste direito.
  */
 public final class LegacyProBilling implements PurchasesUpdatedListener {

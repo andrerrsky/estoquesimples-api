@@ -8,96 +8,39 @@
     android:background="@color/color_surface"
     tools:context="br.com.gameloop.estoquesimples.MainActivity">
 
-    <androidx.appcompat.widget.SearchView
-        android:id="@+id/searchView"
-        style="@style/Widget.Estoque.SearchView"
+    <LinearLayout
+        android:id="@+id/searchBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        app:iconifiedByDefault="false"
-        app:queryHint="Buscar produtos..."
-        app:queryBackground="@android:color/transparent"
-        app:submitBackground="@android:color/transparent" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/field_gap"
+        android:paddingBottom="@dimen/field_gap">
 
-    <FrameLayout
-        android:id="@+id/bannerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/searchView"
-        android:visibility="visible">
-
-        <com.appodeal.ads.BannerView
-            android:id="@+id/appodealBannerView"
-            android:layout_width="match_parent"
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
+            style="@style/Widget.Estoque.SearchView"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="6dp" />
+            android:layout_weight="1"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            app:iconifiedByDefault="false"
+            app:queryHint="Buscar por nome, SKU, código..."
+            app:queryBackground="@android:color/transparent"
+            app:submitBackground="@android:color/transparent" />
 
-    </FrameLayout>
-
-    <LinearLayout
-        android:id="@+id/premiumCard"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/bannerContainer"
-        android:layout_marginLeft="@dimen/screen_padding_horizontal"
-        android:layout_marginRight="@dimen/screen_padding_horizontal"
-        android:layout_marginTop="@dimen/field_gap"
-        android:layout_marginBottom="@dimen/field_gap"
-        android:background="@drawable/bg_surface"
-        android:orientation="vertical"
-        android:padding="@dimen/group_padding_compact"
-        android:visibility="gone">
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <ImageButton
-                android:id="@+id/btnClosePremiumCard"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_alignParentTop="true"
-                android:layout_alignParentRight="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:padding="8dp"
-                android:contentDescription="Fechar" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="40dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/premiumCardTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/premium_card_title"
-                    android:textAppearance="@style/TextAppearance.Estoque.Section"
-                    android:layout_marginBottom="@dimen/field_gap" />
-
-                <TextView
-                    android:id="@+id/premiumCardMessage"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/premium_card_message"
-                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
-                    android:layout_marginBottom="12dp" />
-
-                <Button
-                    android:id="@+id/btnPremiumCardAction"
-                    style="@style/Widget.Estoque.Button.Primary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/premium_card_upgrade" />
-
-            </LinearLayout>
-
-        </RelativeLayout>
+        <Button
+            android:id="@+id/scanSearchButton"
+            style="@style/Widget.Estoque.Button.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/field_gap"
+            android:drawableStart="@drawable/ic_barcode"
+            android:contentDescription="Buscar por código de barras" />
 
     </LinearLayout>
 
@@ -105,7 +48,7 @@
         android:id="@+id/listView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/premiumCard"
+        android:layout_below="@+id/searchBar"
         android:layout_above="@+id/bottomNavigation"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
@@ -132,7 +75,7 @@
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/premiumCard"
+        android:layout_below="@+id/searchBar"
         android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
         android:text=""

@@ -7,15 +7,16 @@ import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
 
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.view.inputmethod.InputMethodManager;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
@@ -24,23 +25,20 @@ import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.appodeal.ads.Appodeal;
-import com.appodeal.ads.initializing.ApdInitializationCallback;
-import com.appodeal.ads.initializing.ApdInitializationError;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SearchView;
 import android.view.Menu;
 import android.view.MenuItem;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class MainActivity extends BaseActivity {
 
@@ -55,6 +53,7 @@ public class MainActivity extends BaseActivity {
     public TextView emptyListItem;
     public CustomListView listAdapter;
     public SearchView searchView;
+    private ActivityResultLauncher<ScanOptions> barcodeSearchLauncher;
 
     public ArrayList<String> names;
     public ArrayList<String> descriptions;
@@ -88,28 +87,17 @@ public class MainActivity extends BaseActivity {
     public SharedPreferences prefs;
     public SharedPreferences.Editor prefsEditor;
 
-    private boolean appODealInitialized;
-    
-    // Premium and Ad management
+    // Premium management
     private PremiumManager premiumManager;
-    private AdManager adManager;
-    private View premiumCard;
-    private View bannerContainer;
-    private TextView premiumCardTitle;
-    private TextView premiumCardMessage;
-    private Button btnPremiumCardAction;
-    private ImageButton btnClosePremiumCard;
 
     /** Pedido de refresh ao voltar de Add/Edit/Import (evita atualizar Activity pausada). */
     private boolean pendingListRefresh;
     private boolean pendingClearSearch;
-    private boolean pendingAdInteraction;
 
     private final ActivityResultLauncher<Intent> addProductLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
                     pendingClearSearch = true;
-                    pendingAdInteraction = true;
                 }
                 pendingListRefresh = true;
             });
@@ -118,25 +106,15 @@ public class MainActivity extends BaseActivity {
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
                     pendingClearSearch = true;
-                    pendingAdInteraction = true;
                 }
                 pendingListRefresh = true;
             });
 
-    public void onAppODealInitialized() {
-        appODealInitialized = true;
-
-        // Usar AdManager para controlar exibição de anúncios, sem empilhar
-        // o banner com o card PRO quando ele estiver na tela.
-        syncHomeBannerWithPremiumCard();
-    }
-
-    public boolean isAppODealInitialized() {
-        return appODealInitialized;
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Precisa vir antes de super.onCreate(): é isso que troca o tema desta
+        // Activity de volta para o CustomActionBarTheme assim que a splash sai.
+        androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -158,28 +136,7 @@ public class MainActivity extends BaseActivity {
 
         // Inicializar gerenciadores
         premiumManager = PremiumManager.getInstance(this);
-        adManager = AdManager.getInstance(this);
 
-        // Inicializar premium card
-        premiumCard = findViewById(R.id.premiumCard);
-        bannerContainer = findViewById(R.id.bannerContainer);
-        premiumCardTitle = findViewById(R.id.premiumCardTitle);
-        premiumCardMessage = findViewById(R.id.premiumCardMessage);
-        btnPremiumCardAction = findViewById(R.id.btnPremiumCardAction);
-        btnClosePremiumCard = findViewById(R.id.btnClosePremiumCard);
-        
-        if (btnPremiumCardAction != null) {
-            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
-        } else {
-            Log.e("MainActivity", "btnPremiumCardAction is null");
-        }
-        
-        if (btnClosePremiumCard != null) {
-            btnClosePremiumCard.setOnClickListener(v -> onClosePremiumCardClicked());
-        } else {
-            Log.e("MainActivity", "btnClosePremiumCard is null");
-        }
-        
         // Inicializar SharedPreferences ANTES de usar
         prefs = getApplicationContext().getSharedPreferences("EstoqueSimplesPrefs", 0);
         
@@ -188,8 +145,7 @@ public class MainActivity extends BaseActivity {
         getListValues();
         updateList();
         
-        // Atualizar card da assinatura e reconhecer compra PRO antiga, se houver
-        updatePremiumCard();
+        // Reconhecer compra PRO antiga, se houver
         startLegacyProRecognition();
         
         // Iniciar verificação de estoque baixo e agendamento de notificações
@@ -205,6 +161,19 @@ public class MainActivity extends BaseActivity {
             searchView.setIconifiedByDefault(false);
             searchView.setIconified(false);
             searchView.clearFocus();
+            // O clearFocus() acima roda antes do layout: o próprio setIconified(false)
+            // pede foco no EditText interno, e a janela reatribui esse foco assim que
+            // aparece na tela, abrindo o teclado sozinho. Repetir clearFocus() em
+            // post() garante que ele rode depois dessa disputa, já com a Activity
+            // visível — e esconde o teclado caso ele já tenha chegado a aparecer.
+            searchView.post(() -> {
+                searchView.clearFocus();
+                InputMethodManager imm =
+                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(searchView.getWindowToken(), 0);
+                }
+            });
             flattenSearchViewPadding(searchView);
             searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                 @Override
@@ -221,6 +190,29 @@ public class MainActivity extends BaseActivity {
             });
         } else {
             Log.e("MainActivity", "searchView is null");
+        }
+
+        // Buscar produto escaneando o código de barras cadastrado nele.
+        barcodeSearchLauncher = registerForActivityResult(
+                new ScanContract(),
+                result -> {
+                    if (result.getContents() != null && searchView != null) {
+                        searchView.setQuery(result.getContents(), true);
+                    }
+                }
+        );
+
+        Button scanSearchButton = findViewById(R.id.scanSearchButton);
+        if (scanSearchButton != null) {
+            scanSearchButton.setOnClickListener(v -> {
+                ScanOptions options = new ScanOptions();
+                options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES);
+                options.setPrompt("Escaneie o código de barras do produto");
+                options.setBeepEnabled(true);
+                options.setBarcodeImageEnabled(false);
+                options.setOrientationLocked(false);
+                barcodeSearchLauncher.launch(options);
+            });
         }
 
         // Bottom Menu:
@@ -258,19 +250,6 @@ public class MainActivity extends BaseActivity {
             prefsEditor.putBoolean("welcomeMsgAlreadyDisplayed", true);
             prefsEditor.commit();
         }
-
-        Appodeal.setBannerViewId(R.id.appodealBannerView);
-        Appodeal.setMrecViewId(R.id.appodealMrecView);
-
-        int adTypes = Appodeal.INTERSTITIAL | Appodeal.BANNER_VIEW | Appodeal.MREC;
-
-        Appodeal.initialize(this, Constants.APPODEAL_KEY, adTypes, new ApdInitializationCallback() {
-            @Override
-            public void onInitializationFinished(@Nullable List<ApdInitializationError> errors) {
-                Log.d("Appodeal", "Initialization finished. errors=" + (errors == null ? 0 : errors.size()));
-                onAppODealInitialized();
-            }
-        });
 
     }
 
@@ -380,9 +359,20 @@ public class MainActivity extends BaseActivity {
             searchView.setIconified(false);
             if (pendingClearSearch) {
                 searchView.setQuery("", false);
-                searchView.clearFocus();
                 pendingClearSearch = false;
             }
+            // setIconified(false) acima pede foco no EditText interno por conta
+            // própria — mesmo quando não há busca para limpar. Sem isso, voltar de
+            // qualquer tela reabre o teclado sozinho. clearFocus() em post() roda
+            // depois dessa disputa, já com a Activity em primeiro plano.
+            searchView.post(() -> {
+                searchView.clearFocus();
+                InputMethodManager imm =
+                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(searchView.getWindowToken(), 0);
+                }
+            });
         }
 
         // Sempre recarrega ao voltar (cadastro/edição/importação) e em todo resume.
@@ -390,20 +380,6 @@ public class MainActivity extends BaseActivity {
             pendingListRefresh = false;
             updateList();
         }
-
-        if (pendingAdInteraction) {
-            pendingAdInteraction = false;
-            if (adManager != null) {
-                try {
-                    adManager.registerInteraction(this);
-                } catch (Exception e) {
-                    Log.e("MainActivity", "Error registering deferred ad interaction", e);
-                }
-            }
-        }
-
-        // Atualizar premium card e anúncios
-        updatePremiumCard();
     }
     
     @Override
@@ -630,7 +606,7 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle("Atenção")
                 .setMessage("Tem certeza que deseja remover o item '" + productName + "'?")
-                .setIcon(R.drawable.delete_icon)
+                .setIcon(R.drawable.ic_delete)
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         try {
@@ -816,97 +792,13 @@ public class MainActivity extends BaseActivity {
     }
     
     /**
-     * Atualiza o card de assinatura de acordo com o status do usuário.
-     */
-    public void updatePremiumCard() {
-        if (premiumManager == null || premiumCard == null) {
-            return;
-        }
-
-        boolean hasSubscription = premiumManager.hasCloudSubscription();
-        boolean isPro = premiumManager.isPro();
-        boolean isCardDismissed = prefs != null && prefs.getBoolean("premiumCardDismissed", false);
-
-        if (hasSubscription || isCardDismissed) {
-            premiumCard.setVisibility(View.GONE);
-        } else if (isPro) {
-            premiumCard.setVisibility(View.VISIBLE);
-            premiumCardTitle.setText(R.string.premium_card_legacy_title);
-            premiumCardMessage.setText(R.string.premium_card_legacy_message);
-            btnPremiumCardAction.setText(R.string.premium_card_upgrade);
-            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
-        } else {
-            premiumCard.setVisibility(View.VISIBLE);
-            premiumCardTitle.setText(R.string.premium_card_title);
-            premiumCardMessage.setText(R.string.premium_card_message);
-            btnPremiumCardAction.setText(R.string.premium_card_upgrade);
-            btnPremiumCardAction.setOnClickListener(v -> SubscriptionActivity.open(this));
-        }
-
-        syncHomeBannerWithPremiumCard();
-    }
-
-    /**
-     * O card de assinatura e o banner não cabem juntos: com o convite visível
-     * o anúncio de cima some; sem o card, o banner volta ao lugar.
-     */
-    private void syncHomeBannerWithPremiumCard() {
-        boolean cardVisible = premiumCard != null && premiumCard.getVisibility() == View.VISIBLE;
-        if (cardVisible) {
-            if (adManager != null) {
-                adManager.hideBannerAds(this, R.id.appodealBannerView, 0);
-            } else if (bannerContainer != null) {
-                bannerContainer.setVisibility(View.GONE);
-            }
-            // showBannerAds agenda o Appodeal no próximo frame; esconder de
-            // novo depois disso evita o banner reaparecer por cima do card.
-            getWindow().getDecorView().post(() -> {
-                if (isFinishing() || premiumCard == null
-                        || premiumCard.getVisibility() != View.VISIBLE) {
-                    return;
-                }
-                if (adManager != null) {
-                    adManager.hideBannerAds(this, R.id.appodealBannerView, 0);
-                }
-            });
-            return;
-        }
-        if (bannerContainer != null) {
-            bannerContainer.setVisibility(View.VISIBLE);
-        }
-        if (adManager != null) {
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
-    }
-    
-    /**
-     * Handler para o clique no botão de fechar o card
-     */
-    private void onClosePremiumCardClicked() {
-        if (prefs != null) {
-            SharedPreferences.Editor editor = prefs.edit();
-            editor.putBoolean("premiumCardDismissed", true);
-            editor.apply();
-        }
-
-        premiumCard.setVisibility(View.GONE);
-        syncHomeBannerWithPremiumCard();
-
-        Toast.makeText(this, "Você pode assinar pelo menu Assinatura", Toast.LENGTH_SHORT).show();
-    }
-
-    /**
      * Consulta a Play Store por uma compra única antiga, sem oferecer venda.
      */
     private void startLegacyProRecognition() {
         if (premiumManager != null && premiumManager.isPro()) {
             return;
         }
-        LegacyProBilling.runQuery(this, false, (result, message) -> {
-            if (result == LegacyProBilling.Result.RECOGNIZED) {
-                updatePremiumCard();
-            }
-        });
+        LegacyProBilling.runQuery(this, false, (result, message) -> { });
     }
     
     /**

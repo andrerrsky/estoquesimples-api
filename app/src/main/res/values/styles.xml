@@ -1,5 +1,14 @@
 <resources>
 
+    <!-- Tema de partida: só existe para a splash screen nativa (API do Android
+         12+, com compatibilidade retroativa via core-splashscreen). Assim que
+         installSplashScreen() roda, a Activity troca para CustomActionBarTheme. -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/color_brand</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_icon</item>
+        <item name="postSplashScreenTheme">@style/CustomActionBarTheme</item>
+    </style>
+
     <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar.Bridge">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>

@@ -68,9 +68,6 @@ public class AnalyticsActivity extends BaseActivity {
         } else {
             showLockedScreen();
         }
-        
-        // Configurar anúncios
-        initializeAppodealAds();
     }
     
     /**
@@ -444,16 +441,6 @@ public class AnalyticsActivity extends BaseActivity {
     }
     
     /**
-     * Inicializa anúncios do Appodeal
-     */
-    private void initializeAppodealAds() {
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
-        }
-    }
-    
-    /**
      * Garante que o banco de dados está disponível
      */
     private boolean ensureDatabaseAvailable() {
@@ -483,12 +470,6 @@ public class AnalyticsActivity extends BaseActivity {
         // Verificar novamente o acesso premium ao retornar
         if (premiumManager.hasPremiumAccess() && lockedLayout.getVisibility() == View.VISIBLE) {
             showContent();
-        }
-        
-        // Atualizar anúncios
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager adManager = AdManager.getInstance(this);
-            adManager.showBannerAds(this, R.id.appodealBannerView, 0);
         }
     }
     

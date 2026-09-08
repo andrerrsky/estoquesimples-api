@@ -93,21 +93,6 @@ public class ImportActivity extends BaseActivity {
         importDesc2.setText(formato);
 
         initializeActivityResultLaunchers();
-        initializeAppodealAds();
-    }
-
-    private void initializeAppodealAds() {
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager.getInstance(this).showBannerAds(this, 0, R.id.appodealMrecView);
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (MainActivity.instance != null && MainActivity.instance.isAppODealInitialized()) {
-            AdManager.getInstance(this).showBannerAds(this, 0, R.id.appodealMrecView);
-        }
     }
 
     @Override
@@ -378,7 +363,6 @@ public class ImportActivity extends BaseActivity {
                     status.setText(LOG_PREFIX + done.asLog());
                 }
                 Toast.makeText(this, "Importação concluída.", Toast.LENGTH_SHORT).show();
-                AdManager.getInstance(this).registerInteraction(this);
             });
         });
     }
@@ -418,7 +402,6 @@ public class ImportActivity extends BaseActivity {
                 reopenAfterSwap();
                 setImportExportDescText("Banco de dados importado com sucesso!\n\nOs produtos já estão disponíveis na lista.");
                 Toast.makeText(this, "Banco de dados importado com sucesso!", Toast.LENGTH_SHORT).show();
-                AdManager.getInstance(this).registerInteraction(this);
             });
         });
     }

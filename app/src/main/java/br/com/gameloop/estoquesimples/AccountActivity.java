@@ -262,7 +262,7 @@ public class AccountActivity extends BaseActivity {
             texto.append(entitlements.stateLegivel()).append("\n");
             if (PremiumManager.getInstance(this).isPro()) {
                 texto.append("A antiga Versão PRO continua válida neste aparelho ")
-                        .append("(recursos premium e sem anúncios). A nuvem exige assinatura.\n");
+                        .append("(recursos premium). A nuvem exige assinatura.\n");
             }
             texto.append("Abra Assinatura para liberar a sincronização na nuvem.\n");
         } else {
@@ -810,7 +810,7 @@ public class AccountActivity extends BaseActivity {
     private void informarAssinaturaObrigatoria() {
         String mensagem;
         if (PremiumManager.getInstance(this).isPro()) {
-            mensagem = "Você já possui a antiga Versão PRO: recursos premium e sem anúncios neste aparelho. "
+            mensagem = "Você já possui a antiga Versão PRO: recursos premium neste aparelho. "
                     + "A sincronização na nuvem é exclusiva da assinatura. "
                     + "Nada foi enviado nem apagado.";
         } else {

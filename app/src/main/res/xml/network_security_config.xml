@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
 
-    <!--
-      Tráfego em texto claro segue permitido no geral porque os SDKs de anúncio
-      ainda dependem disso em alguns casos, e desligar de uma vez quebraria a
-      monetização sem aviso.
-    -->
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

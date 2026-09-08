@@ -6,20 +6,6 @@
     android:orientation="vertical"
     android:background="@color/color_surface">
 
-    <FrameLayout
-        android:id="@+id/bannerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="visible">
-
-        <com.appodeal.ads.BannerView
-            android:id="@+id/appodealBannerView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="6dp" />
-    </FrameLayout>
-
     <TextView
         android:id="@+id/emptyHistory"
         android:layout_width="match_parent"

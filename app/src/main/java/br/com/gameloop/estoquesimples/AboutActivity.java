@@ -58,11 +58,11 @@ public class AboutActivity extends BaseActivity {
         cardGoPro.setVisibility(View.VISIBLE);
         if (premiumManager.isPro()) {
             title.setText("Sincronize na nuvem");
-            subtitle.setText("Sua Versão PRO já remove anúncios. A assinatura adiciona sincronização entre aparelhos.");
+            subtitle.setText("Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos.");
             cta.setText("Conhecer o plano");
         } else {
             title.setText("Assinatura");
-            subtitle.setText("Sincronize na nuvem, desbloqueie recursos e remova anúncios");
+            subtitle.setText("Sincronize na nuvem e desbloqueie a Análise Avançada de Estoque");
             cta.setText("Conhecer o plano");
         }
     }

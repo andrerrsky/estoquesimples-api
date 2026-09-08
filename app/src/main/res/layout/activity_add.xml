@@ -24,21 +24,6 @@
             android:textAppearance="@style/TextAppearance.Estoque.Title"
             android:layout_marginBottom="@dimen/section_gap" />
 
-        <FrameLayout
-            android:id="@+id/bannerContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/section_gap"
-            android:visibility="visible">
-
-            <com.appodeal.ads.BannerView
-                android:id="@+id/appodealBannerView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center" />
-
-        </FrameLayout>
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -58,7 +43,7 @@
                 android:id="@+id/addPhoto"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
-                android:src="@drawable/camera_icon"
+                android:src="@drawable/ic_camera"
                 android:scaleType="fitXY"
                 android:background="@drawable/bg_photo"
                 android:contentDescription="Foto do produto" />
@@ -276,25 +261,29 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
-                    android:layout_marginLeft="4dp"
-                    android:minWidth="64dp" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Estoque.TextInputLayout"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="Estoque Mínimo"
-                    android:layout_marginLeft="@dimen/field_gap">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/addMinStock"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal|numberSigned"
-                        android:digits="0123456789.," />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginLeft="@dimen/field_gap"
+                    android:minWidth="104dp"
+                    android:background="@drawable/bg_dropdown"
+                    android:paddingLeft="@dimen/field_gap"
+                    android:paddingRight="@dimen/field_gap"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="10dp" />
             </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:hint="Estoque Mínimo">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/addMinStock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal|numberSigned"
+                    android:digits="0123456789.," />
+            </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
         <TextView
@@ -357,7 +346,7 @@
 
             <Button
                 android:id="@+id/addCancel"
-                style="@style/Widget.Estoque.Button.Text"
+                style="@style/Widget.Estoque.Button.Secondary"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -374,21 +363,5 @@
                 android:text="Salvar Produto"
                 android:onClick="addProduct" />
         </LinearLayout>
-
-        <FrameLayout
-            android:id="@+id/mrecContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="visible">
-
-            <com.appodeal.ads.MrecView
-                android:id="@+id/appodealMrecView"
-                android:layout_width="300dp"
-                android:layout_height="250dp"
-                android:layout_gravity="center"
-                android:layout_marginTop="@dimen/section_gap"
-                android:layout_marginBottom="@dimen/section_gap" />
-        </FrameLayout>
     </LinearLayout>
 </ScrollView>
