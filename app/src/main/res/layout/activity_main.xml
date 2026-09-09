@@ -35,7 +35,7 @@
 
         <Button
             android:id="@+id/scanSearchButton"
-            style="@style/Widget.Estoque.Button.Icon"
+            style="@style/Widget.Estoque.Button.Icon.Subtle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="@dimen/field_gap"
@@ -71,17 +71,118 @@
         app:itemTextColor="@color/bottom_navigation_selector"
         app:labelVisibilityMode="labeled" />
 
-    <TextView
+    <LinearLayout
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@+id/searchBar"
         android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
-        android:text=""
-        android:textAppearance="@style/TextAppearance.Estoque.Empty"
+        android:orientation="vertical"
         android:gravity="center"
         android:paddingLeft="@dimen/screen_padding_horizontal"
-        android:paddingRight="@dimen/screen_padding_horizontal" />
+        android:paddingRight="@dimen/screen_padding_horizontal">
+
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="@drawable/bg_empty_icon"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <ImageView
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_package"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/emptyTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nenhum produto encontrado"
+            android:textAppearance="@style/TextAppearance.Estoque.Title"
+            android:gravity="center"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/emptyMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textAppearance="@style/TextAppearance.Estoque.Empty"
+            android:layout_marginBottom="@dimen/section_gap" />
+
+        <LinearLayout
+            android:id="@+id/emptyActionAdd"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:layout_marginBottom="@dimen/field_gap">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_add"
+                android:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Adicionar meu primeiro produto"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/emptyActionSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_settings"
+                android:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Ver configurações do app"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </RelativeLayout>

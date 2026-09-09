@@ -27,10 +27,12 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.textfield.TextInputLayout;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
@@ -48,7 +50,10 @@ public class EditActivity extends BaseActivity {
     private TextView amount;
     private TextView value;
     private Spinner currencySpinner;
-    private com.google.android.material.textfield.TextInputLayout valueLayout;
+    private TextInputLayout nameLayout;
+    private TextInputLayout amountLayout;
+    private TextInputLayout valueLayout;
+    private ScrollView scrollView;
     private TextView description;
     private TextView category;
     private TextView sku;
@@ -57,8 +62,6 @@ public class EditActivity extends BaseActivity {
     private TextView location;
     private TextView minStock;
     private TextView unit;
-
-    private String errorFeedback;
 
     public String productName;
 
@@ -134,7 +137,10 @@ public class EditActivity extends BaseActivity {
         minStock = (TextView) findViewById(R.id.editMinStock);
         unit = (TextView) findViewById(R.id.editUnit);
         currencySpinner = (Spinner) findViewById(R.id.editCurrencySpinner);
+        nameLayout = findViewById(R.id.editNameLayout);
+        amountLayout = findViewById(R.id.editAmountLayout);
         valueLayout = findViewById(R.id.editValueLayout);
+        scrollView = findViewById(R.id.editScrollView);
 
         setupCurrencySpinner();
 
@@ -159,8 +165,6 @@ public class EditActivity extends BaseActivity {
             finish();
             return;
         }
-
-        errorFeedback = "Erros encontrados:\n";
 
         name.setText(productName);
 
@@ -546,8 +550,6 @@ public class EditActivity extends BaseActivity {
         }
 
         if (!isValid()) {
-            Toast.makeText(EditActivity.this, errorFeedback, Toast.LENGTH_LONG).show();
-            errorFeedback = "Erros encontrados:\n";
             return;
         }
 
@@ -648,49 +650,48 @@ public class EditActivity extends BaseActivity {
         // Verificação adicional de segurança
         if (!areFieldsInitialized()) {
             Log.e(TAG, "Cannot validate: fields not initialized");
-            errorFeedback += "\n- Erro interno: campos não inicializados;";
+            Toast.makeText(this, "Erro interno: campos não inicializados.", Toast.LENGTH_LONG).show();
             return false;
         }
 
-        boolean isValid = true;
-
+        boolean nameOk;
         try {
             String nameText = name.getText().toString();
-            if (nameText == null || nameText.isEmpty() || nameText.equals("null")) {
-                errorFeedback += "\n- Nome do produto é invalido;";
-                isValid = false;
-            }
+            nameOk = FormValidation.check(nameLayout,
+                    nameText == null || nameText.isEmpty() || nameText.equals("null"),
+                    "Informe o nome do produto.");
         } catch (Exception e) {
             Log.e(TAG, "Error validating product name", e);
-            errorFeedback += "\n- Erro ao validar nome do produto;";
-            isValid = false;
+            nameOk = FormValidation.check(nameLayout, true, "Não foi possível validar o nome.");
         }
 
+        boolean amountOk;
         try {
             String amountText = amount.getText().toString();
-            if (amountText == null || amountText.isEmpty() || amountText.equals("null")) {
-                errorFeedback += "\n- Quantidade do produto é invalida;";
-                isValid = false;
-            }
+            amountOk = FormValidation.check(amountLayout,
+                    amountText == null || amountText.isEmpty() || amountText.equals("null"),
+                    "Informe a quantidade.");
         } catch (Exception e) {
             Log.e(TAG, "Error validating product amount", e);
-            errorFeedback += "\n- Erro ao validar quantidade do produto;";
-            isValid = false;
+            amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
         }
 
+        boolean valueOk;
         try {
             String valueText = value.getText().toString();
-            if (valueText == null || valueText.isEmpty() || valueText.equals("null")) {
-                errorFeedback += "\n- Valor do produto é invalido;";
-                isValid = false;
-            }
+            valueOk = FormValidation.check(valueLayout,
+                    valueText == null || valueText.isEmpty() || valueText.equals("null"),
+                    "Informe o valor.");
         } catch (Exception e) {
             Log.e(TAG, "Error validating product value", e);
-            errorFeedback += "\n- Erro ao validar valor do produto;";
-            isValid = false;
+            valueOk = FormValidation.check(valueLayout, true, "Não foi possível validar o valor.");
         }
 
-        return isValid;
+        boolean allValid = nameOk && amountOk && valueOk;
+        if (!allValid) {
+            FormValidation.focusFirstError(scrollView, nameLayout, amountLayout, valueLayout);
+        }
+        return allValid;
 
     }
 

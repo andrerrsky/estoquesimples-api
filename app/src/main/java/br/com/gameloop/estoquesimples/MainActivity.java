@@ -21,7 +21,6 @@ import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Looper;
-import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -50,7 +49,6 @@ public class MainActivity extends BaseActivity {
     public static final Object DB_LOCK = new Object();
 
     public ListView listView;
-    public TextView emptyListItem;
     public CustomListView listAdapter;
     public SearchView searchView;
     private ActivityResultLauncher<ScanOptions> barcodeSearchLauncher;
@@ -121,12 +119,20 @@ public class MainActivity extends BaseActivity {
 
         CurrencyHelper.warmUp(this);
 
-        emptyListItem = (TextView) findViewById(R.id.empty_list_item);
+        TextView emptyMessage = findViewById(R.id.emptyMessage);
+        if (emptyMessage != null) {
+            emptyMessage.setText("Cadastre seu primeiro produto para começar a controlar o "
+                    + "estoque. Se preferir, dê uma olhada nas configurações do app antes.");
+        }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            emptyListItem.setText(Html.fromHtml("<b>Nenhum produto encontrado</b><br>Você pode começar adicionando um novo cadastro no botão <b>Novo Produto</b>" , Html.FROM_HTML_MODE_LEGACY));
-        } else {
-            emptyListItem.setText(Html.fromHtml("<b>Nenhum produto encontrado</b><br>Você pode começar adicionando um novo cadastro no botão <b>Novo Produto</b>"));
+        View emptyActionAdd = findViewById(R.id.emptyActionAdd);
+        if (emptyActionAdd != null) {
+            emptyActionAdd.setOnClickListener(v -> showAddActivity());
+        }
+
+        View emptyActionSettings = findViewById(R.id.emptyActionSettings);
+        if (emptyActionSettings != null) {
+            emptyActionSettings.setOnClickListener(v -> showSettingsActivity());
         }
 
         instance = this;

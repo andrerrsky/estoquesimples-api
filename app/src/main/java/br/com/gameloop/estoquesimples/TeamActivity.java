@@ -3,12 +3,10 @@ package br.com.gameloop.estoquesimples;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -17,6 +15,8 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
+
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -179,10 +179,8 @@ public final class TeamActivity extends BaseActivity {
         int margem = (int) (20 * getResources().getDisplayMetrics().density);
         caixa.setPadding(margem, margem / 2, margem, 0);
 
-        EditText email = new EditText(this);
-        email.setHint("E-mail de quem vai receber");
-        email.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        caixa.addView(email);
+        TextInputLayout emailLayout = FormValidation.addField(caixa, "E-mail de quem vai receber",
+                android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
 
         final int[] escolhido = { 2 };
         String[] rotulos = new String[TeamClient.PAPEIS.length];
@@ -213,21 +211,25 @@ public final class TeamActivity extends BaseActivity {
         ajuda.setOnClickListener(v -> mostrarAjudaPapeis());
         caixa.addView(ajuda);
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Convidar pessoa")
                 .setMessage("Ela recebe um código por e-mail, cria a própria senha e "
                         + "passa a ver o estoque desta empresa.")
                 .setView(caixa)
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Enviar convite", (dialog, which) -> {
-                    String destino = email.getText().toString().trim();
-                    if (TextUtils.isEmpty(destino)) {
-                        showMessage("Informe o e-mail de quem você quer convidar.");
-                        return;
-                    }
-                    convidar(destino, TeamClient.PAPEIS[escolhido[0]]);
-                })
+                // Listener sobrescrito depois do show(): assim o clique não fecha
+                // o diálogo sozinho quando o e-mail está vazio.
+                .setPositiveButton("Enviar convite", null)
                 .show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!FormValidation.required(emailLayout, "Informe o e-mail de quem você quer convidar.")) {
+                return;
+            }
+            String destino = emailLayout.getEditText().getText().toString().trim();
+            dialog.dismiss();
+            convidar(destino, TeamClient.PAPEIS[escolhido[0]]);
+        });
     }
 
     private void mostrarAjudaPapeis() {

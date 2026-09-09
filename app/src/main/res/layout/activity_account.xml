@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/accountScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -14,6 +15,16 @@
         android:paddingRight="@dimen/screen_padding_horizontal"
         android:paddingTop="@dimen/screen_padding_top"
         android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <TextView
+            android:id="@+id/messageView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:background="@drawable/bg_message_error"
+            android:padding="@dimen/group_padding_compact"
+            android:textAppearance="@style/TextAppearance.Estoque.Error"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/signedInSection"
@@ -156,6 +167,7 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/emailLayout"
                 style="@style/Widget.Estoque.TextInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -204,7 +216,7 @@
 
             <Button
                 android:id="@+id/toggleModeButton"
-                style="@style/Widget.Estoque.Button.Text"
+                style="@style/Widget.Estoque.Button.Secondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -235,14 +247,6 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="24dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/messageView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/section_gap"
-            android:textAppearance="@style/TextAppearance.Estoque.Error"
             android:visibility="gone" />
 
     </LinearLayout>

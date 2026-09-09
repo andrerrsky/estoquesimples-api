@@ -217,6 +217,13 @@
         <item name="android:paddingRight">12dp</item>
     </style>
 
+    <!-- Mesma forma do Icon, mas com a borda discreta dos campos de texto em
+         vez do azul forte de botão — para ações ao lado de um input, onde um
+         contorno chamativo compete com o próprio campo. -->
+    <style name="Widget.Estoque.Button.Icon.Subtle">
+        <item name="android:background">@drawable/bg_button_subtle</item>
+    </style>
+
     <style name="Widget.Estoque.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
         <item name="boxStrokeColor">@color/input_stroke</item>
         <item name="hintTextColor">@color/color_brand</item>
@@ -227,6 +234,9 @@
         <item name="boxCornerRadiusBottomEnd">@dimen/radius_button</item>
         <item name="boxStrokeWidth">@dimen/stroke_width</item>
         <item name="boxStrokeWidthFocused">@dimen/stroke_width_button</item>
+        <item name="errorTextColor">@color/color_error</item>
+        <item name="boxStrokeErrorColor">@color/color_error</item>
+        <item name="errorIconTint">@color/color_error</item>
     </style>
 
     <style name="Widget.Estoque.SearchView" parent="Widget.AppCompat.SearchView">

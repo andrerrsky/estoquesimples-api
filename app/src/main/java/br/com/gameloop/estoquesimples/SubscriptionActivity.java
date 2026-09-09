@@ -2,10 +2,17 @@ package br.com.gameloop.estoquesimples;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
+import android.util.TypedValue;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
@@ -15,6 +22,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingResult;
@@ -25,6 +33,8 @@ import org.json.JSONObject;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
 import br.com.gameloop.estoquesimples.billing.LinkPurchaseWorker;
@@ -53,6 +63,9 @@ public class SubscriptionActivity extends BaseActivity {
     /** Tempo para a loja reconectar antes de acusar falha na tela. */
     private static final long PLAY_CONNECT_TIMEOUT_MS = 12_000L;
 
+    /** Separa o prefixo (símbolo/código da moeda) do valor numérico formatado pela Play Store. */
+    private static final Pattern PRICE_PATTERN = Pattern.compile("^([^0-9]*)([0-9][0-9.,]*)(.*)$");
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -69,7 +82,8 @@ public class SubscriptionActivity extends BaseActivity {
     private TextView heroTitle;
     private TextView heroSubtitle;
     private TextView stateView;
-    private TextView priceView;
+    private View priceView;
+    private TextView priceAmountView;
     private TextView noticeView;
     private TextView messageView;
     private TextView legacyProTitle;
@@ -132,6 +146,7 @@ public class SubscriptionActivity extends BaseActivity {
         heroSubtitle = findViewById(R.id.heroSubtitle);
         stateView = findViewById(R.id.subscriptionState);
         priceView = findViewById(R.id.subscriptionPrice);
+        priceAmountView = findViewById(R.id.subscriptionPriceAmount);
         noticeView = findViewById(R.id.subscriptionNotice);
         messageView = findViewById(R.id.messageView);
         progress = findViewById(R.id.progress);
@@ -143,6 +158,7 @@ public class SubscriptionActivity extends BaseActivity {
         legacyProTitle = findViewById(R.id.legacyProTitle);
         legacyProMessage = findViewById(R.id.legacyProMessage);
         restoreLegacyProButton = findViewById(R.id.restoreLegacyProButton);
+        LegalDocuments.bindFooterLinks(findViewById(R.id.legalFooter));
 
         subscribeButton.setOnClickListener(v -> initiateSubscribe());
         restoreButton.setOnClickListener(v -> restorePurchase());
@@ -235,7 +251,18 @@ public class SubscriptionActivity extends BaseActivity {
             heroSubtitle.setText(R.string.subscription_hero_subtitle);
         }
 
-        stateView.setText(entitlements.stateLegivel());
+        // "Sem assinatura" não soma nada numa tela cujo objetivo é vender a
+        // assinatura — para quem nunca assinou, o estado fica implícito.
+        // Os outros estados (ativa, em carência, cancelada mas ainda ativa...)
+        // são informação real que a pessoa precisa ver.
+        String estado = entitlements.state();
+        boolean semAssinatura = estado == null || estado.isEmpty() || "sem_assinatura".equals(estado);
+        if (semAssinatura) {
+            stateView.setVisibility(View.GONE);
+        } else {
+            stateView.setVisibility(View.VISIBLE);
+            stateView.setText(entitlements.stateLegivel());
+        }
         if (ativa) {
             priceView.setVisibility(View.GONE);
         } else if (currentOffer != null && currentOffer.formattedPrice != null
@@ -326,11 +353,66 @@ public class SubscriptionActivity extends BaseActivity {
             if (offer != null && offer.formattedPrice != null
                     && !offer.formattedPrice.isEmpty()) {
                 priceView.setVisibility(View.VISIBLE);
-                priceView.setText(getString(R.string.subscription_price_month, offer.formattedPrice));
+                priceAmountView.setText(buildPriceDisplay(offer.formattedPrice));
                 subscribeButton.setText(getString(R.string.subscription_cta_with_price,
                         offer.formattedPrice));
             }
         }));
+    }
+
+    /**
+     * Destaca o valor: símbolo e "/ mês" pequenos, número grande — do jeito
+     * que uma vitrine de preço se lê primeiro, em vez de tudo do mesmo
+     * tamanho. O preço em si (`offer.formattedPrice`) vem pronto e localizado
+     * da Play Store, então não recriamos o formato — só separamos o prefixo
+     * não numérico (símbolo da moeda) do valor via regex; se o formato fugir
+     * do esperado, cai de volta no texto plano, sem quebrar a tela.
+     */
+    private CharSequence buildPriceDisplay(String formattedPrice) {
+        String trimmed = formattedPrice.trim();
+        Matcher matcher = PRICE_PATTERN.matcher(trimmed);
+        String prefix = "";
+        String amount = trimmed;
+        if (matcher.matches()) {
+            prefix = matcher.group(1);
+            amount = matcher.group(2) + matcher.group(3);
+        }
+        String suffix = " " + getString(R.string.subscription_price_suffix);
+
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        int prefixStart = text.length();
+        text.append(prefix);
+        int prefixEnd = text.length();
+
+        int amountStart = text.length();
+        text.append(amount);
+        int amountEnd = text.length();
+
+        int suffixStart = text.length();
+        text.append(suffix);
+        int suffixEnd = text.length();
+
+        int prefixColor = ContextCompat.getColor(this, R.color.color_text_muted);
+        int amountColor = ContextCompat.getColor(this, R.color.color_brand);
+
+        applySpan(text, prefixStart, prefixEnd, 18, prefixColor, false);
+        applySpan(text, amountStart, amountEnd, 42, amountColor, true);
+        applySpan(text, suffixStart, suffixEnd, 15, prefixColor, false);
+
+        return text;
+    }
+
+    private void applySpan(SpannableStringBuilder text, int start, int end, int sizeSp, int color, boolean bold) {
+        if (start >= end) {
+            return;
+        }
+        int sizePx = Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP, sizeSp, getResources().getDisplayMetrics()));
+        text.setSpan(new AbsoluteSizeSpan(sizePx), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (bold) {
+            text.setSpan(new StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
     }
 
     private void refreshEntitlementInBackground() {

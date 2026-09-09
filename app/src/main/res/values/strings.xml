@@ -19,20 +19,22 @@
     
     <!-- Assinatura (oferta atual) -->
     <string name="subscription_title">Assinatura</string>
-    <string name="subscription_hero_title">Leve seu estoque para a nuvem</string>
-    <string name="subscription_hero_subtitle">Sincronize entre aparelhos, proteja seus dados e desbloqueie a Análise Avançada de Estoque.</string>
+    <string name="subscription_hero_title">Sua equipe, seu estoque, sempre em sincronia</string>
+    <string name="subscription_hero_subtitle">Atualize o estoque de qualquer aparelho, dê acesso para sua equipe e enxergue pra onde seu negócio está indo com a Análise Avançada.</string>
     <string name="subscription_hero_title_active">Assinatura ativa</string>
     <string name="subscription_hero_subtitle_active">Seus dados podem sincronizar na nuvem. A Análise Avançada de Estoque está liberada.</string>
-    <string name="subscription_hero_title_legacy_pro">Leve sua Versão PRO para a nuvem</string>
-    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos e proteção na nuvem.</string>
-    <string name="subscription_benefits_title">O que a assinatura inclui</string>
-    <string name="subscription_benefit_sync">• Sincronize o estoque na nuvem e use os dados em outros aparelhos</string>
-    <string name="subscription_benefit_devices">• Trabalhe com a equipe na mesma empresa, quando aplicável</string>
-    <string name="subscription_benefit_backup">• Mantenha os dados protegidos e sincronizados</string>
-    <string name="subscription_benefit_premium">• Desbloqueie todas as funcionalidades premium</string>
+    <string name="subscription_hero_title_legacy_pro">Falta pouco para destravar a nuvem</string>
+    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos e acesso para sua equipe.</string>
+    <string name="subscription_benefits_title">O que você desbloqueia</string>
+    <string name="subscription_benefit_sync">Sincronize o estoque entre todos os seus aparelhos em segundos</string>
+    <string name="subscription_benefit_devices">Convide sua equipe e trabalhem juntos, em tempo real</string>
+    <string name="subscription_benefit_backup">Backup automático — seus dados sempre protegidos na nuvem</string>
+    <string name="subscription_benefit_premium">Análise Avançada de Estoque: enxergue tendências antes de faltar produto</string>
     <string name="subscription_cta">Assinar</string>
     <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
     <string name="subscription_price_month">%1$s / mês</string>
+    <string name="subscription_price_suffix">/ mês</string>
+    <string name="subscription_price_label">Por apenas</string>
     <string name="subscription_restore">Restaurar assinatura</string>
     <string name="subscription_manage">Gerenciar no Google Play</string>
     <string name="subscription_go_account">Entrar para assinar</string>

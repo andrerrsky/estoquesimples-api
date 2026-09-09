@@ -27,9 +27,11 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.Toast;
 
+import com.google.android.material.textfield.TextInputLayout;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
@@ -46,7 +48,10 @@ public class AddActivity extends BaseActivity {
     private EditText productAmount;
     private EditText productValue;
     private Spinner currencySpinner;
-    private com.google.android.material.textfield.TextInputLayout valueLayout;
+    private TextInputLayout nameLayout;
+    private TextInputLayout amountLayout;
+    private TextInputLayout valueLayout;
+    private ScrollView scrollView;
     private EditText productDescription;
     private EditText productCategory;
     private EditText productSku;
@@ -56,8 +61,6 @@ public class AddActivity extends BaseActivity {
     private EditText productMinStock;
     private EditText productUnit;
     private ImageView productPhoto;
-
-    private String errorFeedback;
 
     private File imagesFolder;
     private String lastPhotoName;
@@ -111,7 +114,10 @@ public class AddActivity extends BaseActivity {
         productUnit = (EditText) findViewById(R.id.addUnit);
         productPhoto = (ImageView) findViewById(R.id.addPhoto);
         currencySpinner = (Spinner) findViewById(R.id.addCurrencySpinner);
+        nameLayout = findViewById(R.id.addNameLayout);
+        amountLayout = findViewById(R.id.addAmountLayout);
         valueLayout = findViewById(R.id.addValueLayout);
+        scrollView = findViewById(R.id.addScrollView);
 
         setupCurrencySpinner();
 
@@ -136,8 +142,6 @@ public class AddActivity extends BaseActivity {
             finish();
             return;
         }
-
-        errorFeedback = "Erros encontrados:\n";
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
@@ -290,8 +294,6 @@ public class AddActivity extends BaseActivity {
         }
 
         if (!isValid()) {
-            Toast.makeText(AddActivity.this, errorFeedback, Toast.LENGTH_LONG).show();
-            errorFeedback = "Erros encontrados:\n";
             return;
         }
 
@@ -447,61 +449,59 @@ public class AddActivity extends BaseActivity {
         // Verificação adicional de segurança
         if (!areFieldsInitialized()) {
             Log.e(TAG, "Cannot validate: fields not initialized");
-            errorFeedback += "\n- Erro interno: campos não inicializados;";
+            Toast.makeText(this, "Erro interno: campos não inicializados.", Toast.LENGTH_LONG).show();
             return false;
         }
 
-        boolean isValid = true;
-
+        boolean nameOk;
         try {
             String name = productName.getText().toString().trim();
 
             if (name.isEmpty() || name.equals("null")) {
-                errorFeedback += "\n- Nome do produto é invalido;";
-                isValid = false;
+                nameOk = FormValidation.check(nameLayout, true, "Informe o nome do produto.");
             } else {
                 // Verificar se o produto já existe (com tratamento de erro)
+                boolean duplicate = false;
                 try {
-                    if (MainActivity.instance != null && MainActivity.instance.productAlreadyExists(name)) {
-                        errorFeedback += "\n- Produto com mesmo nome já cadastrado;";
-                        isValid = false;
-                    }
+                    duplicate = MainActivity.instance != null
+                            && MainActivity.instance.productAlreadyExists(name);
                 } catch (Exception e) {
                     Log.e(TAG, "Error checking if product exists", e);
                     // Não bloquear a validação por este erro
                 }
+                nameOk = FormValidation.check(nameLayout, duplicate,
+                        "Já existe um produto com este nome.");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error validating product name", e);
-            errorFeedback += "\n- Erro ao validar nome do produto;";
-            isValid = false;
+            nameOk = FormValidation.check(nameLayout, true, "Não foi possível validar o nome.");
         }
 
+        boolean amountOk;
         try {
             String amount = productAmount.getText().toString().trim();
-            if (amount.isEmpty() || amount.equals("null")) {
-                errorFeedback += "\n- Quantidade do produto é invalida;";
-                isValid = false;
-            }
+            amountOk = FormValidation.check(amountLayout, amount.isEmpty() || amount.equals("null"),
+                    "Informe a quantidade.");
         } catch (Exception e) {
             Log.e(TAG, "Error validating product amount", e);
-            errorFeedback += "\n- Erro ao validar quantidade do produto;";
-            isValid = false;
+            amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
         }
 
+        boolean valueOk;
         try {
             String value = productValue.getText().toString().trim();
-            if (value.isEmpty() || value.equals("null")) {
-                errorFeedback += "\n- Valor do produto é invalido;";
-                isValid = false;
-            }
+            valueOk = FormValidation.check(valueLayout, value.isEmpty() || value.equals("null"),
+                    "Informe o valor.");
         } catch (Exception e) {
             Log.e(TAG, "Error validating product value", e);
-            errorFeedback += "\n- Erro ao validar valor do produto;";
-            isValid = false;
+            valueOk = FormValidation.check(valueLayout, true, "Não foi possível validar o valor.");
         }
 
-        return isValid;
+        boolean allValid = nameOk && amountOk && valueOk;
+        if (!allValid) {
+            FormValidation.focusFirstError(scrollView, nameLayout, amountLayout, valueLayout);
+        }
+        return allValid;
 
     }
 

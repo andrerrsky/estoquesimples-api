@@ -1,6 +1,9 @@
 package br.com.gameloop.estoquesimples;
 
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,10 +18,13 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -65,10 +71,13 @@ public class AccountActivity extends BaseActivity {
     private TextView syncStatus;
     private TextView messageView;
     private ProgressBar progress;
-    private View nameLayout;
+    private TextInputLayout nameLayout;
+    private TextInputLayout emailLayout;
+    private TextInputLayout passwordLayout;
     private EditText nameField;
     private EditText emailField;
     private EditText passwordField;
+    private ScrollView scrollView;
     private View passwordRules;
     private TextView ruleLength;
     private TextView ruleCommon;
@@ -116,9 +125,12 @@ public class AccountActivity extends BaseActivity {
         messageView = findViewById(R.id.messageView);
         progress = findViewById(R.id.progress);
         nameLayout = findViewById(R.id.nameLayout);
+        emailLayout = findViewById(R.id.emailLayout);
+        passwordLayout = findViewById(R.id.passwordLayout);
         nameField = findViewById(R.id.nameField);
         emailField = findViewById(R.id.emailField);
         passwordField = findViewById(R.id.passwordField);
+        scrollView = findViewById(R.id.accountScrollView);
         passwordRules = findViewById(R.id.passwordRules);
         ruleLength = findViewById(R.id.ruleLength);
         ruleCommon = findViewById(R.id.ruleCommon);
@@ -314,6 +326,9 @@ public class AccountActivity extends BaseActivity {
         toggleModeButton.setText(registerMode ? "Já tenho conta" : "Ainda não tenho conta");
         legalNotice.setVisibility(registerMode ? View.VISIBLE : View.GONE);
         showMessage(null);
+        nameLayout.setError(null);
+        emailLayout.setError(null);
+        passwordLayout.setError(null);
         if (registerMode) {
             refreshPasswordRules();
         }
@@ -338,21 +353,23 @@ public class AccountActivity extends BaseActivity {
         String email = emailField.getText().toString().trim();
         String senha = passwordField.getText().toString();
 
-        if (TextUtils.isEmpty(email) || TextUtils.isEmpty(senha)) {
-            showMessage("Informe e-mail e senha.");
-            return;
-        }
-        if (registerMode && TextUtils.isEmpty(nome)) {
-            showMessage("Informe seu nome.");
-            return;
-        }
-        if (registerMode) {
+        boolean emailOk = FormValidation.required(emailLayout, "Informe seu e-mail.");
+        boolean senhaOk = FormValidation.required(passwordLayout, "Informe sua senha.");
+        boolean nomeOk = registerMode
+                ? FormValidation.required(nameLayout, "Informe seu nome.")
+                : FormValidation.check(nameLayout, false, null);
+
+        boolean politicaOk = true;
+        if (registerMode && senhaOk) {
             PasswordPolicy.Result regras = PasswordPolicy.check(senha, email);
             refreshPasswordRules();
-            if (!regras.isValid()) {
-                showMessage(regras.problems.get(0));
-                return;
-            }
+            politicaOk = FormValidation.check(passwordLayout, !regras.isValid(),
+                    regras.problems.isEmpty() ? "Senha inválida." : regras.problems.get(0));
+        }
+
+        if (!emailOk || !senhaOk || !nomeOk || !politicaOk) {
+            FormValidation.focusFirstError(scrollView, nameLayout, emailLayout, passwordLayout);
+            return;
         }
 
         setBusy(true);
@@ -383,7 +400,7 @@ public class AccountActivity extends BaseActivity {
                         return;
                     }
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    showMessage(friendlyMessage(e));
                 });
             } catch (Exception e) {
                 // Sem este catch o executor morre em silêncio, o spinner fica
@@ -431,12 +448,6 @@ public class AccountActivity extends BaseActivity {
     }
 
     private void promptCreateWorkspace() {
-        EditText campo = new EditText(this);
-        campo.setHint("Nome da empresa");
-        campo.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
         // O setView do AlertDialog cola o conteúdo nas bordas; o título e a
         // mensagem já vêm com recuo. Sem este padding a linha do input atravessa
         // a caixa inteira.
@@ -444,23 +455,28 @@ public class AccountActivity extends BaseActivity {
         caixa.setOrientation(LinearLayout.VERTICAL);
         int margem = (int) (24 * getResources().getDisplayMetrics().density);
         caixa.setPadding(margem, margem / 2, margem, 0);
-        caixa.addView(campo);
 
-        new AlertDialog.Builder(this)
+        TextInputLayout campoLayout = FormValidation.addField(caixa, "Nome da empresa", 0);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Criar empresa")
                 .setMessage("Seu estoque será guardado nesta empresa. "
                         + "Depois você pode convidar outras pessoas para acessá-la.")
                 .setView(caixa)
                 .setCancelable(false)
-                .setPositiveButton("Criar", (dialog, which) -> {
-                    String nome = campo.getText().toString().trim();
-                    if (nome.isEmpty()) {
-                        promptCreateWorkspace();
-                        return;
-                    }
-                    createWorkspace(nome);
-                })
+                // Listener sobrescrito depois do show(): assim o clique não fecha
+                // o diálogo sozinho quando o nome está vazio.
+                .setPositiveButton("Criar", null)
                 .show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!FormValidation.required(campoLayout, "Informe o nome da empresa.")) {
+                return;
+            }
+            String nome = campoLayout.getEditText().getText().toString().trim();
+            dialog.dismiss();
+            createWorkspace(nome);
+        });
     }
 
     private void createWorkspace(String nome) {
@@ -482,7 +498,7 @@ public class AccountActivity extends BaseActivity {
                         return;
                     }
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    showMessage(friendlyMessage(e));
                 });
             } catch (Exception e) {
                 Log.e(TAG, "falha inesperada ao criar empresa", e);
@@ -549,21 +565,29 @@ public class AccountActivity extends BaseActivity {
      * dá a estranhos acesso ao estoque de quem convidou.
      */
     private void promptInviteCode() {
-        EditText campo = new EditText(this);
-        campo.setHint("Código do convite");
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int margem = (int) (24 * getResources().getDisplayMetrics().density);
+        caixa.setPadding(margem, margem / 2, margem, 0);
 
-        new AlertDialog.Builder(this)
+        TextInputLayout campoLayout = FormValidation.addField(caixa, "Código do convite", 0);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Recebi um convite")
                 .setMessage("Cole aqui o código que chegou no seu e-mail.")
-                .setView(campo)
+                .setView(caixa)
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Continuar", (dialog, which) -> {
-                    String codigo = campo.getText().toString().trim();
-                    if (!codigo.isEmpty()) {
-                        previewInvite(codigo);
-                    }
-                })
+                .setPositiveButton("Continuar", null)
                 .show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!FormValidation.required(campoLayout, "Cole o código do convite.")) {
+                return;
+            }
+            String codigo = campoLayout.getEditText().getText().toString().trim();
+            dialog.dismiss();
+            previewInvite(codigo);
+        });
     }
 
     private void previewInvite(String codigo) {
@@ -578,7 +602,7 @@ public class AccountActivity extends BaseActivity {
             } catch (ApiException e) {
                 main.post(() -> {
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    showMessage(friendlyMessage(e));
                 });
             }
         });
@@ -618,6 +642,8 @@ public class AccountActivity extends BaseActivity {
     /** Convidado sem conta: nome e senha são criados aqui mesmo. */
     private void promptInviteAccount(String codigo, TeamClient.Preview preview, String resumo) {
         View caixa = LayoutInflater.from(this).inflate(R.layout.dialog_invite_account, null);
+        TextInputLayout nomeLayout = caixa.findViewById(R.id.inviteNameLayout);
+        TextInputLayout senhaLayout = caixa.findViewById(R.id.invitePasswordLayout);
         EditText nome = caixa.findViewById(R.id.inviteNameField);
         EditText senha = caixa.findViewById(R.id.invitePasswordField);
         View regras = caixa.findViewById(R.id.invitePasswordRules);
@@ -661,15 +687,19 @@ public class AccountActivity extends BaseActivity {
             confirmar.setOnClickListener(v -> {
                 String texto = nome.getText() == null ? "" : nome.getText().toString().trim();
                 String segredo = senha.getText() == null ? "" : senha.getText().toString();
-                if (TextUtils.isEmpty(texto) || TextUtils.isEmpty(segredo)) {
-                    showMessage("Informe seu nome e crie uma senha.");
-                    return;
+
+                boolean nomeOk = FormValidation.required(nomeLayout, "Informe seu nome.");
+                boolean senhaOk = FormValidation.required(senhaLayout, "Crie uma senha.");
+
+                if (nomeOk && senhaOk) {
+                    PasswordPolicy.Result resultado = PasswordPolicy.check(segredo, emailConvite);
+                    PasswordPolicy.render(ruleLengthInvite, ruleCommonInvite, ruleRepeatedInvite,
+                            ruleEmailInvite, resultado, true);
+                    senhaOk = FormValidation.check(senhaLayout, !resultado.isValid(),
+                            resultado.problems.isEmpty() ? "Senha inválida." : resultado.problems.get(0));
                 }
-                PasswordPolicy.Result resultado = PasswordPolicy.check(segredo, emailConvite);
-                PasswordPolicy.render(ruleLengthInvite, ruleCommonInvite, ruleRepeatedInvite,
-                        ruleEmailInvite, resultado, true);
-                if (!resultado.isValid()) {
-                    showMessage(resultado.problems.get(0));
+
+                if (!nomeOk || !senhaOk) {
                     return;
                 }
                 dialog.dismiss();
@@ -713,7 +743,7 @@ public class AccountActivity extends BaseActivity {
             } catch (ApiException e) {
                 main.post(() -> {
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    showMessage(friendlyMessage(e));
                 });
             }
         });
@@ -981,6 +1011,44 @@ public class AccountActivity extends BaseActivity {
         }
         messageView.setText(mensagem);
         messageView.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * {@link ApiException#userMessage()} para o código SEM_REDE sempre diz
+     * "sem conexão" — o texto certo quando o aparelho está mesmo offline (e
+     * faz sentido para a sincronização em segundo plano, que só espera a
+     * internet voltar). Mas a mesma exceção cobre qualquer falha de rede,
+     * inclusive aparelho online e servidor fora do ar ou inalcançável — nesse
+     * caso "sem conexão" é enganoso e não existe nada pra "esperar voltar"
+     * numa tentativa de login. Aqui, na tela de conta, corrige a mensagem
+     * quando o aparelho tem conectividade de verdade no momento do erro.
+     */
+    private String friendlyMessage(ApiException e) {
+        if (ApiException.SEM_REDE.equals(e.getCode()) && isDeviceOnline()) {
+            return "Não foi possível falar com o servidor. Tente novamente em instantes.";
+        }
+        return e.userMessage();
+    }
+
+    private boolean isDeviceOnline() {
+        try {
+            ConnectivityManager manager =
+                    (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (manager == null) {
+                return false;
+            }
+            Network network = manager.getActiveNetwork();
+            if (network == null) {
+                return false;
+            }
+            NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+            return capabilities != null
+                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        } catch (Exception ex) {
+            // Não sabemos dizer: preserva o comportamento de sempre ("sem conexão").
+            return false;
+        }
     }
 
     private String formatDate(long millis) {

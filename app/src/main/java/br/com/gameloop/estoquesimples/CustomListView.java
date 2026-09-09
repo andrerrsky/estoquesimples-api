@@ -27,6 +27,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.appcompat.app.AlertDialog;
 
+import com.google.android.material.textfield.TextInputLayout;
+
 import java.io.File;
 import java.util.ArrayList;
 
@@ -335,45 +337,43 @@ public class CustomListView extends ArrayAdapter<String> {
         int padding = (int) (context.getResources().getDisplayMetrics().density * 16);
         container.setPadding(padding, padding, padding, padding);
 
-        final EditText inputQty = new EditText(context);
-        inputQty.setHint("Quantidade");
-        inputQty.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
-        container.addView(inputQty);
+        TextInputLayout qtyLayout = FormValidation.addField(container, "Quantidade",
+                android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
 
-        final EditText inputNote = new EditText(context);
-        if (isEntrada) {
-            inputNote.setHint("Observação (opcional)");
-            inputNote.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        } else {
+        String noteHint = isEntrada
+                ? "Observação (opcional)"
+                : "Observações / Informações adicionais\n(comprador, endereço, detalhes de entrega ou retirada...)";
+        int noteInputType = android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | (isEntrada ? 0 : android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        TextInputLayout noteLayout = FormValidation.addField(container, noteHint, noteInputType);
+        LinearLayout.LayoutParams noteLayoutParams =
+                (LinearLayout.LayoutParams) noteLayout.getLayoutParams();
+        noteLayoutParams.topMargin = (int) (context.getResources().getDisplayMetrics().density * 8);
+        noteLayout.setLayoutParams(noteLayoutParams);
+        final EditText inputNote = noteLayout.getEditText();
+        if (!isEntrada && inputNote != null) {
             // Saída para o cliente: campo de informações adicionais mais completo
-            inputNote.setHint("Observações / Informações adicionais\n(comprador, endereço, detalhes de entrega ou retirada...)");
-            inputNote.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                    | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
             inputNote.setMinLines(3);
             inputNote.setMaxLines(6);
             inputNote.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         }
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        params.topMargin = (int) (context.getResources().getDisplayMetrics().density * 8);
-        inputNote.setLayoutParams(params);
-        container.addView(inputNote);
 
         builder.setView(container);
+        builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());
+        // Listener sobrescrito depois do show(): assim o clique não fecha o
+        // diálogo sozinho (e perde o que já foi digitado) quando algo falha.
+        builder.setPositiveButton("Confirmar", null);
 
-        builder.setPositiveButton("Confirmar", (dialog, which) -> {
-            String qtyStr = inputQty.getText().toString().trim();
-            if (qtyStr.isEmpty()) {
-                Toast.makeText(context, "Informe a quantidade", Toast.LENGTH_SHORT).show();
+        AlertDialog dialog = builder.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String qtyStr = qtyLayout.getEditText().getText().toString().trim();
+            if (!FormValidation.required(qtyLayout, "Informe a quantidade.")) {
                 return;
             }
             double qty = CurrencyHelper.parseCurrency(qtyStr, -1);
-            if (qty <= 0) {
-                Toast.makeText(context, "Quantidade deve ser maior que zero", Toast.LENGTH_SHORT).show();
+            if (!FormValidation.check(qtyLayout, qty <= 0, "A quantidade deve ser maior que zero.")) {
                 return;
             }
 
@@ -397,7 +397,7 @@ public class CustomListView extends ArrayAdapter<String> {
             // repositório lê do banco dentro da transação. Com o valor da tela,
             // duas saídas seguidas partiam do mesmo saldo e uma anulava a outra.
             MovementRepository movements = new MovementRepository(MainActivity.stock);
-            String note = inputNote.getText().toString().trim();
+            String note = inputNote == null ? "" : inputNote.getText().toString().trim();
 
             MovementRepository.Result result;
             synchronized (MainActivity.DB_LOCK) {
@@ -413,15 +413,14 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
+            dialog.dismiss();
+
             // Atualizar lista
             if (MainActivity.instance != null) {
                 MainActivity.instance.updateList();
             }
             Toast.makeText(context, isEntrada ? "Entrada registrada" : "Saída registrada", Toast.LENGTH_SHORT).show();
         });
-
-        builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());
-        builder.show();
     }
 
 }

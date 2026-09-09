@@ -42,6 +42,11 @@ final class LegalDocuments {
                 + "Política de Privacidade.");
     }
 
+    /** Rodapé simples com os dois links, sem frase de consentimento em volta. */
+    static void bindFooterLinks(TextView view) {
+        bind(view, "Termos de Uso  ·  Política de Privacidade");
+    }
+
     private static void bind(TextView view, String texto) {
         SpannableString span = new SpannableString(texto);
         int brand = ContextCompat.getColor(view.getContext(), R.color.color_brand);

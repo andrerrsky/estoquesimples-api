@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/addScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -93,6 +94,7 @@
             android:layout_marginBottom="@dimen/section_gap">
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/addNameLayout"
                 style="@style/Widget.Estoque.TextInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -144,7 +146,8 @@
                     android:id="@+id/addScanButton"
                     style="@style/Widget.Estoque.Button.Icon"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="@dimen/input_field_height"
+                    android:layout_gravity="top"
                     android:layout_marginLeft="@dimen/field_gap"
                     android:drawableStart="@drawable/ic_barcode"
                     android:contentDescription="Ler código de barras"
@@ -204,6 +207,7 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/addAmountLayout"
                     style="@style/Widget.Estoque.TextInputLayout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -259,15 +263,13 @@
                 <Spinner
                     android:id="@+id/addCurrencySpinner"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
+                    android:layout_height="@dimen/input_field_height"
+                    android:layout_gravity="top"
                     android:layout_marginLeft="@dimen/field_gap"
                     android:minWidth="104dp"
                     android:background="@drawable/bg_dropdown"
                     android:paddingLeft="@dimen/field_gap"
-                    android:paddingRight="@dimen/field_gap"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp" />
+                    android:paddingRight="@dimen/field_gap" />
             </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
