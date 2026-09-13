@@ -44,6 +44,14 @@ public final class FormValidation {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         if (inputType != 0) {
             field.setInputType(inputType);
+            if ((inputType & android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) {
+                // Brasileiro digita "1,5". Com o inputType numérico puro o
+                // teclado ignorava a vírgula e "1,5" virava "15" — um erro de
+                // estoque silencioso. Mesmo tratamento dos campos do cadastro.
+                boolean signed = (inputType & android.text.InputType.TYPE_NUMBER_FLAG_SIGNED) != 0;
+                field.setKeyListener(android.text.method.DigitsKeyListener.getInstance(
+                        signed ? "0123456789.,-" : "0123456789.,"));
+            }
         }
 
         layout.addView(field);

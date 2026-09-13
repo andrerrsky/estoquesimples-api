@@ -157,7 +157,7 @@ public class ReportsActivity extends BaseActivity {
                 getSupportActionBar().setTitle("Relatórios");
                 // Ver "Análise de Estoque" (menu ⋮) mostra gráficos e
                 // tendências; aqui é o resumo do período com exportação.
-                getSupportActionBar().setSubtitle("Resumo do período e exportação");
+                getSupportActionBar().setSubtitle("Resumo do estoque e exportação");
             }
 
             // Inicializar views de forma segura
@@ -378,6 +378,33 @@ public class ReportsActivity extends BaseActivity {
         return resultado;
     }
 
+    private static void somarPorUnidade(java.util.Map<String, Double> mapa, String unidade, double quantidade) {
+        String chave = unidade == null || unidade.trim().isEmpty() || "null".equals(unidade) ? "un" : unidade.trim();
+        Double atual = mapa.get(chave);
+        mapa.put(chave, (atual == null ? 0 : atual) + quantidade);
+    }
+
+    /** "812 un · 65,4 kg · 40 pct" (as maiores primeiro; mais de quatro vira "…"). */
+    private static String descreverPorUnidade(java.util.Map<String, Double> mapa, double total) {
+        if (mapa.isEmpty()) {
+            return CurrencyHelper.formatQuantity(total);
+        }
+        List<java.util.Map.Entry<String, Double>> entradas = new ArrayList<>(mapa.entrySet());
+        java.util.Collections.sort(entradas, (a, b) -> Double.compare(b.getValue(), a.getValue()));
+        StringBuilder sb = new StringBuilder();
+        int mostrados = 0;
+        for (java.util.Map.Entry<String, Double> e : entradas) {
+            if (mostrados == 4) {
+                sb.append(" · …");
+                break;
+            }
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(CurrencyHelper.formatQuantity(e.getValue())).append(' ').append(e.getKey());
+            mostrados++;
+        }
+        return sb.toString();
+    }
+
     private void generateData() {
 
         List<PieEntry> entries = new ArrayList<>();
@@ -392,13 +419,16 @@ public class ReportsActivity extends BaseActivity {
 
         Cursor cursor = null;
         try {
-            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
+            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category, unit FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
 
         int cursorCount = cursor.getCount();
         double totalItemsCount = 0;
         double totalValueSum = 0.0;
         List<String> lowStockProducts = new ArrayList<>();
         java.util.Map<String, Integer> categoryMap = new java.util.HashMap<>();
+        // Somar "45 un + 3,75 kg + 12 pct" num número só não significa nada:
+        // o total é mostrado por unidade.
+        java.util.Map<String, Double> porUnidade = new java.util.LinkedHashMap<>();
 
         if(cursor.moveToFirst()) {
 
@@ -420,10 +450,11 @@ public class ReportsActivity extends BaseActivity {
             
             totalItemsCount += columnAmount;
             totalValueSum += (columnAmount * columnValue);
+            somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
 
             // Verificar estoque baixo
             if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                lowStockProducts.add(columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + "/" + CurrencyHelper.formatQuantity(columnMinStock) + ")");
+                lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount) + " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")");
             }
 
             // Contar por categoria
@@ -455,10 +486,11 @@ public class ReportsActivity extends BaseActivity {
                 
                 totalItemsCount += columnAmount;
                 totalValueSum += (columnAmount * columnValue);
+                somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
 
                 // Verificar estoque baixo
                 if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                    lowStockProducts.add(columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + "/" + CurrencyHelper.formatQuantity(columnMinStock) + ")");
+                    lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount) + " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")");
                 }
 
                 // Contar por categoria
@@ -472,7 +504,7 @@ public class ReportsActivity extends BaseActivity {
 
         // Atualizar estatísticas gerais
         totalProducts.setText("Total de Produtos: " + cursorCount);
-        totalItems.setText("Total de Itens: " + CurrencyHelper.formatQuantity(totalItemsCount));
+        totalItems.setText("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItemsCount));
         totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         
         if(cursorCount > 0) {
@@ -504,7 +536,9 @@ public class ReportsActivity extends BaseActivity {
                     ContextCompat.getColor(this, R.color.color_warning),
                     ContextCompat.getColor(this, R.color.color_error),
                     ContextCompat.getColor(this, R.color.color_brand_dark),
-                    ContextCompat.getColor(this, R.color.color_text_muted)
+                    ContextCompat.getColor(this, R.color.color_text_muted),
+                    // sétima cor: a fatia "Outros" não pode repetir a primeira
+                    ContextCompat.getColor(this, R.color.color_disabled_text)
             );
             dataSet.setValueTextSize(12f);
             dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
@@ -1747,25 +1781,20 @@ public class ReportsActivity extends BaseActivity {
     // Mostrar dialog com opções após exportar o PDF
     private void showPdfExportedDialog(final File pdfFile) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("PDF Exportado com Sucesso!");
-        builder.setMessage("O relatório foi salvo em:\n" + pdfFile.getAbsolutePath());
+        builder.setTitle("Relatório em PDF pronto");
+        builder.setMessage("Salvo em Downloads/EstoqueSimples/" + pdfFile.getName());
         builder.setIcon(android.R.drawable.ic_dialog_info);
 
         // Botão para visualizar o PDF
-        builder.setPositiveButton("Visualizar PDF", new DialogInterface.OnClickListener() {
+        builder.setPositiveButton("Abrir PDF", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 openPdfFile(pdfFile);
             }
         });
 
-        // Botão para abrir a pasta
-        builder.setNeutralButton("Abrir Pasta", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                openFolder(pdfFile);
-            }
-        });
+        // Fechar explícito: sem ele a única saída era o gesto de voltar.
+        builder.setNeutralButton("Fechar", null);
 
         // Botão para compartilhar
         builder.setNegativeButton("Compartilhar", new DialogInterface.OnClickListener() {

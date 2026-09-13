@@ -281,7 +281,7 @@
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="240dp"
+                android:layout_height="420dp"
                 android:layout_marginTop="@dimen/field_gap"
                 android:layout_marginBottom="@dimen/field_gap">
 

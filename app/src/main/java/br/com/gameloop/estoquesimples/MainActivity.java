@@ -98,6 +98,8 @@ public class MainActivity extends BaseActivity {
                 if (result.getResultCode() == RESULT_OK) {
                     pendingMessage = "Produto adicionado.";
                     pendingClearSearch = true;
+                    // O produto novo não pode nascer escondido atrás do filtro.
+                    lowStockOnly = false;
                 }
                 pendingListRefresh = true;
             });
@@ -105,23 +107,38 @@ public class MainActivity extends BaseActivity {
     private final ActivityResultLauncher<Intent> editProductLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
-                    pendingClearSearch = true;
+                    // A busca fica: quem editou "queijo" quer ver o queijo editado.
                     pendingMessage = "Produto atualizado.";
                 }
                 pendingListRefresh = true;
             });
 
+    // Sem isso o leitor abria e o próprio scanner mostrava um erro em inglês
+    // ("the Android camera encountered a problem") quando a câmera era negada.
+    private final ActivityResultLauncher<String> cameraPermissionForSearch =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    View button = findViewById(R.id.scanSearchButton);
+                    if (button != null) button.performClick();
+                } else {
+                    Feedback.show(this, "Permita a câmera nas configurações do aparelho para ler códigos de barras.");
+                }
+            });
+
     /** Confirmação a mostrar quando a tela voltar ao primeiro plano. */
     private String pendingMessage;
-    public static final String EXTRA_MESSAGE = "br.com.gameloop.estoquesimples.MESSAGE";
+    // Um booleano, não texto livre: a MainActivity é exportada (launcher) e um
+    // extra de texto viraria um jeito de qualquer app escrever na nossa tela.
+    public static final String EXTRA_PRODUCT_ADDED = "br.com.gameloop.estoquesimples.PRODUCT_ADDED";
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        String message = intent == null ? null : intent.getStringExtra(EXTRA_MESSAGE);
-        if (message != null) {
-            pendingMessage = message;
+        if (intent != null && intent.getBooleanExtra(EXTRA_PRODUCT_ADDED, false)) {
+            pendingMessage = "Produto adicionado.";
+            pendingClearSearch = true;
+            lowStockOnly = false;
             pendingListRefresh = true;
         }
     }
@@ -167,8 +184,8 @@ public class MainActivity extends BaseActivity {
         }
 
         instance = this;
-        if (getIntent() != null && getIntent().getStringExtra(EXTRA_MESSAGE) != null) {
-            pendingMessage = getIntent().getStringExtra(EXTRA_MESSAGE);
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_PRODUCT_ADDED, false)) {
+            pendingMessage = "Produto adicionado.";
         }
 
         // Configurar Picasso com otimizações de memória para evitar crashes com imagens grandes
@@ -215,6 +232,14 @@ public class MainActivity extends BaseActivity {
                 }
             });
             flattenSearchViewPadding(searchView);
+            View closeButton = searchView.findViewById(androidx.appcompat.R.id.search_close_btn);
+            if (closeButton != null) {
+                // O "X" padrão limpa e abre o teclado; aqui limpar é terminar a busca.
+                closeButton.setOnClickListener(v -> {
+                    searchView.setQuery("", false);
+                    releaseSearchFocus();
+                });
+            }
             searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                 @Override
                 public boolean onQueryTextSubmit(String query) {
@@ -245,6 +270,11 @@ public class MainActivity extends BaseActivity {
         Button scanSearchButton = findViewById(R.id.scanSearchButton);
         if (scanSearchButton != null) {
             scanSearchButton.setOnClickListener(v -> {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    cameraPermissionForSearch.launch(android.Manifest.permission.CAMERA);
+                    return;
+                }
                 ScanOptions options = new ScanOptions();
                 options.setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES);
                 options.setPrompt("Escaneie o código de barras do produto");
@@ -382,7 +412,7 @@ public class MainActivity extends BaseActivity {
         filteredMinStocks = new ArrayList<>();
         filteredUnits = new ArrayList<>();
 
-        listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits);
+        listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes);
 
         listView = (ListView) findViewById(R.id.listView);
         listView.setEmptyView(findViewById(R.id.empty_list_item));
@@ -482,6 +512,32 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    /**
+     * Tira o foco (e o teclado) da busca e devolve o foco à raiz. Chamado ao
+     * fechar os diálogos de Entrada/Saída e ao limpar a busca pelo "X".
+     */
+    public void releaseSearchFocus() {
+        View root = findViewById(R.id.mainRoot);
+        Runnable release = () -> {
+            if (searchView != null) {
+                searchView.clearFocus();
+            }
+            if (root != null) {
+                root.requestFocus();
+            }
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+            }
+        };
+        release.run();
+        if (root != null) {
+            // De novo depois que a janela recuperar o foco: é aí que o sistema
+            // tentava reapontar o teclado para a busca.
+            root.post(release);
+        }
+    }
+
     /** Filtro "Estoque baixo" da tela inicial. */
     private boolean lowStockOnly = false;
 
@@ -493,10 +549,13 @@ public class MainActivity extends BaseActivity {
         return min > 0 && CurrencyHelper.parseCurrency(amountStr, 0) <= min;
     }
 
-    private int countLowStock() {
+    private int countMatching(boolean lowOnly) {
+        String q = fold(searchView != null ? searchView.getQuery().toString() : "");
         int n = 0;
         for (int i = 0; i < names.size(); i++) {
-            if (isLowStock(amounts.get(i), minStocks.get(i))) n++;
+            if (!matchesQuery(i, q)) continue;
+            if (lowOnly && !isLowStock(amounts.get(i), minStocks.get(i))) continue;
+            n++;
         }
         return n;
     }
@@ -513,14 +572,16 @@ public class MainActivity extends BaseActivity {
         if (filterBar == null || chipAll == null || chipLow == null) {
             return;
         }
-        int low = countLowStock();
+        // Contagens relativas ao que está sendo buscado.
+        int low = countMatching(true);
+        int all = countMatching(false);
         if (names.isEmpty() || (low == 0 && !lowStockOnly)) {
             filterBar.setVisibility(View.GONE);
             lowStockOnly = false;
             return;
         }
         filterBar.setVisibility(View.VISIBLE);
-        chipAll.setText("Todos (" + names.size() + ")");
+        chipAll.setText("Todos (" + all + ")");
         chipLow.setText("Estoque baixo (" + low + ")");
         chipAll.setSelected(!lowStockOnly);
         chipLow.setSelected(lowStockOnly);
@@ -562,7 +623,7 @@ public class MainActivity extends BaseActivity {
      */
     private void refreshAdapterInPlace() {
         if (listAdapter == null) {
-            listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits);
+            listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes);
             listView.setAdapter(listAdapter);
             return;
         }
@@ -587,7 +648,7 @@ public class MainActivity extends BaseActivity {
         boolean searching = query != null && !query.trim().isEmpty();
         if (searching) {
             title.setText("Nenhum produto encontrado");
-            message.setText("Nada corresponde a \u201c" + query.trim() + "\u201d. Confira a digitação "
+            message.setText("Nada corresponde a \u201c" + query.trim() + "\u201d. Tente outra palavra, "
                     + "ou busque por SKU, código de barras ou categoria.");
         } else {
             title.setText("Nenhum produto cadastrado");
@@ -611,26 +672,13 @@ public class MainActivity extends BaseActivity {
             copyToFilteredLists();
         } else {
             // Filtrar itens baseado na busca e no chip de estoque baixo
-            String searchQuery = query == null ? "" : query.toLowerCase().trim();
+            String searchQuery = fold(query);
             
             for (int i = 0; i < names.size(); i++) {
                 if (lowStockOnly && !isLowStock(amounts.get(i), minStocks.get(i))) {
                     continue;
                 }
-                String name = names.get(i) != null ? names.get(i).toLowerCase() : "";
-                String category = categories.get(i) != null ? categories.get(i).toLowerCase() : "";
-                String sku = skus.get(i) != null ? skus.get(i).toLowerCase() : "";
-                String barcode = barcodes.get(i) != null ? barcodes.get(i).toLowerCase() : "";
-                String location = locations.get(i) != null ? locations.get(i).toLowerCase() : "";
-                String description = descriptions.get(i) != null ? descriptions.get(i).toLowerCase() : "";
-                
-                // Verificar se algum dos campos contém o texto da busca
-                if (searchQuery.isEmpty() || name.contains(searchQuery) || 
-                    category.contains(searchQuery) || 
-                    sku.contains(searchQuery) || 
-                    barcode.contains(searchQuery) || 
-                    location.contains(searchQuery) ||
-                    description.contains(searchQuery)) {
+                if (matchesQuery(i, searchQuery)) {
                     
                     filteredNames.add(names.get(i));
                     filteredDescriptions.add(descriptions.get(i));
@@ -650,6 +698,28 @@ public class MainActivity extends BaseActivity {
         
         refreshAdapterInPlace();
         applyEmptyState(query);
+        updateFilterChips();
+    }
+
+    /**
+     * Texto sem acento e em minúsculas para comparar: "oleo" precisa achar
+     * "Óleo de Soja" — metade de uma mercearia tem acento e o teclado do
+     * celular muitas vezes não os digita.
+     */
+    static String fold(String text) {
+        if (text == null) return "";
+        String base = java.text.Normalizer.normalize(text.trim(), java.text.Normalizer.Form.NFD);
+        return base.replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private boolean matchesQuery(int i, String foldedQuery) {
+        if (foldedQuery.isEmpty()) return true;
+        return fold(names.get(i)).contains(foldedQuery)
+                || fold(categories.get(i)).contains(foldedQuery)
+                || fold(skus.get(i)).contains(foldedQuery)
+                || fold(barcodes.get(i)).contains(foldedQuery)
+                || fold(locations.get(i)).contains(foldedQuery)
+                || fold(descriptions.get(i)).contains(foldedQuery);
     }
 
     public void copyToFilteredLists() {
@@ -821,15 +891,33 @@ public class MainActivity extends BaseActivity {
                             // produto some das listas, os relatórios históricos
                             // continuam corretos e nada é perdido.
                             boolean rowsDeleted;
+                            final String deletedUuid;
                             synchronized (DB_LOCK) {
                                 ProductRepository products = new ProductRepository(stock);
-                                String uuid = products.findUuidByName(finalProductName);
-                                rowsDeleted = uuid != null && products.softDelete(uuid);
+                                deletedUuid = products.findUuidByName(finalProductName);
+                                rowsDeleted = deletedUuid != null && products.softDelete(deletedUuid);
                             }
 
                             if (rowsDeleted) {
                                 updateList();
-                                Feedback.show(MainActivity.this, "Produto excluído.");
+                                // Única ação destrutiva sem volta: como a exclusão é
+                                // suave, restaurar é seguro e viaja pelo sync.
+                                com.google.android.material.snackbar.Snackbar undo = Feedback.make(
+                                        MainActivity.this, "Produto excluído.",
+                                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+                                if (undo != null) {
+                                    undo.setDuration(8000);
+                                    undo.setAction("Desfazer", v -> {
+                                        boolean restored;
+                                        synchronized (DB_LOCK) {
+                                            restored = new ProductRepository(stock).restore(deletedUuid);
+                                        }
+                                        updateList();
+                                        Feedback.show(MainActivity.this, restored
+                                                ? "Produto restaurado." : "Não foi possível restaurar.");
+                                    });
+                                    undo.show();
+                                }
                                 
                                 // Verificar e atualizar agendamento de notificações de estoque baixo
                                 LowStockScheduler.checkAndScheduleNotifications(MainActivity.this);

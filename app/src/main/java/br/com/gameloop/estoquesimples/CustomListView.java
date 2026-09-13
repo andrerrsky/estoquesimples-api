@@ -45,6 +45,8 @@ public class CustomListView extends ArrayAdapter<String> {
     private ArrayList<String> locations;
     private ArrayList<String> minStocks;
     private ArrayList<String> units;
+    private ArrayList<String> suppliers;
+    private ArrayList<String> barcodes;
 
     private static final String TAG = "CustomListView";
     private static final String IMAGE_TYPE = "image/*";
@@ -56,7 +58,8 @@ public class CustomListView extends ArrayAdapter<String> {
     public CustomListView(Activity context, ArrayList<String> names, ArrayList<String> amounts, 
                          ArrayList<String> values, ArrayList<String> photos, ArrayList<String> categories,
                          ArrayList<String> skus, ArrayList<String> locations, 
-                         ArrayList<String> minStocks, ArrayList<String> units) {
+                         ArrayList<String> minStocks, ArrayList<String> units,
+                         ArrayList<String> suppliers, ArrayList<String> barcodes) {
 
         super(context, R.layout.custom_listview, names);
 
@@ -70,6 +73,8 @@ public class CustomListView extends ArrayAdapter<String> {
         this.locations = locations;
         this.minStocks = minStocks;
         this.units = units;
+        this.suppliers = suppliers;
+        this.barcodes = barcodes;
         this.showProductImages = SettingsActivity.isShowProductImages(context);
 
     }
@@ -269,14 +274,16 @@ public class CustomListView extends ArrayAdapter<String> {
         // Estado expandido/colapsado
         boolean isExpanded = expandedNames.contains(names.get(position));
         extraContainer.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+        // Expandido é o único lugar onde um nome longo aparece inteiro.
+        name.setMaxLines(isExpanded ? 8 : 2);
         toggleIcon.setImageResource(isExpanded ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
 
         // Campos de detalhes (apenas preenche, a visibilidade da seção é controlada acima)
         TextView detailMinStock = (TextView) rowView.findViewById(R.id.detailMinStock);
         TextView detailUnit = (TextView) rowView.findViewById(R.id.detailUnit);
         TextView detailLocation = (TextView) rowView.findViewById(R.id.detailLocation);
-        TextView detailSku = (TextView) rowView.findViewById(R.id.detailSku);
-        TextView detailCategory = (TextView) rowView.findViewById(R.id.detailCategory);
+        TextView detailBarcode = (TextView) rowView.findViewById(R.id.detailBarcode);
+        TextView detailSupplier = (TextView) rowView.findViewById(R.id.detailSupplier);
 
         minStockStr = minStocks.get(position);
         if(minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null")) {
@@ -299,19 +306,13 @@ public class CustomListView extends ArrayAdapter<String> {
             detailLocation.setText("-");
         }
 
-        String skuStr = skus.get(position);
-        if(skuStr != null && !skuStr.isEmpty() && !skuStr.equals("null")) {
-            detailSku.setText(skuStr);
-        } else {
-            detailSku.setText("-");
-        }
-
-        String categoryStr = categories.get(position);
-        if(categoryStr != null && !categoryStr.isEmpty() && !categoryStr.equals("null")) {
-            detailCategory.setText(categoryStr);
-        } else {
-            detailCategory.setText("-");
-        }
+        // SKU e categoria já estão no cabeçalho; aqui entra o que faltava.
+        String barcodeStr = barcodes == null ? null : barcodes.get(position);
+        detailBarcode.setText(barcodeStr != null && !barcodeStr.isEmpty() && !barcodeStr.equals("null")
+                ? barcodeStr : "-");
+        String supplierStr = suppliers == null ? null : suppliers.get(position);
+        detailSupplier.setText(supplierStr != null && !supplierStr.isEmpty() && !supplierStr.equals("null")
+                ? supplierStr : "-");
 
         // Ações de estoque (Entrada / Saída): visíveis sem expandir o card,
         // porque são a tarefa do dia a dia. Editar/excluir ficam nos detalhes.
@@ -328,9 +329,17 @@ public class CustomListView extends ArrayAdapter<String> {
         }
 
         if (btnSaida != null) {
+            // Sem saldo não há o que dar baixa: o botão avisa em vez de abrir um
+            // diálogo que só vai recusar a quantidade.
+            final boolean semEstoque = CurrencyHelper.parseCurrency(amounts.get(position), 0) <= 0;
+            btnSaida.setAlpha(semEstoque ? 0.4f : 1f);
             btnSaida.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    if (semEstoque) {
+                        Feedback.show(context, "Sem estoque para dar saída. Registre uma entrada primeiro.");
+                        return;
+                    }
                     showStockDialog(finalPosition, false);
                 }
             });
@@ -388,6 +397,13 @@ public class CustomListView extends ArrayAdapter<String> {
         builder.setPositiveButton("Confirmar", null);
 
         AlertDialog dialog = builder.show();
+        // Fechar o diálogo com o teclado aberto devolvia o teclado para a
+        // busca da lista. Quem fecha o teclado é a lista, sempre.
+        dialog.setOnDismissListener(d -> {
+            if (MainActivity.instance != null) {
+                MainActivity.instance.releaseSearchFocus();
+            }
+        });
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String qtyStr = qtyLayout.getEditText().getText().toString().trim();
             if (!FormValidation.required(qtyLayout, "Informe a quantidade.")) {
@@ -479,6 +495,9 @@ public class CustomListView extends ArrayAdapter<String> {
                         : (undo.message == null ? "Não foi possível desfazer." : undo.message));
             });
         }
+        // Tempo para ler e decidir: com os 3 s padrão o "Desfazer" sumia antes
+        // do segundo toque, que caía no card de trás.
+        snackbar.setDuration(8000);
         snackbar.show();
     }
 

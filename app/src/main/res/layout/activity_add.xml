@@ -202,7 +202,10 @@
                         android:digits="0123456789.,$" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- A moeda é uma configuração do app (Configurações > Moeda);
+                     um seletor aqui trocava a moeda de todo o estoque sem avisar. -->
                 <Spinner
+                    android:visibility="gone"
                     android:id="@+id/addCurrencySpinner"
                     android:layout_width="wrap_content"
                     android:layout_height="@dimen/input_field_height"

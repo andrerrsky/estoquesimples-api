@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             app:iconifiedByDefault="false"
-            app:queryHint="Buscar por produto..."
+            app:queryHint="Buscar produto"
             app:queryBackground="@android:color/transparent"
             app:submitBackground="@android:color/transparent" />
 

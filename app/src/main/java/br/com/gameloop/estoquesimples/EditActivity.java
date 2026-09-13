@@ -333,13 +333,30 @@ public class EditActivity extends BaseActivity {
         if (stored == null || stored.trim().isEmpty() || stored.equalsIgnoreCase("null")) {
             return "0";
         }
-        return CurrencyHelper.quantityForStorage(CurrencyHelper.parseCurrency(stored, 0));
+        // Mesmo formato da lista ("2,5"), não o cru do banco ("2.5"): a tela
+        // de edição era a única com ponto decimal ao lado de "39,90".
+        return CurrencyHelper.formatQuantity(CurrencyHelper.parseCurrency(stored, 0));
+    }
+
+    private static final int MENU_SAVE = 9001;
+
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        // "Salvar" também no topo: o formulário tem duas telas e meia de
+        // altura e o botão do rodapé só aparece depois de rolar tudo.
+        menu.add(android.view.Menu.NONE, MENU_SAVE, android.view.Menu.NONE, "Salvar")
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             getOnBackPressedDispatcher().onBackPressed();
+            return true;
+        }
+        if (item.getItemId() == MENU_SAVE) {
+            editProduct(null);
             return true;
         }
         return super.onOptionsItemSelected(item);

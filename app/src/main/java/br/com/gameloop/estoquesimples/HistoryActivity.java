@@ -225,9 +225,12 @@ public class HistoryActivity extends BaseActivity {
         StringBuilder sb = new StringBuilder();
         sb.append("Produto: ").append(item.getProductName()).append("\n");
         sb.append("Tipo: ").append(MovementDisplay.sentenceLabel(item.getType())).append("\n");
+        String unidade = item.getUnit().isEmpty() ? "" : " " + item.getUnit();
+        double efeito = MovementRepository.signedQuantity(item.getType(), item.getQuantity());
         sb.append("Quantidade: ")
-                .append(MovementDisplay.sign(item.getType(), item.getQuantity()))
                 .append(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())))
+                .append(unidade)
+                .append(efeito < 0 ? " (saiu do estoque)" : efeito > 0 ? " (entrou no estoque)" : "")
                 .append("\n");
         sb.append("Data: ").append(dateStr);
 
@@ -252,11 +255,17 @@ public class HistoryActivity extends BaseActivity {
                         .setPositiveButton("OK", null);
 
         if (canCancel(item)) {
-            builder.setNegativeButton("Cancelar movimentação",
+            builder.setNegativeButton("Estornar",
                     (dialog, which) -> confirmCancellation(item));
         }
 
-        builder.show();
+        androidx.appcompat.app.AlertDialog dialog = builder.show();
+        android.widget.Button estornar = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+        if (estornar != null) {
+            // Ação que mexe no saldo: destacada em vermelho e com verbo próprio,
+            // para não ser lida como "fechar" ao lado do OK.
+            estornar.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.color_error));
+        }
     }
 
     /**
@@ -317,8 +326,9 @@ public class HistoryActivity extends BaseActivity {
         }
         String dateStr = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                 .format(new java.util.Date(item.getTimestamp()));
+        String unidade = item.getUnit().isEmpty() ? "" : " " + item.getUnit();
         return MovementDisplay.sentenceLabel(item.getType()) + " de "
-                + CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())) + " em " + dateStr;
+                + CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())) + unidade + " em " + dateStr;
     }
 
     /**
@@ -336,12 +346,12 @@ public class HistoryActivity extends BaseActivity {
 
     private void confirmCancellation(HistoryAdapter.HistoryItem item) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Cancelar movimentação")
+                .setTitle("Estornar movimentação?")
                 .setMessage("O registro original permanece no histórico e uma movimentação "
                         + "de correção será criada para desfazer o efeito no estoque.\n\n"
                         + "Deseja continuar?")
                 .setNegativeButton("Voltar", null)
-                .setPositiveButton("Cancelar movimentação", (dialog, which) -> applyCancellation(item))
+                .setPositiveButton("Estornar", (dialog, which) -> applyCancellation(item))
                 .show();
     }
 

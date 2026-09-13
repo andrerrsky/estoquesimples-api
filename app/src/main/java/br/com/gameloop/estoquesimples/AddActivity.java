@@ -265,10 +265,25 @@ public class AddActivity extends BaseActivity {
         );
     }
 
+    private static final int MENU_SAVE = 9001;
+
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        // "Salvar" também no topo: o formulário tem duas telas e meia de
+        // altura e o botão do rodapé só aparece depois de rolar tudo.
+        menu.add(android.view.Menu.NONE, MENU_SAVE, android.view.Menu.NONE, "Salvar")
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        return true;
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             getOnBackPressedDispatcher().onBackPressed();
+            return true;
+        }
+        if (item.getItemId() == MENU_SAVE) {
+            addProduct(null);
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -342,7 +357,7 @@ public class AddActivity extends BaseActivity {
                     // volta para a lista, onde o produto aparece com a confirmação.
                     Intent home = new Intent(this, MainActivity.class)
                             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            .putExtra(MainActivity.EXTRA_MESSAGE, "Produto adicionado.");
+                            .putExtra(MainActivity.EXTRA_PRODUCT_ADDED, true);
                     startActivity(home);
                 }
                 finish();

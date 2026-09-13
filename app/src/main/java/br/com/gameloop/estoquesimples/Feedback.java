@@ -21,7 +21,10 @@ public final class Feedback {
     }
 
     public static Snackbar make(Activity activity, String message, int duration) {
-        View root = activity == null ? null : activity.findViewById(android.R.id.content);
+        if (activity == null) {
+            return null;
+        }
+        View root = activity.findViewById(android.R.id.content);
         if (root == null) {
             Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
             return null;

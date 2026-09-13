@@ -419,11 +419,11 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="SKU"
+                        android:text="Código de barras"
                         android:textAppearance="@style/TextAppearance.Estoque.Caption" />
 
                     <TextView
-                        android:id="@+id/detailSku"
+                        android:id="@+id/detailBarcode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="-"
@@ -446,11 +446,11 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Categoria"
+                        android:text="Fornecedor"
                         android:textAppearance="@style/TextAppearance.Estoque.Caption" />
 
                     <TextView
-                        android:id="@+id/detailCategory"
+                        android:id="@+id/detailSupplier"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="-"
