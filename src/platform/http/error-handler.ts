@@ -6,6 +6,7 @@ import {
 
 import { AppError, ErrorCode, type ErrorCodeValue, type ErrorDetail } from './errors.js';
 import { isProduction } from '../config/env.js';
+import { pgErrorCode } from '../db/client.js';
 
 interface ErrorBody {
   error: {
@@ -22,14 +23,6 @@ const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 const PG_CHECK_VIOLATION = '23514';
 const PG_INSUFFICIENT_PRIVILEGE = '42501';
-
-function pgErrorCode(error: unknown): string | undefined {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const code = (error as { code: unknown }).code;
-    return typeof code === 'string' ? code : undefined;
-  }
-  return undefined;
-}
 
 export function registerErrorHandler(app: FastifyInstance): void {
   const env = app.services.env;

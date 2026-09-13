@@ -40,6 +40,28 @@ export function createDb(env: Env): DbHandle {
   };
 }
 
+/**
+ * Código de erro do Postgres (ex.: `23505` de violação de unicidade), não
+ * importa se a exceção capturada é o erro cru do driver `pg` ou um
+ * `DrizzleQueryError` — o drizzle-orm passou a embrulhar todo erro de query
+ * numa classe própria, guardando o original em `.cause` em vez de copiar
+ * `.code` para o embrulho. Checar os dois lugares evita que essa mudança de
+ * versão faça um erro de negócio esperado (nome duplicado) virar 500.
+ */
+export function pgErrorCode(error: unknown): string | undefined {
+  const direto = extrairCodigo(error);
+  if (direto) return direto;
+  const causa = error && typeof error === 'object' && 'cause' in error ? error.cause : undefined;
+  return extrairCodigo(causa);
+}
+
+function extrairCodigo(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') {
+    return error.code;
+  }
+  return undefined;
+}
+
 export interface TenantContext {
   workspaceId: string;
   userId: string;

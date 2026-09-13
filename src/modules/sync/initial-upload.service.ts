@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 
-import type { Transaction } from '../../platform/db/client.js';
+import { pgErrorCode, type Transaction } from '../../platform/db/client.js';
 import {
   initialUploadBatches,
   initialUploads,
@@ -298,10 +298,7 @@ export class InitialUploadService {
           }
         });
       } catch (error) {
-        const codigo =
-          typeof error === 'object' && error !== null && 'code' in error
-            ? (error as { code?: unknown }).code
-            : undefined;
+        const codigo = pgErrorCode(error);
         if (codigo === '23505') {
           // Nome duplicado ou outra unicidade: conta como não gravado e segue.
           continue;

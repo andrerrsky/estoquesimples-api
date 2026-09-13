@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
 
-import type { Transaction } from '../../platform/db/client.js';
+import { pgErrorCode, type Transaction } from '../../platform/db/client.js';
 import {
   conflictLog,
   products,
@@ -987,10 +987,7 @@ export class SyncService {
    * para repetir — é uma decisão que só o usuário pode tomar.
    */
   private traduzirFalha(error: unknown, operation: Operation): OperationResult | null {
-    const codigo =
-      typeof error === 'object' && error !== null && 'code' in error
-        ? (error as { code?: unknown }).code
-        : undefined;
+    const codigo = pgErrorCode(error);
 
     if (codigo === '23505') {
       return {

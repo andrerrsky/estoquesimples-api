@@ -33,10 +33,20 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   const app = Fastify({
     logger: buildLoggerOptions(env),
     bodyLimit: env.BODY_LIMIT_BYTES,
-    // Confia em exatamente um hop de proxy (a borda do Railway). `true`
-    // aceitaria qualquer X-Forwarded-For enviado pelo cliente e anularia o
-    // rate limit por IP — além de envenenar a auditoria.
-    trustProxy: 1,
+    // `trustProxy` numérico (contagem de hops) foi neutralizado pelo próprio
+    // Fastify a partir da correção de GHSA-3m5p-2c4r-xxw2: contagem de hops
+    // não consegue validar o peer imediato, então qualquer número agora
+    // resolve para "não confiar em X-Forwarded-*" (equivalente a `false`).
+    // `request.ip` passa a ser sempre o IP do socket — nunca aceita o que o
+    // cliente manda no cabeçalho, então não há mais risco de spoofing.
+    //
+    // Efeito colateral: se a borda de proxy da hospedagem (ex.: Railway) não
+    // preservar o IP real do cliente na conexão TCP, o rate limit por IP de
+    // requisições anônimas passa a agrupar todo mundo atrás dessa borda como
+    // se fosse um único IP. Para confiar de verdade num proxy específico,
+    // troque por `trustProxy: '<ip ou CIDR da borda>'` (string) quando esse
+    // endereço for conhecido — não é algo que dá para adivinhar daqui.
+    trustProxy: false,
     genReqId: (request) => {
       const header = request.headers['x-request-id'];
       if (typeof header === 'string' && header.length > 0 && header.length <= 128) return header;
