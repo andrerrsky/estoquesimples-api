@@ -142,7 +142,10 @@ describe('exportação de dados', () => {
     expect(body.products[0]).toMatchObject({
       id: productId,
       name: '=CMD()',
-      quantity: 10,
+      // A fixture grava quantityCache=10 e depois insere uma saída de 3: o
+      // gatilho que mantém o saldo (apply_movement_to_balance) soma as duas
+      // coisas, então o saldo real e esperado aqui é 10 + (-3) = 7.
+      quantity: 7,
       unitValue: 12.5,
       sku: 'CAF-1',
     });

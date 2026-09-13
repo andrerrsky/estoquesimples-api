@@ -61,7 +61,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     },
   );
 
-  app.get(
+  routes.get(
     '/workspaces/:workspaceId/export/produtos.csv',
     {
       preHandler: [app.authenticate, requireWorkspace('produtos.ver')],
@@ -77,9 +77,11 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const auth = requireAuth(request);
       const { workspaceId } = requireWorkspaceContext(request);
 
-      const query = exportQuerySchema.parse(request.query);
+      // request.query já saiu validado e transformado (string 'true'/'false'
+      // → boolean) pelo schema da rota; reanalisar aqui rejeitaria o próprio
+      // boolean que o Fastify acabou de produzir.
       const csv = await inWorkspace(request, (tx) =>
-        exporter.productsCsv(tx, workspaceId, auth.userId, auth.deviceId, query),
+        exporter.productsCsv(tx, workspaceId, auth.userId, auth.deviceId, request.query),
       );
 
       return reply
@@ -89,7 +91,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     },
   );
 
-  app.get(
+  routes.get(
     '/workspaces/:workspaceId/export/movimentacoes.csv',
     {
       preHandler: [app.authenticate, requireWorkspace('movimentacoes.ver')],

@@ -71,12 +71,45 @@ function iguais(a: unknown, b: unknown): boolean {
   return normalizar(a) === normalizar(b);
 }
 
-/** Permissão exigida por tipo de operação. */
+/** Permissão exigida por tipo de operação (produtos — movimentação é à parte, abaixo). */
 const PERMISSAO_POR_OPERACAO: Record<string, string> = {
   'produto:upsert': 'produtos.criar',
   'produto:delete': 'produtos.excluir',
-  'movimentacao:movement': 'movimentacoes.entrada',
 };
+
+/**
+ * Permissão exigida por tipo real de movimentação.
+ *
+ * O RBAC distingue quem pode lançar entrada/saída de quem pode ajustar ou
+ * cancelar — um "operador" tem os dois primeiros mas não os últimos. Isso só
+ * faz alguma diferença se a permissão for escolhida pelo `changeType` do
+ * payload, e não por um valor fixo igual para toda movimentação: do
+ * contrário, qualquer um com permissão de "entrada" conseguiria gravar um
+ * "ajuste" só trocando o campo no aparelho.
+ */
+const PERMISSAO_POR_TIPO_MOVIMENTO: Record<string, string> = {
+  entrada: 'movimentacoes.entrada',
+  cadastro: 'movimentacoes.entrada',
+  importacao: 'movimentacoes.entrada',
+  compra: 'movimentacoes.entrada', // legado, nunca gerado hoje
+  saida: 'movimentacoes.saida',
+  venda: 'movimentacoes.saida', // legado, nunca gerado hoje
+  ajuste: 'movimentacoes.ajuste',
+  edicao: 'movimentacoes.ajuste', // correção de quantidade fora do diálogo de entrada/saída
+  cancelamento: 'movimentacoes.cancelar',
+};
+
+/**
+ * Tipo não reconhecido cai na permissão mais restrita, não na mais frouxa.
+ * Um valor que não está no mapa não pode herdar a permissão de "entrada" só
+ * por ser tratado como padrão em outro lugar do sistema.
+ */
+function permissaoDeMovimento(payload: unknown): string {
+  const resultado = movementInputSchema.safeParse(payload);
+  if (!resultado.success) return 'movimentacoes.ajuste';
+  const tipo = resultado.data.changeType.trim().toLowerCase();
+  return PERMISSAO_POR_TIPO_MOVIMENTO[tipo] ?? 'movimentacoes.ajuste';
+}
 
 type ProdutoRow = typeof products.$inferSelect;
 type MovimentoRow = typeof stockMovements.$inferSelect;
@@ -222,7 +255,10 @@ export class SyncService {
       return { ...guardado, opId: operation.opId, entityId: operation.entityId, replayed: true };
     }
 
-    const exigida = PERMISSAO_POR_OPERACAO[`${operation.entity}:${operation.op}`];
+    const exigida =
+      operation.entity === ENTITY_MOVIMENTACAO && operation.op === 'movement'
+        ? permissaoDeMovimento(operation.payload)
+        : PERMISSAO_POR_OPERACAO[`${operation.entity}:${operation.op}`];
     if (exigida && !permissions.has(exigida)) {
       // Rejeitada, e não adiada: o papel do usuário não vai mudar por insistir,
       // e a operação precisa sair da fila com aviso em vez de repetir sozinha

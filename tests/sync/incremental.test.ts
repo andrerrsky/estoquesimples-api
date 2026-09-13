@@ -355,6 +355,48 @@ describe('envio incremental', () => {
       code: 'MISSING_PERMISSION',
     });
   });
+
+  it('permissão de movimentação depende do changeType real, não só de poder lançar entrada/saída', async () => {
+    const dono = await registerUser(context);
+    const workspaceId = await setupWorkspace(dono);
+
+    const operador = await registerUser(context);
+    await context.services.db.insert(workspaceMembers).values({
+      workspaceId,
+      userId: operador.userId,
+      roleKey: 'operador', // tem movimentacoes.entrada/saida, não tem movimentacoes.ajuste
+      status: 'active',
+      invitedBy: dono.userId,
+    });
+    const sessao = await loginUser(context, operador.email, VALID_PASSWORD);
+
+    const produtoId = randomUUID();
+    await push(dono, workspaceId, [upsertProduto({ entityId: produtoId })]);
+
+    const entrada = await push(sessao, workspaceId, [
+      movimentacao(produtoId, { payload: { changeType: 'entrada' } }),
+    ]);
+    expect(entrada.json().results[0].status).toBe('aplicada');
+
+    // Sem esta checagem por tipo, bastava trocar o changeType no payload para
+    // um "operador" gravar um ajuste, contornando o RBAC visível na tela de
+    // equipe do app.
+    const ajuste = await push(sessao, workspaceId, [
+      movimentacao(produtoId, { payload: { changeType: 'ajuste' } }),
+    ]);
+    expect(ajuste.json().results[0]).toMatchObject({
+      status: 'rejeitada',
+      code: 'MISSING_PERMISSION',
+    });
+
+    const cancelamento = await push(sessao, workspaceId, [
+      movimentacao(produtoId, { payload: { changeType: 'cancelamento' } }),
+    ]);
+    expect(cancelamento.json().results[0]).toMatchObject({
+      status: 'rejeitada',
+      code: 'MISSING_PERMISSION',
+    });
+  });
 });
 
 describe('leitura incremental', () => {

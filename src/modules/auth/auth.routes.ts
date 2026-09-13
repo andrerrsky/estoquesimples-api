@@ -81,6 +81,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   routes.post(
     '/refresh',
     {
+      ...strictLimit,
       schema: {
         tags: ['auth'],
         summary: 'Rotaciona o refresh token e emite um novo access token',
@@ -203,6 +204,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   routes.post(
     '/verify-email',
     {
+      ...strictLimit,
       schema: {
         tags: ['auth'],
         summary: 'Confirma o e-mail com o código enviado',
