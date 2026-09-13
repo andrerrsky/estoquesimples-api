@@ -392,15 +392,9 @@ public class ReportsActivity extends BaseActivity {
         List<java.util.Map.Entry<String, Double>> entradas = new ArrayList<>(mapa.entrySet());
         java.util.Collections.sort(entradas, (a, b) -> Double.compare(b.getValue(), a.getValue()));
         StringBuilder sb = new StringBuilder();
-        int mostrados = 0;
         for (java.util.Map.Entry<String, Double> e : entradas) {
-            if (mostrados == 4) {
-                sb.append(" · …");
-                break;
-            }
             if (sb.length() > 0) sb.append(" · ");
             sb.append(CurrencyHelper.formatQuantity(e.getValue())).append(' ').append(e.getKey());
-            mostrados++;
         }
         return sb.toString();
     }
@@ -438,8 +432,8 @@ public class ReportsActivity extends BaseActivity {
             double columnMinStock = CurrencyHelper.parseCurrency(cursor.getString(3), 0);
             String columnCategory = cursor.getString(4);
 
-            if (columnAmount > 0) {
-                entries.add(new PieEntry((float) columnAmount, columnName));
+            if (columnAmount * columnValue > 0) {
+                entries.add(new PieEntry((float) (columnAmount * columnValue), columnName));
             }
 
             higherAmoutProductText = "<b>Maior</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
@@ -453,8 +447,9 @@ public class ReportsActivity extends BaseActivity {
             somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
 
             // Verificar estoque baixo
-            if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount) + " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")");
+            if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
+                lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount)
+                        + (columnMinStock > 0 ? " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")" : " (sem estoque)"));
             }
 
             // Contar por categoria
@@ -480,8 +475,8 @@ public class ReportsActivity extends BaseActivity {
                     lowerAmoutProductText = "<b>Menor</b> quantidade no estoque: <b>" + columnName + " (" + CurrencyHelper.formatQuantity(columnAmount) + ")</b>";
                 }
 
-                if (columnAmount > 0) {
-                    entries.add(new PieEntry((float) columnAmount, columnName));
+                if (columnAmount * columnValue > 0) {
+                    entries.add(new PieEntry((float) (columnAmount * columnValue), columnName));
                 }
                 
                 totalItemsCount += columnAmount;
@@ -489,8 +484,9 @@ public class ReportsActivity extends BaseActivity {
                 somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
 
                 // Verificar estoque baixo
-                if(columnMinStock > 0 && columnAmount <= columnMinStock) {
-                    lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount) + " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")");
+                if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
+                    lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount)
+                        + (columnMinStock > 0 ? " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")" : " (sem estoque)"));
                 }
 
                 // Contar por categoria
@@ -548,7 +544,7 @@ public class ReportsActivity extends BaseActivity {
                 public String getFormattedValue(float value) {
                     // float acumulado ("578,2999") arredondado para o que a
                     // lista mostra.
-                    return CurrencyHelper.formatQuantity(Math.round(value * 100) / 100.0);
+                    return CurrencyHelper.formatCurrency(ReportsActivity.this, value);
                 }
             });
 

@@ -507,7 +507,9 @@ public class EditActivity extends BaseActivity {
                 barcode.setText(columnBarcode != null ? columnBarcode : "");
                 supplier.setText(columnSupplier != null ? columnSupplier : "");
                 location.setText(columnLocation != null ? columnLocation : "");
-                minStock.setText(formatAmountForEdit(columnMinStock));
+                // Mínimo não cadastrado fica vazio, não "0" (o card mostra "-").
+                minStock.setText(CurrencyHelper.parseCurrency(columnMinStock, 0) > 0
+                        ? formatAmountForEdit(columnMinStock) : "");
                 unit.setText(columnUnit != null ? columnUnit : "");
 
                 // Carregar foto se disponível (com migração de caminhos legados)
@@ -693,7 +695,8 @@ public class EditActivity extends BaseActivity {
             if (saved) {
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.markListDirty(true);
+                    // Busca e filtro ficam; a lista rola até o produto editado.
+                    MainActivity.instance.showProductAfterSave(name.getText().toString().trim(), false);
                 }
 
                 // A confirmação aparece na lista, ao voltar (MainActivity).

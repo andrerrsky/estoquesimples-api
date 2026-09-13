@@ -79,6 +79,18 @@ public class CustomListView extends ArrayAdapter<String> {
 
     }
 
+    public void expand(String name) {
+        expandedNames.add(name);
+        notifyDataSetChanged();
+    }
+
+    public void collapseAll() {
+        if (!expandedNames.isEmpty()) {
+            expandedNames.clear();
+            notifyDataSetChanged();
+        }
+    }
+
     @Override
     public View getView(int position, View view, ViewGroup parent) {
 
@@ -124,10 +136,16 @@ public class CustomListView extends ArrayAdapter<String> {
             @Override
             public void onClick(View v) {
                 String key = names.get(finalPosition);
-                if (!expandedNames.remove(key)) {
+                boolean opening = !expandedNames.remove(key);
+                if (opening) {
                     expandedNames.add(key);
                 }
                 notifyDataSetChanged();
+                if (opening && parent instanceof android.widget.ListView) {
+                    // Expandir o último card deixava Editar/Excluir abaixo da dobra.
+                    final android.widget.ListView list = (android.widget.ListView) parent;
+                    list.post(() -> list.smoothScrollToPosition(finalPosition));
+                }
             }
         };
         toggleIcon.setOnClickListener(toggleListener);
@@ -258,10 +276,19 @@ public class CustomListView extends ArrayAdapter<String> {
                             : "Estoque baixo · mín. " + CurrencyHelper.formatQuantity(minStockStr));
                     lowStockBadge.setVisibility(View.VISIBLE);
                     amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
+                } else if (currentAmount <= 0) {
+                    lowStockBadge.setText("Sem estoque");
+                    lowStockBadge.setVisibility(View.VISIBLE);
+                    amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
                 } else {
                     lowStockBadge.setVisibility(View.GONE);
                     amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
                 }
+            } else if (currentAmount <= 0) {
+                // Saldo zero é sinalizado mesmo sem mínimo cadastrado.
+                lowStockBadge.setText("Sem estoque");
+                lowStockBadge.setVisibility(View.VISIBLE);
+                amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
             } else {
                 lowStockBadge.setVisibility(View.GONE);
                 amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
@@ -397,6 +424,15 @@ public class CustomListView extends ArrayAdapter<String> {
         builder.setPositiveButton("Confirmar", null);
 
         AlertDialog dialog = builder.show();
+        // Quantidade já em foco, com teclado: é o único campo obrigatório e
+        // cada movimentação exigia um toque a mais.
+        if (qtyLayout.getEditText() != null) {
+            qtyLayout.getEditText().requestFocus();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setSoftInputMode(
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            }
+        }
         // Fechar o diálogo com o teclado aberto devolvia o teclado para a
         // busca da lista. Quem fecha o teclado é a lista, sempre.
         dialog.setOnDismissListener(d -> {

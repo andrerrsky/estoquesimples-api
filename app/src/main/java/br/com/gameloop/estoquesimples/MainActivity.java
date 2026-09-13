@@ -121,7 +121,16 @@ public class MainActivity extends BaseActivity {
                     View button = findViewById(R.id.scanSearchButton);
                     if (button != null) button.performClick();
                 } else {
-                    Feedback.show(this, "Permita a câmera nas configurações do aparelho para ler códigos de barras.");
+                    com.google.android.material.snackbar.Snackbar sb = Feedback.make(this,
+                            "Sem acesso à câmera. Permita nas configurações do app para ler códigos.",
+                            com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+                    if (sb != null) {
+                        sb.setDuration(8000);
+                        sb.setAction("Configurações", v -> startActivity(
+                                new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.fromParts("package", getPackageName(), null))));
+                        sb.show();
+                    }
                 }
             });
 
@@ -166,9 +175,13 @@ public class MainActivity extends BaseActivity {
         View emptyActionClear = findViewById(R.id.emptyActionClear);
         if (emptyActionClear != null) {
             emptyActionClear.setOnClickListener(v -> {
+                if (lowStockOnly) {
+                    setLowStockOnly(false);
+                    return;
+                }
                 if (searchView != null) {
                     searchView.setQuery("", false);
-                    searchView.clearFocus();
+                    releaseSearchFocus();
                 }
             });
         }
@@ -184,6 +197,26 @@ public class MainActivity extends BaseActivity {
         }
 
         instance = this;
+
+        // Voltar com uma busca ou filtro ativo limpa a busca/filtro; só um
+        // segundo Voltar, com a lista inteira à vista, sai do app.
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                boolean searching = searchView != null && searchView.getQuery().length() > 0;
+                if (searching || lowStockOnly) {
+                    if (searchView != null) searchView.setQuery("", false);
+                    lowStockOnly = false;
+                    releaseSearchFocus();
+                    updateFilterChips();
+                    filterList("");
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
+            }
+        });
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_PRODUCT_ADDED, false)) {
             pendingMessage = "Produto adicionado.";
         }
@@ -249,6 +282,9 @@ public class MainActivity extends BaseActivity {
 
                 @Override
                 public boolean onQueryTextChange(String newText) {
+                    if (listAdapter != null) {
+                        listAdapter.collapseAll();
+                    }
                     filterList(newText);
                     return true;
                 }
@@ -452,6 +488,7 @@ public class MainActivity extends BaseActivity {
         if (listAdapter != null || pendingListRefresh) {
             pendingListRefresh = false;
             updateList();
+            revealPendingProduct();
         }
 
         updateConflictsBanner();
@@ -512,6 +549,39 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    /** Produto a mostrar (rolado e expandido) na próxima atualização da lista. */
+    private String pendingShowName;
+
+    /**
+     * Depois de salvar um produto a lista voltava numa posição qualquer e o
+     * produto salvo não aparecia — "cadê o que acabei de cadastrar?". Agora
+     * a lista rola até ele e o mostra expandido.
+     */
+    public void showProductAfterSave(String name, boolean isNew) {
+        pendingShowName = name;
+        pendingListRefresh = true;
+        if (isNew) {
+            // Produto novo pode não bater com a busca nem estar com estoque baixo.
+            pendingClearSearch = true;
+            lowStockOnly = false;
+        }
+    }
+
+    private void revealPendingProduct() {
+        if (pendingShowName == null || listView == null || listAdapter == null) {
+            return;
+        }
+        final String name = pendingShowName;
+        pendingShowName = null;
+        int index = filteredNames.indexOf(name);
+        if (index < 0) {
+            return;
+        }
+        listAdapter.expand(name);
+        final int position = index;
+        listView.post(() -> listView.setSelectionFromTop(position, 0));
+    }
+
     /**
      * Tira o foco (e o teclado) da busca e devolve o foco à raiz. Chamado ao
      * fechar os diálogos de Entrada/Saída e ao limpar a busca pelo "X".
@@ -542,11 +612,16 @@ public class MainActivity extends BaseActivity {
     private boolean lowStockOnly = false;
 
     private static boolean isLowStock(String amountStr, String minStockStr) {
+        double amount = CurrencyHelper.parseCurrency(amountStr, 0);
+        if (amount <= 0) {
+            // Saldo zero é "sem estoque" mesmo sem mínimo cadastrado.
+            return true;
+        }
         if (minStockStr == null || minStockStr.isEmpty() || minStockStr.equals("null")) {
             return false;
         }
         double min = CurrencyHelper.parseCurrency(minStockStr, 0);
-        return min > 0 && CurrencyHelper.parseCurrency(amountStr, 0) <= min;
+        return min > 0 && amount <= min;
     }
 
     private int countMatching(boolean lowOnly) {
@@ -575,7 +650,9 @@ public class MainActivity extends BaseActivity {
         // Contagens relativas ao que está sendo buscado.
         int low = countMatching(true);
         int all = countMatching(false);
-        if (names.isEmpty() || (low == 0 && !lowStockOnly)) {
+        // A barra fica fixa enquanto houver produtos: sumir e voltar
+        // conforme a busca parecia um defeito.
+        if (names.isEmpty()) {
             filterBar.setVisibility(View.GONE);
             lowStockOnly = false;
             return;
@@ -646,10 +723,27 @@ public class MainActivity extends BaseActivity {
             return;
         }
         boolean searching = query != null && !query.trim().isEmpty();
-        if (searching) {
+        int hiddenByChip = lowStockOnly ? countMatching(false) : 0;
+        TextView clearLabel = findViewById(R.id.emptyActionClearLabel);
+        if (lowStockOnly && hiddenByChip > 0) {
+            // O chip "Estoque baixo" escondeu o que a busca achou: dizer isso,
+            // em vez de "nada corresponde" com o chip mostrando "Todos (1)".
+            title.setText("Nenhum com estoque baixo");
+            message.setText(hiddenByChip == 1
+                    ? "1 produto corresponde à busca, mas não está com estoque baixo."
+                    : hiddenByChip + " produtos correspondem à busca, mas nenhum está com estoque baixo.");
+            if (clearLabel != null) clearLabel.setText("Ver todos");
+            searching = true;
+        } else if (lowStockOnly) {
+            title.setText("Nenhum produto com estoque baixo");
+            message.setText("Tudo acima do mínimo por aqui.");
+            if (clearLabel != null) clearLabel.setText("Ver todos");
+            searching = true;
+        } else if (searching) {
             title.setText("Nenhum produto encontrado");
             message.setText("Nada corresponde a \u201c" + query.trim() + "\u201d. Tente outra palavra, "
                     + "ou busque por SKU, código de barras ou categoria.");
+            if (clearLabel != null) clearLabel.setText("Limpar busca");
         } else {
             title.setText("Nenhum produto cadastrado");
             message.setText("Cadastre seu primeiro produto para começar a controlar o "

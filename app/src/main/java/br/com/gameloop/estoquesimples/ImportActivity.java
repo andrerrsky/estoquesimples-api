@@ -84,12 +84,26 @@ public class ImportActivity extends BaseActivity {
         }
 
         CharSequence formato = Html.fromHtml(
-                "Leve seus produtos para uma planilha ou traga de uma. Ao importar, um produto "
-                        + "que já existe (mesmo SKU, código de barras ou nome) é atualizado, não duplicado.<br>"
+                "Para abrir no Excel ou Google Planilhas, ou trazer produtos de uma planilha. "
+                        + "Um produto que já existe (mesmo SKU, código de barras ou nome) é atualizado, não duplicado.<br>"
                         + "<b>Colunas:</b> nome, descrição, quantidade, valor, categoria, SKU, código de "
                         + "barras, fornecedor, localização, estoque mínimo, unidade.",
                 Html.FROM_HTML_MODE_LEGACY);
         importDesc2.setText(formato);
+
+        View advancedHeader = findViewById(R.id.advancedHeader);
+        View advancedContent = findViewById(R.id.advancedContent);
+        android.widget.ImageView advancedChevron = findViewById(R.id.advancedChevron);
+        if (advancedHeader != null && advancedContent != null) {
+            advancedHeader.setOnClickListener(v -> {
+                boolean open = advancedContent.getVisibility() != View.VISIBLE;
+                advancedContent.setVisibility(open ? View.VISIBLE : View.GONE);
+                if (advancedChevron != null) {
+                    advancedChevron.setImageResource(open ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
+                    advancedChevron.setContentDescription(open ? "Ocultar opções avançadas" : "Mostrar opções avançadas");
+                }
+            });
+        }
 
         initializeActivityResultLaunchers();
     }
@@ -553,9 +567,18 @@ public class ImportActivity extends BaseActivity {
         }
     }
 
+    /**
+     * Resultado das operações avançadas (.db, cópia automática). Antes ia
+     * para a descrição do card, que agora é o subtítulo do "Avançado"
+     * recolhido — a mensagem ficaria escondida. Vai para a área de status
+     * da tela e para uma confirmação no rodapé.
+     */
     private void setImportExportDescText(String text) {
-        if (importExportDesc != null) {
-            importExportDesc.setText(text);
+        if (status != null) {
+            status.setText(text);
+        }
+        if (text != null) {
+            Feedback.show(this, text.split("\n")[0]);
         }
     }
 

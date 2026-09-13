@@ -98,62 +98,6 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/report_section_others"
-            android:textAppearance="@style/TextAppearance.Estoque.Label"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportMovements"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_movements"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportExits"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_exits"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportEntries"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_entries"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportLowStock"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_low_stock"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportCategory"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_category"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <Button
-            android:id="@+id/btnReportFinancial"
-            style="@style/Widget.Estoque.Button.Secondary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/report_btn_financial"
-            android:layout_marginBottom="@dimen/section_gap" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:text="Resumo geral"
             android:textAppearance="@style/TextAppearance.Estoque.Label"
             android:layout_marginBottom="@dimen/field_gap" />
@@ -267,7 +211,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Distribuição de quantidade"
+            android:text="Valor em estoque por produto"
             android:textAppearance="@style/TextAppearance.Estoque.Label"
             android:layout_marginBottom="@dimen/field_gap" />
 
@@ -305,7 +249,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:text="Sem quantidade para exibir"
+                        android:text="Sem valor em estoque para exibir"
                         android:textAppearance="@style/TextAppearance.Estoque.Section"
                         android:textColor="@color/color_brand" />
 
@@ -314,7 +258,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/field_gap"
                         android:gravity="center"
-                        android:text="Cadastre produtos e registre entradas para ver como o estoque está distribuído."
+                        android:text="Cadastre produtos com valor e quantidade para ver onde está o dinheiro do estoque."
                         android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
                 </LinearLayout>
             </FrameLayout>
@@ -413,6 +357,61 @@
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting"
                 android:textColor="@color/color_text" />
         </LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/report_section_others"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportMovements"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_movements"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportExits"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_exits"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportEntries"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_entries"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportLowStock"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_low_stock"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportCategory"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_category"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportFinancial"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_financial"
+            android:layout_marginBottom="@dimen/section_gap" />
     </LinearLayout>
 </ScrollView>
 

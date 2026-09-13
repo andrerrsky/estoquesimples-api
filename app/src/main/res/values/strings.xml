@@ -93,7 +93,7 @@
     <string name="total_exit_value_zero">Valor Total de Saídas: %s 0,00</string>
 
     <!-- Report Buttons (Reports Activity) -->
-    <string name="report_section_others">Outros relatórios</string>
+    <string name="report_section_others">Outros relatórios (PDF)</string>
     <string name="report_btn_complete">Relatório completo (PDF)</string>
     <string name="report_btn_movements">Movimentações (entradas e saídas)</string>
     <string name="report_btn_exits">Saídas detalhado</string>

@@ -338,7 +338,7 @@ public class AddActivity extends BaseActivity {
             if (newUuid != null) {
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.markListDirty(true);
+                    MainActivity.instance.showProductAfterSave(productName.getText().toString().trim(), true);
                 }
 
                 // A confirmação aparece na lista, ao voltar (MainActivity).

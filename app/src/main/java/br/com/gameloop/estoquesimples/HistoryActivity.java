@@ -347,7 +347,8 @@ public class HistoryActivity extends BaseActivity {
     private void confirmCancellation(HistoryAdapter.HistoryItem item) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Estornar movimentação?")
-                .setMessage("O registro original permanece no histórico e uma movimentação "
+                .setMessage(descreverVinculo(item) + "\n" + item.getProductName() + "\n\n"
+                        + "O registro original permanece no histórico e uma movimentação "
                         + "de correção será criada para desfazer o efeito no estoque.\n\n"
                         + "Deseja continuar?")
                 .setNegativeButton("Voltar", null)
