@@ -397,6 +397,62 @@ describe('envio incremental', () => {
       code: 'MISSING_PERMISSION',
     });
   });
+
+  it('vínculo de estorno chega a quem sincronizar depois', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produtoId = randomUUID();
+    await push(user, workspaceId, [upsertProduto({ entityId: produtoId })]);
+
+    const entradaId = randomUUID();
+    await push(user, workspaceId, [
+      movimentacao(produtoId, { entityId: entradaId, payload: { changeType: 'entrada', quantity: 5 } }),
+    ]);
+
+    const estorno = await push(user, workspaceId, [
+      movimentacao(produtoId, {
+        payload: { changeType: 'cancelamento', quantity: -5, reversesMovementId: entradaId },
+      }),
+    ]);
+    expect(estorno.json().results[0].status).toBe('aplicada');
+    const estornoId = estorno.json().results[0].entityId;
+
+    const pagina = await pull(user, workspaceId, 0);
+    const changes = pagina.json().changes as Array<{ data: { id: string; reversesMovementId?: string } }>;
+    const alteracaoEstorno = changes.find((c) => c.data.id === estornoId);
+    expect(alteracaoEstorno?.data.reversesMovementId).toBe(entradaId);
+
+    const alteracaoOriginal = changes.find((c) => c.data.id === entradaId);
+    expect(alteracaoOriginal?.data.reversesMovementId ?? null).toBeNull();
+  });
+
+  it('recusa vínculo de estorno para movimentação de outra empresa sem derrubar o lote', async () => {
+    const donoA = await registerUser(context);
+    const workspaceA = await setupWorkspace(donoA);
+    const donoB = await registerUser(context);
+    const workspaceB = await setupWorkspace(donoB);
+
+    const produtoB = randomUUID();
+    await push(donoB, workspaceB, [upsertProduto({ entityId: produtoB })]);
+    const movimentoAlheioId = randomUUID();
+    await push(donoB, workspaceB, [movimentacao(produtoB, { entityId: movimentoAlheioId })]);
+
+    const produtoA = randomUUID();
+    await push(donoA, workspaceA, [upsertProduto({ entityId: produtoA })]);
+
+    // Duas operações no mesmo lote: se o vínculo inválido derrubasse a
+    // transação inteira, a entrada válida junto também seria perdida.
+    const resposta = await push(donoA, workspaceA, [
+      upsertProduto({ payload: { name: 'Produto qualquer' } }),
+      movimentacao(produtoA, {
+        payload: { changeType: 'cancelamento', reversesMovementId: movimentoAlheioId },
+      }),
+    ]);
+
+    expect(resposta.json().results[0].status).toBe('aplicada');
+    expect(resposta.json().results[1]).toMatchObject({ status: 'rejeitada' });
+  });
 });
 
 describe('leitura incremental', () => {

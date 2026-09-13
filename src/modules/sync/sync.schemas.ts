@@ -53,6 +53,14 @@ export const movementInputSchema = z
     quantity: quantidade,
     occurredAt: z.number().int().nonnegative(),
     note: z.string().max(2000).nullish(),
+    /**
+     * Id da movimentação original, quando esta é o estorno de outra.
+     *
+     * Sem isso, cancelar só deixava rastro numa nota de texto livre — o
+     * vínculo não sobrevivia à sincronização, e um segundo aparelho via o
+     * estorno como um evento solto, sem saber que ele anulava outro.
+     */
+    reversesMovementId: z.string().uuid().nullish(),
   })
   .strict();
 

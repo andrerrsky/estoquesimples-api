@@ -230,6 +230,7 @@ export class ExportService {
       occurredAt: row.occurredAt.getTime(),
       note: row.note,
       recordedAt: row.recordedAt.getTime(),
+      reversesMovementId: row.reversesMovementId,
     }));
   }
 }

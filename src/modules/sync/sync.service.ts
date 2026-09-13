@@ -803,6 +803,10 @@ export class SyncService {
       createdBy: userId,
       changeSeq: seq,
       opId: operation.opId,
+      // Vínculo de estorno. Referência para fora do workspace ou para um id
+      // que não existe cai na FK composta (workspace_id, reverses_movement_id)
+      // e vira 23503 — traduzido para VALIDATION_FAILED pelo error handler.
+      reversesMovementId: payload.reversesMovementId ?? null,
     });
 
     return {
@@ -952,6 +956,7 @@ export class SyncService {
         note: row.note,
         occurredAt: row.occurredAt.getTime(),
         recordedAt: row.recordedAt.getTime(),
+        reversesMovementId: row.reversesMovementId,
       },
     };
   }
@@ -996,6 +1001,20 @@ export class SyncService {
         status: 'rejeitada',
         code: ErrorCode.DUPLICATE_NAME,
         message: 'Já existe um produto com este nome nesta empresa.',
+      };
+    }
+
+    // reversesMovementId apontando para um id que não existe (ou existe só
+    // em outro workspace, já que a FK é composta por workspace_id) esbarra
+    // aqui. Sem este caso, um vínculo de estorno inválido derrubava o lote
+    // inteiro em vez de recusar só esta operação.
+    if (codigo === '23503' && operation.entity === ENTITY_MOVIMENTACAO) {
+      return {
+        opId: operation.opId,
+        entityId: operation.entityId,
+        status: 'rejeitada',
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'A movimentação original do estorno não foi encontrada nesta empresa.',
       };
     }
 
