@@ -54,34 +54,8 @@
     <string name="pro_store_not_connected">Aguarde a conexão com a loja…</string>
     <string name="pro_purchase_pending">Sua compra antiga ainda está sendo processada. O acesso PRO entra quando o pagamento for confirmado.</string>
 
-    <!-- Advanced Reports Feature -->
-    <string name="advanced_reports_title">Relatórios Avançados</string>
-    <string name="advanced_reports_description">Gráficos detalhados e análises profundas do seu estoque</string>
-    <string name="advanced_reports_locked">Recurso exclusivo da assinatura</string>
-    <string name="advanced_reports_locked_message">Assine para acessar relatórios avançados com gráficos interativos e análises detalhadas.</string>
-    
-    <!-- Email Reports Feature -->
-    <string name="email_reports_title">Enviar Relatório por Email</string>
-    <string name="email_reports_description">Envie relatórios completos diretamente para seu email</string>
-    <string name="email_reports_locked">Recurso exclusivo da assinatura</string>
-    <string name="email_reports_locked_message">Assine para enviar relatórios detalhados por email.</string>
-    <string name="email_reports_success">Relatório enviado com sucesso!</string>
-    <string name="email_reports_error">Erro ao enviar relatório. Verifique sua conexão.</string>
-    <string name="email_reports_prompt_title">Enviar Relatório por Email</string>
-    <string name="email_reports_prompt_message">Digite o endereço de email:</string>
-    
-    <!-- Low Stock Alerts Feature -->
-    <string name="low_stock_alerts_title">Alertas de Estoque Baixo</string>
-    <string name="low_stock_alerts_description">Receba notificações quando produtos estiverem com estoque baixo</string>
-    <string name="low_stock_alerts_locked">Recurso exclusivo da assinatura</string>
-    <string name="low_stock_alerts_locked_message">Assine para receber alertas automáticos de estoque baixo.</string>
-    <string name="low_stock_alerts_enabled">Alertas de estoque baixo ativados!</string>
-    <string name="low_stock_alerts_disabled">Alertas de estoque baixo desativados.</string>
-    
     <!-- Bulk Edit Feature (Free) -->
     <string name="bulk_edit_title">Edição em Massa</string>
-    <string name="bulk_edit_description">Edite múltiplos produtos de uma vez</string>
-    <string name="bulk_edit_message">Selecione os produtos que deseja editar:</string>
     <string name="bulk_edit_success">%d produtos editados com sucesso!</string>
     
     <!-- Analytics Feature (Premium) -->

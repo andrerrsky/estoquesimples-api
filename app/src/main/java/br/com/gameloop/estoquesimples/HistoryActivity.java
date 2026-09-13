@@ -9,16 +9,31 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.widget.SearchView;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class HistoryActivity extends BaseActivity {
 
+    private static final String[] FILTROS_TIPO = {"Todas", "Entradas", "Saídas", "Ajustes e correções"};
+
     private ListView historyList;
+    private SearchView searchView;
+    private Spinner typeFilter;
+    private TextView emptyView;
+
+    /** Tudo o que veio do banco, antes de aplicar busca/filtro de tipo. */
+    private final List<HistoryAdapter.HistoryItem> allItems = new ArrayList<>();
+    private String searchQuery = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,10 +44,88 @@ public class HistoryActivity extends BaseActivity {
         getSupportActionBar().setTitle(R.string.history_title);
 
         historyList = (ListView) findViewById(R.id.historyList);
-        TextView emptyView = (TextView) findViewById(R.id.emptyHistory);
+        emptyView = (TextView) findViewById(R.id.emptyHistory);
         historyList.setEmptyView(emptyView);
 
+        searchView = findViewById(R.id.historySearchView);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                searchQuery = newText == null ? "" : newText.trim();
+                applyFilters();
+                return true;
+            }
+        });
+
+        typeFilter = findViewById(R.id.historyTypeFilter);
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, FILTROS_TIPO);
+        typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        typeFilter.setAdapter(typeAdapter);
+        typeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                applyFilters();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
         loadHistory();
+    }
+
+    /** Categoria de exibição do tipo, para casar com as opções do filtro. */
+    private static String categoria(String changeType) {
+        if (changeType == null) {
+            return "Entradas";
+        }
+        String tipo = changeType.toLowerCase(Locale.ROOT);
+        if (MovementRepository.SAIDA.equalsIgnoreCase(tipo) || "venda".equalsIgnoreCase(tipo)) {
+            return "Saídas";
+        }
+        if (MovementRepository.AJUSTE.equalsIgnoreCase(tipo)
+                || MovementRepository.EDICAO.equalsIgnoreCase(tipo)
+                || MovementRepository.CANCELAMENTO.equalsIgnoreCase(tipo)) {
+            return "Ajustes e correções";
+        }
+        return "Entradas";
+    }
+
+    private void applyFilters() {
+        String filtroTipo = (String) typeFilter.getSelectedItem();
+        boolean semFiltroTipo = filtroTipo == null || FILTROS_TIPO[0].equals(filtroTipo);
+        String buscaLower = searchQuery.toLowerCase(Locale.ROOT);
+
+        List<HistoryAdapter.HistoryItem> visiveis = new ArrayList<>();
+        for (HistoryAdapter.HistoryItem item : allItems) {
+            boolean casaTipo = semFiltroTipo || filtroTipo.equals(categoria(item.getType()));
+            boolean casaBusca = buscaLower.isEmpty()
+                    || (item.getProductName() != null
+                        && item.getProductName().toLowerCase(Locale.ROOT).contains(buscaLower));
+            if (casaTipo && casaBusca) {
+                visiveis.add(item);
+            }
+        }
+
+        boolean filtroAtivo = !semFiltroTipo || !buscaLower.isEmpty();
+        emptyView.setText(filtroAtivo && !allItems.isEmpty()
+                ? "Nenhuma movimentação encontrada para esse filtro"
+                : "Nenhuma movimentação de entrada ou saída registrada ainda");
+
+        historyList.setAdapter(new HistoryAdapter(this, visiveis));
+        historyList.setOnItemClickListener((parent, view, position, id) -> {
+            Object obj = parent.getItemAtPosition(position);
+            if (obj instanceof HistoryAdapter.HistoryItem) {
+                showHistoryDetail((HistoryAdapter.HistoryItem) obj);
+            }
+        });
     }
 
     private void loadHistory() {
@@ -44,7 +137,8 @@ public class HistoryActivity extends BaseActivity {
         if (!ensureDatabaseAvailable()) {
             Log.e("HistoryActivity", "Database not available, cannot load history");
             Toast.makeText(this, "Não foi possível carregar o histórico no momento.", Toast.LENGTH_LONG).show();
-            historyList.setAdapter(new HistoryAdapter(this, items));
+            allItems.clear();
+            applyFilters();
             return;
         }
 
@@ -80,15 +174,9 @@ public class HistoryActivity extends BaseActivity {
             }
         }
 
-        HistoryAdapter adapter = new HistoryAdapter(this, items);
-        historyList.setAdapter(adapter);
-
-        historyList.setOnItemClickListener((parent, view, position, id) -> {
-            Object obj = parent.getItemAtPosition(position);
-            if (obj instanceof HistoryAdapter.HistoryItem) {
-                showHistoryDetail((HistoryAdapter.HistoryItem) obj);
-            }
-        });
+        allItems.clear();
+        allItems.addAll(items);
+        applyFilters();
     }
 
     /**
@@ -218,9 +306,6 @@ public class HistoryActivity extends BaseActivity {
             return true;
         } else if (itemId == R.id.menu_about) {
             MainActivity.instance.showAboutActivity();
-            return true;
-        } else if (itemId == R.id.menu_history) {
-            // Já estamos nesta tela
             return true;
         } else if (itemId == R.id.menu_settings) {
             startActivity(new Intent(this, SettingsActivity.class));

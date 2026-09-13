@@ -26,7 +26,9 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -44,6 +46,9 @@ import java.util.Date;
 import java.util.Locale;
 
 public class EditActivity extends BaseActivity {
+
+    /** Quantidade carregada do banco ao abrir a tela, para saber se ela mudou ao salvar. */
+    private double originalAmount = 0d;
 
     private ImageView photo;
     private TextView name;
@@ -479,7 +484,16 @@ public class EditActivity extends BaseActivity {
                 description.setText(columnDescription != null ? columnDescription : "");
                 // Quantidade/estoque mínimo: normalizar para não exibir ".0" em inteiros
                 // (sem separador de milhar, pois o texto é gravado bruto ao salvar)
-                amount.setText(formatAmountForEdit(columnAmount));
+                String amountForEdit = formatAmountForEdit(columnAmount);
+                amount.setText(amountForEdit);
+                // Precisa nascer do MESMO texto exibido no campo, não do valor
+                // bruto do banco: formatAmountForEdit arredonda para 2 casas
+                // (DecimalFormat "0.##"). Comparar o bruto (ex.: 10.125) com o
+                // que sai do campo ao salvar sem tocar em nada (10.13) disparava
+                // o diálogo de motivo e um evento de histórico por um produto
+                // que o usuário nunca mudou — só para quantidades com 3+ casas
+                // decimais (unidades como kg/litro).
+                originalAmount = Quantities.parse(amountForEdit);
                 value.setText(columnValue != null ? columnValue : "0");
                 category.setText(columnCategory != null ? columnCategory : "");
                 sku.setText(columnSku != null ? columnSku : "");
@@ -559,14 +573,52 @@ public class EditActivity extends BaseActivity {
             return;
         }
 
-        try {
-            // A quantidade não entra no ContentValues: ela só muda através de
-            // uma movimentação, para que o histórico continue explicando o
-            // saldo. Editar o campo direto era a última forma de alterar
-            // estoque sem deixar rastro.
-            double targetAmount = Quantities.parse(
-                    amount.getText().toString().replace(" ", "").trim());
+        double targetAmount = Quantities.parse(
+                amount.getText().toString().replace(" ", "").trim());
 
+        // Mudar a quantidade por aqui é, na prática, um ajuste de estoque —
+        // só que sem o diálogo de Entrada/Saída, ninguém perguntava o motivo.
+        // O histórico ficava com um evento "edicao" mudo, indistinguível de
+        // uma correção de cadastro. Perguntar aqui também fecha essa lacuna.
+        if (Double.compare(targetAmount, originalAmount) != 0) {
+            promptAdjustmentNote(targetAmount);
+        } else {
+            saveProduct(targetAmount, null);
+        }
+    }
+
+    private void promptAdjustmentNote(double targetAmount) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (getResources().getDisplayMetrics().density * 16);
+        container.setPadding(padding, padding, padding, padding);
+
+        TextInputLayout noteLayout = FormValidation.addField(container,
+                "Motivo do ajuste (opcional)",
+                android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        final EditText inputNote = noteLayout.getEditText();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Quantidade alterada")
+                .setMessage("De " + formatAmountForEdit(Quantities.forStorage(originalAmount))
+                        + " para " + formatAmountForEdit(Quantities.forStorage(targetAmount))
+                        + ". Isso fica registrado no histórico como um ajuste.\n\n"
+                        + "Nada foi salvo ainda — as outras alterações desta tela continuam aqui.")
+                .setView(container)
+                // "Voltar e revisar" em vez de "Cancelar": nada foi gravado até
+                // aqui, e "Cancelar" ao lado de outros campos editados (nome,
+                // preço) sugeria perder a tela inteira, não só a quantidade.
+                .setNegativeButton("Voltar e revisar", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Salvar", (dialog, which) -> {
+                    String note = inputNote == null ? "" : inputNote.getText().toString().trim();
+                    saveProduct(targetAmount, note.isEmpty() ? null : note);
+                })
+                .show();
+    }
+
+    private void saveProduct(double targetAmount, String adjustmentNote) {
+        try {
             ContentValues updateValues = new ContentValues();
             updateValues.put("name", name.getText().toString().trim());
             updateValues.put("value", CurrencyHelper.sanitizeForStorage(value.getText().toString()));
@@ -598,7 +650,7 @@ public class EditActivity extends BaseActivity {
                     if (saved) {
                         MovementRepository.Result adjustment = new MovementRepository(db)
                                 .setAbsolute(productUuid, MovementRepository.EDICAO,
-                                        targetAmount, null);
+                                        targetAmount, adjustmentNote);
                         if (!adjustment.success) {
                             saved = false;
                             amountError = adjustment.message;
@@ -671,6 +723,14 @@ public class EditActivity extends BaseActivity {
             amountOk = FormValidation.check(amountLayout,
                     amountText == null || amountText.isEmpty() || amountText.equals("null"),
                     "Informe a quantidade.");
+            // Sem isso, um valor negativo só era rejeitado depois que o
+            // usuário já tinha respondido ao diálogo de motivo do ajuste —
+            // uma volta perdida para um erro que dá para pegar aqui.
+            if (amountOk) {
+                amountOk = FormValidation.check(amountLayout,
+                        Quantities.parse(amountText.replace(" ", "").trim()) < 0d,
+                        "A quantidade não pode ser negativa.");
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error validating product amount", e);
             amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");

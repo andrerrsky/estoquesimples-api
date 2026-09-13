@@ -154,6 +154,10 @@ public class ReportsActivity extends BaseActivity {
 
             if (getSupportActionBar() != null) {
                 getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                getSupportActionBar().setTitle("Relatórios");
+                // Ver "Análise de Estoque" (menu ⋮) mostra gráficos e
+                // tendências; aqui é o resumo do período com exportação.
+                getSupportActionBar().setSubtitle("Resumo do período e exportação");
             }
 
             // Inicializar views de forma segura
@@ -198,6 +202,20 @@ public class ReportsActivity extends BaseActivity {
                 startReport(ReportType.COMPLETO);
             }
         });
+
+        View openAnalyticsCard = findViewById(R.id.openAnalyticsCard);
+        if (openAnalyticsCard != null) {
+            openAnalyticsCard.setOnClickListener(v ->
+                    startActivity(new Intent(this, AnalyticsActivity.class)));
+
+            // Avisa antes do clique que a Análise pode pedir assinatura, em
+            // vez de deixar quem clicar cair de surpresa numa tela de venda.
+            TextView analyticsBadge = findViewById(R.id.openAnalyticsBadge);
+            if (analyticsBadge != null) {
+                boolean precisaAssinatura = !PremiumManager.getInstance(this).hasPremiumAccess();
+                analyticsBadge.setVisibility(precisaAssinatura ? View.VISIBLE : View.GONE);
+            }
+        }
 
         if (btnReportMovements != null) {
             btnReportMovements.setOnClickListener(new View.OnClickListener() {

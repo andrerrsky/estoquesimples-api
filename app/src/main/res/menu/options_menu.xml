@@ -10,10 +10,6 @@
         android:title="Análise de Estoque"
         app:showAsAction="never" />
     <item
-        android:id="@+id/menu_history"
-        android:title="Histórico"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/menu_account"
         android:title="Conta e sincronização"
         app:showAsAction="never" />

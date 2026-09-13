@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Tema de partida: só existe para a splash screen nativa (API do Android
          12+, com compatibilidade retroativa via core-splashscreen). Assim que
@@ -43,7 +43,10 @@
         <item name="android:statusBarColor">@color/system_bar</item>
         <item name="android:navigationBarColor">@color/system_bar</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!-- Sem efeito abaixo da API 27 (o atributo não existe ali); o app já
+             cobre a cor da barra de navegação em telas antigas com
+             navigationBarColor, acima. -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 
     <style name="MyActionBar" parent="@style/Widget.AppCompat.Light.ActionBar.Solid.Inverse">

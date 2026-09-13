@@ -44,11 +44,52 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/conflictsBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/searchBar"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_message_warning"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingLeft="@dimen/group_padding_compact"
+        android:paddingRight="@dimen/group_padding_compact"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/conflictsBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/field_gap"
+            android:text="Resolver"
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
     <ListView
         android:id="@+id/listView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/searchBar"
+        android:layout_below="@+id/conflictsBanner"
         android:layout_above="@+id/bottomNavigation"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
@@ -69,13 +110,13 @@
         app:menu="@menu/bottom_navigation_menu"
         app:itemIconTint="@color/bottom_navigation_selector"
         app:itemTextColor="@color/bottom_navigation_selector"
-        app:labelVisibilityMode="labeled" />
+        app:labelVisibilityMode="auto" />
 
     <LinearLayout
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/searchBar"
+        android:layout_below="@+id/conflictsBanner"
         android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
         android:orientation="vertical"
@@ -134,7 +175,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_add"
-                android:tint="@color/color_brand"
+                app:tint="@color/color_brand"
                 android:contentDescription="@null" />
 
             <TextView
@@ -168,7 +209,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_settings"
-                android:tint="@color/color_brand"
+                app:tint="@color/color_brand"
                 android:contentDescription="@null" />
 
             <TextView

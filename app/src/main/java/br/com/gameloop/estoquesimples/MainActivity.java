@@ -3,6 +3,7 @@ package br.com.gameloop.estoquesimples;
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
+import br.com.gameloop.estoquesimples.data.SyncMeta;
 import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
 
@@ -236,6 +237,9 @@ public class MainActivity extends BaseActivity {
                     } else if (itemId == R.id.navigation_new) {
                         showAddActivity();
                         return true;
+                    } else if (itemId == R.id.navigation_history) {
+                        showHistoryActivity();
+                        return true;
                     } else if (itemId == R.id.navigation_reports) {
                         showReportsActivity();
                         return true;
@@ -386,8 +390,40 @@ public class MainActivity extends BaseActivity {
             pendingListRefresh = false;
             updateList();
         }
+
+        updateConflictsBanner();
     }
-    
+
+    /**
+     * Mostra o aviso de conflitos de sincronização pendentes, se houver.
+     *
+     * A contagem vem de {@link SyncMeta#CONFLITOS_PENDENTES}, atualizada pela
+     * própria {@link ConflictsActivity} sempre que a lista é carregada ou um
+     * conflito é resolvido — nenhuma chamada de rede extra acontece aqui. Sem
+     * este aviso na tela inicial, um conflito só aparecia para quem lembrasse
+     * de abrir "Conta e sincronização" por conta própria.
+     */
+    private void updateConflictsBanner() {
+        View banner = findViewById(R.id.conflictsBanner);
+        if (banner == null || stock == null || !stock.isOpen()) {
+            return;
+        }
+        long pendentes = new SyncMeta(stock).getLong(SyncMeta.CONFLITOS_PENDENTES, 0L);
+        if (pendentes <= 0) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        TextView texto = findViewById(R.id.conflictsBannerText);
+        if (texto != null) {
+            texto.setText(pendentes == 1
+                    ? "1 conflito de sincronização precisa da sua decisão"
+                    : pendentes + " conflitos de sincronização precisam da sua decisão");
+        }
+        banner.setVisibility(View.VISIBLE);
+        banner.setOnClickListener(v -> startActivity(new Intent(this, ConflictsActivity.class)));
+    }
+
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -754,9 +790,6 @@ public class MainActivity extends BaseActivity {
             return true;
         } else if (itemId == R.id.menu_about) {
             showAboutActivity();
-            return true;
-        } else if (itemId == R.id.menu_history) {
-            showHistoryActivity();
             return true;
         } else if (itemId == R.id.menu_account) {
             startActivity(new Intent(this, AccountActivity.class));

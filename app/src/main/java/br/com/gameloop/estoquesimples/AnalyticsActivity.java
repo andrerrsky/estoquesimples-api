@@ -53,6 +53,10 @@ public class AnalyticsActivity extends BaseActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle("Análise de Estoque");
+            // "Relatórios" (aba principal) e esta tela mostram números de
+            // formas diferentes; o subtítulo existe só para deixar claro qual
+            // é qual na hora de escolher entre as duas.
+            getSupportActionBar().setSubtitle("Gráficos e tendências");
         }
         
         // Inicializar PremiumManager

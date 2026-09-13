@@ -7,7 +7,11 @@
     <item
         android:id="@+id/navigation_new"
         android:icon="@drawable/ic_add"
-        android:title="Novo Produto" />
+        android:title="Novo" />
+    <item
+        android:id="@+id/navigation_history"
+        android:icon="@drawable/ic_history"
+        android:title="Histórico" />
     <item
         android:id="@+id/navigation_reports"
         android:icon="@drawable/ic_reports"
