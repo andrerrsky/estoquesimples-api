@@ -177,6 +177,8 @@ public class HistoryActivity extends BaseActivity {
             }
         }
 
+        marcarEstornadas(items);
+
         allItems.clear();
         allItems.addAll(items);
         applyFilters();
@@ -253,6 +255,29 @@ public class HistoryActivity extends BaseActivity {
         builder.show();
     }
 
+    /**
+     * Marca, na própria lista recém-carregada, quem foi estornado por outra
+     * movimentação — para a lista mostrar isso de relance, sem precisar abrir
+     * o detalhe de cada item para descobrir que ele não vale mais para o
+     * saldo atual.
+     */
+    private void marcarEstornadas(List<HistoryAdapter.HistoryItem> items) {
+        java.util.Set<String> estornadas = new java.util.HashSet<>();
+        for (HistoryAdapter.HistoryItem item : items) {
+            if (item.getReversesUuid() != null) {
+                estornadas.add(item.getReversesUuid());
+            }
+        }
+        if (estornadas.isEmpty()) {
+            return;
+        }
+        for (HistoryAdapter.HistoryItem item : items) {
+            if (estornadas.contains(item.getUuid())) {
+                item.markReversed();
+            }
+        }
+    }
+
     /** Busca em {@link #allItems}, não filtrado — o vínculo existe mesmo que a outra ponta esteja fora do filtro atual. */
     private HistoryAdapter.HistoryItem findByUuid(String uuid) {
         if (uuid == null) {
@@ -296,9 +321,12 @@ public class HistoryActivity extends BaseActivity {
      * O cancelamento em si não pode ser cancelado: seria uma cadeia de eventos
      * que se anulam sem que o usuário consiga acompanhar o efeito. Movimentações
      * legadas sem uuid também ficam de fora, porque não há como endereçá-las.
+     * Uma movimentação já estornada também não oferece o botão de novo — sem
+     * isso, o toque só resultava num aviso de "já foi cancelada".
      */
     private boolean canCancel(HistoryAdapter.HistoryItem item) {
         return item.getUuid() != null
+                && !item.isReversed()
                 && !MovementRepository.CANCELAMENTO.equalsIgnoreCase(item.getType());
     }
 

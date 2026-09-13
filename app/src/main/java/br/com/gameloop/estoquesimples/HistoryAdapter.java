@@ -26,6 +26,8 @@ public class HistoryAdapter extends BaseAdapter {
         private long timestamp;
         private String note;
         private String reversesUuid;
+        /** Marcado depois de carregar a lista inteira: outro item aponta para este em reversesUuid. */
+        private boolean reversed;
 
         public HistoryItem(String uuid, String productName, String type, double quantity,
                            long timestamp, String note, String reversesUuid) {
@@ -40,6 +42,14 @@ public class HistoryAdapter extends BaseAdapter {
 
         public String getReversesUuid() {
             return reversesUuid;
+        }
+
+        public boolean isReversed() {
+            return reversed;
+        }
+
+        public void markReversed() {
+            this.reversed = true;
         }
 
         public String getUuid() {
@@ -101,6 +111,7 @@ public class HistoryAdapter extends BaseAdapter {
             holder.typeSign = convertView.findViewById(R.id.typeSign);
             holder.typeLabel = convertView.findViewById(R.id.typeLabel);
             holder.productName = convertView.findViewById(R.id.productName);
+            holder.reversedBadge = convertView.findViewById(R.id.reversedBadge);
             holder.quantity = convertView.findViewById(R.id.quantity);
             holder.dateTime = convertView.findViewById(R.id.dateTime);
             holder.note = convertView.findViewById(R.id.note);
@@ -122,6 +133,10 @@ public class HistoryAdapter extends BaseAdapter {
 
         // Nome do produto
         holder.productName.setText(item.getProductName());
+        // Sem isso, uma entrada já cancelada continuava com a mesma cara de
+        // uma ativa na lista — só quem abria o detalhe descobria que ela não
+        // vale mais para o saldo atual.
+        holder.reversedBadge.setVisibility(item.isReversed() ? View.VISIBLE : View.GONE);
 
         // Quantidade
         // O sinal já está no selo ao lado; repeti-lo no número mostraria "--5".
@@ -148,6 +163,7 @@ public class HistoryAdapter extends BaseAdapter {
         TextView typeSign;
         TextView typeLabel;
         TextView productName;
+        TextView reversedBadge;
         TextView quantity;
         TextView dateTime;
         TextView note;
