@@ -165,7 +165,8 @@ final class SyncPayloads {
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(
-                    "SELECT uuid, product_uuid, change_type, quantity, timestamp, note "
+                    "SELECT uuid, product_uuid, change_type, quantity, timestamp, note, "
+                            + "reverses_uuid "
                             + "FROM " + LocalDb.TABLE_MOVEMENTS + " WHERE uuid=?",
                     new String[]{uuid});
             if (!cursor.moveToFirst()) {
@@ -188,6 +189,12 @@ final class SyncPayloads {
             // é a sequência atribuída pelo servidor.
             json.put("occurredAt", cursor.getLong(4));
             json.put("note", cursor.isNull(5) ? JSONObject.NULL : cursor.getString(5));
+            // Vínculo estruturado do cancelamento com a movimentação original.
+            // Sem isso, um estorno feito neste aparelho chega aos outros como
+            // mais um evento solto — quem olha o histórico lá não tem como
+            // saber que ele anula outro.
+            json.put("reversesMovementId",
+                    cursor.isNull(6) ? JSONObject.NULL : cursor.getString(6));
             return json;
 
         } catch (JSONException e) {

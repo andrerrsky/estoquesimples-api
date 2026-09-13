@@ -231,6 +231,10 @@ public final class RemoteChanges {
         values.put("timestamp", data.optLong("occurredAt", System.currentTimeMillis()));
         values.put("updated_at", data.optLong("recordedAt", System.currentTimeMillis()));
         values.put("note", optString(data, "note"));
+        // Vínculo de estorno, quando o outro aparelho (ou a carga inicial da
+        // nuvem) cancelou uma movimentação. Sem isso, o cancelamento chegava
+        // aqui como um evento solto, indistinguível de uma correção qualquer.
+        values.put("reverses_uuid", optString(data, "reversesMovementId"));
         values.put("rev", 0);
 
         if (db.insert(LocalDb.TABLE_MOVEMENTS, null, values) < 0) {

@@ -399,8 +399,9 @@ public final class MovementRepository {
             product.put("updated_at", now);
             db.update(LocalDb.TABLE_PRODUCTS, product, "uuid=?", new String[]{productUuid});
 
-            String compensationUuid = insertMovement(
-                    productUuid, atual.name, CANCELAMENTO, compensation, note, now);
+            String compensationUuid = insertMovement(UUID.randomUUID().toString(),
+                    productUuid, atual.name, CANCELAMENTO, compensation, note, now,
+                    movementUuid);
             if (compensationUuid == null) {
                 return Result.fail("Não foi possível registrar o cancelamento.");
             }
@@ -481,6 +482,13 @@ public final class MovementRepository {
 
     private String insertMovement(String movementUuid, String productUuid, String productName,
                                   String changeType, double quantity, String note, long timestamp) {
+        return insertMovement(movementUuid, productUuid, productName, changeType, quantity, note,
+                timestamp, null);
+    }
+
+    private String insertMovement(String movementUuid, String productUuid, String productName,
+                                  String changeType, double quantity, String note, long timestamp,
+                                  String reversesUuid) {
         double stored = keepsSign(changeType) ? quantity : Math.abs(quantity);
 
         ContentValues values = new ContentValues();
@@ -494,6 +502,9 @@ public final class MovementRepository {
         values.put("rev", 0);
         if (note != null && !note.trim().isEmpty()) {
             values.put("note", note.trim());
+        }
+        if (reversesUuid != null) {
+            values.put("reverses_uuid", reversesUuid);
         }
 
         if (db.insert(LocalDb.TABLE_MOVEMENTS, null, values) < 0) {

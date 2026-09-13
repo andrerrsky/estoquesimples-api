@@ -25,15 +25,21 @@ public class HistoryAdapter extends BaseAdapter {
         private double quantity;
         private long timestamp;
         private String note;
+        private String reversesUuid;
 
         public HistoryItem(String uuid, String productName, String type, double quantity,
-                           long timestamp, String note) {
+                           long timestamp, String note, String reversesUuid) {
             this.uuid = uuid;
             this.productName = productName;
             this.type = type;
             this.quantity = quantity;
             this.timestamp = timestamp;
             this.note = note;
+            this.reversesUuid = reversesUuid;
+        }
+
+        public String getReversesUuid() {
+            return reversesUuid;
         }
 
         public String getUuid() {

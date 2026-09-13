@@ -86,14 +86,18 @@ public final class CurrencyHelper {
 
     /**
      * Formats a quantity for display, omitting decimals when the value is a
-     * whole number (e.g. "18" instead of "18.0") and keeping up to two
-     * decimals when they actually exist (e.g. "18.5"). Uses the current
-     * locale's grouping/decimal separators.
+     * whole number (e.g. "18" instead of "18.0") and keeping up to four
+     * decimals when they actually exist (e.g. "18.5" or "10.125"). Uses the
+     * current locale's grouping/decimal separators.
+     *
+     * Four casas, não duas: unidades como kg/litro guardam fração real, e
+     * arredondar aqui para duas casas truncava o valor de volta ao salvar
+     * (a tela de edição relia neste mesmo formato para reexibir e regravar).
      */
     public static String formatQuantity(double value) {
         Locale locale = cachedLocale != null ? cachedLocale : Locale.US;
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(locale);
-        DecimalFormat fmt = new DecimalFormat("#,##0.##", symbols);
+        DecimalFormat fmt = new DecimalFormat("#,##0.####", symbols);
         return fmt.format(value);
     }
 
@@ -109,9 +113,15 @@ public final class CurrencyHelper {
      * Normalizes a quantity to a clean numeric string suitable for database
      * storage, avoiding artifacts like "20.0" produced by String.valueOf on
      * a double. Stores with dot as decimal separator and no grouping.
+     *
+     * Quatro casas decimais, não duas: o campo de quantidade na tela Editar
+     * relia neste mesmo formato tanto para reexibir quanto para regravar um
+     * valor não tocado pelo usuário — com só duas casas, um produto com
+     * 10,125 (kg/litro fracionário) virava 10,13 a cada vez que a tela era
+     * salva, mesmo sem mudança real.
      */
     public static String quantityForStorage(double value) {
-        DecimalFormat storageFmt = new DecimalFormat("0.##");
+        DecimalFormat storageFmt = new DecimalFormat("0.####");
         storageFmt.setDecimalFormatSymbols(DecimalFormatSymbols.getInstance(Locale.US));
         return storageFmt.format(value);
     }

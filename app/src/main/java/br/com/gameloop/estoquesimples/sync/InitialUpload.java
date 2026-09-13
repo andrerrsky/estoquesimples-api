@@ -295,7 +295,7 @@ public final class InitialUpload {
             cursor = db.rawQuery(
                     "SELECT uuid, product_uuid, product_name, change_type, "
                             + MovementRepository.SIGNED_QUANTITY_SQL + ", timestamp, "
-                            + "note FROM " + LocalDb.TABLE_MOVEMENTS
+                            + "note, reverses_uuid FROM " + LocalDb.TABLE_MOVEMENTS
                             + " WHERE id > ? ORDER BY id LIMIT ?",
                     new String[]{String.valueOf(aposId), String.valueOf(limite)});
             while (cursor.moveToNext()) {
@@ -311,6 +311,8 @@ public final class InitialUpload {
                 movimentacao.put("quantity", cursor.getDouble(4));
                 movimentacao.put("occurredAt", cursor.getLong(5));
                 movimentacao.put("note", cursor.isNull(6) ? JSONObject.NULL : cursor.getString(6));
+                movimentacao.put("reversesMovementId",
+                        cursor.isNull(7) ? JSONObject.NULL : cursor.getString(7));
                 destino.put(movimentacao);
             }
         } catch (JSONException e) {

@@ -44,8 +44,10 @@ public final class LocalDb extends SQLiteOpenHelper {
      * 4 — fila de saída e estado de sincronização.
      * 5 — cancelamento idempotente, índice da fila por entidade e nova
      *     tentativa de ligar o histórico legado ao produto pelo uuid.
+     * 6 — reverses_uuid: vínculo estruturado entre um cancelamento e a
+     *     movimentação original, para sincronizar e exibir esse elo.
      */
-    public static final int VERSION = 5;
+    public static final int VERSION = 6;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
@@ -132,6 +134,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV3(db);
         upgradeToV4(db);
         upgradeToV5(db);
+        upgradeToV6(db);
     }
 
     @Override
@@ -149,6 +152,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 5) {
             upgradeToV5(db);
+        }
+        if (oldVersion < 6) {
+            upgradeToV6(db);
         }
     }
 
@@ -349,6 +355,19 @@ public final class LocalDb extends SQLiteOpenHelper {
         // relatórios deixou de ter o desvio pelo nome. Quanto menos
         // movimentação sem product_uuid, mais completo o relatório fica.
         linkMovementsToProducts(db);
+    }
+
+    /**
+     * Vínculo estruturado de estorno.
+     *
+     * Antes, cancelar uma movimentação só deixava rastro numa nota de texto
+     * livre ("Cancelamento de entrada"). Isso bastava para o histórico local,
+     * mas não sobrevivia à sincronização: um segundo aparelho via só mais uma
+     * movimentação solta, sem saber que ela anulava outra. A coluna guarda o
+     * uuid da movimentação original; é local e não muda a soma do saldo.
+     */
+    private void upgradeToV6(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_MOVEMENTS, "reverses_uuid", "TEXT");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {

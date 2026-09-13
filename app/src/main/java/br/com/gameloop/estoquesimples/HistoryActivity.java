@@ -145,7 +145,8 @@ public class HistoryActivity extends BaseActivity {
         Cursor cursor = null;
         try {
             cursor = MainActivity.stock.rawQuery(
-                    "SELECT uuid, product_name, change_type, quantity, timestamp, note "
+                    "SELECT uuid, product_name, change_type, quantity, timestamp, note, "
+                            + "reverses_uuid "
                             + "FROM EstoqueHistorico WHERE deleted_at IS NULL "
                             + "ORDER BY timestamp DESC",
                     null
@@ -159,8 +160,10 @@ public class HistoryActivity extends BaseActivity {
                     double qty = cursor.getDouble(3);
                     long ts = cursor.getLong(4);
                     String note = cursor.getString(5);
+                    String reversesUuid = cursor.getString(6);
 
-                    items.add(new HistoryAdapter.HistoryItem(uuid, product, type, qty, ts, note));
+                    items.add(new HistoryAdapter.HistoryItem(
+                            uuid, product, type, qty, ts, note, reversesUuid));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -227,6 +230,15 @@ public class HistoryActivity extends BaseActivity {
             sb.append("\n\nObservações / Informações adicionais:\n").append(note);
         }
 
+        if (item.getReversesUuid() != null) {
+            HistoryAdapter.HistoryItem original = findByUuid(item.getReversesUuid());
+            sb.append("\n\nEsta movimentação estorna: ").append(descreverVinculo(original));
+        }
+        HistoryAdapter.HistoryItem estorno = findReversalOf(item.getUuid());
+        if (estorno != null) {
+            sb.append("\n\nEsta movimentação foi estornada em: ").append(descreverVinculo(estorno));
+        }
+
         androidx.appcompat.app.AlertDialog.Builder builder =
                 new androidx.appcompat.app.AlertDialog.Builder(this)
                         .setTitle("Detalhes da movimentação")
@@ -239,6 +251,45 @@ public class HistoryActivity extends BaseActivity {
         }
 
         builder.show();
+    }
+
+    /** Busca em {@link #allItems}, não filtrado — o vínculo existe mesmo que a outra ponta esteja fora do filtro atual. */
+    private HistoryAdapter.HistoryItem findByUuid(String uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        for (HistoryAdapter.HistoryItem candidato : allItems) {
+            if (uuid.equals(candidato.getUuid())) {
+                return candidato;
+            }
+        }
+        return null;
+    }
+
+    /** O item, se houver, cujo {@code reverses_uuid} aponta para {@code uuid}. */
+    private HistoryAdapter.HistoryItem findReversalOf(String uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        for (HistoryAdapter.HistoryItem candidato : allItems) {
+            if (uuid.equals(candidato.getReversesUuid())) {
+                return candidato;
+            }
+        }
+        return null;
+    }
+
+    private String descreverVinculo(HistoryAdapter.HistoryItem item) {
+        if (item == null) {
+            // Pode não ter chegado ainda por sincronização, ou pertencer a um
+            // produto excluído há muito tempo — o vínculo continua verdadeiro
+            // mesmo sem os detalhes para mostrar aqui.
+            return "movimentação não encontrada neste aparelho";
+        }
+        String dateStr = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                .format(new java.util.Date(item.getTimestamp()));
+        return MovementDisplay.sentenceLabel(item.getType()) + " de "
+                + CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())) + " em " + dateStr;
     }
 
     /**
