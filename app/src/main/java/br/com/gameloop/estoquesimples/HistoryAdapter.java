@@ -28,6 +28,15 @@ public class HistoryAdapter extends BaseAdapter {
         private String reversesUuid;
         /** Marcado depois de carregar a lista inteira: outro item aponta para este em reversesUuid. */
         private boolean reversed;
+        private String unit;
+
+        public void setUnit(String unit) {
+            this.unit = unit;
+        }
+
+        public String getUnit() {
+            return unit == null || unit.isEmpty() || "null".equals(unit) ? "" : unit;
+        }
 
         public HistoryItem(String uuid, String productName, String type, double quantity,
                            long timestamp, String note, String reversesUuid) {
@@ -140,7 +149,8 @@ public class HistoryAdapter extends BaseAdapter {
 
         // Quantidade
         // O sinal já está no selo ao lado; repeti-lo no número mostraria "--5".
-        holder.quantity.setText(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())));
+        holder.quantity.setText(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity()))
+                + (item.getUnit().isEmpty() ? "" : " " + item.getUnit()));
 
         // Data e hora
         String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));

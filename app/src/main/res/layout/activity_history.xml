@@ -41,7 +41,8 @@
     <TextView
         android:id="@+id/emptyHistory"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:text="Nenhuma movimentação de entrada ou saída registrada ainda"
         android:textAppearance="@style/TextAppearance.Estoque.Empty"
         android:gravity="center"
@@ -51,7 +52,8 @@
     <ListView
         android:id="@+id/historyList"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:divider="@android:color/transparent"
         android:dividerHeight="@dimen/list_item_spacing"
         android:paddingLeft="@dimen/screen_padding_horizontal"
@@ -59,5 +61,7 @@
         android:paddingTop="@dimen/field_gap"
         android:paddingBottom="@dimen/field_gap"
         android:clipToPadding="false" />
+
+    <include layout="@layout/include_bottom_nav" />
 
 </LinearLayout>

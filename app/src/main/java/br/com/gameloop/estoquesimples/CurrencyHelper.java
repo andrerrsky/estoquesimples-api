@@ -17,7 +17,10 @@ public final class CurrencyHelper {
 
     private static final String PREFS_NAME = "EstoqueSimplesPrefs";
     private static final String KEY_CURRENCY_SYMBOL = "currency_symbol";
-    private static final String DEFAULT_CURRENCY = "$";
+    // O app é todo em português do Brasil; numa instalação nova o usuário via
+    // "$ 8.99" (símbolo e formato americanos) até descobrir a opção em
+    // Configurações. Real, com vírgula, é o padrão certo para esse público.
+    private static final String DEFAULT_CURRENCY = "R$";
 
     public static final String[] AVAILABLE_CURRENCIES = {"$", "R$", "€", "£", "¥"};
 

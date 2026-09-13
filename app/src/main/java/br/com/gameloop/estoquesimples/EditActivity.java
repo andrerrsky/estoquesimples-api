@@ -20,7 +20,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
@@ -67,6 +66,7 @@ public class EditActivity extends BaseActivity {
     private TextView location;
     private TextView minStock;
     private TextView unit;
+    private DiscardGuard discardGuard;
 
     public String productName;
 
@@ -141,6 +141,10 @@ public class EditActivity extends BaseActivity {
         location = (TextView) findViewById(R.id.editLocation);
         minStock = (TextView) findViewById(R.id.editMinStock);
         unit = (TextView) findViewById(R.id.editUnit);
+        FieldSuggestions.attach(MainActivity.stock,
+                (android.widget.AutoCompleteTextView) findViewById(R.id.editCategory),
+                (android.widget.AutoCompleteTextView) findViewById(R.id.editUnit),
+                (android.widget.AutoCompleteTextView) findViewById(R.id.editSupplier));
         currencySpinner = (Spinner) findViewById(R.id.editCurrencySpinner);
         nameLayout = findViewById(R.id.editNameLayout);
         amountLayout = findViewById(R.id.editAmountLayout);
@@ -181,6 +185,7 @@ public class EditActivity extends BaseActivity {
         }
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setTitle("Editar produto");
 
         this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
@@ -319,12 +324,6 @@ public class EditActivity extends BaseActivity {
         );
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.options_menu, menu);
-        return true;
-    }
-
     /**
      * Normaliza uma quantidade armazenada para exibição no campo de edição:
      * remove o ".0" de inteiros e não usa separador de milhar (o texto é
@@ -340,18 +339,7 @@ public class EditActivity extends BaseActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        } else if (item.getItemId() == R.id.menu_about) {
-            Intent intent = new Intent(this, AboutActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (item.getItemId() == R.id.menu_history) {
-            Intent intent = new Intent(this, HistoryActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (item.getItemId() == R.id.menu_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
+            getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -494,7 +482,9 @@ public class EditActivity extends BaseActivity {
                 // que o usuário nunca mudou — só para quantidades com 3+ casas
                 // decimais (unidades como kg/litro).
                 originalAmount = Quantities.parse(amountForEdit);
-                value.setText(columnValue != null ? columnValue : "0");
+                // "49.9" cru do banco virava um campo que não parecia dinheiro;
+                // o mesmo formato da lista ("49,90") deixa claro o que se edita.
+                value.setText(CurrencyHelper.formatNumber(CurrencyHelper.parseCurrency(columnValue, 0.0)));
                 category.setText(columnCategory != null ? columnCategory : "");
                 sku.setText(columnSku != null ? columnSku : "");
                 barcode.setText(columnBarcode != null ? columnBarcode : "");
@@ -550,7 +540,21 @@ public class EditActivity extends BaseActivity {
     }
 
     public void cancelEdit(View v) {
-        finish();
+        if (discardGuard != null) {
+            discardGuard.confirmLeave();
+        } else {
+            finish();
+        }
+    }
+
+    @Override
+    protected void onPostCreate(Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        // Depois do onCreate, que já preencheu os campos com o produto: a
+        // partir daqui qualquer mudança conta como alteração não salva.
+        discardGuard = new DiscardGuard(this, "Descartar alterações?");
+        discardGuard.watch(name, amount, value, description, category, sku, barcode, supplier,
+                location, minStock, unit);
     }
 
     public void editProduct(View v) {
@@ -675,7 +679,7 @@ public class EditActivity extends BaseActivity {
                     MainActivity.instance.markListDirty(true);
                 }
 
-                Toast.makeText(EditActivity.this, "Produto atualizado com sucesso.", Toast.LENGTH_SHORT).show();
+                // A confirmação aparece na lista, ao voltar (MainActivity).
                 
                 // Verificar e agendar notificações de estoque baixo
                 try {
@@ -975,6 +979,7 @@ public class EditActivity extends BaseActivity {
             // Verificar se a foto foi salva
             if (imgFile.exists() && imgFile.length() > 0) {
                 newPhotoPath = imgFile.getAbsolutePath();
+                if (discardGuard != null) discardGuard.markDirty();
                 displayPhoto(newPhotoPath);
                 Log.d(TAG, "Photo saved successfully at: " + newPhotoPath + ", size: " + imgFile.length() + " bytes");
                 Toast.makeText(this, "Foto capturada com sucesso", Toast.LENGTH_SHORT).show();
@@ -1011,6 +1016,7 @@ public class EditActivity extends BaseActivity {
         String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
         if (copiedPath != null) {
             newPhotoPath = copiedPath;
+            if (discardGuard != null) discardGuard.markDirty();
             displayPhoto(copiedPath);
         } else {
             Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();

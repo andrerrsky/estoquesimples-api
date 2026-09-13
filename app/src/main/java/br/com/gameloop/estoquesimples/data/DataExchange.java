@@ -435,13 +435,13 @@ public final class DataExchange {
         ContentValues values = new ContentValues();
         putIfChanged(values, "name", current.name, row.name);
         putIfChanged(values, "description", current.description, row.description);
-        putIfChanged(values, "value", current.value, Quantities.forStorage(row.unitValue));
+        putIfNumberChanged(values, "value", current.value, row.unitValue);
         putIfChanged(values, "category", current.category, row.category);
         putIfChanged(values, "sku", current.sku, row.sku);
         putIfChanged(values, "barcode", current.barcode, row.barcode);
         putIfChanged(values, "supplier", current.supplier, row.supplier);
         putIfChanged(values, "location", current.location, row.location);
-        putIfChanged(values, "min_stock", current.minStock, Quantities.forStorage(row.minStock));
+        putIfNumberChanged(values, "min_stock", current.minStock, row.minStock);
         putIfChanged(values, "unit", current.unit, row.unit);
 
         boolean qtyChanged = !skipQuantity
@@ -477,6 +477,18 @@ public final class DataExchange {
         report.updated++;
         report.line("✓ " + row.name + " atualizado.");
         return uuid;
+    }
+
+    /**
+     * Colunas numéricas guardadas como texto ("24.90" no banco, "24.9" no
+     * arquivo exportado): comparar as strings marcava metade do cadastro como
+     * "atualizado" ao reimportar a própria exportação, sem nada ter mudado.
+     */
+    private static void putIfNumberChanged(ContentValues values, String column, String current, double next) {
+        double cur = Quantities.parse(current, Double.NaN);
+        if (Double.isNaN(cur) || Double.compare(cur, next) != 0) {
+            values.put(column, Quantities.forStorage(next));
+        }
     }
 
     private static void putIfChanged(ContentValues values, String column, String current, String next) {

@@ -9,13 +9,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
-import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -31,6 +29,8 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 public class CustomListView extends ArrayAdapter<String> {
 
@@ -48,7 +48,9 @@ public class CustomListView extends ArrayAdapter<String> {
 
     private static final String TAG = "CustomListView";
     private static final String IMAGE_TYPE = "image/*";
-    private final SparseBooleanArray expandedPositions = new SparseBooleanArray();
+    // Expansão guardada por nome, não por posição: a lista é atualizada no
+    // lugar depois de cada movimentação/busca e as posições mudam.
+    private final Set<String> expandedNames = new HashSet<>();
     private final boolean showProductImages;
 
     public CustomListView(Activity context, ArrayList<String> names, ArrayList<String> amounts, 
@@ -75,8 +77,16 @@ public class CustomListView extends ArrayAdapter<String> {
     @Override
     public View getView(int position, View view, ViewGroup parent) {
 
-        LayoutInflater inflater = this.context.getLayoutInflater();
-        View rowView = inflater.inflate(R.layout.custom_listview, null, true);
+        // Reaproveita a linha que saiu da tela em vez de inflar uma nova a
+        // cada getView(): com dezenas de produtos, inflar o card inteiro por
+        // linha deixava a rolagem engasgada (32% de quadros perdidos no
+        // emulador). Todos os campos são preenchidos abaixo, sem estado
+        // residual da linha anterior.
+        View rowView = view;
+        if (rowView == null) {
+            LayoutInflater inflater = this.context.getLayoutInflater();
+            rowView = inflater.inflate(R.layout.custom_listview, parent, false);
+        }
 
         // Views principais
         TextView name = (TextView) rowView.findViewById(R.id.name);
@@ -96,7 +106,7 @@ public class CustomListView extends ArrayAdapter<String> {
 
         final int finalPosition = position;
 
-        ImageButton edit = (ImageButton) rowView.findViewById(R.id.edit);
+        View edit = rowView.findViewById(R.id.edit);
         edit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -108,14 +118,16 @@ public class CustomListView extends ArrayAdapter<String> {
         View.OnClickListener toggleListener = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                boolean expanded = expandedPositions.get(finalPosition, false);
-                expandedPositions.put(finalPosition, !expanded);
+                String key = names.get(finalPosition);
+                if (!expandedNames.remove(key)) {
+                    expandedNames.add(key);
+                }
                 notifyDataSetChanged();
             }
         };
         toggleIcon.setOnClickListener(toggleListener);
 
-        ImageButton delete = (ImageButton) rowView.findViewById(R.id.delete);
+        View delete = rowView.findViewById(R.id.delete);
         delete.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -162,15 +174,14 @@ public class CustomListView extends ArrayAdapter<String> {
         // Definir valores básicos
         name.setText(names.get(position));
         
-        // Quantidade com estoque mínimo (formato: "atual / minimo")
+        // Quantidade sempre com a unidade ao lado ("25 un", "3,75 kg"). O
+        // formato antigo "25 / 5" (atual / mínimo) era críptico para quem não
+        // sabia o que o segundo número significava; o mínimo agora aparece
+        // no selo de estoque baixo e nos detalhes.
         // Formata para evitar ".0" em números inteiros (ex.: "18" em vez de "18.0")
         String amountText = CurrencyHelper.formatQuantity(amounts.get(position));
         String minStockStr = minStocks.get(position);
         boolean hasMinStock = minStockStr != null && !minStockStr.isEmpty() && !minStockStr.equals("null") && !minStockStr.equals("0");
-        
-        if(hasMinStock) {
-            amountText = amountText + " / " + CurrencyHelper.formatQuantity(minStockStr);
-        }
         amount.setText(amountText);
         
         // Valor
@@ -220,8 +231,8 @@ public class CustomListView extends ArrayAdapter<String> {
             metaRow.setVisibility((hasSku || hasCategory) ? View.VISIBLE : View.GONE);
         }
 
-        // Unidade - ocultar quando houver barra de estoque mínimo
-        if(!hasMinStock && units.get(position) != null && !units.get(position).isEmpty() && !units.get(position).equals("null")) {
+        // Unidade
+        if(units.get(position) != null && !units.get(position).isEmpty() && !units.get(position).equals("null")) {
             unit.setText(" " + units.get(position));
             unit.setVisibility(View.VISIBLE);
         } else {
@@ -237,6 +248,9 @@ public class CustomListView extends ArrayAdapter<String> {
                 double minStockValue = CurrencyHelper.parseCurrency(minStockStr, 0);
                 
                 if(minStockValue > 0 && currentAmount <= minStockValue) {
+                    lowStockBadge.setText(currentAmount <= 0
+                            ? "Sem estoque · mín. " + CurrencyHelper.formatQuantity(minStockStr)
+                            : "Estoque baixo · mín. " + CurrencyHelper.formatQuantity(minStockStr));
                     lowStockBadge.setVisibility(View.VISIBLE);
                     amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
                 } else {
@@ -253,7 +267,7 @@ public class CustomListView extends ArrayAdapter<String> {
         }
 
         // Estado expandido/colapsado
-        boolean isExpanded = expandedPositions.get(position, false);
+        boolean isExpanded = expandedNames.contains(names.get(position));
         extraContainer.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
         toggleIcon.setImageResource(isExpanded ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
 
@@ -299,9 +313,10 @@ public class CustomListView extends ArrayAdapter<String> {
             detailCategory.setText("-");
         }
 
-        // Ações de estoque (Entrada / Saída)
-        Button btnEntrada = (Button) rowView.findViewById(R.id.btnEntrada);
-        Button btnSaida = (Button) rowView.findViewById(R.id.btnSaida);
+        // Ações de estoque (Entrada / Saída): visíveis sem expandir o card,
+        // porque são a tarefa do dia a dia. Editar/excluir ficam nos detalhes.
+        View btnEntrada = rowView.findViewById(R.id.btnEntrada);
+        View btnSaida = rowView.findViewById(R.id.btnSaida);
 
         if (btnEntrada != null) {
             btnEntrada.setOnClickListener(new View.OnClickListener() {
@@ -330,7 +345,13 @@ public class CustomListView extends ArrayAdapter<String> {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(isEntrada ? "Entrada de estoque" : "Saída de estoque");
-        builder.setMessage(productName);
+        // Saldo atual no próprio diálogo: quem dá baixa precisa saber quanto
+        // tem antes de digitar, em vez de descobrir pelo erro depois.
+        String unitStr = units.get(position);
+        boolean hasUnit = unitStr != null && !unitStr.isEmpty() && !unitStr.equals("null");
+        String currentText = CurrencyHelper.formatQuantity(amounts.get(position))
+                + (hasUnit ? " " + unitStr : "");
+        builder.setMessage(productName + "\nEm estoque: " + currentText);
 
         LinearLayout container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
@@ -343,7 +364,7 @@ public class CustomListView extends ArrayAdapter<String> {
 
         String noteHint = isEntrada
                 ? "Observação (opcional)"
-                : "Observações / Informações adicionais\n(comprador, endereço, detalhes de entrega ou retirada...)";
+                : "Observação (cliente, entrega...) — opcional";
         int noteInputType = android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 | (isEntrada ? 0 : android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
@@ -355,7 +376,7 @@ public class CustomListView extends ArrayAdapter<String> {
         final EditText inputNote = noteLayout.getEditText();
         if (!isEntrada && inputNote != null) {
             // Saída para o cliente: campo de informações adicionais mais completo
-            inputNote.setMinLines(3);
+            inputNote.setMinLines(2);
             inputNote.setMaxLines(6);
             inputNote.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         }
@@ -409,7 +430,9 @@ public class CustomListView extends ArrayAdapter<String> {
             }
 
             if (!result.success) {
-                Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show();
+                // Erro no próprio campo: um Toast ficava escondido atrás do
+                // diálogo e sumia antes de ser lido.
+                FormValidation.check(qtyLayout, true, result.message);
                 return;
             }
 
@@ -419,8 +442,44 @@ public class CustomListView extends ArrayAdapter<String> {
             if (MainActivity.instance != null) {
                 MainActivity.instance.updateList();
             }
-            Toast.makeText(context, isEntrada ? "Entrada registrada" : "Saída registrada", Toast.LENGTH_SHORT).show();
+            showMovementSnackbar(isEntrada, qty, unitStr, hasUnit, result);
         });
+    }
+
+    /**
+     * Confirmação da movimentação com "Desfazer". Um Toast sumia em dois
+     * segundos por cima da barra de navegação e, se a pessoa errou o número,
+     * a única saída era achar o registro no Histórico e estorná-lo. O
+     * desfazer usa o mesmo estorno estruturado do Histórico (fica
+     * registrado; nada é apagado).
+     */
+    private void showMovementSnackbar(boolean isEntrada, double qty, String unitStr, boolean hasUnit,
+                                      MovementRepository.Result result) {
+        String text = (isEntrada ? "Entrada de " : "Saída de ")
+                + CurrencyHelper.formatQuantity(qty) + (hasUnit ? " " + unitStr : "")
+                + " registrada. Estoque: " + CurrencyHelper.formatQuantity(result.newAmount)
+                + (hasUnit ? " " + unitStr : "");
+        com.google.android.material.snackbar.Snackbar snackbar = Feedback.make(context, text,
+                com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+        if (snackbar == null) {
+            return;
+        }
+        if (result.movementUuid != null) {
+            snackbar.setAction("Desfazer", v -> {
+                MovementRepository.Result undo;
+                synchronized (MainActivity.DB_LOCK) {
+                    undo = new MovementRepository(MainActivity.stock)
+                            .cancel(result.movementUuid, "Desfeita logo após o registro");
+                }
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.updateList();
+                }
+                Feedback.show(context, undo.success
+                        ? "Movimentação desfeita."
+                        : (undo.message == null ? "Não foi possível desfazer." : undo.message));
+            });
+        }
+        snackbar.show();
     }
 
 }

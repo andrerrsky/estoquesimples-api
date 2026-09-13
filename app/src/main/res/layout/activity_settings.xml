@@ -61,6 +61,51 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Avisos"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingRight="@dimen/field_gap">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Avisar sobre estoque baixo"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+                <TextView
+                    android:id="@+id/lowStockAlertsSummary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Notificação quando algum produto ficar abaixo do estoque mínimo"
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchLowStockAlerts"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="@string/settings_section_currency"
             android:textAppearance="@style/TextAppearance.Estoque.Label"
             android:layout_marginBottom="@dimen/field_gap" />

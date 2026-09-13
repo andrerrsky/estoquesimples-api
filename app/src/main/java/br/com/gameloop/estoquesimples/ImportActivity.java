@@ -68,8 +68,9 @@ public class ImportActivity extends BaseActivity {
         setContentView(R.layout.activity_import);
 
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Importar e exportar");
         }
+        SectionNav.attach(this, R.id.navigation_import);
 
         status = findViewById(R.id.importStatus);
         importDesc2 = findViewById(R.id.importDesc2);
@@ -83,12 +84,10 @@ public class ImportActivity extends BaseActivity {
         }
 
         CharSequence formato = Html.fromHtml(
-                "<b>Produtos:</b> nome, descrição, quantidade, valor, categoria, SKU, "
-                        + "código de barras, fornecedor, localização, estoque mínimo, unidade.<br>"
-                        + "A primeira linha pode ser o cabeçalho. Campos com vírgula vão entre aspas. "
-                        + "Se o produto já existir (SKU, código de barras ou nome), os dados são atualizados "
-                        + "em vez de duplicar.<br><br>"
-                        + "<b>JSON:</b> cópia completa (produtos + histórico), no formato da nuvem.",
+                "Leve seus produtos para uma planilha ou traga de uma. Ao importar, um produto "
+                        + "que já existe (mesmo SKU, código de barras ou nome) é atualizado, não duplicado.<br>"
+                        + "<b>Colunas:</b> nome, descrição, quantidade, valor, categoria, SKU, código de "
+                        + "barras, fornecedor, localização, estoque mínimo, unidade.",
                 Html.FROM_HTML_MODE_LEGACY);
         importDesc2.setText(formato);
 
@@ -168,7 +167,7 @@ public class ImportActivity extends BaseActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.options_menu, menu);
+        getMenuInflater().inflate(R.menu.section_menu, menu);
         return true;
     }
 
@@ -177,14 +176,8 @@ public class ImportActivity extends BaseActivity {
         if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;
-        } else if (item.getItemId() == R.id.menu_about) {
-            startActivity(new Intent(this, AboutActivity.class));
-            return true;
-        } else if (item.getItemId() == R.id.menu_history) {
-            startActivity(new Intent(this, HistoryActivity.class));
-            return true;
         }
-        return super.onOptionsItemSelected(item);
+        return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
 
     public void importFile(View v) {
@@ -226,7 +219,7 @@ public class ImportActivity extends BaseActivity {
                                 Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton("Cancelar", null)
                 .show();
     }
 
@@ -283,7 +276,7 @@ public class ImportActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle("Restaurar cópia automática")
                 .setItems(labels, (dialog, which) -> confirmRestore(copias[which]))
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton("Cancelar", null)
                 .show();
     }
 
@@ -293,7 +286,7 @@ public class ImportActivity extends BaseActivity {
                 .setMessage("O estoque atual será substituído por:\n" + LocalBackup.describe(copia)
                         + "\n\nUma cópia do estado de agora é gravada antes.")
                 .setPositiveButton(R.string.sim, (d, w) -> runRestore(copia))
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton("Cancelar", null)
                 .show();
     }
 

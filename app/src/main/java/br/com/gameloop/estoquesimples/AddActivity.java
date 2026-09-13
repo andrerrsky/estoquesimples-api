@@ -19,7 +19,6 @@ import android.os.Bundle;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
@@ -60,6 +59,7 @@ public class AddActivity extends BaseActivity {
     private EditText productLocation;
     private EditText productMinStock;
     private EditText productUnit;
+    private DiscardGuard discardGuard;
     private ImageView productPhoto;
 
     private File imagesFolder;
@@ -112,6 +112,13 @@ public class AddActivity extends BaseActivity {
         productLocation = (EditText) findViewById(R.id.addLocation);
         productMinStock = (EditText) findViewById(R.id.addMinStock);
         productUnit = (EditText) findViewById(R.id.addUnit);
+        discardGuard = new DiscardGuard(this, "Descartar cadastro?");
+        discardGuard.watch(productName, productAmount, productValue, productDescription, productCategory,
+                productSku, productBarcode, productSupplier, productLocation, productMinStock, productUnit);
+        FieldSuggestions.attach(MainActivity.stock,
+                (android.widget.AutoCompleteTextView) findViewById(R.id.addCategory),
+                (android.widget.AutoCompleteTextView) findViewById(R.id.addUnit),
+                (android.widget.AutoCompleteTextView) findViewById(R.id.addSupplier));
         productPhoto = (ImageView) findViewById(R.id.addPhoto);
         currencySpinner = (Spinner) findViewById(R.id.addCurrencySpinner);
         nameLayout = findViewById(R.id.addNameLayout);
@@ -144,6 +151,7 @@ public class AddActivity extends BaseActivity {
         }
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setTitle("Novo produto");
 
         this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
@@ -258,26 +266,9 @@ public class AddActivity extends BaseActivity {
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.options_menu, menu);
-        return true;
-    }
-
-    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        } else if (item.getItemId() == R.id.menu_about) {
-            Intent intent = new Intent(this, AboutActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (item.getItemId() == R.id.menu_history) {
-            Intent intent = new Intent(this, HistoryActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (item.getItemId() == R.id.menu_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
+            getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -335,7 +326,7 @@ public class AddActivity extends BaseActivity {
                     MainActivity.instance.markListDirty(true);
                 }
 
-                Toast.makeText(AddActivity.this, "Produto adicionado com sucesso!", Toast.LENGTH_LONG).show();
+                // A confirmação aparece na lista, ao voltar (MainActivity).
                 
                 // Verificar e agendar notificações de estoque baixo
                 try {
@@ -346,6 +337,14 @@ public class AddActivity extends BaseActivity {
 
                 // finish() direto em vez de dialog: evita ficar nesta Activity com a
                 // listagem desatualizada até o usuário fechar o aviso.
+                if (getCallingActivity() == null) {
+                    // Aberto pelo "Novo" de outra seção (Histórico, Relatórios…):
+                    // volta para a lista, onde o produto aparece com a confirmação.
+                    Intent home = new Intent(this, MainActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            .putExtra(MainActivity.EXTRA_MESSAGE, "Produto adicionado.");
+                    startActivity(home);
+                }
                 finish();
             } else {
                 Toast.makeText(AddActivity.this, "Erro ao adicionar produto no banco de dados.", Toast.LENGTH_SHORT).show();
@@ -506,9 +505,11 @@ public class AddActivity extends BaseActivity {
     }
 
     public void cancelAdd(View v) {
-
-        finish();
-
+        if (discardGuard != null) {
+            discardGuard.confirmLeave();
+        } else {
+            finish();
+        }
     }
 
     public void addTakeCameraPhoto(View v) {
@@ -615,6 +616,7 @@ public class AddActivity extends BaseActivity {
 
             if (imgFile.exists()) {
                 newPhotoPath = imgFile.getAbsolutePath();
+                if (discardGuard != null) discardGuard.markDirty();
                 displayPhoto(newPhotoPath);
                 Log.d(TAG, "Photo saved successfully at: " + newPhotoPath);
             } else {
@@ -641,6 +643,7 @@ public class AddActivity extends BaseActivity {
         String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
         if (copiedPath != null) {
             newPhotoPath = copiedPath;
+            if (discardGuard != null) discardGuard.markDirty();
             displayPhoto(copiedPath);
         } else {
             Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();

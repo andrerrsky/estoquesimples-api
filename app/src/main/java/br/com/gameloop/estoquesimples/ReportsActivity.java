@@ -152,8 +152,8 @@ public class ReportsActivity extends BaseActivity {
         try {
             setContentView(R.layout.activity_reports);
 
+            SectionNav.attach(this, R.id.navigation_reports);
             if (getSupportActionBar() != null) {
-                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
                 getSupportActionBar().setTitle("Relatórios");
                 // Ver "Análise de Estoque" (menu ⋮) mostra gráficos e
                 // tendências; aqui é o resumo do período com exportação.
@@ -332,37 +332,17 @@ public class ReportsActivity extends BaseActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.reports_menu, menu);
+        getMenuInflater().inflate(R.menu.section_menu, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int itemId = item.getItemId();
-        
-        if (itemId == android.R.id.home) {
+        if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;
-        } else if (itemId == R.id.menu_analytics) {
-            Intent intent = new Intent(this, AnalyticsActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_subscription) {
-            SubscriptionActivity.open(this);
-            return true;
-        } else if (itemId == R.id.menu_about) {
-            Intent intent = new Intent(this, AboutActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_history) {
-            Intent intent = new Intent(this, HistoryActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_exit) {
-            exitApp();
-            return true;
         }
-        return super.onOptionsItemSelected(item);
+        return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
     
     private void exitApp() {
@@ -376,6 +356,26 @@ public class ReportsActivity extends BaseActivity {
                 })
                 .setNegativeButton("Não", null)
                 .show();
+    }
+
+    /**
+     * Mantém as {@code maximo} maiores fatias e soma as demais em "Outros".
+     */
+    private static List<PieEntry> agruparFatias(List<PieEntry> entries, int maximo) {
+        if (entries.size() <= maximo + 1) {
+            return entries;
+        }
+        List<PieEntry> ordenadas = new ArrayList<>(entries);
+        java.util.Collections.sort(ordenadas, (a, b) -> Float.compare(b.getValue(), a.getValue()));
+        List<PieEntry> resultado = new ArrayList<>(ordenadas.subList(0, maximo));
+        float resto = 0f;
+        int quantos = 0;
+        for (PieEntry e : ordenadas.subList(maximo, ordenadas.size())) {
+            resto += e.getValue();
+            quantos++;
+        }
+        resultado.add(new PieEntry(resto, "Outros (" + quantos + " produtos)"));
+        return resultado;
     }
 
     private void generateData() {
@@ -493,7 +493,11 @@ public class ReportsActivity extends BaseActivity {
             mostrarDistribuicaoVazia();
         } else {
             mostrarDistribuicaoGrafico();
-            PieDataSet dataSet = new PieDataSet(entries, "Produtos");
+            // Com dezenas de produtos, uma fatia por produto virava um arco-íris
+            // ilegível com rótulos sobrepostos. Mostra as maiores quantidades e
+            // agrupa o resto em "Outros"; os nomes vão para a legenda.
+            entries = agruparFatias(entries, 6);
+            PieDataSet dataSet = new PieDataSet(entries, "");
             dataSet.setColors(
                     ContextCompat.getColor(this, R.color.color_brand),
                     ContextCompat.getColor(this, R.color.color_success),
@@ -504,16 +508,40 @@ public class ReportsActivity extends BaseActivity {
             );
             dataSet.setValueTextSize(12f);
             dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
-            dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
+            dataSet.setSliceSpace(2f);
+            dataSet.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
+                @Override
+                public String getFormattedValue(float value) {
+                    // float acumulado ("578,2999") arredondado para o que a
+                    // lista mostra.
+                    return CurrencyHelper.formatQuantity(Math.round(value * 100) / 100.0);
+                }
+            });
 
             data = new PieData(dataSet);
 
             chart.setData(data);
             chart.setUsePercentValues(false);
             chart.getDescription().setEnabled(false);
-            chart.setDrawEntryLabels(true);
-            chart.setEntryLabelTextSize(11f);
-            chart.setEntryLabelColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
+            chart.setDrawEntryLabels(false);
+            chart.setHoleRadius(38f);
+            chart.setTransparentCircleRadius(42f);
+            chart.setExtraOffsets(4f, 4f, 4f, 4f);
+            com.github.mikephil.charting.components.Legend legend = chart.getLegend();
+            legend.setEnabled(true);
+            // Horizontal com quebra de linha: é o único modo em que a
+            // biblioteca reserva a altura da legenda em vez de desenhá-la por
+            // cima da pizza.
+            legend.setVerticalAlignment(com.github.mikephil.charting.components.Legend.LegendVerticalAlignment.BOTTOM);
+            legend.setHorizontalAlignment(com.github.mikephil.charting.components.Legend.LegendHorizontalAlignment.LEFT);
+            legend.setOrientation(com.github.mikephil.charting.components.Legend.LegendOrientation.HORIZONTAL);
+            legend.setDrawInside(false);
+            legend.setWordWrapEnabled(true);
+            legend.setTextSize(12f);
+            legend.setTextColor(ContextCompat.getColor(this, R.color.color_text));
+            legend.setXEntrySpace(12f);
+            legend.setYEntrySpace(6f);
+            legend.setFormSize(10f);
             chart.animateY(1000);
         }
 

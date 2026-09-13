@@ -6,7 +6,12 @@
     android:fitsSystemWindows="true"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/color_surface"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     tools:context="br.com.gameloop.estoquesimples.MainActivity">
+    <!-- A raiz é focável para que, quando a janela recupera o foco (ao fechar
+         um diálogo de Entrada/Saída, por exemplo), o foco não caia no campo
+         de busca — o primeiro focável da tela — abrindo o teclado sozinho. -->
 
     <LinearLayout
         android:id="@+id/searchBar"
@@ -45,10 +50,36 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/conflictsBanner"
+        android:id="@+id/filterBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@+id/searchBar"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingBottom="@dimen/field_gap"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/chipAll"
+            style="@style/Widget.Estoque.FilterChip"
+            android:text="Todos" />
+
+        <TextView
+            android:id="@+id/chipLowStock"
+            style="@style/Widget.Estoque.FilterChip"
+            android:layout_marginStart="@dimen/field_gap"
+            android:drawableStart="@drawable/ic_warning_small"
+            android:drawablePadding="4dp"
+            android:text="Estoque baixo" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/conflictsBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/filterBar"
         android:layout_marginLeft="@dimen/screen_padding_horizontal"
         android:layout_marginRight="@dimen/screen_padding_horizontal"
         android:layout_marginBottom="@dimen/field_gap"
@@ -110,7 +141,7 @@
         app:menu="@menu/bottom_navigation_menu"
         app:itemIconTint="@color/bottom_navigation_selector"
         app:itemTextColor="@color/bottom_navigation_selector"
-        app:labelVisibilityMode="auto" />
+        app:labelVisibilityMode="labeled" />
 
     <LinearLayout
         android:id="@+id/empty_list_item"
@@ -142,7 +173,7 @@
             android:id="@+id/emptyTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Nenhum produto encontrado"
+            android:text="Nenhum produto cadastrado"
             android:textAppearance="@style/TextAppearance.Estoque.Title"
             android:gravity="center"
             android:layout_marginBottom="6dp" />
@@ -218,6 +249,41 @@
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/field_gap"
                 android:text="Ver configurações do app"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/emptyActionClear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Limpar busca"
                 android:textColor="@color/color_brand"
                 android:textStyle="bold"
                 android:textSize="15sp" />

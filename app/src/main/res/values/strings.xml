@@ -6,7 +6,7 @@
     <string name="my_own_thanks">Não obrigado :(</string>
     <string name="my_own_cancel">Depois :|</string>
     <string name="sim">Sim!</string>
-    <string name="history_title">Histórico de Saída e Entrada</string>
+    <string name="history_title">Histórico</string>
 
     <!-- Settings Activity -->
     <string name="settings_title">Configurações</string>

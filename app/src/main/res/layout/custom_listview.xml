@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:paddingTop="2dp"
@@ -106,9 +107,8 @@
 
                             <TextView
                                 android:id="@+id/amount"
-                                android:layout_width="0dp"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
                                 android:minWidth="0dp"
                                 android:text="0"
                                 android:textSize="15sp"
@@ -119,8 +119,11 @@
 
                             <TextView
                                 android:id="@+id/unit"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_gravity="bottom"
+                                android:paddingBottom="1dp"
                                 android:text=" un"
                                 android:textSize="13sp"
                                 android:textColor="@color/color_text_muted"
@@ -249,27 +252,70 @@
                 android:orientation="vertical"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center">
+                android:gravity="center_horizontal">
 
-                <ImageButton
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:id="@+id/delete"
-                    android:src="@drawable/ic_delete"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="fitCenter"
-                    android:padding="@dimen/field_gap"
-                    android:contentDescription="Excluir produto" />
+                <LinearLayout
+                    android:id="@+id/btnEntrada"
+                    android:layout_width="60dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_quick_action"
+                    android:contentDescription="Registrar entrada">
 
-                <ImageButton
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:id="@+id/edit"
-                    android:src="@drawable/ic_edit"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:scaleType="fitCenter"
-                    android:padding="@dimen/field_gap"
-                    android:contentDescription="Editar produto" />
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_add"
+                        app:tint="@color/color_success"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Entrada"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/color_success"
+                        android:maxLines="1" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSaida"
+                    android:layout_width="60dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_marginTop="4dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_quick_action"
+                    android:contentDescription="Registrar saída">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_remove"
+                        app:tint="@color/color_error"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Saída"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/color_error"
+                        android:maxLines="1" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
@@ -462,25 +508,35 @@
                 android:baselineAligned="false">
 
                 <Button
-                    android:id="@+id/btnEntrada"
+                    android:id="@+id/edit"
                     style="@style/Widget.Estoque.Button.Secondary.Compact"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:minWidth="0dp"
                     android:maxLines="1"
-                    android:text="Entrada" />
+                    android:drawableStart="@drawable/ic_edit"
+                    android:drawablePadding="6dp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:text="Editar" />
 
                 <Button
-                    android:id="@+id/btnSaida"
-                    style="@style/Widget.Estoque.Button.Secondary.Compact"
+                    android:id="@+id/delete"
+                    style="@style/Widget.Estoque.Button.Destructive"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:minWidth="0dp"
+                    android:minHeight="40dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:textSize="14sp"
                     android:maxLines="1"
                     android:layout_marginLeft="12dp"
-                    android:text="Saída" />
+                    android:text="Excluir" />
 
             </LinearLayout>
 

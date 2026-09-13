@@ -96,6 +96,7 @@ public class MainActivity extends BaseActivity {
     private final ActivityResultLauncher<Intent> addProductLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
+                    pendingMessage = "Produto adicionado.";
                     pendingClearSearch = true;
                 }
                 pendingListRefresh = true;
@@ -105,9 +106,25 @@ public class MainActivity extends BaseActivity {
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
                     pendingClearSearch = true;
+                    pendingMessage = "Produto atualizado.";
                 }
                 pendingListRefresh = true;
             });
+
+    /** Confirmação a mostrar quando a tela voltar ao primeiro plano. */
+    private String pendingMessage;
+    public static final String EXTRA_MESSAGE = "br.com.gameloop.estoquesimples.MESSAGE";
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String message = intent == null ? null : intent.getStringExtra(EXTRA_MESSAGE);
+        if (message != null) {
+            pendingMessage = message;
+            pendingListRefresh = true;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,10 +137,23 @@ public class MainActivity extends BaseActivity {
 
         CurrencyHelper.warmUp(this);
 
-        TextView emptyMessage = findViewById(R.id.emptyMessage);
-        if (emptyMessage != null) {
-            emptyMessage.setText("Cadastre seu primeiro produto para começar a controlar o "
-                    + "estoque. Se preferir, dê uma olhada nas configurações do app antes.");
+        applyEmptyState(null);
+
+        TextView chipAll = findViewById(R.id.chipAll);
+        TextView chipLowStock = findViewById(R.id.chipLowStock);
+        if (chipAll != null && chipLowStock != null) {
+            chipAll.setOnClickListener(v -> setLowStockOnly(false));
+            chipLowStock.setOnClickListener(v -> setLowStockOnly(true));
+        }
+
+        View emptyActionClear = findViewById(R.id.emptyActionClear);
+        if (emptyActionClear != null) {
+            emptyActionClear.setOnClickListener(v -> {
+                if (searchView != null) {
+                    searchView.setQuery("", false);
+                    searchView.clearFocus();
+                }
+            });
         }
 
         View emptyActionAdd = findViewById(R.id.emptyActionAdd);
@@ -137,6 +167,9 @@ public class MainActivity extends BaseActivity {
         }
 
         instance = this;
+        if (getIntent() != null && getIntent().getStringExtra(EXTRA_MESSAGE) != null) {
+            pendingMessage = getIntent().getStringExtra(EXTRA_MESSAGE);
+        }
 
         // Configurar Picasso com otimizações de memória para evitar crashes com imagens grandes
         ImageLoadHelper.configurePicasso(this);
@@ -392,6 +425,12 @@ public class MainActivity extends BaseActivity {
         }
 
         updateConflictsBanner();
+
+        if (pendingMessage != null) {
+            String message = pendingMessage;
+            pendingMessage = null;
+            Feedback.show(this, message);
+        }
     }
 
     /**
@@ -443,6 +482,59 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    /** Filtro "Estoque baixo" da tela inicial. */
+    private boolean lowStockOnly = false;
+
+    private static boolean isLowStock(String amountStr, String minStockStr) {
+        if (minStockStr == null || minStockStr.isEmpty() || minStockStr.equals("null")) {
+            return false;
+        }
+        double min = CurrencyHelper.parseCurrency(minStockStr, 0);
+        return min > 0 && CurrencyHelper.parseCurrency(amountStr, 0) <= min;
+    }
+
+    private int countLowStock() {
+        int n = 0;
+        for (int i = 0; i < names.size(); i++) {
+            if (isLowStock(amounts.get(i), minStocks.get(i))) n++;
+        }
+        return n;
+    }
+
+    /**
+     * Chips "Todos" / "Estoque baixo (n)" acima da lista. Os relatórios já
+     * sabiam quantos produtos estavam abaixo do mínimo, mas a Início — onde o
+     * dono do negócio passa o dia — não dava nenhum atalho para chegar neles.
+     */
+    private void updateFilterChips() {
+        View filterBar = findViewById(R.id.filterBar);
+        TextView chipAll = findViewById(R.id.chipAll);
+        TextView chipLow = findViewById(R.id.chipLowStock);
+        if (filterBar == null || chipAll == null || chipLow == null) {
+            return;
+        }
+        int low = countLowStock();
+        if (names.isEmpty() || (low == 0 && !lowStockOnly)) {
+            filterBar.setVisibility(View.GONE);
+            lowStockOnly = false;
+            return;
+        }
+        filterBar.setVisibility(View.VISIBLE);
+        chipAll.setText("Todos (" + names.size() + ")");
+        chipLow.setText("Estoque baixo (" + low + ")");
+        chipAll.setSelected(!lowStockOnly);
+        chipLow.setSelected(lowStockOnly);
+    }
+
+    private void setLowStockOnly(boolean enabled) {
+        if (lowStockOnly == enabled) {
+            return;
+        }
+        lowStockOnly = enabled;
+        updateFilterChips();
+        filterList(searchView != null ? searchView.getQuery().toString() : "");
+    }
+
     public void updateList() {
         if (isFinishing()) {
             return;
@@ -456,18 +548,55 @@ public class MainActivity extends BaseActivity {
         }
 
         getListValues();
-        
-        // Aplicar filtro atual se houver busca ativa
-        if (searchView != null && searchView.getQuery().length() > 0) {
-            filterList(searchView.getQuery().toString());
-        } else {
-            // Se não há busca, mostrar todos os itens
-            copyToFilteredLists();
+        updateFilterChips();
+        filterList(searchView != null ? searchView.getQuery().toString() : "");
+
+    }
+
+    /**
+     * Atualiza o adapter sem trocá-lo. Recriar o adapter a cada movimentação
+     * (setAdapter) fazia a ListView perder o foco para o campo de busca, que
+     * abria o teclado sozinho depois de cada Entrada/Saída, e jogava fora o
+     * estado expandido dos cards. As listas filtradas são as mesmas
+     * instâncias que o adapter recebeu no prepareList().
+     */
+    private void refreshAdapterInPlace() {
+        if (listAdapter == null) {
             listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits);
             listView.setAdapter(listAdapter);
-            listAdapter.notifyDataSetChanged();
+            return;
         }
+        listAdapter.notifyDataSetChanged();
+    }
 
+    /**
+     * O estado vazio tem duas situações bem diferentes: nenhum produto
+     * cadastrado (onboarding) e busca sem resultado. Mostrar "Cadastre seu
+     * primeiro produto" para quem tem 40 produtos e digitou errado fazia
+     * parecer que o cadastro tinha sumido.
+     */
+    private void applyEmptyState(String query) {
+        TextView title = findViewById(R.id.emptyTitle);
+        TextView message = findViewById(R.id.emptyMessage);
+        View actionAdd = findViewById(R.id.emptyActionAdd);
+        View actionSettings = findViewById(R.id.emptyActionSettings);
+        View actionClear = findViewById(R.id.emptyActionClear);
+        if (title == null || message == null) {
+            return;
+        }
+        boolean searching = query != null && !query.trim().isEmpty();
+        if (searching) {
+            title.setText("Nenhum produto encontrado");
+            message.setText("Nada corresponde a \u201c" + query.trim() + "\u201d. Confira a digitação "
+                    + "ou busque por SKU, código de barras ou categoria.");
+        } else {
+            title.setText("Nenhum produto cadastrado");
+            message.setText("Cadastre seu primeiro produto para começar a controlar o "
+                    + "estoque. Se preferir, dê uma olhada nas configurações do app antes.");
+        }
+        if (actionAdd != null) actionAdd.setVisibility(searching ? View.GONE : View.VISIBLE);
+        if (actionSettings != null) actionSettings.setVisibility(searching ? View.GONE : View.VISIBLE);
+        if (actionClear != null) actionClear.setVisibility(searching ? View.VISIBLE : View.GONE);
     }
 
     public void filterList(String query) {
@@ -477,14 +606,17 @@ public class MainActivity extends BaseActivity {
         
         clearFilteredArrays();
         
-        if (query == null || query.trim().isEmpty()) {
+        if ((query == null || query.trim().isEmpty()) && !lowStockOnly) {
             // Se a busca está vazia, mostrar todos os itens
             copyToFilteredLists();
         } else {
-            // Filtrar itens baseado na busca
-            String searchQuery = query.toLowerCase().trim();
+            // Filtrar itens baseado na busca e no chip de estoque baixo
+            String searchQuery = query == null ? "" : query.toLowerCase().trim();
             
             for (int i = 0; i < names.size(); i++) {
+                if (lowStockOnly && !isLowStock(amounts.get(i), minStocks.get(i))) {
+                    continue;
+                }
                 String name = names.get(i) != null ? names.get(i).toLowerCase() : "";
                 String category = categories.get(i) != null ? categories.get(i).toLowerCase() : "";
                 String sku = skus.get(i) != null ? skus.get(i).toLowerCase() : "";
@@ -493,7 +625,7 @@ public class MainActivity extends BaseActivity {
                 String description = descriptions.get(i) != null ? descriptions.get(i).toLowerCase() : "";
                 
                 // Verificar se algum dos campos contém o texto da busca
-                if (name.contains(searchQuery) || 
+                if (searchQuery.isEmpty() || name.contains(searchQuery) || 
                     category.contains(searchQuery) || 
                     sku.contains(searchQuery) || 
                     barcode.contains(searchQuery) || 
@@ -516,9 +648,8 @@ public class MainActivity extends BaseActivity {
             }
         }
         
-        listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits);
-        listView.setAdapter(listAdapter);
-        listAdapter.notifyDataSetChanged();
+        refreshAdapterInPlace();
+        applyEmptyState(query);
     }
 
     public void copyToFilteredLists() {
@@ -552,6 +683,23 @@ public class MainActivity extends BaseActivity {
         filteredUnits.clear();
     }
 
+    @SafeVarargs
+    private static void sortByName(ArrayList<String> names, ArrayList<String>... columns) {
+        java.text.Collator collator = java.text.Collator.getInstance(new java.util.Locale("pt", "BR"));
+        collator.setStrength(java.text.Collator.PRIMARY);
+        Integer[] order = new Integer[names.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        java.util.Arrays.sort(order, (a, b) -> collator.compare(
+                names.get(a) == null ? "" : names.get(a), names.get(b) == null ? "" : names.get(b)));
+        ArrayList<ArrayList<String>> all = new ArrayList<>();
+        all.add(names);
+        java.util.Collections.addAll(all, columns);
+        for (ArrayList<String> col : all) {
+            ArrayList<String> copy = new ArrayList<>(col);
+            for (int i = 0; i < order.length; i++) col.set(i, copy.get(order[i]));
+        }
+    }
+
     public void getListValues() {
         // Carrega em listas temporárias e só troca se a query tiver sucesso,
         // evitando listagem vazia quando há falha transitória (ex.: lock do SQLite).
@@ -579,7 +727,7 @@ public class MainActivity extends BaseActivity {
             synchronized (DB_LOCK) {
                 cursor = stock.rawQuery(
                         "SELECT name, description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit "
-                                + "FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY id DESC",
+                                + "FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY name COLLATE NOCASE ASC",
                         null);
 
                 if (cursor != null && cursor.moveToFirst()) {
@@ -597,6 +745,11 @@ public class MainActivity extends BaseActivity {
                         newMinStocks.add(cursor.getString(10));
                         newUnits.add(cursor.getString(11));
                     } while (cursor.moveToNext());
+                    // Ordem alfabética com regras do português (acentos e
+                    // cedilha no lugar certo): COLLATE NOCASE do SQLite só
+                    // entende ASCII e jogava "Açúcar" depois de "Amaciante".
+                    sortByName(newNames, newDescriptions, newAmounts, newValues, newPhotos, newCategories,
+                            newSkus, newBarcodes, newSuppliers, newLocations, newMinStocks, newUnits);
                 }
             }
 
@@ -646,10 +799,11 @@ public class MainActivity extends BaseActivity {
         final String finalProductName = productName;
 
         new AlertDialog.Builder(this)
-                .setTitle("Atenção")
-                .setMessage("Tem certeza que deseja remover o item '" + productName + "'?")
+                .setTitle("Excluir produto?")
+                .setMessage("\u201c" + productName + "\u201d sai da lista e dos relatórios atuais. "
+                        + "As movimentações já registradas continuam no histórico.")
                 .setIcon(R.drawable.ic_delete)
-                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                .setPositiveButton("Excluir", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         try {
                             // Verificar se o banco de dados está disponível
@@ -675,7 +829,7 @@ public class MainActivity extends BaseActivity {
 
                             if (rowsDeleted) {
                                 updateList();
-                                Toast.makeText(MainActivity.this, "Produto removido com sucesso!", Toast.LENGTH_LONG).show();
+                                Feedback.show(MainActivity.this, "Produto excluído.");
                                 
                                 // Verificar e atualizar agendamento de notificações de estoque baixo
                                 LowStockScheduler.checkAndScheduleNotifications(MainActivity.this);
@@ -688,7 +842,7 @@ public class MainActivity extends BaseActivity {
                             Log.e("MainActivity", "Error deleting product", e);
                         }
                     }})
-                .setNegativeButton(android.R.string.no, null).show();
+                .setNegativeButton("Cancelar", null).show();
 
     }
 
@@ -732,6 +886,7 @@ public class MainActivity extends BaseActivity {
 
         Intent intent = new Intent(this, ReportsActivity.class);
         startActivity(intent);
+        overridePendingTransition(0, 0);
 
     }
 
@@ -739,12 +894,14 @@ public class MainActivity extends BaseActivity {
 
         Intent intent = new Intent(this, ImportActivity.class);
         startActivity(intent);
+        overridePendingTransition(0, 0);
 
     }
 
     public void showHistoryActivity() {
         Intent intent = new Intent(this, HistoryActivity.class);
         startActivity(intent);
+        overridePendingTransition(0, 0);
     }
 
     public void showSettingsActivity() {
@@ -760,9 +917,11 @@ public class MainActivity extends BaseActivity {
     public void showWelcomeMessage() {
 
         AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
-        alertDialog.setTitle("Seja Bem-Vindo!");
-        alertDialog.setMessage("Esperamos que goste do aplicativo e que ele seja muito útil para você, em caso de dúvidas ou problemas por favor entre em contato conosco ;)");
-        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Ok",
+        alertDialog.setTitle("Bem-vindo ao Estoque Simples");
+        alertDialog.setMessage("Cadastre seus produtos e registre cada entrada e saída pelos botões do "
+                + "próprio card. O estoque fica salvo neste aparelho, sem precisar de internet ou "
+                + "cadastro.\n\nDúvidas ou problemas? Fale com a gente em ⋮ > Sobre.");
+        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Começar",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         dialog.dismiss();
@@ -882,7 +1041,7 @@ public class MainActivity extends BaseActivity {
      * Mostra opções de edição em massa
      */
     private void showBulkEditOptionsDialog(final java.util.List<String> selectedProducts) {
-        final String[] options = {"Ajustar Quantidade", "Definir Categoria", "Definir Fornecedor"};
+        final String[] options = {"Ajustar quantidade (+/-)", "Definir categoria", "Definir fornecedor"};
         
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Escolha a operação");
@@ -906,72 +1065,88 @@ public class MainActivity extends BaseActivity {
     }
     
     /**
+     * Campo único dos diálogos de edição em massa, no mesmo padrão dos outros
+     * diálogos do app (borda, legenda de erro, sem colar nas bordas).
+     */
+    private static class BulkField {
+        final LinearLayout container;
+        final com.google.android.material.textfield.TextInputLayout layout;
+
+        BulkField(Context context, String hint, int inputType) {
+            container = new LinearLayout(context);
+            container.setOrientation(LinearLayout.VERTICAL);
+            int padding = (int) (context.getResources().getDisplayMetrics().density * 16);
+            container.setPadding(padding, padding / 2, padding, 0);
+            layout = FormValidation.addField(container, hint, inputType);
+        }
+
+        String text() {
+            return layout.getEditText() == null ? "" : layout.getEditText().getText().toString().trim();
+        }
+    }
+
+    private void showBulkInputDialog(String title, String message, String hint, int inputType,
+                                     String requiredMessage, java.util.function.Consumer<String> onApply) {
+        BulkField field = new BulkField(this, hint, inputType);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setView(field.container)
+                .setPositiveButton("Aplicar", null)
+                .setNegativeButton("Cancelar", null)
+                .show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!FormValidation.required(field.layout, requiredMessage)) {
+                return;
+            }
+            dialog.dismiss();
+            onApply.accept(field.text());
+        });
+    }
+
+    /**
      * Ajusta quantidade em massa
      */
     private void showBulkAdjustQuantityDialog(final java.util.List<String> selectedProducts) {
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        input.setHint("Digite a quantidade (+ ou -)");
-        
-        new AlertDialog.Builder(this)
-            .setTitle("Ajustar Quantidade")
-            .setMessage("Digite a quantidade a adicionar (+10) ou remover (-5):")
-            .setView(input)
-            .setPositiveButton("OK", (dialog, which) -> {
-                String value = input.getText().toString();
-                if (!value.isEmpty()) {
+        showBulkInputDialog("Ajustar quantidade",
+                selectedProducts.size() + " produto(s) selecionado(s). Some ou subtraia a mesma "
+                        + "quantidade em todos: +10 adiciona, -5 remove.",
+                "Quantidade (+10 ou -5)",
+                android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL,
+                "Informe a quantidade.",
+                value -> {
                     double adjustment = CurrencyHelper.parseCurrency(value, Double.NaN);
-                    if (Double.isNaN(adjustment)) {
-                        Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
+                    if (Double.isNaN(adjustment) || adjustment == 0) {
+                        Toast.makeText(this, "Quantidade inválida.", Toast.LENGTH_SHORT).show();
                     } else {
                         performBulkQuantityAdjustment(selectedProducts, adjustment);
                     }
-                }
-            })
-            .setNegativeButton("Cancelar", null)
-            .show();
+                });
     }
     
     /**
      * Define categoria em massa
      */
     private void showBulkSetCategoryDialog(final java.util.List<String> selectedProducts) {
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setHint("Digite a categoria");
-        
-        new AlertDialog.Builder(this)
-            .setTitle("Definir Categoria")
-            .setMessage("Digite a nova categoria para os produtos selecionados:")
-            .setView(input)
-            .setPositiveButton("OK", (dialog, which) -> {
-                String category = input.getText().toString();
-                if (!category.isEmpty()) {
-                    performBulkCategoryUpdate(selectedProducts, category);
-                }
-            })
-            .setNegativeButton("Cancelar", null)
-            .show();
+        showBulkInputDialog("Definir categoria",
+                "A categoria abaixo substitui a atual em " + selectedProducts.size() + " produto(s).",
+                "Categoria",
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
+                "Informe a categoria.",
+                category -> performBulkCategoryUpdate(selectedProducts, category));
     }
     
     /**
      * Define fornecedor em massa
      */
     private void showBulkSetSupplierDialog(final java.util.List<String> selectedProducts) {
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setHint("Digite o fornecedor");
-        
-        new AlertDialog.Builder(this)
-            .setTitle("Definir Fornecedor")
-            .setMessage("Digite o novo fornecedor para os produtos selecionados:")
-            .setView(input)
-            .setPositiveButton("OK", (dialog, which) -> {
-                String supplier = input.getText().toString();
-                if (!supplier.isEmpty()) {
-                    performBulkSupplierUpdate(selectedProducts, supplier);
-                }
-            })
-            .setNegativeButton("Cancelar", null)
-            .show();
+        showBulkInputDialog("Definir fornecedor",
+                "O fornecedor abaixo substitui o atual em " + selectedProducts.size() + " produto(s).",
+                "Fornecedor",
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS,
+                "Informe o fornecedor.",
+                supplier -> performBulkSupplierUpdate(selectedProducts, supplier));
     }
     
     /**
@@ -1012,7 +1187,7 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Toast.makeText(this, getString(R.string.bulk_edit_success, updated), Toast.LENGTH_SHORT).show();
+        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
     }
     
     /**
@@ -1041,7 +1216,7 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Toast.makeText(this, getString(R.string.bulk_edit_success, updated), Toast.LENGTH_SHORT).show();
+        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
     }
     
     /**
@@ -1070,7 +1245,7 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Toast.makeText(this, getString(R.string.bulk_edit_success, updated), Toast.LENGTH_SHORT).show();
+        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
     }
 
     private void flattenSearchViewPadding(SearchView searchView) {

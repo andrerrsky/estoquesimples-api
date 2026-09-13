@@ -17,66 +17,6 @@
         android:paddingTop="@dimen/screen_padding_top"
         android:paddingBottom="@dimen/screen_padding_bottom">
 
-        <TextView
-            android:id="@+id/addTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Novo Produto"
-            android:textAppearance="@style/TextAppearance.Estoque.Title"
-            android:layout_marginBottom="@dimen/section_gap" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Foto do Produto"
-            android:textAppearance="@style/TextAppearance.Estoque.Label"
-            android:layout_marginBottom="@dimen/field_gap" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="@drawable/bg_surface"
-            android:padding="@dimen/group_padding_compact"
-            android:layout_marginBottom="@dimen/section_gap">
-
-            <ImageButton
-                android:id="@+id/addPhoto"
-                android:layout_width="100dp"
-                android:layout_height="100dp"
-                android:src="@drawable/ic_camera"
-                android:scaleType="fitXY"
-                android:background="@drawable/bg_photo"
-                android:contentDescription="Foto do produto" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginLeft="@dimen/section_gap"
-                android:gravity="center_vertical"
-                android:layout_gravity="center_vertical">
-
-                <Button
-                    android:id="@+id/addGallery"
-                    style="@style/Widget.Estoque.Button.Secondary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Galeria"
-                    android:onClick="addTakeGalleryPhoto" />
-
-                <Button
-                    android:id="@+id/addCamera"
-                    style="@style/Widget.Estoque.Button.Secondary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/field_gap"
-                    android:text="Câmera"
-                    android:onClick="addTakeCameraPhoto" />
-
-            </LinearLayout>
-        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -161,7 +101,8 @@
                 android:hint="Categoria"
                 android:layout_marginTop="@dimen/field_gap">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
                     android:id="@+id/addCategory"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -230,7 +171,8 @@
                     android:hint="Unidade"
                     android:layout_marginLeft="@dimen/field_gap">
 
-                    <com.google.android.material.textfield.TextInputEditText
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
                         android:id="@+id/addUnit"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -291,6 +233,59 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Foto do Produto"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <ImageButton
+                android:id="@+id/addPhoto"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:src="@drawable/ic_camera"
+                android:scaleType="fitXY"
+                android:background="@drawable/bg_photo"
+                android:contentDescription="Foto do produto" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginLeft="@dimen/section_gap"
+                android:gravity="center_vertical"
+                android:layout_gravity="center_vertical">
+
+                <Button
+                    android:id="@+id/addGallery"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Galeria"
+                    android:onClick="addTakeGalleryPhoto" />
+
+                <Button
+                    android:id="@+id/addCamera"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Câmera"
+                    android:onClick="addTakeCameraPhoto" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Informações Adicionais"
             android:textAppearance="@style/TextAppearance.Estoque.Label"
             android:layout_marginBottom="@dimen/field_gap" />
@@ -309,7 +304,8 @@
                 android:layout_height="wrap_content"
                 android:hint="Fornecedor">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
                     android:id="@+id/addSupplier"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

@@ -479,33 +479,20 @@ public class AnalyticsActivity extends BaseActivity {
     
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.options_menu, menu);
+        getMenuInflater().inflate(R.menu.section_menu, menu);
+        // Já estamos nela.
+        MenuItem self = menu.findItem(R.id.menu_analytics);
+        if (self != null) self.setVisible(false);
         return true;
     }
     
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int itemId = item.getItemId();
-        
-        if (itemId == android.R.id.home) {
+        if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;
-        } else if (itemId == R.id.menu_subscription) {
-            SubscriptionActivity.open(this);
-            return true;
-        } else if (itemId == R.id.menu_about) {
-            Intent intent = new Intent(this, AboutActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_history) {
-            Intent intent = new Intent(this, HistoryActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_exit) {
-            finishAffinity();
-            return true;
         }
-        return super.onOptionsItemSelected(item);
+        return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
     
     /**

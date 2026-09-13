@@ -76,8 +76,7 @@
         <activity 
             android:name=".HistoryActivity"
             android:label="@string/history_title"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
+            android:exported="false" />
         <activity 
             android:name=".ProActivity"
             android:exported="false"

@@ -35,12 +35,16 @@ final class MovementDisplay {
                 return "CADASTRO";
             case MovementRepository.IMPORTACAO:
                 return "IMPORTAÇÃO";
+            // Mudar a quantidade pela tela Editar grava "edicao", mas para
+            // quem lê o histórico isso é um ajuste de saldo como outro
+            // qualquer — "EDIÇÃO" sugeria alteração de cadastro.
             case MovementRepository.EDICAO:
-                return "EDIÇÃO";
             case MovementRepository.AJUSTE:
                 return "AJUSTE";
+            // "ESTORNO" é o termo que o comércio usa e cabe no selo da lista;
+            // "CANCELAMENTO" quebrava em duas linhas ("CANCELAME / NTO").
             case MovementRepository.CANCELAMENTO:
-                return "CANCELAMENTO";
+                return "ESTORNO";
             default:
                 return changeType.toUpperCase();
         }

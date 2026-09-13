@@ -1,6 +1,8 @@
 package br.com.gameloop.estoquesimples;
 
 import android.content.Context;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -65,10 +67,41 @@ public final class FormValidation {
     public static boolean check(TextInputLayout layout, boolean hasError, String message) {
         if (hasError) {
             layout.setError(message);
+            clearErrorOnEdit(layout);
             return false;
         }
         layout.setError(null);
         return true;
+    }
+
+    /**
+     * Some com o erro assim que o usuário volta a digitar no campo. Sem isso o
+     * campo continuava vermelho, com "Informe a quantidade." embaixo, mesmo já
+     * mostrando "10" — o que faz o usuário achar que o valor ainda está
+     * errado. O watcher é anexado uma única vez por campo (marcado na tag).
+     */
+    private static void clearErrorOnEdit(final TextInputLayout layout) {
+        if (layout.getEditText() == null || layout.getTag(R.id.tag_clear_error_watcher) != null) {
+            return;
+        }
+        TextWatcher watcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (layout.getError() != null) {
+                    layout.setError(null);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        };
+        layout.getEditText().addTextChangedListener(watcher);
+        layout.setTag(R.id.tag_clear_error_watcher, watcher);
     }
 
     /**
@@ -108,8 +141,13 @@ public final class FormValidation {
 
             int offsetDp = 16;
             float density = scrollView.getResources().getDisplayMetrics().density;
+            // O ScrollView das telas de formulário começa atrás da ActionBar
+            // e recebe a altura dela como paddingTop (fitsSystemWindows).
+            // Sem descontar esse padding, o campo era rolado para debaixo da
+            // barra: só a mensagem vermelha ficava visível.
             int targetY = scrollView.getScrollY()
                     + (fieldLocation[1] - scrollLocation[1])
+                    - scrollView.getPaddingTop()
                     - Math.round(offsetDp * density);
 
             scrollView.smoothScrollTo(0, Math.max(0, targetY));

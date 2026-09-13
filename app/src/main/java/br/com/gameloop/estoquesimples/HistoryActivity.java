@@ -40,8 +40,8 @@ public class HistoryActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_history);
 
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle(R.string.history_title);
+        SectionNav.attach(this, R.id.navigation_history);
 
         historyList = (ListView) findViewById(R.id.historyList);
         emptyView = (TextView) findViewById(R.id.emptyHistory);
@@ -145,10 +145,11 @@ public class HistoryActivity extends BaseActivity {
         Cursor cursor = null;
         try {
             cursor = MainActivity.stock.rawQuery(
-                    "SELECT uuid, product_name, change_type, quantity, timestamp, note, "
-                            + "reverses_uuid "
-                            + "FROM EstoqueHistorico WHERE deleted_at IS NULL "
-                            + "ORDER BY timestamp DESC",
+                    "SELECT h.uuid, h.product_name, h.change_type, h.quantity, h.timestamp, h.note, "
+                            + "h.reverses_uuid, "
+                            + "(SELECT e.unit FROM Estoque e WHERE e.uuid = h.product_uuid) AS unit "
+                            + "FROM EstoqueHistorico h WHERE h.deleted_at IS NULL "
+                            + "ORDER BY h.timestamp DESC",
                     null
             );
 
@@ -161,9 +162,12 @@ public class HistoryActivity extends BaseActivity {
                     long ts = cursor.getLong(4);
                     String note = cursor.getString(5);
                     String reversesUuid = cursor.getString(6);
+                    String unit = cursor.getString(7);
 
-                    items.add(new HistoryAdapter.HistoryItem(
-                            uuid, product, type, qty, ts, note, reversesUuid));
+                    HistoryAdapter.HistoryItem item = new HistoryAdapter.HistoryItem(
+                            uuid, product, type, qty, ts, note, reversesUuid);
+                    item.setUnit(unit);
+                    items.add(item);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -350,7 +354,7 @@ public class HistoryActivity extends BaseActivity {
         MovementRepository.Result result;
         synchronized (MainActivity.DB_LOCK) {
             result = new MovementRepository(MainActivity.stock)
-                    .cancel(item.getUuid(), "Cancelamento de " + MovementDisplay
+                    .cancel(item.getUuid(), "Estorno de " + MovementDisplay
                             .sentenceLabel(item.getType()).toLowerCase());
         }
 
@@ -368,30 +372,16 @@ public class HistoryActivity extends BaseActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.options_menu, menu);
+        getMenuInflater().inflate(R.menu.section_menu, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int itemId = item.getItemId();
-        
-        if (itemId == android.R.id.home) {
+        if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;
-        } else if (itemId == R.id.menu_analytics) {
-            Intent intent = new Intent(this, AnalyticsActivity.class);
-            startActivity(intent);
-            return true;
-        } else if (itemId == R.id.menu_about) {
-            MainActivity.instance.showAboutActivity();
-            return true;
-        } else if (itemId == R.id.menu_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
-            return true;
         }
-        return super.onOptionsItemSelected(item);
+        return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
 }
-
-

@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:fitsSystemWindows="true"
     android:background="@color/color_surface"
     tools:context="br.com.gameloop.estoquesimples.ImportActivity">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -91,7 +97,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/field_gap"
-                android:text="Mesmo formato da nuvem: produtos e histórico, com os identificadores estáveis. A importação mescla com o cadastro atual (por SKU, código de barras ou nome) e não duplica movimentações já gravadas. Para substituir o aparelho inteiro, use o arquivo .db. A foto fica de fora — é um caminho só deste aparelho."
+                android:text="Cópia completa (produtos + histórico) para guardar ou levar para outro aparelho. Ao importar, o que já existe é atualizado, nada é duplicado. As fotos não vão junto."
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
 
             <Button
@@ -133,7 +139,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/field_gap"
-                android:text="Arquivo .db nativo, com tudo o que está neste aparelho (incluindo a fila de sincronização). Use para backup local. Substituir o banco apaga o estoque atual."
+                android:text="Backup exato deste aparelho (arquivo .db). Importar um banco substitui todo o estoque atual."
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
 
             <Button
@@ -165,3 +171,7 @@
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
+
+    <include layout="@layout/include_bottom_nav" />
+
+</LinearLayout>
