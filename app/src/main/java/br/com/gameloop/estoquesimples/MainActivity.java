@@ -701,7 +701,8 @@ public class MainActivity extends BaseActivity {
             return;
         }
         filterBar.setVisibility(View.VISIBLE);
-        chipAll.setText("Todos (" + all + ")");
+        chipAll.setText((searchView != null && searchView.getQuery().length() > 0 ? "Busca: " : "Todos (") 
+                + (searchView != null && searchView.getQuery().length() > 0 ? all + " " + (all == 1 ? "resultado" : "resultados") : all + ")"));
         chipLow.setText("Estoque baixo (" + low + ")");
         chipAll.setSelected(!lowStockOnly);
         chipLow.setSelected(lowStockOnly);

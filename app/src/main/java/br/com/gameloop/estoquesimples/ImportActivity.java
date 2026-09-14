@@ -510,8 +510,9 @@ public class ImportActivity extends BaseActivity {
                     oQue = Texto.plural(done.exported, "movimentação gravada", "movimentações gravadas") + " no arquivo escolhido.";
                 } else if (done.productsExported >= 0) {
                     int movs = Math.max(0, done.exported - done.productsExported);
-                    oQue = "Backup salvo: " + Texto.plural(done.productsExported, "produto", "produtos")
-                            + " e " + Texto.plural(movs, "movimentação", "movimentações") + ".";
+                    oQue = "Backup salvo " + new SimpleDateFormat("dd/MM 'às' HH:mm", Locale.getDefault()).format(new Date())
+                            + ": " + Texto.plural(done.productsExported, "produto", "produtos")
+                            + " e " + Texto.plural(movs, "movimentação", "movimentações") + ", no arquivo escolhido.";
                 } else {
                     oQue = Texto.plural(done.exported, "produto gravado", "produtos gravados") + " no arquivo escolhido.";
                 }

@@ -68,6 +68,33 @@ public final class FieldSuggestions {
                 field.showDropDown();
             }
         });
+        // Toque no ícone de seta do campo (end icon do TextInputLayout): abre a
+        // lista inteira com o teclado fechado, para quem quer escolher em vez
+        // de digitar. As listas ficavam espremidas em duas linhas pelo teclado.
+        android.view.ViewParent parent = field.getParent();
+        while (parent != null && !(parent instanceof com.google.android.material.textfield.TextInputLayout)) {
+            parent = parent.getParent();
+        }
+        if (parent instanceof com.google.android.material.textfield.TextInputLayout) {
+            com.google.android.material.textfield.TextInputLayout layout =
+                    (com.google.android.material.textfield.TextInputLayout) parent;
+            layout.setEndIconMode(com.google.android.material.textfield.TextInputLayout.END_ICON_CUSTOM);
+            layout.setEndIconDrawable(R.drawable.ic_expand_more);
+            layout.setEndIconContentDescription("Ver opções");
+            layout.setEndIconOnClickListener(v -> {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        field.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(field.getWindowToken(), 0);
+                }
+                field.requestFocus();
+                field.setDropDownHeight(Math.round(320 * field.getResources().getDisplayMetrics().density));
+                field.postDelayed(() -> {
+                    field.showDropDown();
+                    field.setDropDownHeight(Math.round(150 * field.getResources().getDisplayMetrics().density));
+                }, 250);
+            });
+        }
     }
 
     private static List<String> distinct(SQLiteDatabase db, String column, String[] defaults) {

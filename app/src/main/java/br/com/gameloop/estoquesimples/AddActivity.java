@@ -113,6 +113,13 @@ public class AddActivity extends BaseActivity {
         productMinStock = (EditText) findViewById(R.id.addMinStock);
         productUnit = (EditText) findViewById(R.id.addUnit);
         discardGuard = new DiscardGuard(this, "Descartar cadastro?");
+        // Dica inline ao sair do campo Nome: o aviso de nome parecido só
+        // aparecia no Salvar, depois de preencher tudo.
+        productName.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus || nameLayout == null) return;
+            String parecido = findSimilarName(productName.getText().toString().trim());
+            nameLayout.setHelperText(parecido == null ? null : "Parecido com \u201c" + parecido + "\u201d já cadastrado.");
+        });
         discardGuard.watch(productName, productAmount, productValue, productDescription, productCategory,
                 productSku, productBarcode, productSupplier, productLocation, productMinStock, productUnit);
         FieldSuggestions.attach(MainActivity.stock,
@@ -377,7 +384,10 @@ public class AddActivity extends BaseActivity {
             insertValues.put("supplier", productSupplier != null ? productSupplier.getText().toString().trim() : "");
             insertValues.put("location", productLocation != null ? productLocation.getText().toString().trim() : "");
             insertValues.put("min_stock", productMinStock != null ? productMinStock.getText().toString().trim() : "");
-            insertValues.put("unit", productUnit != null ? productUnit.getText().toString().trim() : "");
+            // Sem unidade o número ficava solto ("Quantidade 10"); o app já trata
+            // o vazio como unidade inteira, então assume "un".
+            String unidadeDigitada = productUnit != null ? productUnit.getText().toString().trim() : "";
+            insertValues.put("unit", unidadeDigitada.isEmpty() ? "un" : unidadeDigitada);
 
             if (newPhotoPath != null) {
                 insertValues.put("photo", newPhotoPath);

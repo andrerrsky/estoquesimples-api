@@ -216,6 +216,7 @@ public final class DataExchange {
                             + " WHERE deleted_at IS NULL ORDER BY timestamp, id",
                     null);
             while (movementCursor.moveToNext()) {
+                report.exported++;
                 movementArray.put(PortableBackup.movement(
                         text(movementCursor, 0),
                         emptyToNull(text(movementCursor, 1)),

@@ -522,7 +522,7 @@ public class ReportsActivity extends BaseActivity {
                 PieEntry e = ordenadas.get(i);
                 barras.add(new com.github.mikephil.charting.data.BarEntry(quantas - 1 - i, e.getValue()));
                 String nome = e.getLabel() == null ? "" : e.getLabel();
-                rotulos.add(nome.length() > 22 ? nome.substring(0, 21) + "…" : nome);
+                rotulos.add(nome.length() > 26 ? nome.substring(0, 25) + "…" : nome);
             }
             com.github.mikephil.charting.data.BarDataSet dataSet =
                     new com.github.mikephil.charting.data.BarDataSet(barras, "");
@@ -538,6 +538,10 @@ public class ReportsActivity extends BaseActivity {
             com.github.mikephil.charting.data.BarData barData = new com.github.mikephil.charting.data.BarData(dataSet);
             barData.setBarWidth(0.62f);
             chart.setData(barData);
+            // Altura pelo número de barras: sobrava área vazia embaixo da 8ª.
+            android.view.ViewGroup.LayoutParams lp = ((View) chart.getParent()).getLayoutParams();
+            lp.height = Math.round((quantas * 34 + 8) * getResources().getDisplayMetrics().density);
+            ((View) chart.getParent()).setLayoutParams(lp);
             chart.getDescription().setEnabled(false);
             chart.getLegend().setEnabled(false);
             chart.setTouchEnabled(false);
@@ -552,7 +556,7 @@ public class ReportsActivity extends BaseActivity {
             eixo.setDrawGridLines(false);
             eixo.setDrawAxisLine(false);
             eixo.setTextColor(ContextCompat.getColor(this, R.color.color_text));
-            eixo.setTextSize(11f);
+            eixo.setTextSize(10f);
             chart.getAxisLeft().setEnabled(false);
             chart.getAxisRight().setEnabled(false);
             chart.getAxisLeft().setAxisMinimum(0f);
@@ -737,6 +741,7 @@ public class ReportsActivity extends BaseActivity {
     private void calculateEntryExitTotals() {
         double totalEntry = 0.0;
         double totalExit = 0.0;
+        double totalOutros = 0.0;
         Cursor historyCursor = null;
         try {
             historyCursor = MainActivity.stock.rawQuery(
@@ -752,7 +757,13 @@ public class ReportsActivity extends BaseActivity {
                     double unitVal = CurrencyHelper.parseCurrency(historyCursor.getString(2), 0.0);
                     double lineTotal = Math.abs(qty) * unitVal;
 
-                    if (isEntrada(changeType, qty)) {
+                    boolean compraVenda = MovementRepository.ENTRADA.equalsIgnoreCase(changeType)
+                            || MovementRepository.SAIDA.equalsIgnoreCase(changeType)
+                            || "compra".equalsIgnoreCase(changeType) || "venda".equalsIgnoreCase(changeType);
+                    if (!compraVenda) {
+                        // cadastro inicial, importação, ajuste, estorno: fecham a conta
+                        totalOutros += MovementRepository.signedQuantity(changeType, qty) * unitVal;
+                    } else if (isEntrada(changeType, qty)) {
                         totalEntry += lineTotal;
                     } else if (isSaida(changeType, qty)) {
                         totalExit += lineTotal;
@@ -774,6 +785,13 @@ public class ReportsActivity extends BaseActivity {
         if (totalExitValue != null) {
             totalExitValue.setText(getString(R.string.total_exit_value,
                     CurrencyHelper.formatCurrency(this, totalExit)));
+        }
+        TextView outros = findViewById(R.id.totalOtherValue);
+        if (outros != null) {
+            // Sem esta linha a conta "entradas − saídas ≠ valor do estoque" não
+            // fechava e o dono estranhava a diferença.
+            outros.setText("Cadastros, ajustes e estornos: " + (totalOutros < 0 ? "− " : "")
+                    + CurrencyHelper.formatCurrency(this, Math.abs(totalOutros)));
         }
     }
 

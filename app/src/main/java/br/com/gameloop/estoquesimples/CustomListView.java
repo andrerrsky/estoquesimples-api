@@ -315,6 +315,18 @@ public class CustomListView extends ArrayAdapter<String> {
             amount.setTextColor(ContextCompat.getColor(context, R.color.color_text));
         }
 
+        // Fração herdada (importação, dado antigo) num produto contado por
+        // unidade: "6,5 un" aparecia como normal e contaminava os totais.
+        // Os diálogos já barram novas frações; esta sinaliza o que sobrou.
+        double saldoAtual = CurrencyHelper.parseCurrency(amounts.get(position), 0);
+        if (Unidades.inteira(units.get(position)) && Unidades.fracionada(saldoAtual)) {
+            lowStockBadge.setText(lowStockBadge.getVisibility() == View.VISIBLE
+                    ? lowStockBadge.getText() + "\nQuantidade quebrada · corrija"
+                    : "Quantidade quebrada em item por unidade · corrija");
+            lowStockBadge.setVisibility(View.VISIBLE);
+            amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
+        }
+
         // Estado expandido/colapsado
         boolean isExpanded = expandedNames.contains(names.get(position));
         extraContainer.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
@@ -573,7 +585,8 @@ public class CustomListView extends ArrayAdapter<String> {
                     MainActivity.instance.updateList();
                 }
                 Feedback.show(context, undo.success
-                        ? "Movimentação desfeita."
+                        ? "Desfeito. Estoque de volta a " + CurrencyHelper.formatQuantity(undo.newAmount)
+                                + (hasUnit ? "\u00a0" + unitStr : "") + "."
                         : (undo.message == null ? "Não foi possível desfazer." : undo.message));
             });
         }

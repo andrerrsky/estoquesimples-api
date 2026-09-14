@@ -655,7 +655,8 @@ public class EditActivity extends BaseActivity {
             updateValues.put("supplier", supplier != null ? supplier.getText().toString().trim() : "");
             updateValues.put("location", location != null ? location.getText().toString().trim() : "");
             updateValues.put("min_stock", minStock != null ? minStock.getText().toString().trim() : "");
-            updateValues.put("unit", unit != null ? unit.getText().toString().trim() : "");
+            String unidadeDigitada = unit != null ? unit.getText().toString().trim() : "";
+            updateValues.put("unit", unidadeDigitada.isEmpty() ? "un" : unidadeDigitada);
 
             if (newPhotoPath != null) {
                 updateValues.put("photo", newPhotoPath);

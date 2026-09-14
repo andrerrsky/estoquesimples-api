@@ -200,6 +200,16 @@
                 android:paddingBottom="4dp" />
 
             <TextView
+                android:id="@+id/totalOtherValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cadastros, ajustes e estornos: R$ 0,00"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/field_gap"
