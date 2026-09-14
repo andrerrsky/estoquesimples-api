@@ -34,6 +34,31 @@ public final class Feedback {
         if (anchor != null) {
             snackbar.setAnchorView(anchor);
         }
+        // A snackbar cobria os botões Entrada/Saída do último card: um toque
+        // tardio no "Desfazer" abria o diálogo de outro produto. Enquanto ela
+        // está na tela, a lista ganha o mesmo espaço embaixo (clipToPadding
+        // já é false) e o conteúdo rola para cima dela.
+        final android.widget.ListView list = activity.findViewById(R.id.listView);
+        if (list != null) {
+            final int paddingOriginal = list.getPaddingBottom();
+            snackbar.addCallback(new Snackbar.Callback() {
+                @Override
+                public void onShown(Snackbar sb) {
+                    int altura = sb.getView().getHeight();
+                    if (altura <= 0) {
+                        altura = Math.round(64 * activity.getResources().getDisplayMetrics().density);
+                    }
+                    list.setPadding(list.getPaddingLeft(), list.getPaddingTop(),
+                            list.getPaddingRight(), paddingOriginal + altura);
+                }
+
+                @Override
+                public void onDismissed(Snackbar sb, int event) {
+                    list.setPadding(list.getPaddingLeft(), list.getPaddingTop(),
+                            list.getPaddingRight(), paddingOriginal);
+                }
+            });
+        }
         return snackbar;
     }
 }

@@ -505,11 +505,18 @@ public class ImportActivity extends BaseActivity {
             }
             DataExchange.Report done = report;
             main.post(() -> {
-                String oQue = kind == ExchangeKind.MOVEMENTS_CSV
-                        ? Texto.plural(done.exported, "movimentação gravada", "movimentações gravadas")
-                        : Texto.plural(done.exported, "produto gravado", "produtos gravados");
+                String oQue;
+                if (kind == ExchangeKind.MOVEMENTS_CSV) {
+                    oQue = Texto.plural(done.exported, "movimentação gravada", "movimentações gravadas") + " no arquivo escolhido.";
+                } else if (done.productsExported >= 0) {
+                    int movs = Math.max(0, done.exported - done.productsExported);
+                    oQue = "Backup salvo: " + Texto.plural(done.productsExported, "produto", "produtos")
+                            + " e " + Texto.plural(movs, "movimentação", "movimentações") + ".";
+                } else {
+                    oQue = Texto.plural(done.exported, "produto gravado", "produtos gravados") + " no arquivo escolhido.";
+                }
                 // Uma confirmação só (antes: texto na tela + snackbar + toast).
-                setImportExportDescText(oQue + " no arquivo escolhido.");
+                setImportExportDescText(oQue);
             });
         });
     }

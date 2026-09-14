@@ -30,6 +30,26 @@ public final class SectionNav {
         nav.setOnItemSelectedListener(null);
         nav.setSelectedItemId(selectedItemId);
         nav.setOnItemSelectedListener(item -> onItemSelected(activity, item, selectedItemId));
+        hideWhileKeyboardOpen(activity, nav);
+    }
+
+    /**
+     * Com o teclado aberto a barra subia junto e ficava colada nas sugestões
+     * do teclado: um toque na barra virava toque no teclado. Igual à Início.
+     */
+    static void hideWhileKeyboardOpen(AppCompatActivity activity, android.view.View nav) {
+        final android.view.View root = activity.findViewById(android.R.id.content);
+        if (root == null) {
+            return;
+        }
+        root.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            androidx.core.view.WindowInsetsCompat insets = androidx.core.view.ViewCompat.getRootWindowInsets(root);
+            boolean keyboard = insets != null && insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime());
+            int wanted = keyboard ? android.view.View.GONE : android.view.View.VISIBLE;
+            if (nav.getVisibility() != wanted) {
+                nav.setVisibility(wanted);
+            }
+        });
     }
 
     private static boolean onItemSelected(AppCompatActivity activity, MenuItem item, int currentId) {

@@ -161,7 +161,11 @@ public class ReportsActivity extends BaseActivity {
             chart = (HorizontalBarChart) findViewById(R.id.chart);
             chartEmptyState = findViewById(R.id.chartEmptyState);
             higher = (TextView) findViewById(R.id.higher);
+            // "Maior quantidade: Água Mineral (125)" comparava un com kg; o
+            // gráfico de valor já cobre "o que pesa mais".
+            higher.setVisibility(View.GONE);
             lower = (TextView) findViewById(R.id.lower);
+            lower.setVisibility(View.GONE);
             totalProducts = (TextView) findViewById(R.id.totalProducts);
             totalItems = (TextView) findViewById(R.id.totalItems);
             totalValue = (TextView) findViewById(R.id.totalValue);
@@ -488,7 +492,7 @@ public class ReportsActivity extends BaseActivity {
         }
 
         // Atualizar estatísticas gerais
-        totalProducts.setText("Total de Produtos: " + cursorCount);
+        totalProducts.setText("Total de produtos: " + cursorCount);
         totalItems.setText("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItemsCount));
         totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         

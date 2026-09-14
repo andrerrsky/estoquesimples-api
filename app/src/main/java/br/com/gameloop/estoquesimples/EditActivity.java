@@ -761,6 +761,15 @@ public class EditActivity extends BaseActivity {
             amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
         }
 
+        try {
+            String unidade = unit.getText().toString();
+            double qtd = CurrencyHelper.parseCurrency(amount.getText().toString().trim(), 0);
+            if (amountOk && Unidades.inteira(unidade) && Unidades.fracionada(qtd)) {
+                amountOk = FormValidation.check(amountLayout, true, Unidades.mensagemFracao(unidade));
+            }
+        } catch (Exception ignored) {
+        }
+
         boolean valueOk;
         try {
             // Valor é opcional (ver AddActivity).

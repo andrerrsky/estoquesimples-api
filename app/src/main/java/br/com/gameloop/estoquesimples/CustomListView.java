@@ -56,7 +56,7 @@ public class CustomListView extends ArrayAdapter<String> {
     private final Set<String> expandedNames = new HashSet<>();
     private boolean showProductImages;
     /** Tempo do "Desfazer": 8 s ainda escapava a quem lê a mensagem antes de decidir. */
-    public static final int UNDO_DURATION_MS = 12000;
+    public static final int UNDO_DURATION_MS = 15000;
 
     public CustomListView(Activity context, ArrayList<String> names, ArrayList<String> amounts, 
                          ArrayList<String> values, ArrayList<String> photos, ArrayList<String> categories,
@@ -420,6 +420,9 @@ public class CustomListView extends ArrayAdapter<String> {
         int padding = (int) (context.getResources().getDisplayMetrics().density * 16);
         container.setPadding(padding, padding, padding, padding);
 
+        final boolean unidadeInteira = Unidades.inteira(units.get(position));
+        // Produto contado por unidade: a fração é barrada na validação, com
+        // mensagem. Tirar a vírgula do teclado fazia "1,5" virar "15" em silêncio.
         TextInputLayout qtyLayout = FormValidation.addField(container, "Quantidade",
                 android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
                         | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
@@ -484,6 +487,10 @@ public class CustomListView extends ArrayAdapter<String> {
             if (!FormValidation.check(qtyLayout, qty <= 0, "A quantidade deve ser maior que zero.")) {
                 return;
             }
+            if (!FormValidation.check(qtyLayout, unidadeInteira && Unidades.fracionada(qty),
+                    Unidades.mensagemFracao(units.get(position)))) {
+                return;
+            }
 
             // Garantir que o banco está disponível antes de gravar
             if (MainActivity.stock == null || !MainActivity.stock.isOpen()) {
@@ -527,6 +534,9 @@ public class CustomListView extends ArrayAdapter<String> {
 
             // Atualizar lista
             if (MainActivity.instance != null) {
+                // Com o filtro "Estoque baixo" ligado, o produto que acabou de
+                // receber entrada sumia da lista no mesmo instante.
+                MainActivity.instance.keepVisible(productName);
                 MainActivity.instance.updateList();
             }
             showMovementSnackbar(isEntrada, qty, unitStr, hasUnit, result);

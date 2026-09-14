@@ -67,6 +67,8 @@ public final class DataExchange {
         public int failed;
         public int movementsImported;
         public int exported;
+        /** Só no backup JSON: produtos gravados (o resto de {@code exported} são movimentações). */
+        public int productsExported = -1;
         public final List<String> lines = new ArrayList<>();
 
         void line(String text) {
@@ -203,6 +205,7 @@ public final class DataExchange {
             LocalDb.closeQuietly(productCursor);
         }
         backup.put("products", productArray);
+        report.productsExported = report.exported;
 
         JSONArray movementArray = new JSONArray();
         Cursor movementCursor = null;

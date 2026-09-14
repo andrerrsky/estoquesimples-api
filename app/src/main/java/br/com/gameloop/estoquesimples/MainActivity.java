@@ -309,6 +309,7 @@ public class MainActivity extends BaseActivity {
 
                 @Override
                 public boolean onQueryTextChange(String newText) {
+                    stickyNames.clear();
                     if (listAdapter != null) {
                         listAdapter.collapseAll();
                     }
@@ -641,6 +642,18 @@ public class MainActivity extends BaseActivity {
     /** Filtro "Estoque baixo" da tela inicial. */
     private boolean lowStockOnly = false;
 
+    /**
+     * Produtos que continuam à vista mesmo sem casar com o filtro, porque a
+     * pessoa acabou de agir neles (limpo ao trocar filtro ou busca).
+     */
+    private final java.util.Set<String> stickyNames = new java.util.HashSet<>();
+
+    public void keepVisible(String name) {
+        if (lowStockOnly && name != null) {
+            stickyNames.add(name);
+        }
+    }
+
     private static boolean isLowStock(String amountStr, String minStockStr) {
         double amount = CurrencyHelper.parseCurrency(amountStr, 0);
         if (amount <= 0) {
@@ -699,6 +712,7 @@ public class MainActivity extends BaseActivity {
             return;
         }
         lowStockOnly = enabled;
+        stickyNames.clear();
         updateFilterChips();
         filterList(searchView != null ? searchView.getQuery().toString() : "");
     }
@@ -802,7 +816,8 @@ public class MainActivity extends BaseActivity {
             String searchQuery = fold(query);
             
             for (int i = 0; i < names.size(); i++) {
-                if (lowStockOnly && !isLowStock(amounts.get(i), minStocks.get(i))) {
+                if (lowStockOnly && !isLowStock(amounts.get(i), minStocks.get(i))
+                        && !stickyNames.contains(names.get(i))) {
                     continue;
                 }
                 if (matchesQuery(i, searchQuery)) {
@@ -1292,7 +1307,8 @@ public class MainActivity extends BaseActivity {
         dialog.show();
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (selected.isEmpty()) {
-                Feedback.show(this, "Marque pelo menos um produto.");
+                // Dentro do diálogo: a snackbar ficava atrás do escurecimento.
+                FormValidation.check(filterLayout, true, "Marque pelo menos um produto.");
                 return;
             }
             dialog.dismiss();
@@ -1467,7 +1483,12 @@ public class MainActivity extends BaseActivity {
             }
         }
         
+        if (!products.isEmpty()) {
+            // Mostra o primeiro produto alterado; antes a lista ficava onde estava.
+            pendingShowName = products.get(0);
+        }
         updateList();
+        revealPendingProduct();
         String resumo = (adjustment > 0 ? "+" : "") + CurrencyHelper.formatQuantity(adjustment)
                 + " em " + updated + (updated == 1 ? " produto." : " produtos.");
         com.google.android.material.snackbar.Snackbar undo = Feedback.make(this, resumo,

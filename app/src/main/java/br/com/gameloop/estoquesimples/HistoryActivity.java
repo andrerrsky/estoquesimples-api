@@ -409,12 +409,32 @@ public class HistoryActivity extends BaseActivity {
     }
 
     private void confirmCancellation(HistoryAdapter.HistoryItem item) {
+        // "Estoque atual X → ficará Y": quem já corrigiu o saldo na mão depois
+        // desta movimentação acabava com estoque dobrado sem perceber.
+        String efeito = "";
+        String alerta = "";
+        String pid = item.getProductUuid();
+        if (pid != null && ensureDatabaseAvailable()) {
+            double atual = new br.com.gameloop.estoquesimples.data.ProductRepository(MainActivity.stock).currentAmount(pid);
+            double depois = atual - MovementRepository.signedQuantity(item.getType(), item.getQuantity());
+            String un = item.getUnit().isEmpty() ? "" : " " + item.getUnit();
+            efeito = "\n\nEstoque atual: " + CurrencyHelper.formatQuantity(atual) + un
+                    + " → ficará: " + CurrencyHelper.formatQuantity(Math.max(0, depois)) + un;
+            for (HistoryAdapter.HistoryItem outro : allItems) {
+                if (pid.equals(outro.getProductUuid()) && outro.getTimestamp() > item.getTimestamp()
+                        && (MovementRepository.AJUSTE.equalsIgnoreCase(outro.getType())
+                        || MovementRepository.EDICAO.equalsIgnoreCase(outro.getType()))) {
+                    alerta = "\n\nAtenção: houve um ajuste manual neste produto depois desta movimentação. "
+                            + "Se ele já corrigiu o saldo, estornar vai contar duas vezes.";
+                    break;
+                }
+            }
+        }
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Estornar movimentação?")
-                .setMessage(descreverVinculo(item) + "\n" + item.getProductName() + "\n\n"
+                .setMessage(descreverVinculo(item) + "\n" + item.getProductName() + efeito + alerta + "\n\n"
                         + "O registro original permanece no histórico e uma movimentação "
-                        + "de correção será criada para desfazer o efeito no estoque.\n\n"
-                        + "Deseja continuar?")
+                        + "de correção será criada para desfazer o efeito no estoque.")
                 .setNegativeButton("Voltar", null)
                 .setPositiveButton("Estornar", (dialog, which) -> applyCancellation(item))
                 .show();

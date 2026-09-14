@@ -294,6 +294,37 @@ public class AddActivity extends BaseActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    private boolean similarConfirmed;
+
+    /**
+     * "Cafe Torrado 500g" ao lado de "Café Torrado e Moído 500g" é o erro
+     * clássico de estoque dividido em dois cadastros. Antes de salvar, um
+     * nome parecido com um existente pede confirmação.
+     */
+    private String findSimilarName(String name) {
+        if (MainActivity.instance == null || MainActivity.instance.names == null) {
+            return null;
+        }
+        String alvo = MainActivity.fold(name).replaceAll("[^a-z0-9]", "");
+        if (alvo.length() < 4) {
+            return null;
+        }
+        for (String existente : MainActivity.instance.names) {
+            String e = MainActivity.fold(existente).replaceAll("[^a-z0-9]", "");
+            if (e.isEmpty() || e.equals(alvo)) {
+                continue;
+            }
+            if (e.contains(alvo) || alvo.contains(e)) {
+                return existente;
+            }
+            int prefixo = Math.min(8, Math.min(e.length(), alvo.length()));
+            if (prefixo >= 8 && e.regionMatches(0, alvo, 0, prefixo)) {
+                return existente;
+            }
+        }
+        return null;
+    }
+
     public void addProduct(View v) {
 
         // Verificar se os campos foram inicializados
@@ -302,6 +333,23 @@ public class AddActivity extends BaseActivity {
             Log.e(TAG, "Fields not initialized in addProduct");
             finish();
             return;
+        }
+
+        if (!similarConfirmed) {
+            String parecido = findSimilarName(productName.getText().toString().trim());
+            if (parecido != null) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Produto parecido já existe")
+                        .setMessage("\u201c" + parecido + "\u201d já está cadastrado. Se for o mesmo produto, "
+                                + "registre uma entrada nele em vez de criar outro cadastro.")
+                        .setPositiveButton("Cadastrar mesmo assim", (d, w) -> {
+                            similarConfirmed = true;
+                            addProduct(v);
+                        })
+                        .setNegativeButton("Voltar", null)
+                        .show();
+                return;
+            }
         }
 
         if (!isValid()) {
@@ -505,6 +553,16 @@ public class AddActivity extends BaseActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error validating product amount", e);
             amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
+        }
+
+        // Unidade inteira não aceita fração (ver Unidades).
+        try {
+            String unidade = productUnit.getText().toString();
+            double qtd = CurrencyHelper.parseCurrency(productAmount.getText().toString().trim(), 0);
+            if (amountOk && Unidades.inteira(unidade) && Unidades.fracionada(qtd)) {
+                amountOk = FormValidation.check(amountLayout, true, Unidades.mensagemFracao(unidade));
+            }
+        } catch (Exception ignored) {
         }
 
         boolean valueOk;

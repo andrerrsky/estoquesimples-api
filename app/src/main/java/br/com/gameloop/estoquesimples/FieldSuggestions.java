@@ -50,11 +50,17 @@ public final class FieldSuggestions {
         // vigésimo produto quer escolher a categoria, não lembrar como escreveu.
         // O primeiro toque num campo só dá foco (não chega ao onClick), por
         // isso a lista abre no foco; o onClick cobre o segundo toque.
+        Runnable abrir = () -> {
+            if (field.hasFocus() && !values.isEmpty() && !field.isPopupShowing()
+                    && field.getText().length() == 0) {
+                field.showDropDown();
+            }
+        };
         field.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus && !values.isEmpty()) {
-                field.post(() -> {
-                    if (field.hasFocus() && !field.isPopupShowing()) field.showDropDown();
-                });
+            if (hasFocus) {
+                // Duas tentativas: o teclado abrindo derruba o popup da primeira.
+                field.post(abrir);
+                field.postDelayed(abrir, 350);
             }
         });
         field.setOnClickListener(v -> {

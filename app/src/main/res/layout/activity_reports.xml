@@ -111,44 +111,10 @@
             android:layout_marginBottom="@dimen/section_gap">
 
             <TextView
-                android:id="@+id/totalProducts"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Total de Produtos: 0"
-                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
-                android:textColor="@color/color_text"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/stroke_width"
-                android:background="@color/color_border"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <TextView
-                android:id="@+id/totalItems"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Total de Itens: 0"
-                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
-                android:textColor="@color/color_text"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/stroke_width"
-                android:background="@color/color_border"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <TextView
                 android:id="@+id/totalValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Valor Total: $ 0,00"
+                android:text="Valor do estoque: R$ 0,00"
                 android:textAppearance="@style/TextAppearance.Estoque.Value"
                 android:textSize="16sp"
                 android:paddingTop="4dp"
@@ -169,6 +135,32 @@
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting"
                 android:textColor="@color/color_text"
                 android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/stroke_width"
+                android:background="@color/color_border"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalProducts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Total de produtos: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalItems"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Itens em estoque: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:paddingTop="2dp"
                 android:paddingBottom="4dp" />
         </LinearLayout>
 
@@ -274,7 +266,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Análise de estoque"
+            android:text="Alertas de reposição"
             android:textAppearance="@style/TextAppearance.Estoque.Label"
             android:layout_marginBottom="@dimen/field_gap" />
 
