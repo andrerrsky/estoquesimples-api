@@ -576,6 +576,19 @@ public class EditActivity extends BaseActivity {
         discardGuard = new DiscardGuard(this, "Descartar alterações?");
         discardGuard.watch(name, amount, value, description, category, sku, barcode, supplier,
                 location, minStock, unit);
+
+        if (getIntent() != null && getIntent().getBooleanExtra("fixQuantity", false) && amountLayout != null) {
+            // Veio do selo "quantidade quebrada": já rola até a quantidade com a
+            // explicação, em vez de abrir o formulário genérico no topo.
+            FormValidation.check(amountLayout, true, Unidades.mensagemFracao(unit.getText().toString()));
+            FormValidation.focusFirstError(scrollView, amountLayout);
+            amount.postDelayed(() -> {
+                amount.requestFocus();
+                if (amount instanceof android.widget.EditText) {
+                    ((android.widget.EditText) amount).selectAll();
+                }
+            }, 400);
+        }
     }
 
     public void editProduct(View v) {

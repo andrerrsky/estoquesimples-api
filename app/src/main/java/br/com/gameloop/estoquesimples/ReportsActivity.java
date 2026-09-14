@@ -414,6 +414,7 @@ public class ReportsActivity extends BaseActivity {
         // Somar "45 un + 3,75 kg + 12 pct" num número só não significa nada:
         // o total é mostrado por unidade.
         java.util.Map<String, Double> porUnidade = new java.util.LinkedHashMap<>();
+        int quantidadesQuebradas = 0;
 
         if(cursor.moveToFirst()) {
 
@@ -436,6 +437,7 @@ public class ReportsActivity extends BaseActivity {
             totalItemsCount += columnAmount;
             totalValueSum += (columnAmount * columnValue);
             somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
+            if (Unidades.inteira(cursor.getString(5)) && Unidades.fracionada(columnAmount)) quantidadesQuebradas++;
 
             // Verificar estoque baixo
             if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
@@ -474,6 +476,7 @@ public class ReportsActivity extends BaseActivity {
                 totalItemsCount += columnAmount;
                 totalValueSum += (columnAmount * columnValue);
                 somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
+                if (Unidades.inteira(cursor.getString(5)) && Unidades.fracionada(columnAmount)) quantidadesQuebradas++;
 
                 // Verificar estoque baixo
                 if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
@@ -493,7 +496,10 @@ public class ReportsActivity extends BaseActivity {
 
         // Atualizar estatísticas gerais
         totalProducts.setText("Total de produtos: " + cursorCount);
-        totalItems.setText("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItemsCount));
+        totalItems.setText("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItemsCount)
+                + (quantidadesQuebradas > 0
+                        ? " · " + Texto.plural(quantidadesQuebradas, "produto", "produtos") + " com quantidade a corrigir"
+                        : ""));
         totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         
         // "Valor médio por produto" não ajudava ninguém a decidir nada; o que
@@ -790,8 +796,11 @@ public class ReportsActivity extends BaseActivity {
         if (outros != null) {
             // Sem esta linha a conta "entradas − saídas ≠ valor do estoque" não
             // fechava e o dono estranhava a diferença.
+            double liquido = totalEntry - totalExit + totalOutros;
             outros.setText("Cadastros, ajustes e estornos: " + (totalOutros < 0 ? "− " : "")
-                    + CurrencyHelper.formatCurrency(this, Math.abs(totalOutros)));
+                    + CurrencyHelper.formatCurrency(this, Math.abs(totalOutros))
+                    + "\nSaldo líquido das movimentações: " + CurrencyHelper.formatCurrency(this, liquido)
+                    + "\n(difere do valor do estoque quando produtos foram excluídos ou o valor unitário mudou)");
         }
     }
 
@@ -1433,9 +1442,22 @@ public class ReportsActivity extends BaseActivity {
         Cursor c = null;
         int count = 0;
         double qtyEntrada = 0, qtySaida = 0, valEntrada = 0, valSaida = 0, qtyOutros = 0, valOutros = 0;
+        // Quem lê só o PDF contava a saída original e o estorno como duas
+        // saídas: a original vem marcada como estornada, igual à tela.
+        java.util.Set<String> estornadas = new java.util.HashSet<>();
+        Cursor r = null;
+        try {
+            r = MainActivity.stock.rawQuery(
+                    "SELECT reverses_uuid FROM EstoqueHistorico WHERE reverses_uuid IS NOT NULL AND deleted_at IS NULL", null);
+            while (r != null && r.moveToNext()) {
+                estornadas.add(r.getString(0));
+            }
+        } finally {
+            closeCursor(r);
+        }
         try {
             c = MainActivity.stock.rawQuery(
-                    "SELECT h.product_name, h.change_type, h.quantity, h.timestamp, h.note, e.value, e.unit " +
+                    "SELECT h.product_name, h.change_type, h.quantity, h.timestamp, h.note, e.value, e.unit, h.uuid " +
                             "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
                             "WHERE h.timestamp >= ? AND h.deleted_at IS NULL ORDER BY h.timestamp DESC",
                     new String[]{String.valueOf(period.cutoffMillis())});
@@ -1462,8 +1484,9 @@ public class ReportsActivity extends BaseActivity {
                     double lineVal = absQty * val;
 
                     count++;
+                    boolean estornada = estornadas.contains(c.getString(7));
                     b.movementItem(count, sdf.format(new Date(ts)), product,
-                            MovementDisplay.label(changeType),
+                            MovementDisplay.label(changeType) + (estornada ? "  (ESTORNADA)" : ""),
                             fq(absQty) + unit, fc(lineVal), note, entrada);
 
                     if (!isCompraOuVenda(changeType)) {

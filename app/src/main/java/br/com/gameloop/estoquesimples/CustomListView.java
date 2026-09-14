@@ -274,10 +274,11 @@ public class CustomListView extends ArrayAdapter<String> {
         // Unidade
         if(units.get(position) != null && !units.get(position).isEmpty() && !units.get(position).equals("null")) {
             unit.setText(" " + units.get(position));
-            unit.setVisibility(View.VISIBLE);
         } else {
-            unit.setVisibility(View.GONE);
+            // Cadastro antigo sem unidade: o app já a trata como "un".
+            unit.setText(" un");
         }
+        unit.setVisibility(View.VISIBLE);
 
         // Alerta de estoque baixo
         try {
@@ -325,7 +326,7 @@ public class CustomListView extends ArrayAdapter<String> {
                     : "Quantidade quebrada em item por unidade · toque aqui");
             lowStockBadge.setVisibility(View.VISIBLE);
             amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
-            lowStockBadge.setOnClickListener(v -> MainActivity.instance.showEditActivity(names.get(finalPosition)));
+            lowStockBadge.setOnClickListener(v -> MainActivity.instance.showEditActivity(names.get(finalPosition), true));
             lowStockBadge.setClickable(true);
         } else {
             lowStockBadge.setOnClickListener(null);
@@ -430,7 +431,7 @@ public class CustomListView extends ArrayAdapter<String> {
                     com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
             if (aviso != null) {
                 aviso.setDuration(8000);
-                aviso.setAction("Corrigir", v -> MainActivity.instance.showEditActivity(productName));
+                aviso.setAction("Corrigir", v -> MainActivity.instance.showEditActivity(productName, true));
                 aviso.show();
             }
             return;
@@ -600,7 +601,7 @@ public class CustomListView extends ArrayAdapter<String> {
                 MainActivity.instance.keepVisible(productName);
                 MainActivity.instance.updateList();
             }
-            showMovementSnackbar(isEntrada, qty, unitStr, hasUnit, result);
+            showMovementSnackbar(isEntrada, qty, unitStr, hasUnit, result, quando[0]);
         });
     }
 
@@ -612,11 +613,14 @@ public class CustomListView extends ArrayAdapter<String> {
      * registrado; nada é apagado).
      */
     private void showMovementSnackbar(boolean isEntrada, double qty, String unitStr, boolean hasUnit,
-                                      MovementRepository.Result result) {
+                                      MovementRepository.Result result, long quando) {
         // \u00a0 entre número e unidade: "kg" sozinho na linha de baixo lia mal.
+        String data = quando > 0
+                ? " em " + new java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault()).format(new java.util.Date(quando))
+                : "";
         String text = (isEntrada ? "Entrada de " : "Saída de ")
                 + CurrencyHelper.formatQuantity(qty) + (hasUnit ? "\u00a0" + unitStr : "")
-                + " registrada. Estoque agora: " + CurrencyHelper.formatQuantity(result.newAmount)
+                + data + " registrada. Estoque agora: " + CurrencyHelper.formatQuantity(result.newAmount)
                 + (hasUnit ? "\u00a0" + unitStr : "");
         com.google.android.material.snackbar.Snackbar snackbar = Feedback.make(context, text,
                 com.google.android.material.snackbar.Snackbar.LENGTH_LONG);

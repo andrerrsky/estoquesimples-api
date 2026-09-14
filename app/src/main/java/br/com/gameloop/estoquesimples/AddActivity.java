@@ -335,8 +335,12 @@ public class AddActivity extends BaseActivity {
         }
         for (String existente : MainActivity.instance.names) {
             String e = MainActivity.fold(existente).replaceAll("[^a-z0-9]", "");
-            if (e.isEmpty() || e.equals(alvo)) {
+            if (e.isEmpty()) {
                 continue;
+            }
+            if (e.equals(alvo)) {
+                // "Agua Sanitaria 2L" e "Água Sanitária 2L": o mesmo produto.
+                return existente;
             }
             if (e.contains(alvo) || alvo.contains(e)) {
                 return existente;
@@ -362,11 +366,20 @@ public class AddActivity extends BaseActivity {
         if (!similarConfirmed) {
             String parecido = findSimilarName(productName.getText().toString().trim());
             if (parecido != null) {
+                final String existente = parecido;
                 new AlertDialog.Builder(this)
                         .setTitle("Produto parecido já existe")
                         .setMessage("\u201c" + parecido + "\u201d já está cadastrado. Se for o mesmo produto, "
                                 + "registre uma entrada nele em vez de criar outro cadastro.")
-                        .setPositiveButton("Cadastrar mesmo assim", (d, w) -> {
+                        .setPositiveButton("Ver produto", (d, w) -> {
+                            if (MainActivity.instance != null) {
+                                MainActivity.instance.searchFor(existente);
+                            }
+                            if (discardGuard != null) discardGuard.markDirty();
+                            setResult(RESULT_CANCELED);
+                            finish();
+                        })
+                        .setNeutralButton("Cadastrar mesmo assim", (d, w) -> {
                             similarConfirmed = true;
                             addProduct(v);
                         })

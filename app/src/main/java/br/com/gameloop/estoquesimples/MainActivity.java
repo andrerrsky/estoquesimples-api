@@ -648,6 +648,16 @@ public class MainActivity extends BaseActivity {
      */
     private final java.util.Set<String> stickyNames = new java.util.HashSet<>();
 
+    /** Mostra um produto específico: limpa filtro, busca pelo nome e o expande. */
+    public void searchFor(String name) {
+        lowStockOnly = false;
+        pendingShowName = name;
+        pendingListRefresh = true;
+        if (searchView != null) {
+            searchView.setQuery(name, false);
+        }
+    }
+
     public void keepVisible(String name) {
         if (lowStockOnly && name != null) {
             stickyNames.add(name);
@@ -782,7 +792,7 @@ public class MainActivity extends BaseActivity {
                     : hiddenByChip + " produtos correspondem à busca, mas nenhum está com estoque baixo.");
             if (clearLabel != null) clearLabel.setText("Ver todos");
             searching = true;
-        } else if (lowStockOnly) {
+        } else if (lowStockOnly && !searching) {
             title.setText("Nenhum produto com estoque baixo");
             message.setText("Tudo acima do mínimo por aqui.");
             if (clearLabel != null) clearLabel.setText("Ver todos");
@@ -1112,9 +1122,14 @@ public class MainActivity extends BaseActivity {
     }
 
     public void showEditActivity(String productName) {
+        showEditActivity(productName, false);
+    }
+
+    public void showEditActivity(String productName, boolean fixQuantity) {
 
         Intent intent = new Intent(this, EditActivity.class);
         intent.putExtra("productName", productName);
+        intent.putExtra("fixQuantity", fixQuantity);
         editProductLauncher.launch(intent);
 
     }

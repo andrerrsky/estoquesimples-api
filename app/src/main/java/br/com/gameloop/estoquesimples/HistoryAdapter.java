@@ -31,6 +31,25 @@ public class HistoryAdapter extends BaseAdapter {
         private String unit;
         private String productUuid;
         private Double balanceAfter;
+        private long recordedAt;
+        private boolean productDeleted;
+
+        public void setRecordedAt(long recordedAt) {
+            this.recordedAt = recordedAt;
+        }
+
+        /** Lançamento retroativo: registrado num dia diferente do da movimentação. */
+        public boolean isBackdated() {
+            return recordedAt > 0 && recordedAt - timestamp > 12 * 60 * 60 * 1000L;
+        }
+
+        public void setProductDeleted(boolean productDeleted) {
+            this.productDeleted = productDeleted;
+        }
+
+        public boolean isProductDeleted() {
+            return productDeleted;
+        }
 
         public void setProductUuid(String productUuid) {
             this.productUuid = productUuid;
@@ -164,7 +183,10 @@ public class HistoryAdapter extends BaseAdapter {
         }
 
         // Nome do produto
-        holder.productName.setText(item.getProductName());
+        // Produto excluído: as movimentações ficam, mas sem parecer de um item vivo.
+        holder.productName.setText(item.isProductDeleted()
+                ? item.getProductName() + " (produto excluído)"
+                : item.getProductName());
         // Sem isso, uma entrada já cancelada continuava com a mesma cara de
         // uma ativa na lista — só quem abria o detalhe descobria que ela não
         // vale mais para o saldo atual.
@@ -188,7 +210,9 @@ public class HistoryAdapter extends BaseAdapter {
 
         // Data e hora
         String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));
-        holder.dateTime.setText(dateStr);
+        // Lançamento retroativo recalcula o "Estoque depois" das linhas
+        // seguintes; sem esta marca o número parecia ter mudado sozinho.
+        holder.dateTime.setText(item.isBackdated() ? dateStr + " · lançada depois" : dateStr);
 
         // Observações
         String note = item.getNote();

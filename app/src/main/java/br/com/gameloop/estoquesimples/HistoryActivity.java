@@ -173,7 +173,8 @@ public class HistoryActivity extends BaseActivity {
                     "SELECT h.uuid, h.product_name, h.change_type, h.quantity, h.timestamp, h.note, "
                             + "h.reverses_uuid, "
                             + "(SELECT e.unit FROM Estoque e WHERE e.uuid = h.product_uuid) AS unit, "
-                            + "h.product_uuid "
+                            + "h.product_uuid, h.updated_at, "
+                            + "(SELECT e.deleted_at FROM Estoque e WHERE e.uuid = h.product_uuid) AS product_deleted "
                             + "FROM EstoqueHistorico h WHERE h.deleted_at IS NULL "
                             + "ORDER BY h.timestamp DESC",
                     null
@@ -194,6 +195,8 @@ public class HistoryActivity extends BaseActivity {
                             uuid, product, type, qty, ts, note, reversesUuid);
                     item.setUnit(unit);
                     item.setProductUuid(cursor.getString(8));
+                    item.setRecordedAt(cursor.isNull(9) ? 0L : cursor.getLong(9));
+                    item.setProductDeleted(!cursor.isNull(10));
                     items.add(item);
                 } while (cursor.moveToNext());
             }
