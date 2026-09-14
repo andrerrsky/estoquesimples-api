@@ -153,7 +153,12 @@ public class AddActivity extends BaseActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("Novo produto");
 
-        this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        // Cadastro começa pelo nome, já com o teclado: um toque a menos por produto.
+        this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        if (productName != null) {
+            productName.requestFocus();
+        }
 
         // Inicializar launchers para Activity Results
         initializeActivityResultLaunchers();
@@ -313,7 +318,8 @@ public class AddActivity extends BaseActivity {
             ContentValues insertValues = new ContentValues();
             insertValues.put("name", productName.getText().toString().trim());
             insertValues.put("amount", productAmount.getText().toString().trim());
-            insertValues.put("value", CurrencyHelper.sanitizeForStorage(productValue.getText().toString()));
+            String valorDigitado = productValue.getText().toString().trim();
+            insertValues.put("value", valorDigitado.isEmpty() ? "0" : CurrencyHelper.sanitizeForStorage(valorDigitado));
             insertValues.put("description", productDescription != null ? productDescription.getText().toString().trim() : "");
             
             // Novos campos com verificação null
@@ -503,9 +509,8 @@ public class AddActivity extends BaseActivity {
 
         boolean valueOk;
         try {
-            String value = productValue.getText().toString().trim();
-            valueOk = FormValidation.check(valueLayout, value.isEmpty() || value.equals("null"),
-                    "Informe o valor.");
+            // Valor é opcional: quem só quer contar estoque não precisa inventar preço.
+            valueOk = FormValidation.check(valueLayout, false, null);
         } catch (Exception e) {
             Log.e(TAG, "Error validating product value", e);
             valueOk = FormValidation.check(valueLayout, true, "Não foi possível validar o valor.");

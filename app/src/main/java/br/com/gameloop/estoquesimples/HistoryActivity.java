@@ -63,8 +63,17 @@ public class HistoryActivity extends BaseActivity {
         });
 
         typeFilter = findViewById(R.id.historyTypeFilter);
-        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, FILTROS_TIPO);
+        // A caixa fechada mostra "Tipo: Todas": uma caixa só com "Todas" não
+        // parecia um filtro.
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<String>(
+                this, android.R.layout.simple_spinner_item, FILTROS_TIPO) {
+            @Override
+            public android.view.View getView(int position, android.view.View convertView, android.view.ViewGroup parent) {
+                android.view.View v = super.getView(position, convertView, parent);
+                ((TextView) v).setText("Tipo: " + getItem(position));
+                return v;
+            }
+        };
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         typeFilter.setAdapter(typeAdapter);
         typeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -101,23 +110,29 @@ public class HistoryActivity extends BaseActivity {
     private void applyFilters() {
         String filtroTipo = (String) typeFilter.getSelectedItem();
         boolean semFiltroTipo = filtroTipo == null || FILTROS_TIPO[0].equals(filtroTipo);
-        String buscaLower = searchQuery.toLowerCase(Locale.ROOT);
+        String buscaLower = MainActivity.fold(searchQuery);
 
         List<HistoryAdapter.HistoryItem> visiveis = new ArrayList<>();
         for (HistoryAdapter.HistoryItem item : allItems) {
             boolean casaTipo = semFiltroTipo || filtroTipo.equals(categoria(item.getType()));
+            // Mesma regra da Início: sem acento, sem caixa ("moida" acha "Moída").
             boolean casaBusca = buscaLower.isEmpty()
-                    || (item.getProductName() != null
-                        && item.getProductName().toLowerCase(Locale.ROOT).contains(buscaLower));
+                    || MainActivity.fold(item.getProductName()).contains(buscaLower);
             if (casaTipo && casaBusca) {
                 visiveis.add(item);
             }
         }
 
-        boolean filtroAtivo = !semFiltroTipo || !buscaLower.isEmpty();
-        emptyView.setText(filtroAtivo && !allItems.isEmpty()
-                ? "Nenhuma movimentação encontrada para esse filtro"
-                : "Nenhuma movimentação de entrada ou saída registrada ainda");
+        String vazio;
+        if (allItems.isEmpty()) {
+            vazio = "Nenhuma movimentação registrada ainda. Entradas, saídas e ajustes aparecem aqui.";
+        } else if (!buscaLower.isEmpty()) {
+            vazio = "Nenhuma movimentação de \u201c" + searchQuery.trim() + "\u201d"
+                    + (semFiltroTipo ? "." : " em \u201c" + filtroTipo + "\u201d.");
+        } else {
+            vazio = "Nenhuma movimentação em \u201c" + filtroTipo + "\u201d.";
+        }
+        emptyView.setText(vazio);
 
         historyList.setAdapter(new HistoryAdapter(this, visiveis));
         historyList.setOnItemClickListener((parent, view, position, id) -> {
@@ -147,7 +162,8 @@ public class HistoryActivity extends BaseActivity {
             cursor = MainActivity.stock.rawQuery(
                     "SELECT h.uuid, h.product_name, h.change_type, h.quantity, h.timestamp, h.note, "
                             + "h.reverses_uuid, "
-                            + "(SELECT e.unit FROM Estoque e WHERE e.uuid = h.product_uuid) AS unit "
+                            + "(SELECT e.unit FROM Estoque e WHERE e.uuid = h.product_uuid) AS unit, "
+                            + "h.product_uuid "
                             + "FROM EstoqueHistorico h WHERE h.deleted_at IS NULL "
                             + "ORDER BY h.timestamp DESC",
                     null
@@ -167,6 +183,7 @@ public class HistoryActivity extends BaseActivity {
                     HistoryAdapter.HistoryItem item = new HistoryAdapter.HistoryItem(
                             uuid, product, type, qty, ts, note, reversesUuid);
                     item.setUnit(unit);
+                    item.setProductUuid(cursor.getString(8));
                     items.add(item);
                 } while (cursor.moveToNext());
             }
@@ -182,10 +199,46 @@ public class HistoryActivity extends BaseActivity {
         }
 
         marcarEstornadas(items);
+        calcularSaldos(items);
 
         allItems.clear();
         allItems.addAll(items);
         applyFilters();
+    }
+
+    /**
+     * "Ficou com quanto?" depois de cada movimentação. O histórico não guarda
+     * saldo; ele é refeito de trás para frente a partir do saldo atual de cada
+     * produto, desfazendo o efeito de cada movimentação mais nova.
+     */
+    private void calcularSaldos(List<HistoryAdapter.HistoryItem> items) {
+        java.util.Map<String, Double> saldo = new java.util.HashMap<>();
+        Cursor c = null;
+        try {
+            c = MainActivity.stock.rawQuery("SELECT uuid, amount FROM Estoque WHERE uuid IS NOT NULL", null);
+            while (c != null && c.moveToNext()) {
+                saldo.put(c.getString(0), CurrencyHelper.parseCurrency(c.getString(1), 0));
+            }
+        } catch (Exception e) {
+            Log.e("HistoryActivity", "Error computing balances", e);
+            return;
+        } finally {
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (Exception ignored) {}
+            }
+        }
+        // items vêm do mais novo para o mais antigo
+        for (HistoryAdapter.HistoryItem item : items) {
+            String pid = item.getProductUuid();
+            if (pid == null || !saldo.containsKey(pid)) {
+                continue;
+            }
+            double depois = saldo.get(pid);
+            item.setBalanceAfter(depois);
+            saldo.put(pid, depois - MovementRepository.signedQuantity(item.getType(), item.getQuantity()));
+        }
     }
 
     /**
@@ -235,6 +288,10 @@ public class HistoryActivity extends BaseActivity {
                 .append(efeito < 0 ? " (saiu do estoque)" : efeito > 0 ? " (entrou no estoque)" : "")
                 .append("<br><br>");
         sb.append("<b>Data</b><br>").append(dateStr);
+        if (item.hasBalanceAfter()) {
+            sb.append("<br><br><b>Estoque depois</b><br>")
+                    .append(CurrencyHelper.formatQuantity(item.getBalanceAfter())).append(esc(unidade));
+        }
 
         String note = item.getNote();
         if (note != null && !note.isEmpty() && !"null".equalsIgnoreCase(note)) {
@@ -384,7 +441,7 @@ public class HistoryActivity extends BaseActivity {
         if (MainActivity.instance != null) {
             MainActivity.instance.markListDirty(true);
         }
-        Toast.makeText(this, "Movimentação cancelada.", Toast.LENGTH_SHORT).show();
+        Feedback.show(this, "Movimentação estornada.");
         loadHistory();
     }
 

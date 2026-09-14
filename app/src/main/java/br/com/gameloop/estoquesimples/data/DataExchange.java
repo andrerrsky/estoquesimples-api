@@ -82,9 +82,9 @@ public final class DataExchange {
             }
             if (created + updated + skipped + failed + movementsImported > 0) {
                 out.append('\n')
-                        .append(created).append(" criado(s), ")
-                        .append(updated).append(" atualizado(s), ")
-                        .append(skipped).append(" ignorado(s)");
+                        .append(br.com.gameloop.estoquesimples.Texto.plural(created, "criado", "criados")).append(", ")
+                        .append(br.com.gameloop.estoquesimples.Texto.plural(updated, "atualizado", "atualizados")).append(", ")
+                        .append(br.com.gameloop.estoquesimples.Texto.plural(skipped, "ignorado", "ignorados"));
                 if (movementsImported > 0) {
                     out.append(", ").append(movementsImported).append(" movimentação(ões)");
                 }

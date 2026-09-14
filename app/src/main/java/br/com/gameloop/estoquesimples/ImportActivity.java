@@ -506,12 +506,10 @@ public class ImportActivity extends BaseActivity {
             DataExchange.Report done = report;
             main.post(() -> {
                 String oQue = kind == ExchangeKind.MOVEMENTS_CSV
-                        ? "movimentação(ões)"
-                        : "produto(s)";
-                setImportExportDescText("Exportação concluída.\n\n"
-                        + done.exported + " " + oQue + " gravado(s) no arquivo escolhido.");
-                Toast.makeText(this, done.exported + " registro(s) exportado(s).",
-                        Toast.LENGTH_LONG).show();
+                        ? Texto.plural(done.exported, "movimentação gravada", "movimentações gravadas")
+                        : Texto.plural(done.exported, "produto gravado", "produtos gravados");
+                // Uma confirmação só (antes: texto na tela + snackbar + toast).
+                setImportExportDescText(oQue + " no arquivo escolhido.");
             });
         });
     }
@@ -530,9 +528,9 @@ public class ImportActivity extends BaseActivity {
                 int produtos = json.optJSONArray("products") == null
                         ? 0 : json.optJSONArray("products").length();
                 main.post(() -> {
-                    setImportExportDescText("Cópia da nuvem salva.\n\n"
-                            + produtos + " produto(s) no arquivo. Isso não alterou o estoque deste aparelho.");
-                    Toast.makeText(this, "Cópia da nuvem salva.", Toast.LENGTH_LONG).show();
+                    setImportExportDescText("Cópia da nuvem salva: "
+                            + Texto.plural(produtos, "produto", "produtos")
+                            + " no arquivo. Isso não alterou o estoque deste aparelho.");
                 });
             } catch (ApiException e) {
                 Log.w(TAG, "falha ao baixar cópia da nuvem", e);
@@ -637,7 +635,8 @@ public class ImportActivity extends BaseActivity {
     }
 
     private static String stamp() {
-        return new SimpleDateFormat("dd-M-yyyy_HH-mm-ss", Locale.getDefault()).format(new Date());
+        // Mesmo formato dos PDFs: ordena certo na pasta.
+        return new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(new Date());
     }
 
     private enum ExchangeKind {

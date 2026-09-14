@@ -20,7 +20,7 @@ import br.com.gameloop.estoquesimples.data.LocalDb;
 public final class FieldSuggestions {
 
     private static final String[] UNIDADES_COMUNS = {
-            "un", "kg", "g", "L", "ml", "cx", "pct", "dz", "par", "m", "sc", "pote", "fardo"
+            "un", "kg", "g", "L", "ml", "caixa", "pacote", "dúzia", "par", "m", "saco", "pote", "fardo"
     };
 
     private FieldSuggestions() {
@@ -41,6 +41,9 @@ public final class FieldSuggestions {
 
     private static void bind(AutoCompleteTextView field, List<String> values) {
         field.setThreshold(1);
+        // Altura limitada: com o teclado aberto a lista inteira não cabia
+        // embaixo e o Android a jogava por cima da toolbar e do próprio campo.
+        field.setDropDownHeight(Math.round(150 * field.getResources().getDisplayMetrics().density));
         field.setAdapter(new ArrayAdapter<>(field.getContext(),
                 android.R.layout.simple_dropdown_item_1line, values));
         // Abre a lista também num toque, sem digitar nada: quem cadastra o

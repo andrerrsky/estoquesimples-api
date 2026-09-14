@@ -29,6 +29,28 @@ public class HistoryAdapter extends BaseAdapter {
         /** Marcado depois de carregar a lista inteira: outro item aponta para este em reversesUuid. */
         private boolean reversed;
         private String unit;
+        private String productUuid;
+        private Double balanceAfter;
+
+        public void setProductUuid(String productUuid) {
+            this.productUuid = productUuid;
+        }
+
+        public String getProductUuid() {
+            return productUuid;
+        }
+
+        public void setBalanceAfter(double balanceAfter) {
+            this.balanceAfter = balanceAfter;
+        }
+
+        public boolean hasBalanceAfter() {
+            return balanceAfter != null;
+        }
+
+        public double getBalanceAfter() {
+            return balanceAfter == null ? 0 : balanceAfter;
+        }
 
         public void setUnit(String unit) {
             this.unit = unit;
@@ -124,6 +146,7 @@ public class HistoryAdapter extends BaseAdapter {
             holder.quantity = convertView.findViewById(R.id.quantity);
             holder.dateTime = convertView.findViewById(R.id.dateTime);
             holder.note = convertView.findViewById(R.id.note);
+            holder.balanceAfter = convertView.findViewById(R.id.balanceAfter);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -152,6 +175,17 @@ public class HistoryAdapter extends BaseAdapter {
         holder.quantity.setText(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity()))
                 + (item.getUnit().isEmpty() ? "" : " " + item.getUnit()));
 
+        if (holder.balanceAfter != null) {
+            if (item.hasBalanceAfter()) {
+                holder.balanceAfter.setText("Estoque depois: "
+                        + CurrencyHelper.formatQuantity(item.getBalanceAfter())
+                        + (item.getUnit().isEmpty() ? "" : " " + item.getUnit()));
+                holder.balanceAfter.setVisibility(View.VISIBLE);
+            } else {
+                holder.balanceAfter.setVisibility(View.GONE);
+            }
+        }
+
         // Data e hora
         String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));
         holder.dateTime.setText(dateStr);
@@ -177,6 +211,7 @@ public class HistoryAdapter extends BaseAdapter {
         TextView quantity;
         TextView dateTime;
         TextView note;
+        TextView balanceAfter;
     }
 }
 

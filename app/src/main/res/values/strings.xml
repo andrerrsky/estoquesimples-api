@@ -56,7 +56,7 @@
 
     <!-- Bulk Edit Feature (Free) -->
     <string name="bulk_edit_title">Edição em Massa</string>
-    <string name="bulk_edit_success">%d produtos editados com sucesso!</string>
+    <string name="bulk_edit_success">%s editados</string>
     
     <!-- Analytics Feature (Premium) -->
     <string name="analytics_title">Análise de Estoque</string>
@@ -82,7 +82,7 @@
     
     <!-- Currency / Monetary Formatting -->
     <string name="currency_selector_label">Moeda</string>
-    <string name="currency_label_value">Valor unitário (%s) *</string>
+    <string name="currency_label_value">Valor unitário (%s)</string>
     <string name="report_total_value">Valor do estoque: %s</string>
     <string name="report_avg_value">Valor Médio por Produto: %s</string>
     <string name="total_entry_value">Entradas (desde o início): %s</string>

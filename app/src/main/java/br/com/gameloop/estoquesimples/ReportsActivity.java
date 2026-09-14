@@ -40,9 +40,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.charts.HorizontalBarChart;
 import com.github.mikephil.charting.data.PieEntry;
 
 public class ReportsActivity extends BaseActivity {
@@ -53,9 +51,8 @@ public class ReportsActivity extends BaseActivity {
     private android.app.ProgressDialog pdfProgressDialog;
     private volatile boolean isExportingPdf = false;
 
-    private PieChart chart;
+    private HorizontalBarChart chart;
     private View chartEmptyState;
-    private PieData data;
 
     private String higherAmoutProductText;
     private String lowerAmoutProductText;
@@ -161,7 +158,7 @@ public class ReportsActivity extends BaseActivity {
             }
 
             // Inicializar views de forma segura
-            chart = (PieChart) findViewById(R.id.chart);
+            chart = (HorizontalBarChart) findViewById(R.id.chart);
             chartEmptyState = findViewById(R.id.chartEmptyState);
             higher = (TextView) findViewById(R.id.higher);
             lower = (TextView) findViewById(R.id.lower);
@@ -407,6 +404,8 @@ public class ReportsActivity extends BaseActivity {
         double totalItemsCount = 0;
         double totalValueSum = 0.0;
         List<String> lowStockProducts = new ArrayList<>();
+        // Mais urgente primeiro: o que já zerou, depois o mais longe do mínimo.
+        List<double[]> urgencia = new ArrayList<>();
         java.util.Map<String, Integer> categoryMap = new java.util.HashMap<>();
         // Somar "45 un + 3,75 kg + 12 pct" num número só não significa nada:
         // o total é mostrado por unidade.
@@ -438,6 +437,7 @@ public class ReportsActivity extends BaseActivity {
             if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
                 lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount)
                         + (columnMinStock > 0 ? " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")" : " (sem estoque)"));
+                urgencia.add(new double[]{columnMinStock > 0 ? columnAmount / columnMinStock : 0, lowStockProducts.size() - 1});
             }
 
             // Contar por categoria
@@ -475,6 +475,7 @@ public class ReportsActivity extends BaseActivity {
                 if(columnAmount <= 0 || (columnMinStock > 0 && columnAmount <= columnMinStock)) {
                     lowStockProducts.add(columnName + ": " + CurrencyHelper.formatQuantity(columnAmount)
                         + (columnMinStock > 0 ? " (mín. " + CurrencyHelper.formatQuantity(columnMinStock) + ")" : " (sem estoque)"));
+                    urgencia.add(new double[]{columnMinStock > 0 ? columnAmount / columnMinStock : 0, lowStockProducts.size() - 1});
                 }
 
                 // Contar por categoria
@@ -505,61 +506,54 @@ public class ReportsActivity extends BaseActivity {
             mostrarDistribuicaoVazia();
         } else {
             mostrarDistribuicaoGrafico();
-            // Com dezenas de produtos, uma fatia por produto virava um arco-íris
-            // ilegível com rótulos sobrepostos. Mostra as maiores quantidades e
-            // agrupa o resto em "Outros"; os nomes vão para a legenda.
-            entries = agruparFatias(entries, 6);
-            PieDataSet dataSet = new PieDataSet(entries, "");
-            dataSet.setColors(
-                    ContextCompat.getColor(this, R.color.color_brand),
-                    ContextCompat.getColor(this, R.color.color_success),
-                    ContextCompat.getColor(this, R.color.color_warning),
-                    ContextCompat.getColor(this, R.color.color_error),
-                    ContextCompat.getColor(this, R.color.color_brand_dark),
-                    ContextCompat.getColor(this, R.color.color_text_muted),
-                    // sétima cor: a fatia "Outros" não pode repetir a primeira
-                    ContextCompat.getColor(this, R.color.color_disabled_text)
-            );
-            dataSet.setValueTextSize(12f);
-            dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
-            dataSet.setSliceSpace(2f);
-            float totalFatias = 0f;
-            for (PieEntry e : entries) totalFatias += e.getValue();
-            final float minimoRotulo = totalFatias * 0.06f;
+            // Barras com os maiores valores em estoque: a pizza virava uma
+            // fatia "Outros" de 60% e quatro fatias sem rótulo — nada para decidir.
+            List<PieEntry> ordenadas = new ArrayList<>(entries);
+            java.util.Collections.sort(ordenadas, (a, c2) -> Float.compare(c2.getValue(), a.getValue()));
+            int quantas = Math.min(8, ordenadas.size());
+            ArrayList<com.github.mikephil.charting.data.BarEntry> barras = new ArrayList<>();
+            final ArrayList<String> rotulos = new ArrayList<>();
+            // Índice 0 desenha embaixo: o maior entra por último para ficar no topo.
+            for (int i = quantas - 1; i >= 0; i--) {
+                PieEntry e = ordenadas.get(i);
+                barras.add(new com.github.mikephil.charting.data.BarEntry(quantas - 1 - i, e.getValue()));
+                String nome = e.getLabel() == null ? "" : e.getLabel();
+                rotulos.add(nome.length() > 22 ? nome.substring(0, 21) + "…" : nome);
+            }
+            com.github.mikephil.charting.data.BarDataSet dataSet =
+                    new com.github.mikephil.charting.data.BarDataSet(barras, "");
+            dataSet.setColor(ContextCompat.getColor(this, R.color.color_brand));
+            dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text));
+            dataSet.setValueTextSize(11f);
             dataSet.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
                 @Override
                 public String getFormattedValue(float value) {
-                    // Fatias finas ficam só na legenda: o rótulo dentro delas
-                    // se sobrepunha ao vizinho.
-                    return value < minimoRotulo ? "" : CurrencyHelper.formatCurrency(ReportsActivity.this, value);
+                    return CurrencyHelper.formatCurrency(ReportsActivity.this, value);
                 }
             });
-
-            data = new PieData(dataSet);
-
-            chart.setData(data);
-            chart.setUsePercentValues(false);
+            com.github.mikephil.charting.data.BarData barData = new com.github.mikephil.charting.data.BarData(dataSet);
+            barData.setBarWidth(0.62f);
+            chart.setData(barData);
             chart.getDescription().setEnabled(false);
-            chart.setDrawEntryLabels(false);
-            chart.setHoleRadius(38f);
-            chart.setTransparentCircleRadius(42f);
-            chart.setExtraOffsets(4f, 4f, 4f, 4f);
-            com.github.mikephil.charting.components.Legend legend = chart.getLegend();
-            legend.setEnabled(true);
-            // Horizontal com quebra de linha: é o único modo em que a
-            // biblioteca reserva a altura da legenda em vez de desenhá-la por
-            // cima da pizza.
-            legend.setVerticalAlignment(com.github.mikephil.charting.components.Legend.LegendVerticalAlignment.BOTTOM);
-            legend.setHorizontalAlignment(com.github.mikephil.charting.components.Legend.LegendHorizontalAlignment.LEFT);
-            legend.setOrientation(com.github.mikephil.charting.components.Legend.LegendOrientation.HORIZONTAL);
-            legend.setDrawInside(false);
-            legend.setWordWrapEnabled(true);
-            legend.setTextSize(12f);
-            legend.setTextColor(ContextCompat.getColor(this, R.color.color_text));
-            legend.setXEntrySpace(12f);
-            legend.setYEntrySpace(6f);
-            legend.setFormSize(10f);
-            chart.animateY(1000);
+            chart.getLegend().setEnabled(false);
+            chart.setTouchEnabled(false);
+            chart.setDrawValueAboveBar(true);
+            chart.setFitBars(true);
+            chart.setExtraOffsets(0f, 0f, 72f, 0f);
+            com.github.mikephil.charting.components.XAxis eixo = chart.getXAxis();
+            eixo.setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
+            eixo.setValueFormatter(new com.github.mikephil.charting.formatter.IndexAxisValueFormatter(rotulos));
+            eixo.setGranularity(1f);
+            eixo.setLabelCount(quantas);
+            eixo.setDrawGridLines(false);
+            eixo.setDrawAxisLine(false);
+            eixo.setTextColor(ContextCompat.getColor(this, R.color.color_text));
+            eixo.setTextSize(11f);
+            chart.getAxisLeft().setEnabled(false);
+            chart.getAxisRight().setEnabled(false);
+            chart.getAxisLeft().setAxisMinimum(0f);
+            chart.getAxisRight().setAxisMinimum(0f);
+            chart.animateY(800);
         }
 
         // Análise de estoque
@@ -579,11 +573,12 @@ public class ReportsActivity extends BaseActivity {
                 lowStockWarning.setVisibility(android.view.View.VISIBLE);
                 lowStockList.setVisibility(android.view.View.VISIBLE);
                 
-                lowStockWarning.setText("Alerta: " + lowStockProducts.size() + " produto(s) com estoque baixo");
+                lowStockWarning.setText("Alerta: " + Texto.plural(lowStockProducts.size(), "produto", "produtos") + " com estoque baixo");
                 
+                java.util.Collections.sort(urgencia, (a, b) -> Double.compare(a[0], b[0]));
                 StringBuilder lowStockText = new StringBuilder();
-                for(String product : lowStockProducts) {
-                    lowStockText.append("• ").append(product).append("\n");
+                for(double[] u : urgencia) {
+                    lowStockText.append("• ").append(lowStockProducts.get((int) u[1])).append("\n");
                 }
                 lowStockList.setText(lowStockText.toString().trim());
             }
@@ -598,8 +593,8 @@ public class ReportsActivity extends BaseActivity {
                 java.util.Collections.sort(categorias, (a, b) -> b.getValue().compareTo(a.getValue()));
                 for(java.util.Map.Entry<String, Integer> entry : categorias) {
                     categoryText.append("• ").append(entry.getKey())
-                        .append(": ").append(entry.getValue())
-                        .append(" produto(s)\n");
+                        .append(": ").append(Texto.plural(entry.getValue(), "produto", "produtos"))
+                        .append("\n");
                 }
                 categoriesList.setText(categoryText.toString().trim());
             }
@@ -1140,7 +1135,7 @@ public class ReportsActivity extends BaseActivity {
 
             b.spacer(6);
             b.divider();
-            b.label("TOTAL GERAL: " + grandCount + " produto(s), " + fq(grandItems)
+            b.label("TOTAL GERAL: " + Texto.plural(grandCount, "produto", "produtos") + ", " + fq(grandItems)
                     + " itens, " + fc(grandValue), 10);
         } finally {
             closeCursor(c);
@@ -1205,18 +1200,22 @@ public class ReportsActivity extends BaseActivity {
     private void drawInventorySummary(PdfReportBuilder b) {
         b.heading("RESUMO GERAL");
         Cursor c = null;
-        int totalProducts = 0;
+        int totalProducts = 0, paraRepor = 0;
         double totalItems = 0, totalValue = 0.0;
+        java.util.Map<String, Double> porUnidade = new java.util.LinkedHashMap<>();
         try {
-            c = MainActivity.stock.rawQuery("SELECT amount, value FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
+            c = MainActivity.stock.rawQuery("SELECT amount, value, unit, min_stock FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
             if (c != null) {
                 totalProducts = c.getCount();
                 if (c.moveToFirst()) {
                     do {
                         double amount = CurrencyHelper.parseCurrency(c.getString(0), 0);
                         double value = CurrencyHelper.parseCurrency(c.getString(1), 0.0);
+                        double min = CurrencyHelper.parseCurrency(c.getString(3), 0);
                         totalItems += amount;
                         totalValue += (amount * value);
+                        somarPorUnidade(porUnidade, c.getString(2), amount);
+                        if (amount <= 0 || (min > 0 && amount <= min)) paraRepor++;
                     } while (c.moveToNext());
                 }
             }
@@ -1224,12 +1223,12 @@ public class ReportsActivity extends BaseActivity {
             closeCursor(c);
         }
 
-        b.text("Total de Produtos: " + totalProducts, 10);
-        b.text("Total de Itens: " + fq(totalItems), 10);
-        b.text("Valor Total do Estoque: " + fc(totalValue), 10);
-        if (totalProducts > 0) {
-            b.text("Valor Médio por Produto: " + fc(totalValue / totalProducts), 10);
-        }
+        // Mesmos números da tela: itens por unidade (somar kg com dúzia não
+        // significa nada) e "para repor" em vez de valor médio.
+        b.text("Total de produtos: " + totalProducts, 10);
+        b.text("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItems), 10);
+        b.text("Valor do estoque: " + fc(totalValue), 10);
+        b.text("Produtos para repor: " + paraRepor, 10);
         b.spacer(8);
     }
 
@@ -1268,8 +1267,8 @@ public class ReportsActivity extends BaseActivity {
 
         b.colored("Entradas (" + entryCount + "): " + fc(totalEntry), 10, true);
         b.colored("Saídas (" + exitCount + "): " + fc(totalExit), 10, false);
-        b.label("Saldo (Entradas - Saídas): " + fc(totalEntry - totalExit), 10);
-        b.small("* Valores estimados com o preço unitário atual dos produtos.", 10);
+        b.text("Diferença entre entradas e saídas: " + fc(totalEntry - totalExit), 10);
+        b.small("Soma do valor unitário cadastrado x quantidade movimentada. Não é faturamento, lucro nem despesa real.", 10);
         b.spacer(8);
     }
 
@@ -1279,15 +1278,18 @@ public class ReportsActivity extends BaseActivity {
         Cursor c = null;
         int count = 0;
         try {
+            // Mais urgente primeiro (zerados, depois os mais longe do mínimo),
+            // igual à tela.
             c = MainActivity.stock.rawQuery(
                     "SELECT name, amount, min_stock, supplier, location, unit FROM Estoque " +
-                            "WHERE " + LocalDb.ACTIVE_PRODUCTS + " ORDER BY name COLLATE NOCASE",
+                            "WHERE " + LocalDb.ACTIVE_PRODUCTS
+                            + " ORDER BY CASE WHEN CAST(min_stock AS REAL) > 0 THEN CAST(amount AS REAL) / CAST(min_stock AS REAL) ELSE 0 END, name COLLATE NOCASE",
                     null);
             if (c != null && c.moveToFirst()) {
                 do {
                     double amount = CurrencyHelper.parseCurrency(c.getString(1), 0);
                     double min = CurrencyHelper.parseCurrency(c.getString(2), 0);
-                    if (min > 0 && amount <= min) {
+                    if (amount <= 0 || (min > 0 && amount <= min)) {
                         count++;
                         String name = c.getString(0);
                         String supplier = c.getString(3);
@@ -1318,7 +1320,7 @@ public class ReportsActivity extends BaseActivity {
             b.text("Nenhum produto com estoque baixo no momento.", 10);
         } else {
             b.spacer(2);
-            b.label("Total: " + count + " produto(s) para reposição.", 10);
+            b.label("Total: " + Texto.plural(count, "produto", "produtos") + " para reposição.", 10);
         }
         b.spacer(8);
     }
@@ -1466,7 +1468,7 @@ public class ReportsActivity extends BaseActivity {
     }
 
     private void drawCategorySubtotal(PdfReportBuilder b, int count, double items, double value) {
-        b.small("Subtotal: " + count + " produto(s), " + fq(items) + " itens, " + fc(value), 12);
+        b.small("Subtotal: " + Texto.plural(count, "produto", "produtos") + ", " + fq(items) + " itens, " + fc(value), 12);
         b.spacer(6);
     }
 

@@ -66,11 +66,15 @@ final class DiscardGuard {
             activity.finish();
             return;
         }
-        new AlertDialog.Builder(activity)
+        AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle(title)
                 .setMessage("O que você digitou nesta tela será perdido.")
                 .setPositiveButton("Descartar", (d, w) -> activity.finish())
                 .setNegativeButton("Continuar editando", null)
                 .show();
+        android.widget.Button descartar = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (descartar != null) {
+            descartar.setTextColor(androidx.core.content.ContextCompat.getColor(activity, R.color.color_error));
+        }
     }
 }

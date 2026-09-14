@@ -54,7 +54,7 @@ public class CustomListView extends ArrayAdapter<String> {
     // Expansão guardada por nome, não por posição: a lista é atualizada no
     // lugar depois de cada movimentação/busca e as posições mudam.
     private final Set<String> expandedNames = new HashSet<>();
-    private final boolean showProductImages;
+    private boolean showProductImages;
     /** Tempo do "Desfazer": 8 s ainda escapava a quem lê a mensagem antes de decidir. */
     public static final int UNDO_DURATION_MS = 12000;
 
@@ -87,6 +87,15 @@ public class CustomListView extends ArrayAdapter<String> {
     public void expand(String name) {
         expandedNames.add(name);
         notifyDataSetChanged();
+    }
+
+    /** Relê "Exibir imagens": a configuração não valia até reabrir o app. */
+    public void refreshSettings() {
+        boolean now = SettingsActivity.isShowProductImages(context);
+        if (now != showProductImages) {
+            showProductImages = now;
+            notifyDataSetChanged();
+        }
     }
 
     public void collapseAll() {
@@ -245,7 +254,10 @@ public class CustomListView extends ArrayAdapter<String> {
         if (hasSku) {
             sku.setText(skus.get(position));
         }
-        skuGroup.setVisibility(hasSku ? View.VISIBLE : View.GONE);
+        // INVISIBLE (não GONE) quando só a categoria existe: mantém a
+        // categoria na mesma coluna dos outros cards.
+        boolean categoriaPresente = categories.get(position) != null && !categories.get(position).isEmpty() && !categories.get(position).equals("null");
+        skuGroup.setVisibility(hasSku ? View.VISIBLE : (categoriaPresente ? View.INVISIBLE : View.GONE));
 
         // Categoria
         boolean hasCategory = categories.get(position) != null && !categories.get(position).isEmpty() && !categories.get(position).equals("null");
@@ -368,7 +380,17 @@ public class CustomListView extends ArrayAdapter<String> {
                 @Override
                 public void onClick(View v) {
                     if (semEstoque) {
-                        Feedback.show(context, "Sem estoque para dar saída. Registre uma entrada primeiro.");
+                        if (MainActivity.instance != null) {
+                            MainActivity.instance.releaseSearchFocus();
+                        }
+                        com.google.android.material.snackbar.Snackbar aviso = Feedback.make(context,
+                                "Sem estoque para dar saída. Registre uma entrada primeiro.",
+                                com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+                        if (aviso != null) {
+                            aviso.setDuration(6000);
+                            aviso.setAction("Entrada", v2 -> showStockDialog(finalPosition, true));
+                            aviso.show();
+                        }
                         return;
                     }
                     showStockDialog(finalPosition, false);
@@ -402,9 +424,7 @@ public class CustomListView extends ArrayAdapter<String> {
                 android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
                         | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
 
-        String noteHint = isEntrada
-                ? "Observação (opcional)"
-                : "Observação (cliente, entrega...) — opcional";
+        String noteHint = "Observação (opcional)";
         int noteInputType = android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 | (isEntrada ? 0 : android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
@@ -522,10 +542,11 @@ public class CustomListView extends ArrayAdapter<String> {
      */
     private void showMovementSnackbar(boolean isEntrada, double qty, String unitStr, boolean hasUnit,
                                       MovementRepository.Result result) {
+        // \u00a0 entre número e unidade: "kg" sozinho na linha de baixo lia mal.
         String text = (isEntrada ? "Entrada de " : "Saída de ")
-                + CurrencyHelper.formatQuantity(qty) + (hasUnit ? " " + unitStr : "")
-                + " registrada. Estoque: " + CurrencyHelper.formatQuantity(result.newAmount)
-                + (hasUnit ? " " + unitStr : "");
+                + CurrencyHelper.formatQuantity(qty) + (hasUnit ? "\u00a0" + unitStr : "")
+                + " registrada. Estoque agora: " + CurrencyHelper.formatQuantity(result.newAmount)
+                + (hasUnit ? "\u00a0" + unitStr : "");
         com.google.android.material.snackbar.Snackbar snackbar = Feedback.make(context, text,
                 com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
         if (snackbar == null) {

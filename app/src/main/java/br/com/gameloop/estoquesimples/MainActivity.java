@@ -165,6 +165,21 @@ public class MainActivity extends BaseActivity {
 
         applyEmptyState(null);
 
+        // Com o teclado aberto a barra inferior subia junto e comia a lista.
+        View mainRoot = findViewById(R.id.mainRoot);
+        if (mainRoot != null) {
+            mainRoot.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                androidx.core.view.WindowInsetsCompat insets = androidx.core.view.ViewCompat.getRootWindowInsets(mainRoot);
+                boolean keyboard = insets != null && insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime());
+                if (bottomNavigationView != null) {
+                    int wanted = keyboard ? View.GONE : View.VISIBLE;
+                    if (bottomNavigationView.getVisibility() != wanted) {
+                        bottomNavigationView.setVisibility(wanted);
+                    }
+                }
+            });
+        }
+
         TextView chipAll = findViewById(R.id.chipAll);
         TextView chipLowStock = findViewById(R.id.chipLowStock);
         if (chipAll != null && chipLowStock != null) {
@@ -701,6 +716,9 @@ public class MainActivity extends BaseActivity {
         }
 
         getListValues();
+        if (listAdapter != null) {
+            listAdapter.refreshSettings();
+        }
         updateFilterChips();
         filterList(searchView != null ? searchView.getQuery().toString() : "");
 
@@ -977,7 +995,7 @@ public class MainActivity extends BaseActivity {
 
         final String finalProductName = productName;
 
-        new AlertDialog.Builder(this)
+        AlertDialog deleteDialog = new AlertDialog.Builder(this)
                 .setTitle("Excluir produto?")
                 .setMessage("\u201c" + productName + "\u201d sai da lista e dos relatórios atuais. "
                         + "As movimentações já registradas continuam no histórico.")
@@ -1039,7 +1057,13 @@ public class MainActivity extends BaseActivity {
                             Log.e("MainActivity", "Error deleting product", e);
                         }
                     }})
-                .setNegativeButton("Cancelar", null).show();
+                .setNegativeButton("Cancelar", null).create();
+        deleteDialog.show();
+        android.widget.Button excluir = deleteDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (excluir != null) {
+            // Mesma cor do "Excluir" do card: ação destrutiva não pode parecer igual ao Cancelar.
+            excluir.setTextColor(ContextCompat.getColor(this, R.color.color_error));
+        }
 
     }
 
@@ -1189,33 +1213,91 @@ public class MainActivity extends BaseActivity {
             return;
         }
         
-        // Criar array de nomes de produtos
-        final String[] productNames = names.toArray(new String[0]);
-        final boolean[] checkedItems = new boolean[productNames.length];
-        final java.util.List<String> selectedProducts = new java.util.ArrayList<>();
-        
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.bulk_edit_title);
-        builder.setMultiChoiceItems(productNames, checkedItems, (dialog, which, isChecked) -> {
-            if (isChecked) {
-                selectedProducts.add(productNames[which]);
-            } else {
-                selectedProducts.remove(productNames[which]);
+        // Com dezenas de produtos, marcar 15 itens numa lista de checkboxes sem
+        // busca era penoso: filtro por nome/categoria e "marcar todos os visíveis".
+        final java.util.Set<String> selected = new java.util.LinkedHashSet<>();
+        final java.util.List<String> visible = new ArrayList<>(names);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (getResources().getDisplayMetrics().density * 16);
+        container.setPadding(pad, pad / 2, pad, 0);
+        com.google.android.material.textfield.TextInputLayout filterLayout =
+                FormValidation.addField(container, "Filtrar por nome ou categoria", android.text.InputType.TYPE_CLASS_TEXT);
+        final TextView selectAll = new TextView(this);
+        selectAll.setText("Marcar todos os visíveis");
+        selectAll.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        selectAll.setTypeface(null, android.graphics.Typeface.BOLD);
+        selectAll.setPadding(0, pad / 2, 0, pad / 2);
+        container.addView(selectAll);
+        final ListView list = new ListView(this);
+        list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        list.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (getResources().getDisplayMetrics().density * 320)));
+        final android.widget.ArrayAdapter<String> listAdapterBulk = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_multiple_choice, visible);
+        list.setAdapter(listAdapterBulk);
+        container.addView(list);
+
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.bulk_edit_title)
+                .setView(container)
+                .setPositiveButton("Continuar", null)
+                .setNegativeButton("Cancelar", null)
+                .create();
+
+        Runnable syncChecks = () -> {
+            for (int i = 0; i < visible.size(); i++) {
+                list.setItemChecked(i, selected.contains(visible.get(i)));
             }
+            dialog.setTitle(selected.isEmpty()
+                    ? getString(R.string.bulk_edit_title)
+                    : getString(R.string.bulk_edit_title) + " · " + Texto.plural(selected.size(), "marcado", "marcados"));
+        };
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            String name = visible.get(position);
+            if (!selected.remove(name)) {
+                selected.add(name);
+            }
+            syncChecks.run();
         });
-        
-        builder.setPositiveButton("Editar Selecionados", (dialog, which) -> {
-            if (selectedProducts.isEmpty()) {
-                Toast.makeText(this, "Nenhum produto selecionado.", Toast.LENGTH_SHORT).show();
+        selectAll.setOnClickListener(v -> {
+            selected.addAll(visible);
+            syncChecks.run();
+        });
+        if (filterLayout.getEditText() != null) {
+            filterLayout.getEditText().addTextChangedListener(new android.text.TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence cs, int a, int b, int c) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence cs, int a, int b, int c) {
+                    String q = fold(cs.toString());
+                    visible.clear();
+                    for (int i = 0; i < names.size(); i++) {
+                        if (q.isEmpty() || fold(names.get(i)).contains(q) || fold(categories.get(i)).contains(q)) {
+                            visible.add(names.get(i));
+                        }
+                    }
+                    listAdapterBulk.notifyDataSetChanged();
+                    syncChecks.run();
+                }
+
+                @Override
+                public void afterTextChanged(android.text.Editable e) {
+                }
+            });
+        }
+        dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (selected.isEmpty()) {
+                Feedback.show(this, "Marque pelo menos um produto.");
                 return;
             }
-            
-            // Mostrar opções de edição
-            showBulkEditOptionsDialog(selectedProducts);
+            dialog.dismiss();
+            showBulkEditOptionsDialog(new ArrayList<>(selected));
         });
-        
-        builder.setNegativeButton("Cancelar", null);
-        builder.show();
     }
     
     /**
@@ -1441,7 +1523,7 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
+        Feedback.show(this, getString(R.string.bulk_edit_success, Texto.plural(updated, "produto", "produtos")));
     }
     
     /**
@@ -1470,7 +1552,7 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
+        Feedback.show(this, getString(R.string.bulk_edit_success, Texto.plural(updated, "produto", "produtos")));
     }
 
     private void flattenSearchViewPadding(SearchView searchView) {

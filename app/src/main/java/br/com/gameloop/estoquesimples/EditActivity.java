@@ -644,7 +644,8 @@ public class EditActivity extends BaseActivity {
         try {
             ContentValues updateValues = new ContentValues();
             updateValues.put("name", name.getText().toString().trim());
-            updateValues.put("value", CurrencyHelper.sanitizeForStorage(value.getText().toString()));
+            String valorDigitado = value.getText().toString().trim();
+            updateValues.put("value", valorDigitado.isEmpty() ? "0" : CurrencyHelper.sanitizeForStorage(valorDigitado));
             updateValues.put("description", description != null ? description.getText().toString().trim() : "");
             
             // Novos campos com verificação null
@@ -762,10 +763,8 @@ public class EditActivity extends BaseActivity {
 
         boolean valueOk;
         try {
-            String valueText = value.getText().toString();
-            valueOk = FormValidation.check(valueLayout,
-                    valueText == null || valueText.isEmpty() || valueText.equals("null"),
-                    "Informe o valor.");
+            // Valor é opcional (ver AddActivity).
+            valueOk = FormValidation.check(valueLayout, false, null);
         } catch (Exception e) {
             Log.e(TAG, "Error validating product value", e);
             valueOk = FormValidation.check(valueLayout, true, "Não foi possível validar o valor.");
