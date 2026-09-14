@@ -33,6 +33,18 @@ public final class Unidades {
         return Math.abs(quantidade - Math.rint(quantidade)) > 1e-9;
     }
 
+    /** Unidades aceitas no cadastro (a lista das sugestões + variações comuns). */
+    private static final Set<String> CONHECIDAS = new HashSet<>(Arrays.asList(
+            "un", "kg", "g", "l", "ml", "caixa", "pacote", "dúzia", "duzia", "par", "m", "cm",
+            "saco", "pote", "fardo", "rolo", "lata", "garrafa", "frasco", "bandeja", "kit", "pct", "cx", "dz", "sc"));
+
+    /** Vazio é aceito (vira "un"); qualquer outra coisa precisa estar na lista. */
+    public static boolean valida(String unidade) {
+        if (unidade == null) return true;
+        String u = unidade.trim().toLowerCase(Locale.ROOT).replace(".", "");
+        return u.isEmpty() || CONHECIDAS.contains(u);
+    }
+
     public static String mensagemFracao(String unidade) {
         String u = unidade == null || unidade.trim().isEmpty() || "null".equals(unidade) ? "" : unidade.trim();
         String nome = u.isEmpty() || "un".equalsIgnoreCase(u) ? "unidade" : u;

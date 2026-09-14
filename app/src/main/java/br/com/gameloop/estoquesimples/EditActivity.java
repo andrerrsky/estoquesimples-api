@@ -57,6 +57,7 @@ public class EditActivity extends BaseActivity {
     private TextInputLayout nameLayout;
     private TextInputLayout amountLayout;
     private TextInputLayout valueLayout;
+    private TextInputLayout unitLayout;
     private ScrollView scrollView;
     private TextView description;
     private TextView category;
@@ -149,6 +150,7 @@ public class EditActivity extends BaseActivity {
         nameLayout = findViewById(R.id.editNameLayout);
         amountLayout = findViewById(R.id.editAmountLayout);
         valueLayout = findViewById(R.id.editValueLayout);
+        unitLayout = findViewById(R.id.editUnitLayout);
         scrollView = findViewById(R.id.editScrollView);
 
         setupCurrencySpinner();
@@ -762,6 +764,15 @@ public class EditActivity extends BaseActivity {
             amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
         }
 
+        try {
+            String unidadeDigitada = unit.getText().toString();
+            if (!Unidades.valida(unidadeDigitada)) {
+                amountOk = FormValidation.check(unitLayout, true, "Escolha uma unidade da lista (un, kg, g, L, ml, caixa, pacote…).") && amountOk;
+            } else {
+                FormValidation.check(unitLayout, false, null);
+            }
+        } catch (Exception ignored) {
+        }
         try {
             String unidade = unit.getText().toString();
             double qtd = CurrencyHelper.parseCurrency(amount.getText().toString().trim(), 0);

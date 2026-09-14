@@ -1458,6 +1458,9 @@ public class MainActivity extends BaseActivity {
         ProductRepository repository = new ProductRepository(stock);
         MovementRepository movements = new MovementRepository(stock);
         final java.util.List<String> movementUuids = new ArrayList<>();
+        // Mesma nota em todas: o Histórico usa para oferecer "Estornar todos".
+        final String loteNota = "Ajuste em massa " + new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault()).format(new java.util.Date())
+                + " (" + (adjustment > 0 ? "+" : "") + CurrencyHelper.formatQuantity(adjustment) + ")";
 
         for (String productName : products) {
             try {
@@ -1472,7 +1475,7 @@ public class MainActivity extends BaseActivity {
                 // reconstruir o estoque a partir do histórico.
                 double target = Math.max(0, repository.currentAmount(uuid) + adjustment);
                 MovementRepository.Result result = movements.setAbsolute(
-                        uuid, MovementRepository.AJUSTE, target, "Ajuste em massa");
+                        uuid, MovementRepository.AJUSTE, target, loteNota);
                 if (result.success) {
                     updated++;
                     if (result.movementUuid != null) {
@@ -1491,7 +1494,7 @@ public class MainActivity extends BaseActivity {
         updateList();
         revealPendingProduct();
         String resumo = (adjustment > 0 ? "+" : "") + CurrencyHelper.formatQuantity(adjustment)
-                + " em " + updated + (updated == 1 ? " produto." : " produtos.");
+                + " em " + listarNomes(products) + ".";
         com.google.android.material.snackbar.Snackbar undo = Feedback.make(this, resumo,
                 com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
         if (undo == null) {

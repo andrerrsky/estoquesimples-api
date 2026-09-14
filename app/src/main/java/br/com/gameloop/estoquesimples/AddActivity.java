@@ -50,6 +50,7 @@ public class AddActivity extends BaseActivity {
     private TextInputLayout nameLayout;
     private TextInputLayout amountLayout;
     private TextInputLayout valueLayout;
+    private TextInputLayout unitLayout;
     private ScrollView scrollView;
     private EditText productDescription;
     private EditText productCategory;
@@ -115,10 +116,25 @@ public class AddActivity extends BaseActivity {
         discardGuard = new DiscardGuard(this, "Descartar cadastro?");
         // Dica inline ao sair do campo Nome: o aviso de nome parecido só
         // aparecia no Salvar, depois de preencher tudo.
-        productName.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus || nameLayout == null) return;
+        final Runnable checarParecido = () -> {
+            if (nameLayout == null) return;
             String parecido = findSimilarName(productName.getText().toString().trim());
             nameLayout.setHelperText(parecido == null ? null : "Parecido com \u201c" + parecido + "\u201d já cadastrado.");
+        };
+        productName.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence cs, int a, int b, int c) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence cs, int a, int b, int c) {
+                productName.removeCallbacks(checarParecido);
+                productName.postDelayed(checarParecido, 400);
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+            }
         });
         discardGuard.watch(productName, productAmount, productValue, productDescription, productCategory,
                 productSku, productBarcode, productSupplier, productLocation, productMinStock, productUnit);
@@ -131,6 +147,7 @@ public class AddActivity extends BaseActivity {
         nameLayout = findViewById(R.id.addNameLayout);
         amountLayout = findViewById(R.id.addAmountLayout);
         valueLayout = findViewById(R.id.addValueLayout);
+        unitLayout = findViewById(R.id.addUnitLayout);
         scrollView = findViewById(R.id.addScrollView);
 
         setupCurrencySpinner();
@@ -563,6 +580,17 @@ public class AddActivity extends BaseActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error validating product amount", e);
             amountOk = FormValidation.check(amountLayout, true, "Não foi possível validar a quantidade.");
+        }
+
+        // Unidade só da lista: "10un" ou "kilo" quebravam os totais por unidade.
+        try {
+            String unidadeDigitada = productUnit.getText().toString();
+            if (!Unidades.valida(unidadeDigitada)) {
+                amountOk = FormValidation.check(unitLayout, true, "Escolha uma unidade da lista (un, kg, g, L, ml, caixa, pacote…).") && amountOk;
+            } else {
+                FormValidation.check(unitLayout, false, null);
+            }
+        } catch (Exception ignored) {
         }
 
         // Unidade inteira não aceita fração (ver Unidades).

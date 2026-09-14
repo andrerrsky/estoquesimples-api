@@ -1259,8 +1259,11 @@ public class ReportsActivity extends BaseActivity {
         b.heading("RESUMO FINANCEIRO DE MOVIMENTAÇÕES");
         b.small("Período: " + period.getLabel(), 10);
 
-        double totalEntry = 0.0, totalExit = 0.0;
-        int entryCount = 0, exitCount = 0;
+        // Mesma classificação da tela Relatórios: cadastro, importação, ajuste
+        // e estorno não são compra nem venda. O PDF contava tudo como entrada
+        // ou saída e os números não batiam com a tela.
+        double totalEntry = 0.0, totalExit = 0.0, totalOutros = 0.0;
+        int entryCount = 0, exitCount = 0, outrosCount = 0;
         Cursor c = null;
         try {
             c = MainActivity.stock.rawQuery(
@@ -1274,7 +1277,10 @@ public class ReportsActivity extends BaseActivity {
                     double qty = CurrencyHelper.parseCurrency(c.getString(1), 0);
                     double val = CurrencyHelper.parseCurrency(c.getString(2), 0.0);
                     double line = Math.abs(qty) * val;
-                    if (isEntrada(changeType, qty)) {
+                    if (!isCompraOuVenda(changeType)) {
+                        totalOutros += MovementRepository.signedQuantity(changeType, qty) * val;
+                        outrosCount++;
+                    } else if (isEntrada(changeType, qty)) {
                         totalEntry += line;
                         entryCount++;
                     } else if (isSaida(changeType, qty)) {
@@ -1289,7 +1295,7 @@ public class ReportsActivity extends BaseActivity {
 
         b.colored("Entradas (" + entryCount + "): " + fc(totalEntry), 10, true);
         b.colored("Saídas (" + exitCount + "): " + fc(totalExit), 10, false);
-        b.text("Diferença entre entradas e saídas: " + fc(totalEntry - totalExit), 10);
+        b.text("Cadastros, ajustes e estornos (" + outrosCount + "): " + (totalOutros < 0 ? "- " : "") + fc(Math.abs(totalOutros)), 10);
         b.small("Soma do valor unitário cadastrado x quantidade movimentada. Não é faturamento, lucro nem despesa real.", 10);
         b.spacer(8);
     }
@@ -1426,7 +1432,7 @@ public class ReportsActivity extends BaseActivity {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
         Cursor c = null;
         int count = 0;
-        double qtyEntrada = 0, qtySaida = 0, valEntrada = 0, valSaida = 0;
+        double qtyEntrada = 0, qtySaida = 0, valEntrada = 0, valSaida = 0, qtyOutros = 0, valOutros = 0;
         try {
             c = MainActivity.stock.rawQuery(
                     "SELECT h.product_name, h.change_type, h.quantity, h.timestamp, h.note, e.value, e.unit " +
@@ -1441,6 +1447,8 @@ public class ReportsActivity extends BaseActivity {
                     boolean saida = isSaida(changeType, qty);
 
                     if (entradaFilter != null) {
+                        // "Entradas detalhado"/"Saídas detalhado" são compras e vendas.
+                        if (!isCompraOuVenda(changeType)) continue;
                         if (entradaFilter && !entrada) continue;
                         if (!entradaFilter && !saida) continue;
                     }
@@ -1458,7 +1466,10 @@ public class ReportsActivity extends BaseActivity {
                             MovementDisplay.label(changeType),
                             fq(absQty) + unit, fc(lineVal), note, entrada);
 
-                    if (entrada) {
+                    if (!isCompraOuVenda(changeType)) {
+                        qtyOutros += MovementRepository.signedQuantity(changeType, qty);
+                        valOutros += MovementRepository.signedQuantity(changeType, qty) * val;
+                    } else if (entrada) {
                         qtyEntrada += absQty;
                         valEntrada += lineVal;
                     } else if (saida) {
@@ -1484,6 +1495,10 @@ public class ReportsActivity extends BaseActivity {
         }
         if (entradaFilter == null || !entradaFilter) {
             b.colored("Total de saídas: " + fq(qtySaida) + " itens (" + fc(valSaida) + ")", 10, false);
+        }
+        if (entradaFilter == null && (qtyOutros != 0 || valOutros != 0)) {
+            b.text("Cadastros, ajustes e estornos: " + (qtyOutros < 0 ? "- " : "") + fq(Math.abs(qtyOutros))
+                    + " itens (" + (valOutros < 0 ? "- " : "") + fc(Math.abs(valOutros)) + ")", 10);
         }
         b.small("* Valores estimados com o preço unitário atual dos produtos.", 10);
         b.spacer(8);
@@ -1525,6 +1540,12 @@ public class ReportsActivity extends BaseActivity {
      * edição e ajuste, então esses eventos sumiam dos relatórios — o total de
      * entradas não batia com o estoque que o usuário via na tela.
      */
+    private static boolean isCompraOuVenda(String changeType) {
+        return MovementRepository.ENTRADA.equalsIgnoreCase(changeType)
+                || MovementRepository.SAIDA.equalsIgnoreCase(changeType)
+                || "compra".equalsIgnoreCase(changeType) || "venda".equalsIgnoreCase(changeType);
+    }
+
     private boolean isEntrada(String changeType, double quantity) {
         return MovementRepository.signedQuantity(changeType, quantity) > 0;
     }

@@ -24,7 +24,9 @@ import java.util.Locale;
 
 public class HistoryActivity extends BaseActivity {
 
-    private static final String[] FILTROS_TIPO = {"Todas", "Entradas", "Saídas", "Ajustes e correções"};
+    // Por efeito no saldo, não pelo nome do tipo: quem quer "tudo que saiu do
+    // estoque" precisa ver também o estorno de uma entrada.
+    private static final String[] FILTROS_TIPO = {"Todas", "Aumentaram o estoque", "Diminuíram o estoque", "Ajustes e estornos"};
 
     private ListView historyList;
     private SearchView searchView;
@@ -90,6 +92,14 @@ public class HistoryActivity extends BaseActivity {
         loadHistory();
     }
 
+    private static boolean casaFiltro(String filtro, HistoryAdapter.HistoryItem item) {
+        double efeito = MovementRepository.signedQuantity(item.getType(), item.getQuantity());
+        if (FILTROS_TIPO[1].equals(filtro)) return efeito > 0;
+        if (FILTROS_TIPO[2].equals(filtro)) return efeito < 0;
+        if (FILTROS_TIPO[3].equals(filtro)) return "Ajustes e correções".equals(categoria(item.getType()));
+        return true;
+    }
+
     /** Categoria de exibição do tipo, para casar com as opções do filtro. */
     private static String categoria(String changeType) {
         if (changeType == null) {
@@ -114,7 +124,7 @@ public class HistoryActivity extends BaseActivity {
 
         List<HistoryAdapter.HistoryItem> visiveis = new ArrayList<>();
         for (HistoryAdapter.HistoryItem item : allItems) {
-            boolean casaTipo = semFiltroTipo || filtroTipo.equals(categoria(item.getType()));
+            boolean casaTipo = semFiltroTipo || casaFiltro(filtroTipo, item);
             // Mesma regra da Início: sem acento, sem caixa ("moida" acha "Moída").
             boolean casaBusca = buscaLower.isEmpty()
                     || MainActivity.fold(item.getProductName()).contains(buscaLower);
@@ -318,6 +328,11 @@ public class HistoryActivity extends BaseActivity {
             builder.setNegativeButton("Estornar",
                     (dialog, which) -> confirmCancellation(item));
         }
+        final List<HistoryAdapter.HistoryItem> lote = loteDoMesmoAjuste(item);
+        if (lote.size() > 1) {
+            builder.setNeutralButton("Estornar todos (" + lote.size() + ")",
+                    (dialog, which) -> confirmBatchCancellation(lote));
+        }
 
         androidx.appcompat.app.AlertDialog dialog = builder.show();
         android.widget.Button estornar = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
@@ -402,6 +417,49 @@ public class HistoryActivity extends BaseActivity {
      * Uma movimentação já estornada também não oferece o botão de novo — sem
      * isso, o toque só resultava num aviso de "já foi cancelada".
      */
+    /**
+     * Movimentações do mesmo ajuste em massa (mesma nota "Ajuste em massa
+     * dd/MM HH:mm (+N)") ainda não estornadas. Reverter um a um era o jeito
+     * mais caro de corrigir o erro mais caro.
+     */
+    private List<HistoryAdapter.HistoryItem> loteDoMesmoAjuste(HistoryAdapter.HistoryItem item) {
+        List<HistoryAdapter.HistoryItem> lote = new ArrayList<>();
+        String nota = item.getNote();
+        if (nota == null || !nota.startsWith("Ajuste em massa ")) {
+            return lote;
+        }
+        for (HistoryAdapter.HistoryItem outro : allItems) {
+            if (nota.equals(outro.getNote()) && canCancel(outro)) {
+                lote.add(outro);
+            }
+        }
+        return lote;
+    }
+
+    private void confirmBatchCancellation(List<HistoryAdapter.HistoryItem> lote) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Estornar o ajuste em massa?")
+                .setMessage(lote.size() + " movimentações deste ajuste serão estornadas de uma vez. "
+                        + "Os registros originais ficam no histórico.")
+                .setNegativeButton("Voltar", null)
+                .setPositiveButton("Estornar todos", (d, w) -> {
+                    if (!ensureDatabaseAvailable()) return;
+                    int ok = 0;
+                    synchronized (MainActivity.DB_LOCK) {
+                        MovementRepository repo = new MovementRepository(MainActivity.stock);
+                        for (HistoryAdapter.HistoryItem it : lote) {
+                            if (repo.cancel(it.getUuid(), "Estorno do ajuste em massa").success) ok++;
+                        }
+                    }
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.markListDirty(true);
+                    }
+                    Feedback.show(this, "Ajuste em massa estornado em " + Texto.plural(ok, "produto", "produtos") + ".");
+                    loadHistory();
+                })
+                .show();
+    }
+
     private boolean canCancel(HistoryAdapter.HistoryItem item) {
         return item.getUuid() != null
                 && !item.isReversed()

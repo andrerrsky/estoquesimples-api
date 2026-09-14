@@ -321,10 +321,15 @@ public class CustomListView extends ArrayAdapter<String> {
         double saldoAtual = CurrencyHelper.parseCurrency(amounts.get(position), 0);
         if (Unidades.inteira(units.get(position)) && Unidades.fracionada(saldoAtual)) {
             lowStockBadge.setText(lowStockBadge.getVisibility() == View.VISIBLE
-                    ? lowStockBadge.getText() + "\nQuantidade quebrada · corrija"
-                    : "Quantidade quebrada em item por unidade · corrija");
+                    ? lowStockBadge.getText() + "\nQuantidade quebrada · toque aqui"
+                    : "Quantidade quebrada em item por unidade · toque aqui");
             lowStockBadge.setVisibility(View.VISIBLE);
             amount.setTextColor(ContextCompat.getColor(context, R.color.color_warning));
+            lowStockBadge.setOnClickListener(v -> MainActivity.instance.showEditActivity(names.get(finalPosition)));
+            lowStockBadge.setClickable(true);
+        } else {
+            lowStockBadge.setOnClickListener(null);
+            lowStockBadge.setClickable(false);
         }
 
         // Estado expandido/colapsado
@@ -416,6 +421,20 @@ public class CustomListView extends ArrayAdapter<String> {
 
     private void showStockDialog(int position, boolean isEntrada) {
         String productName = names.get(position);
+        double saldoAtual = CurrencyHelper.parseCurrency(amounts.get(position), 0);
+        if (Unidades.inteira(units.get(position)) && Unidades.fracionada(saldoAtual)) {
+            // Movimentar por cima de um saldo quebrado só espalha o erro.
+            com.google.android.material.snackbar.Snackbar aviso = Feedback.make(context,
+                    "Este produto está com " + CurrencyHelper.formatQuantity(saldoAtual)
+                            + " " + units.get(position) + ". Corrija a quantidade antes de movimentar.",
+                    com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+            if (aviso != null) {
+                aviso.setDuration(8000);
+                aviso.setAction("Corrigir", v -> MainActivity.instance.showEditActivity(productName));
+                aviso.show();
+            }
+            return;
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(isEntrada ? "Entrada de estoque" : "Saída de estoque");
@@ -455,6 +474,35 @@ public class CustomListView extends ArrayAdapter<String> {
             inputNote.setMaxLines(6);
             inputNote.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         }
+
+        // Data opcional: registrar a compra de ontem com a data de hoje deixava
+        // o histórico e o PDF por período errados.
+        final long[] quando = {0L};
+        final android.widget.TextView dataView = new android.widget.TextView(context);
+        dataView.setText("Data: agora · alterar");
+        dataView.setTextColor(ContextCompat.getColor(context, R.color.color_brand));
+        dataView.setTypeface(null, android.graphics.Typeface.BOLD);
+        dataView.setPadding(0, (int) (context.getResources().getDisplayMetrics().density * 12), 0, 0);
+        dataView.setOnClickListener(v -> {
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            if (quando[0] > 0) cal.setTimeInMillis(quando[0]);
+            android.app.DatePickerDialog picker = new android.app.DatePickerDialog(context, (dp, y, m, d) -> {
+                java.util.Calendar escolhido = java.util.Calendar.getInstance();
+                escolhido.set(y, m, d, 12, 0, 0);
+                long hoje = System.currentTimeMillis();
+                if (escolhido.getTimeInMillis() > hoje) {
+                    escolhido.setTimeInMillis(hoje);
+                }
+                boolean eHoje = android.text.format.DateUtils.isToday(escolhido.getTimeInMillis());
+                quando[0] = eHoje ? 0L : escolhido.getTimeInMillis();
+                dataView.setText(eHoje ? "Data: agora · alterar"
+                        : "Data: " + new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                        .format(new java.util.Date(quando[0])) + " · alterar");
+            }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH));
+            picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+            picker.show();
+        });
+        container.addView(dataView);
 
         builder.setView(container);
         builder.setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss());
@@ -532,7 +580,8 @@ public class CustomListView extends ArrayAdapter<String> {
                         productUuid,
                         isEntrada ? MovementRepository.ENTRADA : MovementRepository.SAIDA,
                         isEntrada ? qty : -qty,
-                        note);
+                        note,
+                        quando[0]);
             }
 
             if (!result.success) {

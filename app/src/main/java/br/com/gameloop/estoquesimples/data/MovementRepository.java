@@ -128,6 +128,15 @@ public final class MovementRepository {
      * @param delta positivo para entrada, negativo para saída.
      */
     public Result apply(String productUuid, String changeType, double delta, String note) {
+        return apply(productUuid, changeType, delta, note, 0L);
+    }
+
+    /**
+     * @param when data da movimentação em millis, ou 0 para "agora". Datas
+     *             passadas servem para registrar a compra de ontem; nunca
+     *             futuras (o chamador limita).
+     */
+    public Result apply(String productUuid, String changeType, double delta, String note, long when) {
         if (productUuid == null) {
             return Result.fail("Produto sem identificação.");
         }
@@ -148,6 +157,7 @@ public final class MovementRepository {
             }
 
             long now = System.currentTimeMillis();
+            long movementTime = when > 0 && when <= now ? when : now;
 
             // O saldo é atualizado sem mexer no `rev` do produto: quantidade
             // não é um campo editável que dois aparelhos disputam, é o
@@ -163,7 +173,7 @@ public final class MovementRepository {
             }
 
             String movementUuid = insertMovement(productUuid, atual.name, changeType,
-                    Math.abs(delta), note, now);
+                    Math.abs(delta), note, movementTime);
             if (movementUuid == null) {
                 return Result.fail("Não foi possível registrar a movimentação.");
             }
