@@ -47,6 +47,7 @@ public class CustomListView extends ArrayAdapter<String> {
     private ArrayList<String> units;
     private ArrayList<String> suppliers;
     private ArrayList<String> barcodes;
+    private ArrayList<String> descriptions;
 
     private static final String TAG = "CustomListView";
     private static final String IMAGE_TYPE = "image/*";
@@ -54,12 +55,15 @@ public class CustomListView extends ArrayAdapter<String> {
     // lugar depois de cada movimentação/busca e as posições mudam.
     private final Set<String> expandedNames = new HashSet<>();
     private final boolean showProductImages;
+    /** Tempo do "Desfazer": 8 s ainda escapava a quem lê a mensagem antes de decidir. */
+    public static final int UNDO_DURATION_MS = 12000;
 
     public CustomListView(Activity context, ArrayList<String> names, ArrayList<String> amounts, 
                          ArrayList<String> values, ArrayList<String> photos, ArrayList<String> categories,
                          ArrayList<String> skus, ArrayList<String> locations, 
                          ArrayList<String> minStocks, ArrayList<String> units,
-                         ArrayList<String> suppliers, ArrayList<String> barcodes) {
+                         ArrayList<String> suppliers, ArrayList<String> barcodes,
+                         ArrayList<String> descriptions) {
 
         super(context, R.layout.custom_listview, names);
 
@@ -75,6 +79,7 @@ public class CustomListView extends ArrayAdapter<String> {
         this.units = units;
         this.suppliers = suppliers;
         this.barcodes = barcodes;
+        this.descriptions = descriptions;
         this.showProductImages = SettingsActivity.isShowProductImages(context);
 
     }
@@ -307,7 +312,7 @@ public class CustomListView extends ArrayAdapter<String> {
 
         // Campos de detalhes (apenas preenche, a visibilidade da seção é controlada acima)
         TextView detailMinStock = (TextView) rowView.findViewById(R.id.detailMinStock);
-        TextView detailUnit = (TextView) rowView.findViewById(R.id.detailUnit);
+        TextView detailDescription = (TextView) rowView.findViewById(R.id.detailDescription);
         TextView detailLocation = (TextView) rowView.findViewById(R.id.detailLocation);
         TextView detailBarcode = (TextView) rowView.findViewById(R.id.detailBarcode);
         TextView detailSupplier = (TextView) rowView.findViewById(R.id.detailSupplier);
@@ -319,12 +324,11 @@ public class CustomListView extends ArrayAdapter<String> {
             detailMinStock.setText("-");
         }
 
-        String unitStr = units.get(position);
-        if(unitStr != null && !unitStr.isEmpty() && !unitStr.equals("null")) {
-            detailUnit.setText(unitStr);
-        } else {
-            detailUnit.setText("-");
-        }
+        // A unidade já aparece ao lado da quantidade; a descrição não aparecia
+        // em lugar nenhum da lista.
+        String descriptionStr = descriptions == null ? null : descriptions.get(position);
+        detailDescription.setText(descriptionStr != null && !descriptionStr.trim().isEmpty()
+                && !descriptionStr.equals("null") ? descriptionStr.trim() : "-");
 
         String locationStr = locations.get(position);
         if(locationStr != null && !locationStr.isEmpty() && !locationStr.equals("null")) {
@@ -423,15 +427,26 @@ public class CustomListView extends ArrayAdapter<String> {
         // diálogo sozinho (e perde o que já foi digitado) quando algo falha.
         builder.setPositiveButton("Confirmar", null);
 
-        AlertDialog dialog = builder.show();
+        AlertDialog dialog = builder.create();
         // Quantidade já em foco, com teclado: é o único campo obrigatório e
-        // cada movimentação exigia um toque a mais.
-        if (qtyLayout.getEditText() != null) {
-            qtyLayout.getEditText().requestFocus();
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setSoftInputMode(
-                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-            }
+        // cada movimentação exigia um toque a mais. STATE_VISIBLE depois do
+        // show() não bastava; o modo precisa estar na janela antes de ela
+        // aparecer, e o showSoftInput cobre o teclado que ainda assim não vier.
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        }
+        dialog.show();
+        final EditText qtyField = qtyLayout.getEditText();
+        if (qtyField != null) {
+            qtyField.requestFocus();
+            qtyField.post(() -> {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        context.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(qtyField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                }
+            });
         }
         // Fechar o diálogo com o teclado aberto devolvia o teclado para a
         // busca da lista. Quem fecha o teclado é a lista, sempre.
@@ -533,7 +548,7 @@ public class CustomListView extends ArrayAdapter<String> {
         }
         // Tempo para ler e decidir: com os 3 s padrão o "Desfazer" sumia antes
         // do segundo toque, que caía no card de trás.
-        snackbar.setDuration(8000);
+        snackbar.setDuration(UNDO_DURATION_MS);
         snackbar.show();
     }
 

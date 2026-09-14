@@ -11,8 +11,7 @@
         android:id="@+id/historyFilterBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
         android:paddingTop="@dimen/field_gap"
@@ -21,20 +20,22 @@
         <androidx.appcompat.widget.SearchView
             android:id="@+id/historySearchView"
             style="@style/Widget.Estoque.SearchView"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             app:iconifiedByDefault="false"
-            app:queryHint="Buscar produto"
+            app:queryHint="Buscar por produto..."
             app:queryBackground="@android:color/transparent"
             app:submitBackground="@android:color/transparent" />
 
         <Spinner
             android:id="@+id/historyTypeFilter"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="@dimen/field_gap"
-            android:minWidth="110dp" />
+            android:layout_marginTop="@dimen/field_gap"
+            android:background="@drawable/bg_dropdown"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:minHeight="44dp" />
 
     </LinearLayout>
 

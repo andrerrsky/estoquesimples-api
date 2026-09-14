@@ -182,7 +182,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/section_gap"
-                    android:text="Banco deste aparelho (.db): cópia exata, incluindo a fila de sincronização. Importar um banco substitui todo o estoque atual."
+                    android:text="Cópia exata deste aparelho (arquivo .db), inclusive o que ainda não foi enviado para a nuvem. Substituir apaga o estoque atual (uma cópia automática é gravada antes)."
                     android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
 
                 <Button

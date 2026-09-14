@@ -165,7 +165,7 @@
                 android:id="@+id/averageValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Valor Médio: $ 0,00"
+                android:text="Produtos para repor: 0"
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting"
                 android:textColor="@color/color_text"
                 android:paddingTop="4dp"
@@ -206,6 +206,13 @@
                 android:textStyle="bold"
                 android:paddingTop="4dp"
                 android:paddingBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Soma do valor unitário cadastrado × quantidade movimentada. Não é faturamento nem despesa real."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
         </LinearLayout>
 
         <TextView

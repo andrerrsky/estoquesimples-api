@@ -204,12 +204,24 @@ public class MainActivity extends BaseActivity {
             @Override
             public void handleOnBackPressed() {
                 boolean searching = searchView != null && searchView.getQuery().length() > 0;
-                if (searching || lowStockOnly) {
-                    if (searchView != null) searchView.setQuery("", false);
-                    lowStockOnly = false;
+                if (searching) {
+                    // Só a busca: o filtro escolhido continua.
+                    searchView.setQuery("", false);
                     releaseSearchFocus();
-                    updateFilterChips();
                     filterList("");
+                    return;
+                }
+                if (lowStockOnly) {
+                    setLowStockOnly(false);
+                    return;
+                }
+                long now = android.os.SystemClock.elapsedRealtime();
+                if (now - lastBackPress > 2500) {
+                    // Sair sem querer no meio do trabalho custa caro; um segundo
+                    // toque em seguida confirma.
+                    lastBackPress = now;
+                    Feedback.make(MainActivity.this, "Toque Voltar de novo para sair",
+                            com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show();
                     return;
                 }
                 setEnabled(false);
@@ -317,6 +329,7 @@ public class MainActivity extends BaseActivity {
                 options.setBeepEnabled(true);
                 options.setBarcodeImageEnabled(false);
                 options.setOrientationLocked(false);
+        options.setCaptureActivity(ScannerActivity.class);
                 barcodeSearchLauncher.launch(options);
             });
         }
@@ -448,7 +461,7 @@ public class MainActivity extends BaseActivity {
         filteredMinStocks = new ArrayList<>();
         filteredUnits = new ArrayList<>();
 
-        listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes);
+        listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes, filteredDescriptions);
 
         listView = (ListView) findViewById(R.id.listView);
         listView.setEmptyView(findViewById(R.id.empty_list_item));
@@ -548,6 +561,8 @@ public class MainActivity extends BaseActivity {
             pendingClearSearch = true;
         }
     }
+
+    private long lastBackPress;
 
     /** Produto a mostrar (rolado e expandido) na próxima atualização da lista. */
     private String pendingShowName;
@@ -700,7 +715,7 @@ public class MainActivity extends BaseActivity {
      */
     private void refreshAdapterInPlace() {
         if (listAdapter == null) {
-            listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes);
+            listAdapter = new CustomListView(this, filteredNames, filteredAmounts, filteredValues, filteredPhotos, filteredCategories, filteredSkus, filteredLocations, filteredMinStocks, filteredUnits, filteredSuppliers, filteredBarcodes, filteredDescriptions);
             listView.setAdapter(listAdapter);
             return;
         }
@@ -1000,7 +1015,7 @@ public class MainActivity extends BaseActivity {
                                         MainActivity.this, "Produto excluído.",
                                         com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
                                 if (undo != null) {
-                                    undo.setDuration(8000);
+                                    undo.setDuration(CustomListView.UNDO_DURATION_MS);
                                     undo.setAction("Desfazer", v -> {
                                         boolean restored;
                                         synchronized (DB_LOCK) {
@@ -1141,9 +1156,6 @@ public class MainActivity extends BaseActivity {
         } else if (itemId == R.id.menu_settings) {
             showSettingsActivity();
             return true;
-        } else if (itemId == R.id.menu_exit) {
-            exitApp();
-            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -1151,19 +1163,6 @@ public class MainActivity extends BaseActivity {
     public void showAboutActivity() {
         Intent intent = new Intent(this, AboutActivity.class);
         startActivity(intent);
-    }
-
-    public void exitApp() {
-        new AlertDialog.Builder(this)
-                .setTitle("Sair")
-                .setMessage("Tem certeza que deseja sair do aplicativo?")
-                .setPositiveButton("Sim", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        finishAffinity();
-                    }
-                })
-                .setNegativeButton("Não", null)
-                .show();
     }
 
     @Override
@@ -1267,6 +1266,20 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    /** "Açúcar Refinado 1kg, Água Mineral 500ml e mais 3" — para a pessoa ver em quem vai mexer. */
+    private static String listarNomes(java.util.List<String> nomes) {
+        StringBuilder sb = new StringBuilder();
+        int mostrados = Math.min(4, nomes.size());
+        for (int i = 0; i < mostrados; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(nomes.get(i));
+        }
+        if (nomes.size() > mostrados) {
+            sb.append(" e mais ").append(nomes.size() - mostrados);
+        }
+        return sb.toString();
+    }
+
     private void showBulkInputDialog(String title, String message, String hint, int inputType,
                                      String requiredMessage, java.util.function.Consumer<String> onApply) {
         BulkField field = new BulkField(this, hint, inputType);
@@ -1291,8 +1304,8 @@ public class MainActivity extends BaseActivity {
      */
     private void showBulkAdjustQuantityDialog(final java.util.List<String> selectedProducts) {
         showBulkInputDialog("Ajustar quantidade",
-                selectedProducts.size() + " produto(s) selecionado(s). Some ou subtraia a mesma "
-                        + "quantidade em todos: +10 adiciona, -5 remove.",
+                "Some ou subtraia a mesma quantidade em: " + listarNomes(selectedProducts)
+                        + ". +10 adiciona, -5 remove. Dá para desfazer logo em seguida.",
                 "Quantidade (+10 ou -5)",
                 android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
                         | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL,
@@ -1312,7 +1325,7 @@ public class MainActivity extends BaseActivity {
      */
     private void showBulkSetCategoryDialog(final java.util.List<String> selectedProducts) {
         showBulkInputDialog("Definir categoria",
-                "A categoria abaixo substitui a atual em " + selectedProducts.size() + " produto(s).",
+                "A categoria abaixo substitui a atual em: " + listarNomes(selectedProducts) + ".",
                 "Categoria",
                 android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
                 "Informe a categoria.",
@@ -1324,7 +1337,7 @@ public class MainActivity extends BaseActivity {
      */
     private void showBulkSetSupplierDialog(final java.util.List<String> selectedProducts) {
         showBulkInputDialog("Definir fornecedor",
-                "O fornecedor abaixo substitui o atual em " + selectedProducts.size() + " produto(s).",
+                "O fornecedor abaixo substitui o atual em: " + listarNomes(selectedProducts) + ".",
                 "Fornecedor",
                 android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS,
                 "Informe o fornecedor.",
@@ -1345,6 +1358,7 @@ public class MainActivity extends BaseActivity {
         int updated = 0;
         ProductRepository repository = new ProductRepository(stock);
         MovementRepository movements = new MovementRepository(stock);
+        final java.util.List<String> movementUuids = new ArrayList<>();
 
         for (String productName : products) {
             try {
@@ -1362,6 +1376,9 @@ public class MainActivity extends BaseActivity {
                         uuid, MovementRepository.AJUSTE, target, "Ajuste em massa");
                 if (result.success) {
                     updated++;
+                    if (result.movementUuid != null) {
+                        movementUuids.add(result.movementUuid);
+                    }
                 }
             } catch (Exception e) {
                 Log.e("MainActivity", "Error adjusting quantity for product: " + productName, e);
@@ -1369,7 +1386,33 @@ public class MainActivity extends BaseActivity {
         }
         
         updateList();
-        Feedback.show(this, getString(R.string.bulk_edit_success, updated));
+        String resumo = (adjustment > 0 ? "+" : "") + CurrencyHelper.formatQuantity(adjustment)
+                + " em " + updated + (updated == 1 ? " produto." : " produtos.");
+        com.google.android.material.snackbar.Snackbar undo = Feedback.make(this, resumo,
+                com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+        if (undo == null) {
+            return;
+        }
+        undo.setDuration(CustomListView.UNDO_DURATION_MS);
+        if (!movementUuids.isEmpty()) {
+            // Um erro de digitação (+50 em vez de +5) mexia em vários saldos de
+            // uma vez e reverter era um por um no Histórico.
+            undo.setAction("Desfazer", v -> {
+                int revertidos = 0;
+                synchronized (DB_LOCK) {
+                    MovementRepository repo = new MovementRepository(stock);
+                    for (String movementUuid : movementUuids) {
+                        if (repo.cancel(movementUuid, "Ajuste em massa desfeito").success) {
+                            revertidos++;
+                        }
+                    }
+                }
+                updateList();
+                Feedback.show(MainActivity.this, "Ajuste desfeito em " + revertidos
+                        + (revertidos == 1 ? " produto." : " produtos."));
+            });
+        }
+        undo.show();
     }
     
     /**

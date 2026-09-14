@@ -370,6 +370,12 @@ public class SubscriptionActivity extends BaseActivity {
      */
     private CharSequence buildPriceDisplay(String formattedPrice) {
         String trimmed = formattedPrice.trim();
+        // A Play Store devolve o preço no idioma do aparelho; num aparelho em
+        // inglês vem "R$19.99". Para real, o formato é sempre "R$ 19,99".
+        Matcher real = Pattern.compile("^R\\$\\s*([0-9]+)\\.([0-9]{2})$").matcher(trimmed);
+        if (real.matches()) {
+            trimmed = "R$ " + real.group(1) + "," + real.group(2);
+        }
         Matcher matcher = PRICE_PATTERN.matcher(trimmed);
         String prefix = "";
         String amount = trimmed;

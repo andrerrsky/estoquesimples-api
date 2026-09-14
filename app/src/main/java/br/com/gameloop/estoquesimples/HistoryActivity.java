@@ -222,36 +222,39 @@ public class HistoryActivity extends BaseActivity {
         String dateStr = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                 .format(new java.util.Date(item.getTimestamp()));
 
+        // Rótulos em negrito e uma linha por informação: o bloco de texto
+        // corrido era a parte menos legível do Histórico.
         StringBuilder sb = new StringBuilder();
-        sb.append("Produto: ").append(item.getProductName()).append("\n");
-        sb.append("Tipo: ").append(MovementDisplay.sentenceLabel(item.getType())).append("\n");
+        sb.append("<b>Produto</b><br>").append(esc(item.getProductName())).append("<br><br>");
+        sb.append("<b>Tipo</b><br>").append(esc(MovementDisplay.sentenceLabel(item.getType()))).append("<br><br>");
         String unidade = item.getUnit().isEmpty() ? "" : " " + item.getUnit();
         double efeito = MovementRepository.signedQuantity(item.getType(), item.getQuantity());
-        sb.append("Quantidade: ")
+        sb.append("<b>Quantidade</b><br>")
                 .append(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity())))
-                .append(unidade)
+                .append(esc(unidade))
                 .append(efeito < 0 ? " (saiu do estoque)" : efeito > 0 ? " (entrou no estoque)" : "")
-                .append("\n");
-        sb.append("Data: ").append(dateStr);
+                .append("<br><br>");
+        sb.append("<b>Data</b><br>").append(dateStr);
 
         String note = item.getNote();
         if (note != null && !note.isEmpty() && !"null".equalsIgnoreCase(note)) {
-            sb.append("\n\nObservações / Informações adicionais:\n").append(note);
+            sb.append("<br><br><b>Observação</b><br>").append(esc(note));
         }
 
         if (item.getReversesUuid() != null) {
             HistoryAdapter.HistoryItem original = findByUuid(item.getReversesUuid());
-            sb.append("\n\nEsta movimentação estorna: ").append(descreverVinculo(original));
+            sb.append("<br><br><b>Estorna</b><br>").append(esc(descreverVinculo(original)));
         }
         HistoryAdapter.HistoryItem estorno = findReversalOf(item.getUuid());
         if (estorno != null) {
-            sb.append("\n\nEsta movimentação foi estornada em: ").append(descreverVinculo(estorno));
+            sb.append("<br><br><b>Estornada por</b><br>").append(esc(descreverVinculo(estorno)));
         }
 
         androidx.appcompat.app.AlertDialog.Builder builder =
                 new androidx.appcompat.app.AlertDialog.Builder(this)
                         .setTitle("Detalhes da movimentação")
-                        .setMessage(sb.toString())
+                        .setMessage(androidx.core.text.HtmlCompat.fromHtml(sb.toString(),
+                                androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY))
                         .setPositiveButton("OK", null);
 
         if (canCancel(item)) {
@@ -315,6 +318,10 @@ public class HistoryActivity extends BaseActivity {
             }
         }
         return null;
+    }
+
+    private static String esc(String text) {
+        return android.text.TextUtils.htmlEncode(text == null ? "" : text);
     }
 
     private String descreverVinculo(HistoryAdapter.HistoryItem item) {

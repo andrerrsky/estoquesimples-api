@@ -91,6 +91,8 @@ public class ImportActivity extends BaseActivity {
                 Html.FROM_HTML_MODE_LEGACY);
         importDesc2.setText(formato);
 
+        refreshRestoreButton();
+
         View advancedHeader = findViewById(R.id.advancedHeader);
         View advancedContent = findViewById(R.id.advancedContent);
         android.widget.ImageView advancedChevron = findViewById(R.id.advancedChevron);
@@ -218,10 +220,11 @@ public class ImportActivity extends BaseActivity {
         }
 
         new AlertDialog.Builder(this)
-                .setTitle("Atenção")
-                .setMessage("O banco atual será substituído. Uma cópia automática é gravada antes. Continuar?")
+                .setTitle("Substituir todo o estoque?")
+                .setMessage("Todos os produtos e o histórico deste aparelho serão trocados pelos do "
+                        + "arquivo escolhido. Uma cópia automática do estado atual é gravada antes.")
                 .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton(R.string.sim, (DialogInterface dialog, int whichButton) -> {
+                .setPositiveButton("Substituir tudo", (DialogInterface dialog, int whichButton) -> {
                     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                     intent.setType("*/*");
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -269,6 +272,23 @@ public class ImportActivity extends BaseActivity {
                 "EstoqueSimples_nuvem_" + stamp() + ".json", exportCloudLauncher);
     }
 
+    /**
+     * Sem cópia automática o botão não faz nada: fica desabilitado e diz
+     * isso, em vez de responder com um aviso ao toque.
+     */
+    private void refreshRestoreButton() {
+        android.widget.Button restore = findViewById(R.id.buttonRestoreBackup);
+        if (restore == null) {
+            return;
+        }
+        File[] copias = LocalBackup.list(this);
+        boolean tem = copias != null && copias.length > 0;
+        restore.setEnabled(tem);
+        restore.setText(tem
+                ? "Restaurar cópia automática (" + LocalBackup.describe(copias[0]) + ")"
+                : "Restaurar cópia automática (nenhuma ainda)");
+    }
+
     public void restoreAutomaticBackup(View view) {
         int pendentes = pendingOutboxCount();
         if (pendentes > 0) {
@@ -299,7 +319,7 @@ public class ImportActivity extends BaseActivity {
                 .setTitle("Restaurar esta cópia?")
                 .setMessage("O estoque atual será substituído por:\n" + LocalBackup.describe(copia)
                         + "\n\nUma cópia do estado de agora é gravada antes.")
-                .setPositiveButton(R.string.sim, (d, w) -> runRestore(copia))
+                .setPositiveButton("Restaurar", (d, w) -> runRestore(copia))
                 .setNegativeButton("Cancelar", null)
                 .show();
     }

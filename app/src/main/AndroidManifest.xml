@@ -119,6 +119,13 @@
             android:parentActivityName=".MainActivity"
             android:windowSoftInputMode="adjustResize" />
         
+        <activity
+            android:name=".ScannerActivity"
+            android:screenOrientation="fullSensor"
+            android:exported="false"
+            android:theme="@style/zxing_CaptureTheme"
+            tools:replace="android:screenOrientation" />
+
         <!-- ZXing Barcode Scanner Activity -->
         <activity
             android:name="com.journeyapps.barcodescanner.CaptureActivity"

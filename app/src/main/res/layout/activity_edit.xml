@@ -192,7 +192,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Valor ($) *">
+                    android:hint="Valor unitário ($) *">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editValue"
@@ -344,25 +344,6 @@
             android:orientation="horizontal"
             android:layout_marginTop="@dimen/field_gap"
             android:layout_marginBottom="@dimen/section_gap">
-
-            <Button
-                android:id="@+id/editCancel"
-                style="@style/Widget.Estoque.Button.Secondary"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Cancelar"
-                android:onClick="cancelEdit" />
-
-            <Button
-                android:id="@+id/editReady"
-                style="@style/Widget.Estoque.Button.Primary"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="2"
-                android:layout_marginLeft="@dimen/field_gap"
-                android:text="Salvar Alterações"
-                android:onClick="editProduct" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

@@ -345,18 +345,6 @@ public class ReportsActivity extends BaseActivity {
         return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
     
-    private void exitApp() {
-        new AlertDialog.Builder(this)
-                .setTitle("Sair")
-                .setMessage("Tem certeza que deseja sair do aplicativo?")
-                .setPositiveButton("Sim", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        finishAffinity();
-                    }
-                })
-                .setNegativeButton("Não", null)
-                .show();
-    }
 
     /**
      * Mantém as {@code maximo} maiores fatias e soma as demais em "Outros".
@@ -503,13 +491,9 @@ public class ReportsActivity extends BaseActivity {
         totalItems.setText("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItemsCount));
         totalValue.setText(getString(R.string.report_total_value, CurrencyHelper.formatCurrency(this, totalValueSum)));
         
-        if(cursorCount > 0) {
-            double avgValue = totalValueSum / cursorCount;
-            averageValue.setText(getString(R.string.report_avg_value, CurrencyHelper.formatCurrency(this, avgValue)));
-        } else {
-            String sym = CurrencyHelper.getCurrencySymbol(this);
-            averageValue.setText(getString(R.string.report_avg_value_zero, sym));
-        }
+        // "Valor médio por produto" não ajudava ninguém a decidir nada; o que
+        // o dono quer saber é quantos itens precisa repor.
+        averageValue.setText("Produtos para repor: " + lowStockProducts.size());
 
         // Calcular valor total de entradas e saídas
         calculateEntryExitTotals();
@@ -539,12 +523,15 @@ public class ReportsActivity extends BaseActivity {
             dataSet.setValueTextSize(12f);
             dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text_on_brand));
             dataSet.setSliceSpace(2f);
+            float totalFatias = 0f;
+            for (PieEntry e : entries) totalFatias += e.getValue();
+            final float minimoRotulo = totalFatias * 0.06f;
             dataSet.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
                 @Override
                 public String getFormattedValue(float value) {
-                    // float acumulado ("578,2999") arredondado para o que a
-                    // lista mostra.
-                    return CurrencyHelper.formatCurrency(ReportsActivity.this, value);
+                    // Fatias finas ficam só na legenda: o rótulo dentro delas
+                    // se sobrepunha ao vizinho.
+                    return value < minimoRotulo ? "" : CurrencyHelper.formatCurrency(ReportsActivity.this, value);
                 }
             });
 
@@ -607,7 +594,9 @@ public class ReportsActivity extends BaseActivity {
                 categorySection.setVisibility(android.view.View.VISIBLE);
                 
                 StringBuilder categoryText = new StringBuilder();
-                for(java.util.Map.Entry<String, Integer> entry : categoryMap.entrySet()) {
+                List<java.util.Map.Entry<String, Integer>> categorias = new ArrayList<>(categoryMap.entrySet());
+                java.util.Collections.sort(categorias, (a, b) -> b.getValue().compareTo(a.getValue()));
+                for(java.util.Map.Entry<String, Integer> entry : categorias) {
                     categoryText.append("• ").append(entry.getKey())
                         .append(": ").append(entry.getValue())
                         .append(" produto(s)\n");
@@ -690,7 +679,7 @@ public class ReportsActivity extends BaseActivity {
             totalProducts.setText("Total de Produtos: 0");
             totalItems.setText("Total de Itens: 0");
             totalValue.setText(getString(R.string.report_total_value_zero, sym));
-            averageValue.setText(getString(R.string.report_avg_value_zero, sym));
+            averageValue.setText("Produtos para repor: 0");
             if (totalEntryValue != null) {
                 totalEntryValue.setText(getString(R.string.total_entry_value_zero, sym));
             }

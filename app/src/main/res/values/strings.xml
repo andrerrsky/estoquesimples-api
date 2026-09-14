@@ -5,7 +5,7 @@
     <string name="my_own_rate">Avaliar agora! :D</string>
     <string name="my_own_thanks">Não obrigado :(</string>
     <string name="my_own_cancel">Depois :|</string>
-    <string name="sim">Sim!</string>
+    <string name="sim">Sim</string>
     <string name="history_title">Histórico</string>
 
     <!-- Settings Activity -->
@@ -82,15 +82,15 @@
     
     <!-- Currency / Monetary Formatting -->
     <string name="currency_selector_label">Moeda</string>
-    <string name="currency_label_value">Valor (%s) *</string>
-    <string name="report_total_value">Valor Total: %s</string>
+    <string name="currency_label_value">Valor unitário (%s) *</string>
+    <string name="report_total_value">Valor do estoque: %s</string>
     <string name="report_avg_value">Valor Médio por Produto: %s</string>
-    <string name="total_entry_value">Valor Total de Entradas: %s</string>
-    <string name="total_exit_value">Valor Total de Saídas: %s</string>
-    <string name="report_total_value_zero">Valor Total: %s 0,00</string>
+    <string name="total_entry_value">Entradas (desde o início): %s</string>
+    <string name="total_exit_value">Saídas (desde o início): %s</string>
+    <string name="report_total_value_zero">Valor do estoque: %s 0,00</string>
     <string name="report_avg_value_zero">Valor Médio: %s 0,00</string>
-    <string name="total_entry_value_zero">Valor Total de Entradas: %s 0,00</string>
-    <string name="total_exit_value_zero">Valor Total de Saídas: %s 0,00</string>
+    <string name="total_entry_value_zero">Entradas (desde o início): %s 0,00</string>
+    <string name="total_exit_value_zero">Saídas (desde o início): %s 0,00</string>
 
     <!-- Report Buttons (Reports Activity) -->
     <string name="report_section_others">Outros relatórios (PDF)</string>

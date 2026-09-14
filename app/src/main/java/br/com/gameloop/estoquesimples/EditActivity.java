@@ -1166,6 +1166,7 @@ public class EditActivity extends BaseActivity {
         options.setBeepEnabled(true);
         options.setBarcodeImageEnabled(false);
         options.setOrientationLocked(false);
+        options.setCaptureActivity(ScannerActivity.class);
         
         barcodeLauncher.launch(options);
     }
