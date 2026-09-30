@@ -205,13 +205,14 @@ export class GooglePlayClient implements PlayStoreClient {
       headers: { authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
+      const reason = await googleErrorMessage(response);
       throw new AppError(
         502,
         ErrorCode.BILLING_UNAVAILABLE,
         response.status === 403
-          ? 'O Google recusou a leitura de avaliações: confira a permissão "Responder a avaliações" da conta de serviço.'
-          : 'Não foi possível ler as avaliações agora. Tente novamente.',
-        { extra: { status: response.status } },
+          ? `O Google recusou a leitura de avaliações (${reason}). Confira a permissão "Responder a avaliações" da conta de serviço e se a API Google Play Android Developer está ativada no projeto do Google Cloud.`
+          : `Não foi possível ler as avaliações agora (${reason}).`,
+        { extra: { status: response.status, googleMessage: reason } },
       );
     }
     const body = (await response.json()) as {
@@ -229,15 +230,16 @@ export class GooglePlayClient implements PlayStoreClient {
       body: JSON.stringify({ replyText: text }),
     });
     if (!response.ok) {
+      const reason = await googleErrorMessage(response);
       throw new AppError(
         502,
         ErrorCode.BILLING_UNAVAILABLE,
         response.status === 403
-          ? 'O Google recusou a resposta: confira a permissão "Responder a avaliações" da conta de serviço.'
+          ? `O Google recusou a resposta (${reason}). Confira a permissão "Responder a avaliações" da conta de serviço.`
           : response.status === 404
             ? 'A avaliação não existe mais na Play Store.'
-            : 'Não foi possível enviar a resposta agora. Tente novamente.',
-        { extra: { status: response.status } },
+            : `Não foi possível enviar a resposta agora (${reason}).`,
+        { extra: { status: response.status, googleMessage: reason } },
       );
     }
   }
@@ -268,6 +270,17 @@ export class GooglePlayClient implements PlayStoreClient {
         { extra: { status: response.status } },
       );
     }
+  }
+}
+
+/** Mensagem curta do envelope de erro do Google, para o painel mostrar a causa. */
+async function googleErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { message?: string } };
+    const message = body.error?.message;
+    return message ? message.slice(0, 200) : `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
   }
 }
 
