@@ -174,6 +174,7 @@ Servido pela própria API na mesma origem (SPA em `admin/`, build em
 | Analytics | `analytics/summary`, `metrics`, `events`, `event-names`, `events/:name/series`, `funnel`, `retention` | — |
 | Auditoria | `audit/users`, `audit/admins`, `audit/actions` | — |
 | Operação | `ops/status`, `ops/sync` (owner), `ops/jobs`, `retry`, `cancel` | support |
+| Avaliações da Play Store | `reviews/stats`, `reviews`, `reviews/sync`, `reviews/:id/reply`, `reviews/:id/draft`, `settings/openai` (GET/PUT/DELETE) | support (chave da OpenAI: owner) |
 
 Princípios do painel:
 
@@ -205,6 +206,17 @@ por eixo; tooltip em toda superfície). Cliente HTTP em `api/client.ts`
 (cookie + cabeçalho anti-CSRF; 401 derruba a sessão local). Estado de
 listagem vive na URL (`lib/hooks.ts`). Rótulos e traduções de estados em
 `lib/labels.ts`.
+
+### Avaliações da Play Store (`src/modules/reviews/`)
+
+`play_reviews` é a cópia local do que `reviews.list` devolve (só avaliações
+com comentário alteradas nos últimos 7 dias; o job `play.reviews_sync` roda a
+cada 6 h para não perder nada). Responder (`reviews.reply`) vai ao Google
+primeiro e só depois atualiza a linha; limite de 350 caracteres. O rascunho
+por IA usa a chave da OpenAI guardada cifrada em `admin_settings`
+(`PurchaseTokenCipher`, mesma chave AES em repouso) e nunca devolve a chave ao
+painel; modelo em `OPENAI_MODEL`. Exige a permissão "Responder a avaliações"
+na conta de serviço do Play.
 
 ## 8. Analytics (eventos de uso)
 

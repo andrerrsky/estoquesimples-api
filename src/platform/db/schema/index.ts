@@ -30,3 +30,4 @@ export * from './billing.js';
 export * from './inventory.js';
 export * from './admin.js';
 export * from './analytics.js';
+export * from './reviews.js';

@@ -144,6 +144,11 @@ const envSchema = z
     ANALYTICS_MAX_BATCH: z.coerce.number().int().positive().max(1000).default(200),
     /** Lotes de eventos por janela de rate limit, por usuário/IP. */
     ANALYTICS_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+
+    /** Coleta das avaliações da Play Store (exige a conta de serviço). */
+    PLAY_REVIEWS_SYNC_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),
+    /** Modelo usado para rascunhar respostas; a chave fica em admin_settings. */
+    OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
   })
   .superRefine((value, ctx) => {
     const isProdLike = value.NODE_ENV === 'production' || value.NODE_ENV === 'staging';

@@ -30,9 +30,43 @@ export interface SubscriptionPurchaseV2 {
   }>;
 }
 
+/**
+ * Recorte de `reviews.list`: só o que o painel mostra e responde. O Google
+ * devolve apenas avaliações com comentário criadas ou alteradas nos últimos
+ * sete dias, por isso o serviço guarda uma cópia local.
+ */
+export interface PlayReview {
+  reviewId: string;
+  authorName?: string;
+  comments?: Array<{
+    userComment?: {
+      text?: string;
+      lastModified?: { seconds?: string | number; nanos?: number };
+      starRating?: number;
+      reviewerLanguage?: string;
+      device?: string;
+      androidOsVersion?: number;
+      appVersionCode?: number;
+      appVersionName?: string;
+      deviceMetadata?: { productName?: string; manufacturer?: string };
+    };
+    developerComment?: {
+      text?: string;
+      lastModified?: { seconds?: string | number; nanos?: number };
+    };
+  }>;
+}
+
+export interface PlayReviewsPage {
+  reviews: PlayReview[];
+  nextPageToken: string | null;
+}
+
 export interface PlayStoreClient {
   getSubscription(purchaseToken: string): Promise<SubscriptionPurchaseV2>;
   acknowledge(purchaseToken: string, productId: string): Promise<void>;
+  listReviews(pageToken?: string | null): Promise<PlayReviewsPage>;
+  replyToReview(reviewId: string, text: string): Promise<void>;
   readonly configured: boolean;
 }
 
@@ -154,6 +188,60 @@ export class GooglePlayClient implements PlayStoreClient {
     return (await response.json()) as SubscriptionPurchaseV2;
   }
 
+  private reviewsUrl(suffix = ''): string {
+    return (
+      `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
+      `${encodeURIComponent(this.env.GOOGLE_PLAY_PACKAGE_NAME)}/reviews${suffix}`
+    );
+  }
+
+  /** Exige a permissão "Responder a avaliações" na conta de serviço. */
+  async listReviews(pageToken: string | null = null): Promise<PlayReviewsPage> {
+    const token = await this.getAccessToken();
+    const params = new URLSearchParams({ maxResults: '100' });
+    if (pageToken) params.set('token', pageToken);
+
+    const response = await fetch(`${this.reviewsUrl()}?${params.toString()}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new AppError(
+        502,
+        ErrorCode.BILLING_UNAVAILABLE,
+        response.status === 403
+          ? 'O Google recusou a leitura de avaliações: confira a permissão "Responder a avaliações" da conta de serviço.'
+          : 'Não foi possível ler as avaliações agora. Tente novamente.',
+        { extra: { status: response.status } },
+      );
+    }
+    const body = (await response.json()) as {
+      reviews?: PlayReview[];
+      tokenPagination?: { nextPageToken?: string };
+    };
+    return { reviews: body.reviews ?? [], nextPageToken: body.tokenPagination?.nextPageToken ?? null };
+  }
+
+  async replyToReview(reviewId: string, text: string): Promise<void> {
+    const token = await this.getAccessToken();
+    const response = await fetch(this.reviewsUrl(`/${encodeURIComponent(reviewId)}:reply`), {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ replyText: text }),
+    });
+    if (!response.ok) {
+      throw new AppError(
+        502,
+        ErrorCode.BILLING_UNAVAILABLE,
+        response.status === 403
+          ? 'O Google recusou a resposta: confira a permissão "Responder a avaliações" da conta de serviço.'
+          : response.status === 404
+            ? 'A avaliação não existe mais na Play Store.'
+            : 'Não foi possível enviar a resposta agora. Tente novamente.',
+        { extra: { status: response.status } },
+      );
+    }
+  }
+
   /**
    * Confirma o recebimento da compra. O Google reembolsa automaticamente
    * compras não confirmadas em três dias, então esta chamada não é opcional.
@@ -223,5 +311,19 @@ export class FakePlayStoreClient implements PlayStoreClient {
 
   async acknowledge(purchaseToken: string): Promise<void> {
     this.acknowledged.push(purchaseToken);
+  }
+
+  readonly reviews: PlayReview[] = [];
+  readonly replies: Array<{ reviewId: string; text: string }> = [];
+
+  async listReviews(): Promise<PlayReviewsPage> {
+    return { reviews: [...this.reviews], nextPageToken: null };
+  }
+
+  async replyToReview(reviewId: string, text: string): Promise<void> {
+    if (!this.reviews.some((review) => review.reviewId === reviewId)) {
+      throw new AppError(502, ErrorCode.BILLING_UNAVAILABLE, 'A avaliação não existe mais na Play Store.');
+    }
+    this.replies.push({ reviewId, text });
   }
 }

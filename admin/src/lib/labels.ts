@@ -83,6 +83,7 @@ export const JOB_KIND: Record<string, string> = {
   'sync.retention': 'Limpeza da sincronização',
   'ops.watchdog': 'Vigia do sistema',
   'analytics.retention': 'Retenção de eventos',
+  'play.reviews_sync': 'Coleta de avaliações da Play Store',
 };
 
 /**
@@ -161,6 +162,11 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'ops.sync_config_changed': { label: 'Sincronização reconfigurada', tone: 'error' },
   'ops.job_retried': { label: 'Tarefa recolocada na fila', tone: 'info' },
   'ops.job_cancelled': { label: 'Tarefa cancelada', tone: 'warning' },
+  'review.replied': { label: 'Resposta publicada na Play Store', tone: 'info' },
+  'review.draft_generated': { label: 'Rascunho de resposta gerado', tone: 'neutral' },
+  'reviews.synced': { label: 'Avaliações buscadas no Google', tone: 'neutral' },
+  'setting.updated': { label: 'Configuração alterada', tone: 'warning' },
+  'setting.removed': { label: 'Configuração removida', tone: 'warning' },
 };
 
 export function auditLabel(action: string): { label: string; tone: Tone } {

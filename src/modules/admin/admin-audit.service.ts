@@ -50,6 +50,12 @@ export const AdminAction = {
   OPS_JOB_RETRIED: 'ops.job_retried',
   OPS_JOB_CANCELLED: 'ops.job_cancelled',
 
+  REVIEW_REPLIED: 'review.replied',
+  REVIEW_DRAFT_GENERATED: 'review.draft_generated',
+  REVIEWS_SYNCED: 'reviews.synced',
+  SETTING_UPDATED: 'setting.updated',
+  SETTING_REMOVED: 'setting.removed',
+
   DATA_EXPORTED: 'data.exported',
 } as const;
 
@@ -61,6 +67,8 @@ export const READ_ONLY_ADMIN_ACTIONS: ReadonlySet<AdminActionValue> = new Set([
   AdminAction.ADMIN_LOGIN_FAILED,
   AdminAction.ADMIN_LOGGED_OUT,
   AdminAction.DATA_EXPORTED,
+  AdminAction.REVIEW_DRAFT_GENERATED,
+  AdminAction.REVIEWS_SYNCED,
 ]);
 
 export interface AdminActor {

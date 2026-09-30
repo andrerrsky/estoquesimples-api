@@ -355,3 +355,77 @@ describe('painel administrativo: visão geral e operação', () => {
     expect(response.headers['content-type']).toContain('text/html');
   });
 });
+
+describe('avaliações da Play Store', () => {
+  it('coleta, lista, conta e responde pelo Google', async () => {
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+    context.play.reviews.push(
+      {
+        reviewId: 'rev-1',
+        authorName: 'Maria',
+        comments: [{ userComment: { text: 'Ótimo app, mas o PDF não abre', starRating: 3, lastModified: { seconds: '1790000000' }, appVersionName: '24', reviewerLanguage: 'pt' } }],
+      },
+      {
+        reviewId: 'rev-2',
+        authorName: 'João',
+        comments: [
+          { userComment: { text: 'Perfeito', starRating: 5, lastModified: { seconds: '1790000100' } } },
+          { developerComment: { text: 'Obrigado!', lastModified: { seconds: '1790000200' } } },
+        ],
+      },
+    );
+
+    const sync = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/sync', headers: { cookie, ...CSRF } });
+    expect(sync.statusCode).toBe(200);
+    expect(sync.json()).toMatchObject({ fetched: 2, created: 2 });
+
+    const stats = await context.app.inject({ method: 'GET', url: '/admin/api/reviews/stats', headers: { cookie } });
+    expect(stats.json()).toMatchObject({ total: 2, answered: 1, unanswered: 1, average: 4 });
+
+    const pending = await context.app.inject({ method: 'GET', url: '/admin/api/reviews?status=unanswered', headers: { cookie } });
+    expect(pending.json().total).toBe(1);
+    expect(pending.json().items[0].reviewId).toBe('rev-1');
+
+    const tooLong = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/reviews/rev-1/reply',
+      headers: { cookie, ...CSRF },
+      payload: { text: 'x'.repeat(351) },
+    });
+    expect(tooLong.statusCode).toBe(400);
+
+    const reply = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/reviews/rev-1/reply',
+      headers: { cookie, ...CSRF },
+      payload: { text: 'Obrigado, Maria! Envie um e-mail para suporte@estoquesimples.com.br com o modelo do aparelho que a gente resolve.' },
+    });
+    expect(reply.statusCode).toBe(200);
+    expect(context.play.replies).toHaveLength(1);
+
+    const after = await context.app.inject({ method: 'GET', url: '/admin/api/reviews/stats', headers: { cookie } });
+    expect(after.json()).toMatchObject({ answered: 2, unanswered: 0, answeredViaPanel: 1 });
+
+    const audit = await context.app.inject({ method: 'GET', url: '/admin/api/audit/admins?action=review.replied', headers: { cookie } });
+    expect(audit.json().items[0]).toMatchObject({ targetId: 'rev-1' });
+
+    const draft = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/rev-1/draft', headers: { cookie, ...CSRF }, payload: {} });
+    expect(draft.statusCode).toBe(409);
+  });
+
+  it('só owner configura a chave da OpenAI e o formato é validado', async () => {
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+    const forbidden = await context.app.inject({ method: 'PUT', url: '/admin/api/settings/openai', headers: { cookie, ...CSRF }, payload: { apiKey: 'sk-abcdefghijklmnopqrstuvwxyz' } });
+    expect(forbidden.statusCode).toBe(403);
+
+    const owner = await createAdmin('owner');
+    const session = await loginAdmin(owner);
+    const invalid = await context.app.inject({ method: 'PUT', url: '/admin/api/settings/openai', headers: { cookie: session.cookie, ...CSRF }, payload: { apiKey: 'nao-e-uma-chave-da-openai-mesmo' } });
+    expect(invalid.statusCode).toBe(400);
+
+    const status = await context.app.inject({ method: 'GET', url: '/admin/api/settings/openai', headers: { cookie: session.cookie } });
+    expect(status.json().configured).toBe(false);
+  });
+});

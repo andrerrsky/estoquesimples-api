@@ -4,6 +4,7 @@ import { migrateUp } from './platform/db/migrate.js';
 import { startJobRunner } from './platform/jobs/runner.js';
 import { ensureBootstrapAdmin } from './modules/admin/admin-bootstrap.js';
 import { bootstrapAnalyticsJobs } from './modules/analytics/analytics.jobs.js';
+import { bootstrapReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { bootstrapBillingJobs } from './modules/billing/billing.jobs.js';
 import { bootstrapOpsJobs } from './modules/ops/ops.jobs.js';
 import { bootstrapSyncJobs } from './modules/sync/sync.jobs.js';
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
     await bootstrapSyncJobs(services);
     await bootstrapOpsJobs(services);
     await bootstrapAnalyticsJobs(services);
+    await bootstrapReviewsJobs(services);
   }
   const stopJobs = env.JOBS_ENABLED ? startJobRunner(services, app.log) : () => undefined;
 

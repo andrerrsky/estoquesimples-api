@@ -13,6 +13,7 @@ import { LoggingMailer, type Mailer } from './platform/email/mailer.js';
 import { registerAnalyticsJobs } from './modules/analytics/analytics.jobs.js';
 import { registerBillingJobs } from './modules/billing/billing.jobs.js';
 import { registerOpsJobs } from './modules/ops/ops.jobs.js';
+import { registerReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { registerSyncJobs } from './modules/sync/sync.jobs.js';
 import { GooglePlayClient, type PlayStoreClient } from './modules/billing/play-client.js';
 import type { AppServices } from './platform/http/context.js';
@@ -75,6 +76,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerSyncJobs(services);
   registerOpsJobs(services);
   registerAnalyticsJobs(services);
+  registerReviewsJobs(services);
 
   return {
     app,
