@@ -1,7 +1,7 @@
 import fastifyStatic from '@fastify/static';
 import type { FastifyInstance } from 'fastify';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ErrorCode } from '../../platform/http/errors.js';
@@ -56,20 +56,21 @@ export async function registerAdminStatic(app: FastifyInstance): Promise<void> {
     await app.register(fastifyStatic, {
       root: distDir,
       prefix: '/',
-      // Assets do Vite têm hash no nome: podem ser cacheados por muito tempo.
-      // O index.html nunca é cacheado (é servido pelo handler abaixo).
-      maxAge: '30d',
-      immutable: true,
+      // O cache é decidido por arquivo em `setHeaders`: assets do Vite têm
+      // hash no nome e podem ficar imutáveis por muito tempo; o index.html
+      // (que o plugin também serve em /admin/index.html) nunca pode, senão um
+      // deploy deixa o navegador apontando para assets com hash antigo.
+      cacheControl: false,
       index: false,
       wildcard: false,
       decorateReply: true,
       serve: true,
       setHeaders: (reply, filePath) => {
         reply.setHeader('Content-Security-Policy', CSP);
-        // O plugin também registra /admin/index.html como arquivo; ele não
-        // pode ficar imutável em cache, senão um deploy deixa o navegador
-        // apontando para assets com hash antigo.
-        if (filePath.endsWith('index.html')) reply.setHeader('Cache-Control', 'no-store');
+        reply.setHeader(
+          'Cache-Control',
+          filePath.includes(`${sep}assets${sep}`) ? 'public, max-age=2592000, immutable' : 'no-store',
+        );
       },
     });
   }
