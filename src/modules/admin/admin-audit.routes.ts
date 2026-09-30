@@ -71,6 +71,7 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
         FROM audit_log a
         LEFT JOIN users u ON u.id = a.actor_user_id
         LEFT JOIN workspaces w ON w.id = a.workspace_id
+        LEFT JOIN devices d ON d.id = a.actor_device_id
         WHERE ${where}
       `;
 
@@ -84,7 +85,6 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
                  a.workspace_id, w.name AS workspace_name, a.entity_type, a.entity_id, a.metadata,
                  host(a.ip_address) AS ip, d.model AS device_model
           ${base}
-          LEFT JOIN devices d ON d.id = a.actor_device_id
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT ${f.pageSize} OFFSET ${offsetOf(f)}
         `),

@@ -11,9 +11,11 @@ import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
+import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
 import { OWNER_ROLE } from '../workspaces/workspaces.service.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
+import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
 
 export interface WorkspaceListFilters extends PaginationQuery {
@@ -39,9 +41,6 @@ export interface WorkspaceListItem {
   createdAt: string;
   deletedAt: string | null;
 }
-
-const LIVE_STATES = `('pendente','ativa','carencia','suspensa','cancelada_mas_ativa')`;
-const ENTITLED_STATES = `('ativa','carencia','cancelada_mas_ativa')`;
 
 const SORT_COLUMNS: Record<NonNullable<WorkspaceListFilters['sort']>, string> = {
   createdAt: 'w.created_at',
@@ -79,7 +78,7 @@ export class AdminWorkspacesService {
       );
     }
     if (filters.subscription === 'entitled') {
-      conditions.push(sql`s.state IN ${sql.raw(ENTITLED_STATES)}`);
+      conditions.push(sql`s.state IN ${sqlList(ENTITLED_STATES)}`);
     } else if (filters.subscription === 'none') {
       conditions.push(sql`s.id IS NULL`);
     } else if (filters.subscription === 'problem') {
@@ -93,7 +92,7 @@ export class AdminWorkspacesService {
     const base = sql`
       FROM workspaces w
       JOIN users o ON o.id = w.owner_user_id
-      LEFT JOIN subscriptions s ON s.workspace_id = w.id AND s.state IN ${sql.raw(LIVE_STATES)}
+      LEFT JOIN subscriptions s ON s.workspace_id = w.id AND s.state IN ${sqlList(LIVE_STATES)}
       WHERE ${where}
     `;
 
@@ -451,7 +450,7 @@ export class AdminWorkspacesService {
   }
 
   async timeline(workspaceId: string, query: PaginationQuery) {
-    const rows = await this.db.execute<{
+    const rowsQuery = this.db.execute<{
       source: 'user' | 'admin'; id: string; action: string; at: string; actor: string | null;
       entity_type: string | null; entity_id: string | null; metadata: Record<string, unknown>; ip: string | null;
     }>(sql`
@@ -469,12 +468,13 @@ export class AdminWorkspacesService {
       ORDER BY at DESC
       LIMIT ${query.pageSize} OFFSET ${offsetOf(query)}
     `);
-    const total = await this.db.execute<{ total: number }>(sql`
+    const totalQuery = this.db.execute<{ total: number }>(sql`
       SELECT (
         (SELECT count(*) FROM audit_log WHERE workspace_id = ${workspaceId})
         + (SELECT count(*) FROM admin_audit_log WHERE target_type = 'workspace' AND target_id = ${workspaceId})
       )::int AS total
     `);
+    const [rows, total] = await Promise.all([rowsQuery, totalQuery]);
     return {
       items: rows.rows.map((row) => ({
         source: row.source,

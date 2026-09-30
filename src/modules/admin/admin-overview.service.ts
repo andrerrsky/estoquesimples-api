@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
 
 import type { AppServices } from '../../platform/http/context.js';
+import { ENTITLED_STATES } from '../billing/billing.service.js';
 import { OpsService } from '../ops/ops.service.js';
-import { bucketExpr, fillSeries, resolveRange, type SeriesPoint } from './admin-series.js';
+import { ACTIVITY_SQL as ACTIVITY_UNION, bucketExpr, fillSeries, resolveRange, sqlList, type SeriesPoint } from './admin-series.js';
 
 /**
  * Retrato da plataforma para a primeira tela do painel.
@@ -61,17 +62,6 @@ export interface OverviewResponse {
   recentAdminActions: Array<{ id: string; adminEmail: string; action: string; targetType: string | null; targetId: string | null; at: string }>;
 }
 
-/**
- * "Usuário ativo" = teve um evento de uso (do app ou da API) ou uma ação
- * auditada. Sessões e aparelhos guardam só o último uso, então não servem
- * para séries históricas; os eventos servem para as duas coisas.
- */
-const ACTIVITY_UNION = sql`
-  SELECT user_id, occurred_at AS at FROM analytics_events WHERE user_id IS NOT NULL
-  UNION ALL
-  SELECT actor_user_id AS user_id, created_at AS at FROM audit_log WHERE actor_user_id IS NOT NULL
-`;
-
 export class AdminOverviewService {
   private readonly ops: OpsService;
 
@@ -97,7 +87,7 @@ export class AdminOverviewService {
             (SELECT count(*) FROM users WHERE deleted_at IS NULL AND email_verified_at IS NULL AND status = 'active') AS users_unverified,
             (SELECT count(*) FROM workspaces WHERE deleted_at IS NULL) AS workspaces_active,
             (SELECT count(DISTINCT workspace_id) FROM subscriptions
-               WHERE state IN ('ativa','carencia','cancelada_mas_ativa')) AS workspaces_with_subscription,
+               WHERE state IN ${sqlList(ENTITLED_STATES)}) AS workspaces_with_subscription,
             (SELECT count(*) FROM workspaces WHERE deleted_at IS NULL AND seeded_at IS NOT NULL) AS workspaces_seeded,
             (SELECT count(*) FROM subscriptions WHERE state = 'ativa') AS subs_active,
             (SELECT count(*) FROM subscriptions WHERE state = 'carencia') AS subs_grace,

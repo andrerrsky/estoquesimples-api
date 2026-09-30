@@ -250,6 +250,7 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         const job = rows[0];
         if (!job) throw notFound('Tarefa não encontrada.');
         if (job.completedAt || job.failedAt) throw conflict(ErrorCode.CONFLICT, 'A tarefa já terminou.');
+        if (job.lockedAt) throw conflict(ErrorCode.CONFLICT, 'A tarefa está em execução; aguarde terminar.');
 
         await tx
           .update(jobs)

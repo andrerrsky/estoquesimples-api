@@ -26,7 +26,9 @@ export const LIVE_STATES = [
   'cancelada_mas_ativa',
 ] as const;
 
-const ENTITLED_STATES = new Set(['ativa', 'carencia', 'cancelada_mas_ativa']);
+/** Estados que concedem acesso; subconjunto de LIVE_STATES. */
+export const ENTITLED_STATES = ['ativa', 'carencia', 'cancelada_mas_ativa'] as const;
+const ENTITLED_STATE_SET: ReadonlySet<string> = new Set(ENTITLED_STATES);
 
 /**
  * Tradução do estado do Google para o nosso vocabulário.
@@ -420,7 +422,7 @@ export class BillingService {
     now: Date,
   ): boolean {
     if (!subscription) return false;
-    if (!ENTITLED_STATES.has(subscription.state)) return false;
+    if (!ENTITLED_STATE_SET.has(subscription.state)) return false;
 
     // O estado pode estar desatualizado se uma notificação se perdeu. Comparar
     // com a data de expiração evita liberar acesso indevidamente enquanto a

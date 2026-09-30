@@ -3,6 +3,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import type { AppServices } from '../../platform/http/context.js';
 import { ANALYTICS_EVENT_CATALOG, DEFAULT_FUNNEL } from '../analytics/analytics.events.js';
 import {
+  ACTIVITY_SQL as ACTIVITY,
   bucketExpr,
   fillSeries,
   resolveRange,
@@ -10,16 +11,6 @@ import {
   type SeriesPoint,
 } from './admin-series.js';
 import { offsetOf, type PaginationQuery } from './admin.schemas.js';
-
-/**
- * Atividade de usuário: qualquer evento (do app ou da API) ou ação auditada.
- * Mesma definição usada na visão geral, para os números baterem entre telas.
- */
-const ACTIVITY = sql`
-  SELECT user_id, occurred_at AS at FROM analytics_events WHERE user_id IS NOT NULL
-  UNION ALL
-  SELECT actor_user_id, created_at FROM audit_log WHERE actor_user_id IS NOT NULL
-`;
 
 /**
  * Registro de métricas do painel.

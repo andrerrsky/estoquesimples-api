@@ -52,8 +52,13 @@ export function resolveRange(query: z.infer<typeof rangeQuerySchema>, defaultDay
     return { from: new Date(to.getTime() - 86_400_000), to, granularity: 'day', days: 1 };
   }
   const days = Math.ceil((to.getTime() - from.getTime()) / 86_400_000);
-  const granularity =
+  let granularity: Granularity =
     query.granularity ?? (days <= 92 ? 'day' : days <= MAX_POINTS * 7 ? 'week' : 'month');
+  // Mesmo pedida explicitamente, uma granularidade que estoure o teto de
+  // pontos é engrossada: cortar a série em silêncio esconderia os dias mais
+  // recentes, que são justamente os que interessam.
+  if (granularity === 'day' && days > MAX_POINTS) granularity = 'week';
+  if (granularity === 'week' && days > MAX_POINTS * 7) granularity = 'month';
   return { from, to, granularity, days };
 }
 
@@ -110,3 +115,20 @@ export function fillSeries(
 }
 
 export const seriesPointSchema = z.object({ t: z.string(), v: z.number() });
+
+/**
+ * Atividade de usuário: qualquer evento (do app ou da API) ou ação auditada.
+ * Definição única, usada pela visão geral e pelo analytics para que os
+ * números batam entre telas. Sessões e aparelhos só guardam o último uso e
+ * por isso não servem para séries.
+ */
+export const ACTIVITY_SQL = sql`
+  SELECT user_id, occurred_at AS at FROM analytics_events WHERE user_id IS NOT NULL
+  UNION ALL
+  SELECT actor_user_id AS user_id, created_at AS at FROM audit_log WHERE actor_user_id IS NOT NULL
+`;
+
+/** `('a','b')` parametrizado, para `IN` com listas de constantes do código. */
+export function sqlList(values: readonly string[]): SQL {
+  return sql`(${sql.join(values.map((value) => sql`${value}`), sql`, `)})`;
+}

@@ -322,6 +322,32 @@ describe('painel administrativo: visão geral e operação', () => {
     expect(config.json().sync.enabled).toBe(false);
   });
 
+  it('lista a auditoria das contas com filtros e junções', async () => {
+    const user = await registerUser(context, { installId: 'aparelho-auditoria' });
+    const owner = await createAdmin('owner');
+    const { cookie } = await loginAdmin(owner);
+
+    const all = await context.app.inject({ method: 'GET', url: '/admin/api/audit/users', headers: { cookie } });
+    expect(all.statusCode).toBe(200);
+    expect(all.json().total).toBeGreaterThanOrEqual(1);
+    expect(all.json().items[0]).toMatchObject({ action: 'user.registered', actorEmail: user.email });
+
+    const filtered = await context.app.inject({
+      method: 'GET',
+      url: `/admin/api/audit/users?action=user.&q=${encodeURIComponent(user.email)}`,
+      headers: { cookie },
+    });
+    expect(filtered.statusCode).toBe(200);
+    expect(filtered.json().items.every((item: { action: string }) => item.action.startsWith('user.'))).toBe(true);
+
+    const none = await context.app.inject({
+      method: 'GET',
+      url: '/admin/api/audit/users?action=workspace.deleted',
+      headers: { cookie },
+    });
+    expect(none.json().total).toBe(0);
+  });
+
   it('serve a interface em /admin com CSP', async () => {
     const response = await context.app.inject({ method: 'GET', url: '/admin/usuarios' });
     expect(response.statusCode).toBe(200);

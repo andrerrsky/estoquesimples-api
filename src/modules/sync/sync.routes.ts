@@ -291,9 +291,10 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
           env.SYNC_DEFAULT_PAGE_SIZE,
         ),
       );
-      // Só o primeiro pull de uma sequência conta como evento: páginas
-      // seguintes (cursor > 0 com hasMore) inflariam o número sem dizer nada.
-      if (result.changes.length > 0 || request.query.cursor === 0) {
+      // Um evento por sequência de leitura: só a última página conta, e só
+      // quando trouxe algo (ou é a primeira leitura do aparelho). Polls vazios
+      // de rotina e páginas intermediárias inflariam o número sem dizer nada.
+      if (!result.hasMore && (result.changes.length > 0 || request.query.cursor === 0)) {
         await trackServerEvent(app.services, {
           name: 'sync.pulled',
           userId: auth.userId,

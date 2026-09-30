@@ -10,8 +10,9 @@ import {
 } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
-import { BillingService, RtdnType } from '../billing/billing.service.js';
+import { BillingService, ENTITLED_STATES, RtdnType } from '../billing/billing.service.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
+import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
 
 export interface SubscriptionListFilters extends PaginationQuery {
@@ -58,12 +59,12 @@ export class AdminBillingService {
     `);
     const expiring = await this.db.execute<{ count: number }>(sql`
       SELECT count(*)::int AS count FROM subscriptions
-      WHERE state IN ('ativa','carencia','cancelada_mas_ativa')
+      WHERE state IN ${sqlList(ENTITLED_STATES)}
         AND current_period_end < now() + interval '7 days'
     `);
     const unverified = await this.db.execute<{ count: number }>(sql`
       SELECT count(*)::int AS count FROM subscriptions
-      WHERE state IN ('ativa','carencia','cancelada_mas_ativa') AND last_verified_at < now() - interval '48 hours'
+      WHERE state IN ${sqlList(ENTITLED_STATES)} AND last_verified_at < now() - interval '48 hours'
     `);
     const eventsPending = await this.db.execute<{ count: number }>(sql`
       SELECT count(*)::int AS count FROM subscription_events WHERE processed_at IS NULL
@@ -380,7 +381,7 @@ export class AdminBillingService {
       this.db.select().from(planFeatures),
       this.db.execute<{ plan_key: string; count: number }>(sql`
         SELECT plan_key, count(*)::int AS count FROM subscriptions
-        WHERE state IN ('ativa','carencia','cancelada_mas_ativa') GROUP BY plan_key
+        WHERE state IN ${sqlList(ENTITLED_STATES)} GROUP BY plan_key
       `),
     ]);
     const countByPlan = new Map(counts.rows.map((row) => [row.plan_key, row.count]));

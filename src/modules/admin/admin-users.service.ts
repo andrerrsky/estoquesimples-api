@@ -12,8 +12,10 @@ import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
+import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
+import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
 
 export interface UserListFilters extends PaginationQuery {
@@ -159,7 +161,7 @@ export class AdminUsersService {
                  SELECT 1 FROM workspace_members wm
                  JOIN subscriptions sub ON sub.workspace_id = wm.workspace_id
                  WHERE wm.user_id = u.id AND wm.status = 'active'
-                   AND sub.state IN ('ativa','carencia','cancelada_mas_ativa')
+                   AND sub.state IN ${sqlList(ENTITLED_STATES)}
                ) AS has_subscription
         FROM users u
         WHERE ${where}
@@ -204,7 +206,7 @@ export class AdminUsersService {
         FROM workspace_members wm
         JOIN workspaces w ON w.id = wm.workspace_id
         LEFT JOIN subscriptions s ON s.workspace_id = w.id
-          AND s.state IN ('pendente','ativa','carencia','suspensa','cancelada_mas_ativa')
+          AND s.state IN ${sqlList(LIVE_STATES)}
         WHERE wm.user_id = ${userId}
         ORDER BY wm.joined_at
       `),
@@ -613,7 +615,13 @@ export class AdminUsersService {
   // -------------------------------------------------------------------------
 
   async timeline(userId: string, query: PaginationQuery) {
-    const rows = await this.db.execute<{
+    // Um único predicado para linhas e contagem: filtro novo entra num lugar só.
+    const userAuditWhere = sql`
+      a.actor_user_id = ${userId}
+      OR (a.entity_type = 'user' AND a.entity_id = ${userId})
+      OR (a.entity_type = 'workspace_member' AND a.metadata->>'targetUserId' = ${userId})
+    `;
+    const rowsQuery = this.db.execute<{
       source: 'user' | 'admin';
       id: string;
       action: string;
@@ -631,9 +639,7 @@ export class AdminUsersService {
                NULL::text AS actor, a.workspace_id, w.name AS workspace_name,
                a.entity_type, a.entity_id, a.metadata, host(a.ip_address) AS ip
         FROM audit_log a LEFT JOIN workspaces w ON w.id = a.workspace_id
-        WHERE a.actor_user_id = ${userId}
-           OR (a.entity_type = 'user' AND a.entity_id = ${userId})
-           OR (a.entity_type = 'workspace_member' AND a.metadata->>'targetUserId' = ${userId})
+        WHERE ${userAuditWhere}
         UNION ALL
         SELECT 'admin'::text, l.id::text, l.action, l.created_at, l.admin_email,
                NULL::uuid, NULL::text, l.target_type, l.target_id, l.metadata, host(l.ip_address)
@@ -643,16 +649,13 @@ export class AdminUsersService {
       ORDER BY at DESC
       LIMIT ${query.pageSize} OFFSET ${offsetOf(query)}
     `);
-
-    const total = await this.db.execute<{ total: number }>(sql`
+    const totalQuery = this.db.execute<{ total: number }>(sql`
       SELECT (
-        (SELECT count(*) FROM audit_log a
-          WHERE a.actor_user_id = ${userId}
-             OR (a.entity_type = 'user' AND a.entity_id = ${userId})
-             OR (a.entity_type = 'workspace_member' AND a.metadata->>'targetUserId' = ${userId}))
+        (SELECT count(*) FROM audit_log a WHERE ${userAuditWhere})
         + (SELECT count(*) FROM admin_audit_log l WHERE l.target_type = 'user' AND l.target_id = ${userId})
       )::int AS total
     `);
+    const [rows, total] = await Promise.all([rowsQuery, totalQuery]);
 
     return {
       items: rows.rows.map((row) => ({

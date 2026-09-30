@@ -64,8 +64,12 @@ export async function registerAdminStatic(app: FastifyInstance): Promise<void> {
       wildcard: false,
       decorateReply: true,
       serve: true,
-      setHeaders: (reply) => {
+      setHeaders: (reply, filePath) => {
         reply.setHeader('Content-Security-Policy', CSP);
+        // O plugin também registra /admin/index.html como arquivo; ele não
+        // pode ficar imutável em cache, senão um deploy deixa o navegador
+        // apontando para assets com hash antigo.
+        if (filePath.endsWith('index.html')) reply.setHeader('Cache-Control', 'no-store');
       },
     });
   }

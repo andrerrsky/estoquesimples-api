@@ -26,7 +26,26 @@ export async function registerAnalyticsRoutes(app: FastifyInstance): Promise<voi
     '/analytics/events',
     {
       config: {
-        rateLimit: { max: env.ANALYTICS_RATE_LIMIT_MAX, timeWindow: env.RATE_LIMIT_WINDOW_MS },
+        rateLimit: {
+          max: env.ANALYTICS_RATE_LIMIT_MAX,
+          timeWindow: env.RATE_LIMIT_WINDOW_MS,
+          // Esta rota não passa por `app.authenticate`, então o gerador de
+          // chave global veria só o IP — atrás da borda do Railway, um único
+          // IP para todo mundo. Verifica a assinatura do Bearer (sem ir ao
+          // banco) para limitar por usuário; sem token, por IP.
+          keyGenerator: async (request) => {
+            const header = request.headers.authorization;
+            if (header?.startsWith('Bearer ')) {
+              try {
+                const claims = await app.services.tokens.verifyAccessToken(header.slice('Bearer '.length).trim());
+                return `user:${claims.sub}`;
+              } catch {
+                // Token inválido cai na cota anônima e é recusado logo abaixo.
+              }
+            }
+            return `ip:${request.ip}`;
+          },
+        },
       },
       schema: {
         tags: ['analytics'],

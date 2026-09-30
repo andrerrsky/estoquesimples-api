@@ -9,10 +9,13 @@ const INTERVAL_MINUTES = 24 * 60;
 
 export function registerAnalyticsJobs(services: AppServices): void {
   registerJobHandler(ANALYTICS_RETENTION_JOB, async (_payload, context) => {
+    // A próxima execução é agendada antes da limpeza: se a limpeza falhar
+    // (banco fora, lock_timeout num DELETE grande) e esgotar as tentativas,
+    // a cadeia diária não pode morrer junto.
+    await scheduleNext(context.services);
     const service = new AnalyticsService(context.services);
     const removidos = await service.purgeExpired(context.services.env.ANALYTICS_RETENTION_DAYS);
     context.logger.info({ removidos }, 'retenção de eventos de analytics concluída');
-    await scheduleNext(context.services);
   });
 }
 
