@@ -15,3 +15,6 @@ gcp-*.json
 .DS_Store
 .vscode/
 .idea/
+
+# Chave da conta de serviço do Google Play baixada na raiz (nunca versionar)
+estoque-simples-*.json
