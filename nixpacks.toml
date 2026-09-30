@@ -1,0 +1,5 @@
+# Build no Railway (Nixpacks). O build precisa das devDependencies (tsc, vite):
+# com NODE_ENV=production no ambiente, um `npm ci` sem `--include=dev` pula
+# essas dependências e o build falha com "tsc: not found".
+[phases.install]
+cmds = ["npm ci --include=dev"]
