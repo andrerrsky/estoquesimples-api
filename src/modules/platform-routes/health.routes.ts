@@ -41,6 +41,14 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
   );
 
   /**
+   * Nada neste host é para ser indexado: é uma API e o painel de suporte.
+   * O painel ainda manda `X-Robots-Tag` e `<meta name="robots">` próprios.
+   */
+  routes.get('/robots.txt', { schema: { hide: true } }, async (_request, reply) =>
+    reply.type('text/plain; charset=utf-8').send('User-agent: *\nDisallow: /\n'),
+  );
+
+  /**
    * Liveness: responde sem tocar no banco.
    *
    * Se dependesse do Postgres, uma indisponibilidade momentânea do banco faria

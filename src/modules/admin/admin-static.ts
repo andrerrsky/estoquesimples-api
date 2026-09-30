@@ -67,6 +67,7 @@ export async function registerAdminStatic(app: FastifyInstance): Promise<void> {
       serve: true,
       setHeaders: (reply, filePath) => {
         reply.setHeader('Content-Security-Policy', CSP);
+        reply.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
         reply.setHeader(
           'Cache-Control',
           filePath.includes(`${sep}assets${sep}`) ? 'public, max-age=2592000, immutable' : 'no-store',
@@ -80,6 +81,7 @@ export async function registerAdminStatic(app: FastifyInstance): Promise<void> {
       .header('Content-Security-Policy', CSP)
       .header('Cache-Control', 'no-store')
       .header('X-Frame-Options', 'DENY')
+      .header('X-Robots-Tag', 'noindex, nofollow, noarchive')
       .type('text/html; charset=utf-8')
       .send(indexHtml);
 

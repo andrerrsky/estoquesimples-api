@@ -9,6 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
@@ -447,47 +448,74 @@ export function ConfirmDialog({
 
 export function ActionMenu({ label = 'Ações', items }: { label?: string; items: Array<{ label: string; icon?: IconName; danger?: boolean; onClick: () => void; disabled?: boolean } | 'sep'> }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // A lista é renderizada num portal com posição fixa: dentro de cartões com
+  // overflow (tabelas roláveis, card--flush) ela seria cortada pelo pai.
+  const place = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) });
+  };
 
   useEffect(() => {
     if (!open) return;
+    place();
     const onDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!buttonRef.current?.contains(target) && !listRef.current?.contains(target)) setOpen(false);
     };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    const onScroll = () => setOpen(false);
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onScroll);
+    document.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onScroll);
+      document.removeEventListener('scroll', onScroll, true);
+    };
   }, [open]);
 
   return (
-    <div className="menu" ref={ref}>
-      <button type="button" className="btn btn--secondary" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open}>
+    <div className="menu">
+      <button ref={buttonRef} type="button" className="btn btn--secondary" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open}>
         {label}
         <Icon name="chevronDown" size={16} />
       </button>
-      {open && (
-        <div className="menu__list" role="menu">
-          {items.map((item, index) =>
-            item === 'sep' ? (
-              <div key={`sep-${index}`} className="menu__sep" />
-            ) : (
-              <button
-                key={item.label}
-                type="button"
-                role="menuitem"
-                className={`menu__item ${item.danger ? 'menu__item--danger' : ''}`}
-                disabled={item.disabled}
-                onClick={() => {
-                  setOpen(false);
-                  item.onClick();
-                }}
-              >
-                {item.icon && <Icon name={item.icon} />}
-                {item.label}
-              </button>
-            ),
-          )}
-        </div>
-      )}
+      {open &&
+        position &&
+        createPortal(
+          <div ref={listRef} className="menu__list menu__list--portal" role="menu" style={{ top: position.top, right: position.right }}>
+            {items.map((item, index) =>
+              item === 'sep' ? (
+                <div key={`sep-${index}`} className="menu__sep" />
+              ) : (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  className={`menu__item ${item.danger ? 'menu__item--danger' : ''}`}
+                  disabled={item.disabled}
+                  onClick={() => {
+                    setOpen(false);
+                    item.onClick();
+                  }}
+                >
+                  {item.icon && <Icon name={item.icon} />}
+                  {item.label}
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

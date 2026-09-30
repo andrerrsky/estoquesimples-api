@@ -1254,6 +1254,11 @@ code,
   display: flex;
   flex-direction: column;
 }
+.menu__list--portal {
+  position: fixed;
+  top: auto;
+  z-index: 120;
+}
 .menu__item {
   text-align: left;
   border: none;

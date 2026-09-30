@@ -1,17 +1,61 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { errorMessage } from '../components/ui';
 
+/**
+ * "Lembrar de mim" guarda e-mail e senha no armazenamento local deste
+ * navegador, a pedido do administrador, para preencher o formulário nas
+ * próximas visitas. Desmarcar apaga; sair do painel não apaga. Só o próprio
+ * navegador lê o valor; ele nunca sai para a API além do login em si.
+ */
+const REMEMBER_KEY = 'es_admin_remember';
+
+function readRemembered(): { email: string; password: string } | null {
+  try {
+    const raw = window.localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: unknown; password?: unknown };
+    if (typeof parsed.email !== 'string' || typeof parsed.password !== 'string') return null;
+    return { email: parsed.email, password: parsed.password };
+  } catch {
+    return null;
+  }
+}
+
+function writeRemembered(value: { email: string; password: string } | null): void {
+  try {
+    if (value) window.localStorage.setItem(REMEMBER_KEY, JSON.stringify(value));
+    else window.localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    // Armazenamento indisponível (modo privado, cota): o login segue sem lembrar.
+  }
+}
+
 export function LoginPage() {
   const { admin, loading, login } = useAuth();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = readRemembered();
+    if (saved) {
+      setEmail(saved.email);
+      setPassword(saved.password);
+      setRemember(true);
+    }
+  }, []);
+
+  const toggleRemember = (checked: boolean) => {
+    setRemember(checked);
+    if (!checked) writeRemembered(null);
+  };
 
   if (!loading && admin) {
     const from = (location.state as { from?: string } | null)?.from ?? '/';
@@ -24,6 +68,7 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email.trim(), password);
+      if (remember) writeRemembered({ email: email.trim(), password });
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'AUTH_ACCOUNT_LOCKED') {
         const seconds = Number(caught.extra['retryAfterSeconds'] ?? 0);
@@ -77,6 +122,10 @@ export function LoginPage() {
           <label className="field">
             <span className="field__label">Senha</span>
             <input className="input" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={remember} onChange={(event) => toggleRemember(event.target.checked)} />
+            Lembrar de mim neste navegador
           </label>
           {error && <div className="notice notice--error">{error}</div>}
           <button type="submit" className="btn btn--primary btn--block" disabled={busy}>
