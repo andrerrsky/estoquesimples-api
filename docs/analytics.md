@@ -81,13 +81,24 @@ Os eventos marcados "API" já são emitidos pelo servidor: o app **não** deve
 duplicá-los. Um evento novo pode ser emitido antes de entrar no catálogo; o
 painel o mostra como "fora do catálogo" até alguém documentá-lo.
 
-## Implementação sugerida no Android
+## Implementação no Android (feita)
 
-- Tabela `analytics_outbox (id TEXT PK, name, occurred_at, workspace_id,
-  session_key, properties TEXT, attempts)` em `LocalDb`.
-- `Analytics.track(name, props)` grava na outbox; um `Worker` (WorkManager,
-  rede obrigatória) envia lotes de até 200 via `ApiClient` e apaga os aceitos
-  ou duplicados; erro 4xx que não seja 401/429 descarta o lote (não vai
-  funcionar repetindo).
-- Se o usuário estiver logado, envia com Bearer; caso contrário sem.
-- Mantenha o Firebase Analytics se quiser, mas o painel lê **estes** eventos.
+Pacote `br.com.gameloop.estoquesimples.analytics` no app:
+
+- `AnalyticsDb`: fila `analytics_outbox` num banco próprio (`analytics.db`),
+  separado do banco do estoque para não ser sobrescrito por restauração ou
+  importação nem sair numa exportação.
+- `Analytics.track(context, nome, props)` grava na fila e agenda o envio;
+  `Analytics.screen(activity)` em `BaseActivity.onResume`;
+  `Analytics.appOpened(context)` em `MainActivity.onCreate` (cold start e
+  retorno após 30 min parado). `sessionKey` rotaciona após 30 min sem evento.
+- `AnalyticsWorker` (WorkManager, rede obrigatória) envia lotes de até 200
+  com Bearer quando há sessão; 401 invalida o token e tenta de novo sem ele;
+  erro transitório repete com backoff; outro 4xx descarta o lote. Eventos com
+  mais de 30 dias ou 8 tentativas são descartados.
+- `AnalyticsScheduler`: envio 1 minuto após o primeiro evento novo e a cada
+  6 horas.
+- O Firebase Analytics continua só com os eventos automáticos; o painel lê
+  **estes** eventos.
+
+Para a versão web, o mesmo desenho vale com IndexedDB no lugar do SQLite.
