@@ -12,6 +12,7 @@ import {
   unauthorized,
 } from '../../platform/http/errors.js';
 import { verifyPassword } from '../../platform/auth/password.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { revokeUserSessions } from '../auth/auth.service.js';
 import { deviceInfoSchema, errorSchema, messageSchema } from '../auth/auth.schemas.js';
@@ -402,6 +403,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
           ipAddress: requestMeta(request).ipAddress,
         });
       });
+
+      await trackServerEvent(app.services, { name: 'user.deletion_requested', userId: auth.userId });
 
       return {
         message: 'Exclusão solicitada. A conta será removida definitivamente após o período de recuperação.',

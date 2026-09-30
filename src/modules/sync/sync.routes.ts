@@ -9,6 +9,7 @@ import {
   requireWorkspaceContext,
 } from '../../platform/http/authorize.js';
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { errorSchema } from '../auth/auth.schemas.js';
 import { BillingService } from '../billing/billing.service.js';
 import { ConflictsService } from './conflicts.service.js';
@@ -198,9 +199,18 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       const { workspaceId, uploadId } = request.params;
       await assertCanSync(request);
 
-      return inWorkspace(request, (tx) =>
+      const auth = requireAuth(request);
+      const result = await inWorkspace(request, (tx) =>
         uploads.complete(tx, workspaceId, uploadId, request.body),
       );
+      await trackServerEvent(app.services, {
+        name: 'sync.initial_upload_completed',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: { products: result.products, movements: result.movements },
+      });
+      return result;
     },
   );
 
@@ -228,9 +238,25 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
 
       const contexto = requireWorkspaceContext(request);
 
-      return inWorkspace(request, (tx) =>
+      const result = await inWorkspace(request, (tx) =>
         sync.push(tx, workspaceId, auth.userId, auth.deviceId, contexto.permissions, request.body),
       );
+      const contagem = { aplicada: 0, duplicada: 0, conflito: 0, rejeitada: 0 };
+      for (const item of result.results) contagem[item.status] += 1;
+      await trackServerEvent(app.services, {
+        name: 'sync.pushed',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: {
+          operations: result.results.length,
+          applied: contagem.aplicada,
+          duplicated: contagem.duplicada,
+          conflicts: contagem.conflito,
+          rejected: contagem.rejeitada,
+        },
+      });
+      return result;
     },
   );
 
@@ -255,7 +281,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       const { workspaceId } = request.params;
       await assertCanSync(request);
 
-      return inWorkspace(request, (tx) =>
+      const result = await inWorkspace(request, (tx) =>
         sync.pull(
           tx,
           workspaceId,
@@ -265,6 +291,18 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
           env.SYNC_DEFAULT_PAGE_SIZE,
         ),
       );
+      // Só o primeiro pull de uma sequência conta como evento: páginas
+      // seguintes (cursor > 0 com hasMore) inflariam o número sem dizer nada.
+      if (result.changes.length > 0 || request.query.cursor === 0) {
+        await trackServerEvent(app.services, {
+          name: 'sync.pulled',
+          userId: auth.userId,
+          workspaceId,
+          deviceId: auth.deviceId,
+          properties: { changes: result.changes.length, hasMore: result.hasMore },
+        });
+      }
+      return result;
     },
   );
 
@@ -313,9 +351,17 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       const { workspaceId, conflictId } = request.params;
       await assertCanSync(request);
 
-      return inWorkspace(request, (tx) =>
+      const result = await inWorkspace(request, (tx) =>
         conflicts.resolve(tx, workspaceId, auth.userId, conflictId, request.body.escolha),
       );
+      await trackServerEvent(app.services, {
+        name: 'sync.conflict_resolved',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: { choice: request.body.escolha },
+      });
+      return result;
     },
   );
 }

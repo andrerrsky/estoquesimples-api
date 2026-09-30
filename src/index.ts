@@ -2,6 +2,8 @@ import { buildApp } from './app.js';
 import { getEnv } from './platform/config/env.js';
 import { migrateUp } from './platform/db/migrate.js';
 import { startJobRunner } from './platform/jobs/runner.js';
+import { ensureBootstrapAdmin } from './modules/admin/admin-bootstrap.js';
+import { bootstrapAnalyticsJobs } from './modules/analytics/analytics.jobs.js';
 import { bootstrapBillingJobs } from './modules/billing/billing.jobs.js';
 import { bootstrapOpsJobs } from './modules/ops/ops.jobs.js';
 import { bootstrapSyncJobs } from './modules/sync/sync.jobs.js';
@@ -26,10 +28,19 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  try {
+    await ensureBootstrapAdmin(services, (message) => app.log.info(message));
+  } catch (error) {
+    app.log.fatal({ err: error }, 'falha ao criar o administrador inicial');
+    await services.dbHandle.close();
+    process.exit(1);
+  }
+
   if (env.JOBS_ENABLED) {
     await bootstrapBillingJobs(services);
     await bootstrapSyncJobs(services);
     await bootstrapOpsJobs(services);
+    await bootstrapAnalyticsJobs(services);
   }
   const stopJobs = env.JOBS_ENABLED ? startJobRunner(services, app.log) : () => undefined;
 

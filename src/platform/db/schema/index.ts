@@ -28,3 +28,5 @@ export * from './auth.js';
 export * from './workspaces.js';
 export * from './billing.js';
 export * from './inventory.js';
+export * from './admin.js';
+export * from './analytics.js';

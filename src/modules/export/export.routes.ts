@@ -8,6 +8,7 @@ import {
   requireWorkspace,
   requireWorkspaceContext,
 } from '../../platform/http/authorize.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { errorSchema } from '../auth/auth.schemas.js';
 import { backupFileSchema, exportQuerySchema } from './export.schemas.js';
 import { ExportService } from './export.service.js';
@@ -48,7 +49,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const { workspaceId } = requireWorkspaceContext(request);
       const podeVerMovimentos = request.workspace?.permissions.has('movimentacoes.ver') ?? false;
 
-      return inWorkspace(request, (tx) =>
+      const backup = await inWorkspace(request, (tx) =>
         exporter.backup(
           tx,
           workspaceId,
@@ -58,6 +59,14 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
           podeVerMovimentos,
         ),
       );
+      await trackServerEvent(app.services, {
+        name: 'export.completed',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: { format: 'json', products: backup.products.length, movements: backup.movements.length },
+      });
+      return backup;
     },
   );
 
@@ -83,6 +92,13 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const csv = await inWorkspace(request, (tx) =>
         exporter.productsCsv(tx, workspaceId, auth.userId, auth.deviceId, request.query),
       );
+      await trackServerEvent(app.services, {
+        name: 'export.completed',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: { format: 'csv-produtos' },
+      });
 
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
@@ -109,6 +125,13 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const csv = await inWorkspace(request, (tx) =>
         exporter.movementsCsv(tx, workspaceId, auth.userId, auth.deviceId),
       );
+      await trackServerEvent(app.services, {
+        name: 'export.completed',
+        userId: auth.userId,
+        workspaceId,
+        deviceId: auth.deviceId,
+        properties: { format: 'csv-movimentacoes' },
+      });
 
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')

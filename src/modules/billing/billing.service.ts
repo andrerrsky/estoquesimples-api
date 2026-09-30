@@ -12,6 +12,7 @@ import {
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
 import { recordBillingEvent } from '../../platform/observability/metrics.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
 import type { RequestMeta } from '../auth/auth.service.js';
 import type { SubscriptionPurchaseV2 } from './play-client.js';
@@ -298,6 +299,13 @@ export class BillingService {
         );
       }
     }
+
+    await trackServerEvent(this.services, {
+      name: 'subscription.linked',
+      userId,
+      workspaceId,
+      properties: { planKey, state: parsed.state, productId: parsed.productId },
+    });
 
     return this.getEntitlement(workspaceId);
   }
@@ -605,6 +613,15 @@ export class BillingService {
         });
       }
     });
+
+    if (previousState !== state) {
+      await trackServerEvent(this.services, {
+        name: 'subscription.state_changed',
+        userId: current.purchaserUserId,
+        workspaceId: current.workspaceId,
+        properties: { from: previousState, to: state, notificationType },
+      });
+    }
 
     return current.id;
   }

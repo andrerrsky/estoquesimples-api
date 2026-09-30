@@ -17,11 +17,30 @@ separados. Compartilhar o banco entre eles significaria que um teste de
 migration destrutiva atingiria dados de clientes.
 
 Variáveis obrigatórias fora de desenvolvimento: `DATABASE_URL`,
-`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (gere com `npm run keys:generate`) e
-`OPS_TOKEN` (`openssl rand -base64 32`). As demais têm padrão em
+`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` (gere com `npm run keys:generate`),
+`OPS_TOKEN` (`openssl rand -base64 32`), `GOOGLE_PUBSUB_VERIFICATION_TOKEN`,
+`PURCHASE_TOKEN_ENCRYPTION_KEY` e o e-mail (`EMAIL_PROVIDER=resend` +
+`RESEND_API_KEY` + `EMAIL_FROM`). As demais têm padrão em
 [`src/platform/config/env.ts`](src/platform/config/env.ts) e a aplicação recusa
 subir se alguma estiver inválida — falhar no boot é preferível a descobrir o
 erro na primeira requisição de um cliente.
+
+### Painel administrativo
+
+O painel (`/admin`) sobe junto com a API e é compilado no mesmo `npm run
+build` (workspace `admin/` → `admin/dist`). Para ele funcionar em produção:
+
+| Variável | Para quê |
+| --- | --- |
+| `ADMIN_COOKIE_SECRET` | assina o cookie de sessão (`openssl rand -base64 48`). Sem ela a API sobe com um segredo efêmero e avisa no log: todo restart derruba as sessões do painel |
+| `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` | cria o primeiro administrador (owner) na subida, se ainda não existir. Idempotente; remova após o primeiro acesso. Senha com no mínimo 12 caracteres |
+| `ADMIN_PANEL_ENABLED=false` | desliga o painel inteiro (`/admin` e `/admin/api` respondem 404) |
+
+Alternativa ao bootstrap: `railway run --service <api> -- sh -c
+'ADMIN_PASSWORD=... npm run admin:create -- --email voce@... --role owner'`.
+Depois do primeiro owner, novos administradores são criados pelo próprio
+painel (menu Administradores). A trilha de tudo o que os administradores
+fazem fica em `admin_audit_log` e é consultável em Auditoria › Administradores.
 
 ## Deploy
 
@@ -68,6 +87,11 @@ nesse campo, e não em texto da mensagem.
 | `fila_atrasada` | mais de 20 tarefas vencidas | conferir se alguma instância está viva com `JOBS_ENABLED=true` |
 | `assinaturas_sem_verificacao` | assinatura ativa sem confirmação do Google há 48h | verificar credenciais da service account |
 | `conflitos_esquecidos` | conflitos pendentes há mais de 7 dias | avisar os clientes envolvidos; os aparelhos seguem divergentes |
+
+Os mesmos alertas aparecem na visão geral e na tela Operação do painel, que
+também permite repetir tarefas falhas, reprocessar notificações do Google
+Play pendentes e alternar o interruptor de sincronização (papel owner, com
+motivo registrado).
 
 A lista é curta de propósito. Alerta que dispara toda semana por algo que
 ninguém trata deixa de ser lido, e o primeiro incidente de verdade passa

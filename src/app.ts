@@ -10,6 +10,7 @@ import {
 import { createDb } from './platform/db/client.js';
 import { createMailer } from './platform/email/create-mailer.js';
 import { LoggingMailer, type Mailer } from './platform/email/mailer.js';
+import { registerAnalyticsJobs } from './modules/analytics/analytics.jobs.js';
 import { registerBillingJobs } from './modules/billing/billing.jobs.js';
 import { registerOpsJobs } from './modules/ops/ops.jobs.js';
 import { registerSyncJobs } from './modules/sync/sync.jobs.js';
@@ -73,6 +74,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerBillingJobs(services);
   registerSyncJobs(services);
   registerOpsJobs(services);
+  registerAnalyticsJobs(services);
 
   return {
     app,

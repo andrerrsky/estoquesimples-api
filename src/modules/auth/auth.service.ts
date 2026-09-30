@@ -30,6 +30,7 @@ import {
   generateToken,
   hashToken,
 } from '../../platform/auth/tokens.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
 import type { AuthSuccess, DeviceInfo } from './auth.schemas.js';
 
@@ -116,6 +117,12 @@ export class AuthService {
     // API ainda responde. Esperar o provedor com a transação aberta deixava
     // o app em loading infinito.
     await this.deliverVerificationEmail(created.email, created.verificationToken);
+    await trackServerEvent(this.services, {
+      name: 'user.registered',
+      userId: created.auth.user.id,
+      deviceId: created.auth.deviceId,
+      properties: { origin: 'direto', platform: input.device?.platform ?? null },
+    });
     return created.auth;
   }
 
@@ -212,7 +219,7 @@ export class AuthService {
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       await tx
         .update(users)
         .set({ failedLoginAttempts: 0, lockedUntil: null })
@@ -232,6 +239,14 @@ export class AuthService {
 
       return this.buildAuthSuccess(user, session, deviceId);
     });
+
+    await trackServerEvent(this.services, {
+      name: 'user.logged_in',
+      userId: user.id,
+      deviceId: result.deviceId,
+      properties: { platform: input.device?.platform ?? null },
+    });
+    return result;
   }
 
   /**
@@ -703,7 +718,7 @@ export class AuthService {
   async verifyEmail(token: string, meta: RequestMeta): Promise<void> {
     const tokenHash = hashToken(token);
 
-    await this.db.transaction(async (tx) => {
+    const verifiedUserId = await this.db.transaction(async (tx) => {
       const rows = await tx
         .select()
         .from(emailVerificationTokens)
@@ -733,7 +748,10 @@ export class AuthService {
         entityId: stored.userId,
         ipAddress: meta.ipAddress,
       });
+      return stored.userId;
     });
+
+    await trackServerEvent(this.services, { name: 'user.email_verified', userId: verifiedUserId });
   }
 
   // -------------------------------------------------------------------------

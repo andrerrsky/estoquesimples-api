@@ -109,6 +109,41 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((value) => value === 'true'),
+
+    // -----------------------------------------------------------------------
+    // Painel administrativo (/admin) e analytics de produto
+    // -----------------------------------------------------------------------
+
+    /** Desliga o painel e a API administrativa inteira (respondem 404). */
+    ADMIN_PANEL_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
+    /**
+     * Primeiro administrador. Criado na subida se ainda não existir nenhum
+     * com este e-mail; depois disso as variáveis podem ser removidas. Sem
+     * elas, use `npm run admin:create`.
+     */
+    ADMIN_BOOTSTRAP_EMAIL: z.string().email().optional(),
+    ADMIN_BOOTSTRAP_PASSWORD: z.string().min(12).max(200).optional(),
+    ADMIN_BOOTSTRAP_NAME: z.string().min(1).max(120).default('Administrador'),
+    /** Sessão do painel: expira por inatividade e tem um teto absoluto. */
+    ADMIN_SESSION_IDLE_HOURS: z.coerce.number().int().positive().default(12),
+    ADMIN_SESSION_MAX_DAYS: z.coerce.number().int().positive().default(7),
+    ADMIN_COOKIE_NAME: z.string().min(1).max(40).default('es_admin'),
+    /**
+     * Segredo que assina o cookie de sessão do painel. Sem ele, um valor
+     * efêmero é gerado a cada boot: o painel funciona, mas todo restart
+     * derruba as sessões abertas. Configure em staging/produção
+     * (`openssl rand -base64 48`); a subida avisa no log enquanto faltar.
+     */
+    ADMIN_COOKIE_SECRET: z.string().min(32).optional(),
+
+    /** Eventos mais antigos do que isto são apagados pelo job de retenção. */
+    ANALYTICS_RETENTION_DAYS: z.coerce.number().int().positive().default(400),
+    ANALYTICS_MAX_BATCH: z.coerce.number().int().positive().max(1000).default(200),
+    /** Lotes de eventos por janela de rate limit, por usuário/IP. */
+    ANALYTICS_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
   })
   .superRefine((value, ctx) => {
     const isProdLike = value.NODE_ENV === 'production' || value.NODE_ENV === 'staging';
@@ -134,6 +169,13 @@ const envSchema = z
         path: ['PURCHASE_TOKEN_ENCRYPTION_KEY'],
         message:
           'PURCHASE_TOKEN_ENCRYPTION_KEY é obrigatória em staging/produção. Gere com: openssl rand -base64 32',
+      });
+    }
+    if (value.ADMIN_BOOTSTRAP_EMAIL && !value.ADMIN_BOOTSTRAP_PASSWORD) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ADMIN_BOOTSTRAP_PASSWORD'],
+        message: 'ADMIN_BOOTSTRAP_PASSWORD é obrigatória quando ADMIN_BOOTSTRAP_EMAIL está definido.',
       });
     }
     if (isProdLike && value.EMAIL_PROVIDER === 'log') {

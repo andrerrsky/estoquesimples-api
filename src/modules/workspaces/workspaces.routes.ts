@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { requireAuth } from '../../platform/http/authenticate.js';
 import { requireWorkspace, requireWorkspaceContext } from '../../platform/http/authorize.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { errorSchema, messageSchema } from '../auth/auth.schemas.js';
 import { requestMeta } from '../auth/auth.routes.js';
 import { WorkspaceService } from './workspaces.service.js';
@@ -51,6 +52,12 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
       const auth = requireAuth(request);
       await service.assertNameAvailable(auth.userId, request.body.name);
       const created = await service.create(auth.userId, request.body, requestMeta(request));
+      await trackServerEvent(app.services, {
+        name: 'workspace.created',
+        userId: auth.userId,
+        workspaceId: created.id,
+        deviceId: auth.deviceId,
+      });
       return reply.code(201).send(created);
     },
   );

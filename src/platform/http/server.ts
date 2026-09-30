@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -11,6 +12,9 @@ import {
 } from 'fastify-type-provider-zod';
 import { randomUUID } from 'node:crypto';
 
+import { registerAdminRoutes } from '../../modules/admin/admin.routes.js';
+import { adminAuthPlugin } from '../../modules/admin/admin-auth.plugin.js';
+import { registerAnalyticsRoutes } from '../../modules/analytics/analytics.routes.js';
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerBillingRoutes } from '../../modules/billing/billing.routes.js';
 import { registerInviteRoutes } from '../../modules/invites/invites.routes.js';
@@ -93,6 +97,19 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(authenticatePlugin);
   await app.register(metricsPlugin);
 
+  // Cookies só existem para a sessão do painel administrativo. O segredo
+  // assina o cookie: um valor adulterado é descartado antes de ir ao banco.
+  if (!env.ADMIN_COOKIE_SECRET && env.ADMIN_PANEL_ENABLED && env.NODE_ENV !== 'test') {
+    app.log.warn(
+      'ADMIN_COOKIE_SECRET ausente: usando segredo efêmero; as sessões do painel não sobrevivem a um restart',
+    );
+  }
+  await app.register(cookie, {
+    secret: env.ADMIN_COOKIE_SECRET ?? randomUUID() + randomUUID(),
+    hook: 'onRequest',
+  });
+  await app.register(adminAuthPlugin);
+
   await app.register(swagger, {
     openapi: {
       openapi: '3.1.0',
@@ -120,6 +137,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
         { name: 'assinatura', description: 'Google Play e direitos de acesso' },
         { name: 'sincronização', description: 'Upload inicial, push, pull e conflitos' },
         { name: 'estoque', description: 'Produtos e movimentações' },
+        { name: 'analytics', description: 'Eventos de uso do produto' },
       ],
     },
     transform: jsonSchemaTransform,
@@ -141,6 +159,12 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerBillingRoutes, { prefix: '/v1' });
   await app.register(registerSyncRoutes, { prefix: '/v1' });
   await app.register(registerExportRoutes, { prefix: '/v1' });
+  await app.register(registerAnalyticsRoutes, { prefix: '/v1' });
+
+  // Painel administrativo: API em /admin/api e a interface estática em /admin.
+  if (env.ADMIN_PANEL_ENABLED) {
+    await app.register(registerAdminRoutes, { prefix: '/admin' });
+  }
 
   return app;
 }

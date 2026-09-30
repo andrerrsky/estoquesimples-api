@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { requireAuth, resolveAuth } from '../../platform/http/authenticate.js';
 import { requireWorkspace, requireWorkspaceContext } from '../../platform/http/authorize.js';
+import { trackServerEvent } from '../analytics/analytics.service.js';
 import { authSuccessSchema, errorSchema, messageSchema } from '../auth/auth.schemas.js';
 import { requestMeta } from '../auth/auth.routes.js';
 import { InvitesService } from './invites.service.js';
@@ -64,6 +65,12 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
         request.body,
         requestMeta(request),
       );
+      await trackServerEvent(app.services, {
+        name: 'invite.sent',
+        userId: auth.userId,
+        workspaceId: context.workspaceId,
+        properties: { roleKey: convite.roleKey },
+      });
       return reply.code(201).send(convite);
     },
   );
@@ -161,12 +168,28 @@ export async function registerInviteRoutes(app: FastifyInstance): Promise<void> 
           }))
         : null;
 
-      return service.accept(
+      const result = await service.accept(
         request.params.token,
         request.body,
         autenticado,
         requestMeta(request),
       );
+      const userId = result.auth?.user.id ?? autenticado?.userId ?? null;
+      if (result.auth) {
+        await trackServerEvent(app.services, {
+          name: 'user.registered',
+          userId,
+          deviceId: result.auth.deviceId,
+          properties: { origin: 'convite' },
+        });
+      }
+      await trackServerEvent(app.services, {
+        name: 'invite.accepted',
+        userId,
+        workspaceId: result.workspaceId,
+        properties: { roleKey: result.roleKey, newAccount: result.auth !== null },
+      });
+      return result;
     },
   );
 }
