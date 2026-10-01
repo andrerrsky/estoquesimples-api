@@ -3,6 +3,13 @@
 /local.properties
 /.idea/workspace.xml
 /.idea/libraries
+/.idea/caches
+/.idea/deploymentTargetSelector.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
 .DS_Store
+Thumbs.db
 /build
 /captures
+*.apk
+*.aab
