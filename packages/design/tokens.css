@@ -1,0 +1,73 @@
+/* ==========================================================================
+   Estoque Simples · identidade visual
+   Fonte única dos tokens usados pelo painel (apps/admin) e pela aplicação
+   web (apps/web). Derivados do app Android (res/values/colors.xml,
+   dimens.xml, styles.xml): mesma paleta, mesmos raios, mesma escala
+   tipográfica, sem sombras. Layout (larguras, grades) fica em cada app.
+   ========================================================================== */
+
+:root {
+  --brand: #1c679d;
+  --brand-dark: #15537e;
+  --brand-pressed: #155a87;
+  --brand-soft: #e8f1f8;
+  --brand-tint: #f0f5fa;
+  --on-brand: #ffffff;
+  --on-brand-muted: rgba(255, 255, 255, 0.7);
+
+  --surface: #f4f7fa;
+  --surface-content: #ffffff;
+  --chip: #eef2f6;
+  --border: #e3e8ee;
+  --border-muted: #e0e6ed;
+
+  --text: #1a2330;
+  --text-muted: #5c6b7a;
+  --text-faint: #8a97a6;
+  --disabled: #c5cdd6;
+
+  --success: #1b7a3d;
+  --success-soft: #e6f3ea;
+  --warning: #e65100;
+  --warning-soft: #fdeee3;
+  --error: #c62828;
+  --error-soft: #fbe9e9;
+  --info: #1c679d;
+  --info-soft: #e8f1f8;
+
+  /* séries de gráfico: validadas para daltonismo (ΔE ≥ 12 entre vizinhas) */
+  --series-1: #1c679d;
+  --series-2: #c25e1e;
+  --series-3: #6e4db8;
+  --series-4: #b03a6e;
+  --series-muted: #b9c4cf;
+
+  --radius-hero: 16px;
+  --radius-card: 14px;
+  --radius-panel: 12px;
+  --radius-control: 10px;
+  --radius-chip: 8px;
+  --radius-pill: 18px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  --font: "Inter", "Roboto", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, monospace;
+
+  --fs-title: 22px;
+  --fs-section: 16px;
+  --fs-body: 15px;
+  --fs-supporting: 14px;
+  --fs-label: 13px;
+  --fs-caption: 12px;
+
+  --focus-ring: 0 0 0 3px rgba(28, 103, 157, 0.25);
+  --transition: 140ms ease;
+}

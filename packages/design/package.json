@@ -1,0 +1,11 @@
+{
+  "name": "@estoquesimples/design",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Identidade visual compartilhada entre o painel e a aplicação web (derivada do app Android).",
+  "files": ["tokens.css", "icon.svg"],
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./icon.svg": "./icon.svg"
+  }
+}
