@@ -8,6 +8,8 @@ import {
 } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, forbidden, notFound } from '../../platform/http/errors.js';
+import { BillingService } from '../billing/billing.service.js';
+import { Feature, countActiveMembers, featureEnabled, limitOf, planLimitReached } from '../billing/plan-limits.js';
 import { getRoleRanks } from '../../platform/http/authorize.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
@@ -327,6 +329,28 @@ export class WorkspaceService {
   ): Promise<void> {
     const ranks = await getRoleRanks(this.services);
     const actorRank = ranks.get(actor.roleKey) ?? 0;
+
+    // Reativar alguém é o mesmo que acrescentar uma pessoa: vale o plano.
+    if (status === 'active') {
+      const entitlement = await new BillingService(this.services).getEntitlement(workspaceId);
+      if (!featureEnabled(entitlement, Feature.MEMBERS)) {
+        throw forbidden(
+          ErrorCode.SUBSCRIPTION_REQUIRED,
+          'Equipe faz parte do plano Equipe. Assine para reativar este membro.',
+          { feature: Feature.MEMBERS, planKey: entitlement.planKey },
+        );
+      }
+      const limit = limitOf(entitlement, Feature.MEMBERS);
+      if (limit !== null && (await countActiveMembers(this.db, workspaceId)) >= limit) {
+        throw planLimitReached({
+          feature: Feature.MEMBERS,
+          limit,
+          current: await countActiveMembers(this.db, workspaceId),
+          planKey: entitlement.planKey,
+          message: `Seu plano permite até ${limit} pessoas na empresa.`,
+        });
+      }
+    }
 
     await withTenant(this.db, { workspaceId, userId: actor.userId }, async (tx) => {
       const target = await this.findMember(tx, workspaceId, targetUserId);

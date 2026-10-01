@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 
 import { pgErrorCode, type Transaction } from '../../platform/db/client.js';
 import {
@@ -10,6 +10,8 @@ import {
   workspaces,
 } from '../../platform/db/schema/index.js';
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
+import { Feature, countLiveProducts, planLimitReached, productLimitMessage } from '../billing/plan-limits.js';
+import type { PlanContext } from './initial-upload.service.js';
 import {
   recordConflict,
   recordSyncOperation,
@@ -145,8 +147,11 @@ export class SyncService {
     deviceId: string | null,
     permissions: ReadonlySet<string>,
     body: PushBody,
+    plan: PlanContext = { productLimit: null, planKey: 'gratuito' },
   ): Promise<{ results: OperationResult[]; cursor: string; serverChangeSeq?: string }> {
     const results: OperationResult[] = [];
+
+    await this.assertProductLimit(tx, workspaceId, body, plan);
 
     for (const operation of body.operations) {
       const resultado = await this.applyOperation(
@@ -185,6 +190,64 @@ export class SyncService {
       cursor: String(deviceCursor),
       serverChangeSeq: String(posicao?.changeSeq ?? 0),
     };
+  }
+
+  /**
+   * Teto de produtos do plano, avaliado sobre o lote inteiro.
+   *
+   * Recusar operação por operação deixaria produtos "meio sincronizados" —
+   * criados no aparelho, recusados na nuvem, com movimentações órfãs atrás.
+   * Em vez disso o lote é aceito ou recusado por completo: o aparelho
+   * guarda tudo na fila e tenta de novo quando o plano (ou o estoque) mudar.
+   * Exclusões no mesmo lote contam a favor, para que reduzir o estoque seja
+   * um caminho possível sem assinar.
+   */
+  private async assertProductLimit(
+    tx: Transaction,
+    workspaceId: string,
+    body: PushBody,
+    plan: PlanContext,
+  ): Promise<void> {
+    if (plan.productLimit === null) return;
+
+    const upserts = new Set<string>();
+    const deletes = new Set<string>();
+    for (const operation of body.operations) {
+      if (operation.entity !== ENTITY_PRODUTO) continue;
+      if (operation.op === 'upsert') upserts.add(operation.entityId);
+      if (operation.op === 'delete') deletes.add(operation.entityId);
+    }
+    if (upserts.size === 0 && deletes.size === 0) return;
+
+    const ids = [...new Set([...upserts, ...deletes])];
+    const existentes = await tx
+      .select({ id: products.id, deletedAt: products.deletedAt })
+      .from(products)
+      .where(and(eq(products.workspaceId, workspaceId), inArray(products.id, ids)));
+    const vivosNaNuvem = new Set(existentes.filter((row) => row.deletedAt === null).map((row) => row.id));
+    const conhecidos = new Set(existentes.map((row) => row.id));
+
+    let novos = 0;
+    for (const id of upserts) {
+      if (!conhecidos.has(id) && !deletes.has(id)) novos += 1;
+    }
+    let removidos = 0;
+    for (const id of deletes) {
+      if (vivosNaNuvem.has(id)) removidos += 1;
+    }
+    if (novos === 0) return;
+
+    const atual = await countLiveProducts(tx, workspaceId);
+    const projetado = atual + novos - removidos;
+    if (projetado > plan.productLimit) {
+      throw planLimitReached({
+        feature: Feature.PRODUCTS,
+        limit: plan.productLimit,
+        current: projetado,
+        planKey: plan.planKey,
+        message: productLimitMessage(plan.productLimit, projetado),
+      });
+    }
   }
 
   private async applyOperation(

@@ -11,7 +11,8 @@ import {
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { errorSchema } from '../auth/auth.schemas.js';
-import { BillingService } from '../billing/billing.service.js';
+import { BillingService, type EntitlementSnapshot } from '../billing/billing.service.js';
+import { Feature, featureEnabled, limitOf } from '../billing/plan-limits.js';
 import { ConflictsService } from './conflicts.service.js';
 import { InitialUploadService } from './initial-upload.service.js';
 import { SyncService } from './sync.service.js';
@@ -64,14 +65,15 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
    * interpretaria pela metade — e o resultado seria corrupção silenciosa em
    * vez de um erro que o usuário entende.
    *
-   * A assinatura é conferida no servidor, nunca a partir do que o app diz.
-   * Conta, equipe e diagnóstico do aparelho não passam por aqui: só o envio
-   * e a leitura da nuvem.
+   * O plano é conferido no servidor, nunca a partir do que o app diz. A nuvem
+   * é grátis para quem tem conta (plano gratuito), mas só para o proprietário:
+   * a equipe faz parte da assinatura. O teto de produtos é aplicado adiante,
+   * no envio, porque depende do conteúdo do lote.
    *
    * O workspaceId vem do contexto já autorizado, não do parâmetro cru da URL.
    */
-  async function assertCanSync(request: FastifyRequest): Promise<void> {
-    const { workspaceId } = requireWorkspaceContext(request);
+  async function assertCanSync(request: FastifyRequest): Promise<EntitlementSnapshot> {
+    const { workspaceId, isOwner } = requireWorkspaceContext(request);
 
     if (!env.FEATURE_SYNC_ENABLED) {
       throw new AppError(
@@ -102,14 +104,24 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const entitlement = await billing.getEntitlement(workspaceId);
-    if (!entitlement.active) {
+    if (!entitlement.syncAllowed) {
       throw new AppError(
         403,
         ErrorCode.SUBSCRIPTION_REQUIRED,
-        'A sincronização na nuvem exige assinatura. Nada foi apagado do aparelho.',
-        { extra: { state: entitlement.state } },
+        'A sincronização na nuvem não está disponível para esta empresa. Nada foi apagado do aparelho.',
+        { extra: { state: entitlement.state, planKey: entitlement.planKey } },
       );
     }
+    if (!isOwner && !featureEnabled(entitlement, Feature.MEMBERS)) {
+      throw new AppError(
+        403,
+        ErrorCode.SUBSCRIPTION_REQUIRED,
+        'Esta empresa está no plano gratuito, que sincroniza só para o proprietário. ' +
+          'Peça a ele para assinar o plano Equipe. Nada foi apagado do aparelho.',
+        { extra: { state: entitlement.state, planKey: entitlement.planKey, feature: Feature.MEMBERS } },
+      );
+    }
+    return entitlement;
   }
 
   routes.post(
@@ -132,10 +144,11 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const auth = requireAuth(request);
       const { workspaceId } = request.params;
-      await assertCanSync(request);
+      const entitlement = await assertCanSync(request);
+      const productLimit = limitOf(entitlement, Feature.PRODUCTS);
 
       const result = await inWorkspace(request, (tx) =>
-        uploads.start(tx, workspaceId, auth.userId, request.body),
+        uploads.start(tx, workspaceId, auth.userId, request.body, { productLimit, planKey: entitlement.planKey }),
       );
       return reply.code(201).send(result);
     },
@@ -160,7 +173,8 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId, uploadId } = request.params;
-      await assertCanSync(request);
+      const entitlement = await assertCanSync(request);
+      const productLimit = limitOf(entitlement, Feature.PRODUCTS);
 
       const itens = request.body.products.length + request.body.movements.length;
       if (itens > env.SYNC_MAX_BATCH_ITEMS) {
@@ -173,7 +187,7 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return inWorkspace(request, (tx) =>
-        uploads.applyBatch(tx, workspaceId, uploadId, auth.userId, request.body),
+        uploads.applyBatch(tx, workspaceId, uploadId, auth.userId, request.body, { productLimit, planKey: entitlement.planKey }),
       );
     },
   );
@@ -234,12 +248,15 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId } = request.params;
-      await assertCanSync(request);
+      const entitlement = await assertCanSync(request);
 
       const contexto = requireWorkspaceContext(request);
 
       const result = await inWorkspace(request, (tx) =>
-        sync.push(tx, workspaceId, auth.userId, auth.deviceId, contexto.permissions, request.body),
+        sync.push(tx, workspaceId, auth.userId, auth.deviceId, contexto.permissions, request.body, {
+          productLimit: limitOf(entitlement, Feature.PRODUCTS),
+          planKey: entitlement.planKey,
+        }),
       );
       const contagem = { aplicada: 0, duplicada: 0, conflito: 0, rejeitada: 0 };
       for (const item of result.results) contagem[item.status] += 1;

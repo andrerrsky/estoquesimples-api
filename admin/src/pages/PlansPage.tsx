@@ -21,8 +21,10 @@ interface Plan {
 
 const FEATURE_LABEL: Record<string, string> = {
   'sync.nuvem': 'Sincronização em nuvem',
-  'equipe.membros': 'Membros na equipe',
-  'sync.dispositivos': 'Aparelhos sincronizando',
+  'produtos.sincronizados': 'Produtos na nuvem (teto)',
+  'equipe.membros': 'Pessoas na empresa (teto, inclui o proprietário)',
+  'sync.dispositivos': 'Aparelhos sincronizando (não aplicado)',
+  'analise.avancada': 'Análise Avançada de Estoque',
 };
 
 type Dialog = null | { kind: 'plan'; plan: Plan } | { kind: 'feature'; plan: Plan; feature: { key: string; enabled: boolean; limit: number | null } };
@@ -49,7 +51,7 @@ export function PlansPage() {
     <div className="page">
       <PageHeader title="Planos e recursos" subtitle="O que cada plano libera. Modelado como dados para não caçar números no código." />
       <Notice tone="info">
-        Alterar um recurso vale para todas as empresas do plano na próxima consulta de direitos do app. O preço e a cobrança ficam no Google Play Console; aqui só o mapeamento produto → plano → recursos.
+        Alterar um recurso vale para todas as empresas do plano na próxima consulta de direitos do app. O preço e a cobrança ficam no Google Play Console; aqui só o mapeamento produto → plano → recursos. Modelo atual: a nuvem é grátis com conta (só para o proprietário, até o teto de produtos); a assinatura libera equipe, produtos sem limite e a Análise Avançada.
       </Notice>
       {query.isLoading ? (
         <Skeleton lines={6} />

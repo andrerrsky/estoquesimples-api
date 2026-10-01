@@ -9,6 +9,7 @@ import {
   workspaces,
 } from '../../platform/db/schema/index.js';
 import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
+import { Feature, countLiveProducts, planLimitReached, productLimitMessage } from '../billing/plan-limits.js';
 import type {
   CompleteUploadBody,
   MovementInput,
@@ -30,6 +31,12 @@ import type {
  * repetido encontra as chaves já ocupadas e não faz nada. Não há contador que
  * possa ser incrementado duas vezes nem registro que possa ser duplicado.
  */
+/** Teto de produtos do plano em vigor; `null` = sem limite. */
+export interface PlanContext {
+  productLimit: number | null;
+  planKey: string;
+}
+
 export class InitialUploadService {
   /**
    * Abre a sessão de envio, ou devolve a que já estava aberta.
@@ -43,6 +50,7 @@ export class InitialUploadService {
     workspaceId: string,
     userId: string,
     body: StartUploadBody,
+    plan: PlanContext = { productLimit: null, planKey: 'gratuito' },
   ): Promise<{
     uploadId: string;
     nextBatchIndex: number;
@@ -66,6 +74,19 @@ export class InitialUploadService {
         ErrorCode.SYNC_ALREADY_SEEDED,
         'Esta empresa já tem dados na nuvem. Este aparelho deve baixá-los em vez de enviar.',
       );
+    }
+
+    // O aparelho declara quantos produtos vai mandar: recusar aqui poupa o
+    // envio de lotes que seriam rejeitados no fim. A contagem é conferida de
+    // novo lote a lote, porque o número declarado vem do cliente.
+    if (plan.productLimit !== null && body.declaredProducts > plan.productLimit) {
+      throw planLimitReached({
+        feature: Feature.PRODUCTS,
+        limit: plan.productLimit,
+        current: body.declaredProducts,
+        planKey: plan.planKey,
+        message: productLimitMessage(plan.productLimit, body.declaredProducts),
+      });
     }
 
     const [existing] = await tx
@@ -121,6 +142,7 @@ export class InitialUploadService {
     uploadId: string,
     userId: string,
     body: UploadBatchBody,
+    plan: PlanContext = { productLimit: null, planKey: 'gratuito' },
   ): Promise<{
     batchIndex: number;
     duplicate: boolean;
@@ -156,6 +178,20 @@ export class InitialUploadService {
     }
 
     const produtosGravados = await this.insertProducts(tx, workspaceId, userId, body.products);
+    if (plan.productLimit !== null) {
+      const vivos = await countLiveProducts(tx, workspaceId);
+      if (vivos > plan.productLimit) {
+        // A transação desfaz o lote inteiro; o aparelho reenvia quando o
+        // plano permitir (ou com menos produtos).
+        throw planLimitReached({
+          feature: Feature.PRODUCTS,
+          limit: plan.productLimit,
+          current: vivos,
+          planKey: plan.planKey,
+          message: productLimitMessage(plan.productLimit, vivos),
+        });
+      }
+    }
     const movimentosGravados = await this.insertMovements(tx, workspaceId, userId, body.movements);
 
     const [atualizado] = await tx

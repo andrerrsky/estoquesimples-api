@@ -50,7 +50,7 @@ export const ADMIN_ROLE: Record<string, { label: string; hint: string }> = {
 
 export const PLAN_LABEL: Record<string, string> = {
   gratuito: 'Gratuito',
-  basico: 'Básico',
+  basico: 'Equipe',
 };
 
 export const MOVEMENT_TYPE: Record<string, string> = {

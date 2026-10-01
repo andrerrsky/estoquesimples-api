@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -157,17 +157,82 @@ async function pull(user: RegisteredUser, workspaceId: string, cursor = 0, limit
 }
 
 describe('envio incremental', () => {
-  it('recusa envio e leitura da nuvem sem assinatura ativa', async () => {
+  it('plano gratuito sincroniza para o proprietário sem assinatura', async () => {
     const user = await registerUser(context);
     const workspaceId = await criarEmpresa(user);
 
     const enviado = await push(user, workspaceId, [upsertProduto()]);
-    expect(enviado.statusCode).toBe(403);
-    expect(enviado.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+    expect(enviado.statusCode).toBe(200);
+    expect(enviado.json().results[0].status).toBe('aplicada');
 
     const baixado = await pull(user, workspaceId, 0);
+    expect(baixado.statusCode).toBe(200);
+  });
+
+  it('plano gratuito não sincroniza para quem não é o proprietário', async () => {
+    const dono = await registerUser(context);
+    const workspaceId = await criarEmpresa(dono);
+
+    const membro = await registerUser(context);
+    await context.services.db.insert(workspaceMembers).values({
+      workspaceId,
+      userId: membro.userId,
+      roleKey: 'operador',
+      status: 'active',
+      invitedBy: dono.userId,
+    });
+    const sessao = await loginUser(context, membro.email, VALID_PASSWORD);
+
+    const enviado = await push(sessao, workspaceId, [upsertProduto()]);
+    expect(enviado.statusCode).toBe(403);
+    expect(enviado.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+    expect(enviado.json().error.extra?.feature ?? enviado.json().error.feature).toBe('equipe.membros');
+
+    const baixado = await pull(sessao, workspaceId, 0);
     expect(baixado.statusCode).toBe(403);
-    expect(baixado.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+  });
+
+  it('plano gratuito recusa o lote que passaria do teto de produtos, mas aceita com exclusão junto', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await criarEmpresa(user);
+    await context.services.db.execute(
+      sql`UPDATE plan_features SET limit_value = 2 WHERE plan_key = 'gratuito' AND feature_key = 'produtos.sincronizados'`,
+    );
+    try {
+      const primeiro = randomUUID();
+      const ok = await push(user, workspaceId, [upsertProduto({ entityId: primeiro }), upsertProduto()]);
+      expect(ok.statusCode).toBe(200);
+
+      const excedente = await push(user, workspaceId, [upsertProduto()]);
+      expect(excedente.statusCode).toBe(403);
+      expect(excedente.json().error.code).toBe('PLAN_LIMIT_REACHED');
+      expect(excedente.json().error.extra?.limit ?? excedente.json().error.limit).toBe(2);
+
+      // Editar o que já existe não conta como produto novo.
+      const edicao = await push(user, workspaceId, [upsertProduto({ entityId: primeiro, baseRev: 1 })]);
+      expect(edicao.statusCode).toBe(200);
+
+      // Excluir um e criar outro no mesmo lote mantém o total: aceito.
+      const troca = await push(user, workspaceId, [
+        {
+          opId: randomUUID(),
+          entity: 'produto' as const,
+          op: 'delete' as const,
+          entityId: primeiro,
+          payload: { id: primeiro, deletedAt: Date.now(), rev: 2 },
+        },
+        upsertProduto(),
+      ]);
+      expect(troca.statusCode).toBe(200);
+      expect(troca.json().results.map((item: { status: string }) => item.status)).toEqual(['aplicada', 'aplicada']);
+
+      const direitos = await context.app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/entitlement`, headers: user.authHeader });
+      expect(direitos.json()).toMatchObject({ syncAllowed: true, planKey: 'gratuito', limits: { products: 2 }, usage: { products: 2 } });
+    } finally {
+      await context.services.db.execute(
+        sql`UPDATE plan_features SET limit_value = 50 WHERE plan_key = 'gratuito' AND feature_key = 'produtos.sincronizados'`,
+      );
+    }
   });
 
   it('aplica um produto novo e devolve a versão gravada', async () => {

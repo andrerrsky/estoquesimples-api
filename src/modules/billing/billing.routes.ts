@@ -29,6 +29,9 @@ const entitlementSchema = z.object({
   graceUntil: z.string().nullable(),
   autoRenewing: z.boolean(),
   features: z.record(z.object({ enabled: z.boolean(), limit: z.number().int().nullable() })),
+  syncAllowed: z.boolean(),
+  limits: z.object({ products: z.number().int().nullable(), members: z.number().int().nullable() }),
+  usage: z.object({ products: z.number().int(), members: z.number().int() }),
   offlineValidUntil: z.string(),
   checkedAt: z.string(),
 });

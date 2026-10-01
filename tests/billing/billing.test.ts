@@ -101,6 +101,8 @@ describe('vinculação de compra', () => {
     expect(entitlement.planKey).toBe('basico');
     expect(entitlement.state).toBe('ativa');
     expect(entitlement.features['sync.nuvem'].enabled).toBe(true);
+    expect(entitlement.features['equipe.membros'].enabled).toBe(true);
+    expect(entitlement.limits).toEqual({ products: null, members: null });
   });
 
   it('confirma a compra no Google para não ser reembolsada automaticamente', async () => {
@@ -294,7 +296,7 @@ describe('estados da assinatura', () => {
     expect(response.json().active).toBe(false);
   });
 
-  it('empresa sem assinatura fica no plano gratuito e sem sincronização', async () => {
+  it('empresa sem assinatura fica no plano gratuito, com nuvem liberada e teto de produtos', async () => {
     const owner = await registerUser(context);
     const workspaceId = await createWorkspace(owner);
 
@@ -307,6 +309,10 @@ describe('estados da assinatura', () => {
     expect(response.json().active).toBe(false);
     expect(response.json().planKey).toBe('gratuito');
     expect(response.json().state).toBe('sem_assinatura');
+    expect(response.json().syncAllowed).toBe(true);
+    expect(response.json().features['equipe.membros'].enabled).toBe(false);
+    expect(response.json().limits).toEqual({ products: 50, members: 0 });
+    expect(response.json().usage).toEqual({ products: 0, members: 1 });
   });
 
   it('informa até quando o app pode confiar no retrato sem rede', async () => {

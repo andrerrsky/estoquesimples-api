@@ -2,6 +2,7 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { invites } from '../../src/platform/db/schema/index.js';
+import type { SubscriptionPurchaseV2 } from '../../src/modules/billing/play-client.js';
 import {
   createTestApp,
   loginUser,
@@ -38,10 +39,25 @@ async function confirmarEmail(user: RegisteredUser): Promise<void> {
   );
 }
 
-/**
- * Cria a empresa sem vincular assinatura. Convidar equipe não depende da nuvem.
- */
-async function criarEmpresa(user: RegisteredUser, name = 'Minha Loja'): Promise<string> {
+/** Resposta típica da Play Developer API para uma assinatura em dia. */
+function activePurchase(): SubscriptionPurchaseV2 {
+  return {
+    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+    startTime: new Date(Date.now() - 86_400_000).toISOString(),
+    acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+    lineItems: [
+      {
+        productId: 'assinatura',
+        expiryTime: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        autoRenewingPlan: { autoRenewEnabled: true },
+        offerDetails: { basePlanId: 'plano-basico', offerId: 'oferta' },
+      },
+    ],
+  };
+}
+
+/** Empresa no plano gratuito: nuvem só para o proprietário, sem convites. */
+async function criarEmpresaGratuita(user: RegisteredUser, name = 'Minha Loja'): Promise<string> {
   const response = await context.app.inject({
     method: 'POST',
     url: '/v1/workspaces',
@@ -52,6 +68,25 @@ async function criarEmpresa(user: RegisteredUser, name = 'Minha Loja'): Promise<
     throw new Error(`Falha ao criar workspace: ${response.statusCode} ${response.body}`);
   }
   return response.json().id;
+}
+
+/**
+ * Cria a empresa já com assinatura ativa: equipe é recurso do plano pago.
+ */
+async function criarEmpresa(user: RegisteredUser, name = 'Minha Loja'): Promise<string> {
+  const workspaceId = await criarEmpresaGratuita(user, name);
+  const token = `token-${workspaceId}`;
+  context.play.setSubscription(token, activePurchase());
+  const linked = await context.app.inject({
+    method: 'POST',
+    url: `/v1/workspaces/${workspaceId}/billing/subscriptions`,
+    headers: user.authHeader,
+    payload: { purchaseToken: token },
+  });
+  if (linked.statusCode !== 200) {
+    throw new Error(`Falha ao ativar a assinatura de teste: ${linked.statusCode} ${linked.body}`);
+  }
+  return workspaceId;
 }
 
 /** Extrai o token do corpo do e-mail, que é o único lugar onde ele existe. */
@@ -102,6 +137,33 @@ describe('emissão de convites', () => {
     expect(linha?.email).toBe(email);
     expect(linha?.tokenHash).not.toContain(token);
     expect(token.startsWith('esinv_')).toBe(true);
+  });
+
+  it('plano gratuito não convida: equipe faz parte da assinatura', async () => {
+    const owner = await registerUser(context);
+    await confirmarEmail(owner);
+    const workspaceId = await criarEmpresaGratuita(owner);
+
+    const response = await convidar(owner, workspaceId, uniqueEmail('convidado'));
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+    expect(context.mailer.lastOfKind('invite')).toBeUndefined();
+  });
+
+  it('respeita o teto de membros do plano', async () => {
+    const { owner, workspaceId } = await prepararConvite();
+    await context.services.db.execute(
+      sql`UPDATE plan_features SET limit_value = 1 WHERE plan_key = 'basico' AND feature_key = 'equipe.membros'`,
+    );
+    try {
+      const response = await convidar(owner, workspaceId, uniqueEmail('segundo'));
+      expect(response.statusCode).toBe(403);
+      expect(response.json().error.code).toBe('PLAN_LIMIT_REACHED');
+    } finally {
+      await context.services.db.execute(
+        sql`UPDATE plan_features SET limit_value = NULL WHERE plan_key = 'basico' AND feature_key = 'equipe.membros'`,
+      );
+    }
   });
 
   it('exige e-mail confirmado de quem convida', async () => {

@@ -84,7 +84,14 @@ export interface EntitlementSnapshot {
   currentPeriodEnd: string | null;
   graceUntil: string | null;
   autoRenewing: boolean;
+  /** Recursos do plano em vigor (gratuito quando não há assinatura ativa). */
   features: Record<string, { enabled: boolean; limit: number | null }>;
+  /** A empresa pode sincronizar (recurso `sync.nuvem` do plano em vigor). */
+  syncAllowed: boolean;
+  /** Tetos do plano em vigor; `null` quando não há limite. */
+  limits: { products: number | null; members: number | null };
+  /** O que a empresa já usa, para o app mostrar "12 de 50". */
+  usage: { products: number; members: number };
   /** Até quando o app pode confiar neste retrato sem falar com a API. */
   offlineValidUntil: string;
   checkedAt: string;
@@ -381,7 +388,12 @@ export class BillingService {
       .limit(1);
 
     const subscription = rows[0];
-    const planKey = subscription?.planKey ?? 'gratuito';
+    const now = new Date();
+    const active = this.isEntitled(subscription, now);
+
+    // Sem assinatura ativa valem os recursos do plano gratuito — que hoje
+    // incluem a nuvem. O app nunca mais recebe `features` vazio.
+    const planKey = active && subscription ? subscription.planKey : 'gratuito';
 
     const featureRows = await this.db
       .select()
@@ -393,18 +405,32 @@ export class BillingService {
       features[feature.featureKey] = { enabled: feature.enabled, limit: feature.limitValue };
     }
 
-    const now = new Date();
-    const active = this.isEntitled(subscription, now);
+    const [usage] = (
+      await this.db.execute<{ products: number; members: number }>(sql`
+        SELECT
+          (SELECT count(*)::int FROM products WHERE workspace_id = ${workspaceId} AND deleted_at IS NULL) AS products,
+          (SELECT count(*)::int FROM workspace_members WHERE workspace_id = ${workspaceId} AND status = 'active') AS members
+      `)
+    ).rows;
+
+    const limitOf = (key: string): number | null => {
+      const row = features[key];
+      if (!row || !row.enabled) return 0;
+      return row.limit;
+    };
 
     return {
       workspaceId,
       active,
-      planKey: active ? planKey : 'gratuito',
+      planKey,
       state: subscription?.state ?? 'sem_assinatura',
       currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
       graceUntil: subscription?.graceUntil?.toISOString() ?? null,
       autoRenewing: subscription?.autoRenewing ?? false,
-      features: active ? features : {},
+      features,
+      syncAllowed: features['sync.nuvem']?.enabled ?? false,
+      limits: { products: limitOf('produtos.sincronizados'), members: limitOf('equipe.membros') },
+      usage: { products: usage?.products ?? 0, members: usage?.members ?? 0 },
       offlineValidUntil: new Date(
         now.getTime() + this.services.env.ENTITLEMENT_OFFLINE_MAX_DAYS * 86_400_000,
       ).toISOString(),

@@ -16,6 +16,8 @@ import { addDays, generateInviteToken, hashToken } from '../../platform/auth/tok
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { AuthService, bumpPermissionVersion, type RequestMeta } from '../auth/auth.service.js';
 import type { AuthSuccess } from '../auth/auth.schemas.js';
+import { BillingService } from '../billing/billing.service.js';
+import { Feature, countActiveMembers, featureEnabled, limitOf, planLimitReached } from '../billing/plan-limits.js';
 import type { AcceptInviteBody, CreateInviteBody } from './invites.schemas.js';
 
 export interface InviteView {
@@ -52,6 +54,34 @@ export class InvitesService {
    * deles não revoga nada — e o índice único no banco existe exatamente para
    * tornar esse engano impossível.
    */
+  /**
+   * Equipe é recurso da assinatura. No plano gratuito a empresa é só do
+   * proprietário; com assinatura, até o teto do plano (sem teto por padrão).
+   */
+  private async assertTeamAllowed(workspaceId: string): Promise<void> {
+    const entitlement = await new BillingService(this.services).getEntitlement(workspaceId);
+    if (!featureEnabled(entitlement, Feature.MEMBERS)) {
+      throw forbidden(
+        ErrorCode.SUBSCRIPTION_REQUIRED,
+        'Convidar pessoas faz parte do plano Equipe. Assine para trabalhar com sua equipe no mesmo estoque.',
+        { feature: Feature.MEMBERS, planKey: entitlement.planKey },
+      );
+    }
+    const limit = limitOf(entitlement, Feature.MEMBERS);
+    if (limit !== null) {
+      const atual = await countActiveMembers(this.db, workspaceId);
+      if (atual >= limit) {
+        throw planLimitReached({
+          feature: Feature.MEMBERS,
+          limit,
+          current: atual,
+          planKey: entitlement.planKey,
+          message: `Seu plano permite até ${limit} pessoas na empresa. Remova alguém ou fale com o suporte.`,
+        });
+      }
+    }
+  }
+
   async create(
     workspaceId: string,
     actor: { userId: string; roleKey: string; emailVerified: boolean },
@@ -67,6 +97,8 @@ export class InvitesService {
         'Confirme seu e-mail antes de convidar outras pessoas.',
       );
     }
+
+    await this.assertTeamAllowed(workspaceId);
 
     const ranks = await getRoleRanks(this.services);
     const actorRank = ranks.get(actor.roleKey) ?? 0;
@@ -284,6 +316,24 @@ export class InvitesService {
         'Informe seu nome e crie uma senha para aceitar o convite.',
         [{ field: 'password', message: 'Obrigatório para quem ainda não tem conta.' }],
       );
+    }
+
+    // O plano é conferido de novo ao aceitar: o convite pode ter sido feito
+    // enquanto a assinatura valia. Quem já é membro (readmissão) não conta.
+    const [jaMembro] = autenticado
+      ? await this.db
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            and(
+              eq(workspaceMembers.workspaceId, convite.workspaceId),
+              eq(workspaceMembers.userId, autenticado.userId),
+              eq(workspaceMembers.status, 'active'),
+            ),
+          )
+      : [];
+    if (!jaMembro) {
+      await this.assertTeamAllowed(convite.workspaceId);
     }
 
     const auth = new AuthService(this.services);

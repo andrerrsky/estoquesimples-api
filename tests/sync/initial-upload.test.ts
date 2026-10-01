@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { products, stockMovements, workspaces } from '../../src/platform/db/schema/index.js';
@@ -305,7 +305,7 @@ describe('carga inicial', () => {
     expect(response.json().error.code).toBe('SYNC_PROTOCOL_UNSUPPORTED');
   });
 
-  it('recusa sincronização sem assinatura ativa', async () => {
+  it('plano gratuito aceita a carga inicial até o teto de produtos e recusa acima dele', async () => {
     const user = await registerUser(context);
     const created = await context.app.inject({
       method: 'POST',
@@ -314,10 +314,32 @@ describe('carga inicial', () => {
       payload: { name: 'Sem assinatura' },
     });
     const workspaceId = created.json().id;
+    await context.services.db.execute(
+      sql`UPDATE plan_features SET limit_value = 2 WHERE plan_key = 'gratuito' AND feature_key = 'produtos.sincronizados'`,
+    );
+    try {
+      const acima = await startUpload(user, workspaceId, 3, 0);
+      expect(acima.statusCode).toBe(403);
+      expect(acima.json().error.code).toBe('PLAN_LIMIT_REACHED');
 
-    const response = await startUpload(user, workspaceId, 1, 0);
-    expect(response.statusCode).toBe(403);
-    expect(response.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+      const dentro = await startUpload(user, workspaceId, 2, 0);
+      expect(dentro.statusCode).toBe(201);
+      const uploadId = dentro.json().uploadId;
+
+      // O declarado era 2, mas o lote traz 3: a conferência real é por lote.
+      const lote = await context.app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${workspaceId}/sync/initial-upload/${uploadId}/batch`,
+        headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+        payload: { batchIndex: 0, products: [produto(), produto(), produto()], movements: [] },
+      });
+      expect(lote.statusCode).toBe(403);
+      expect(lote.json().error.code).toBe('PLAN_LIMIT_REACHED');
+    } finally {
+      await context.services.db.execute(
+        sql`UPDATE plan_features SET limit_value = 50 WHERE plan_key = 'gratuito' AND feature_key = 'produtos.sincronizados'`,
+      );
+    }
   });
 
   it('não vaza a carga de uma empresa para outra', async () => {

@@ -249,6 +249,28 @@ da instalação e da conta; sem aparelho, e-mail (`kind: support_reply`).
 Notas internas (`internal`) não notificam. Rascunho por IA reutiliza a
 chave da OpenAI das avaliações. Contrato em [docs/support.md](docs/support.md).
 
+### Planos e limites (`src/modules/billing/plan-limits.ts`)
+
+Desde a migration 0013 a nuvem é **grátis com conta**: o plano `gratuito`
+tem `sync.nuvem` ligado, `produtos.sincronizados` com teto (50) e
+`equipe.membros` desligado (só o proprietário). A assinatura (`basico`,
+exibida como "Equipe") libera equipe, produtos sem teto e `analise.avancada`.
+Os números vivem em `plan_features` e são editáveis pelo painel (Planos).
+Onde cada regra é aplicada:
+
+- `sync.routes.ts#assertCanSync`: `syncAllowed` do plano em vigor e, sem
+  `equipe.membros`, só o proprietário sincroniza (403 `SUBSCRIPTION_REQUIRED`).
+- Teto de produtos: `initial-upload.service` (declarado no `start` e contado
+  por lote) e `sync.service#assertProductLimit` (lote inteiro: aceito ou
+  recusado com 403 `PLAN_LIMIT_REACHED`; exclusões no mesmo lote contam a
+  favor). Nunca recusa operação por operação, para não deixar produtos meio
+  sincronizados.
+- Equipe: `invites.service` (criar e aceitar) e
+  `workspaces.service#setMemberStatus` (reativar). O painel não é limitado.
+- `GET /entitlement` devolve `features` do plano em vigor (gratuito incluído),
+  `syncAllowed`, `limits` e `usage`; `active` continua significando
+  "assinatura paga válida" (é o que libera a Análise no app).
+
 ## 8. Analytics (eventos de uso)
 
 Tabela `analytics_events`, uma linha por evento, sem pré-agregação; retenção
