@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/scrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <TextView
+            android:id="@+id/messageView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:background="@drawable/bg_message_error"
+            android:padding="@dimen/group_padding_compact"
+            android:textAppearance="@style/TextAppearance.Estoque.Error"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sobre o que é?"
+            android:textAppearance="@style/TextAppearance.Estoque.Label" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:scrollbars="none"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:id="@+id/categoryRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/chipQuestion"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:layout_marginEnd="@dimen/field_gap"
+                    android:text="Dúvida" />
+
+                <TextView
+                    android:id="@+id/chipProblem"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:layout_marginEnd="@dimen/field_gap"
+                    android:text="Problema" />
+
+                <TextView
+                    android:id="@+id/chipSuggestion"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:layout_marginEnd="@dimen/field_gap"
+                    android:text="Sugestão" />
+
+                <TextView
+                    android:id="@+id/chipBilling"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:layout_marginEnd="@dimen/field_gap"
+                    android:text="Assinatura" />
+
+                <TextView
+                    android:id="@+id/chipAccount"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:layout_marginEnd="@dimen/field_gap"
+                    android:text="Conta e sincronização" />
+
+                <TextView
+                    android:id="@+id/chipOther"
+                    style="@style/Widget.Estoque.FilterChip"
+                    android:text="Outro" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/subjectLayout"
+            style="@style/Widget.Estoque.TextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:hint="Assunto"
+            app:counterEnabled="true"
+            app:counterMaxLength="120">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/subjectField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textCapSentences"
+                android:maxLength="120" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/messageLayout"
+            style="@style/Widget.Estoque.TextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:hint="Conte com detalhes">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/messageField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textMultiLine|textCapSentences"
+                android:gravity="top"
+                android:minLines="5"
+                android:maxLength="4000" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:id="@+id/contactGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/nameLayout"
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:hint="Seu nome (opcional)">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/nameField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName|textCapWords"
+                    android:maxLength="80" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/emailLayout"
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:hint="E-mail para resposta (opcional)">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/emailField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textEmailAddress"
+                    android:maxLength="254" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/infoView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption"
+            android:text="Enviamos junto o modelo do aparelho, a versão do Android e do app e o estado da sincronização, para ajudar no diagnóstico. Nenhum produto ou valor seu é enviado." />
+
+        <Button
+            android:id="@+id/sendButton"
+            style="@style/Widget.Estoque.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Enviar solicitação" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="24dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

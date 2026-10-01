@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 
+        Configuração de caminhos para FileProvider
+        Permite compartilhar arquivos de forma segura sem expor URIs file://
+    -->
+    
+    <!-- Diretório de cache interno para fotos temporárias -->
+    <cache-path name="cache_images" path="images/" />
+    <cache-path name="cache_root" path="/" />
+    
+    <!-- Diretório de arquivos internos da aplicação -->
+    <files-path name="app_images" path="images/" />
+    <files-path name="app_files" path="/" />
+    <files-path name="app_estoque_simples" path="EstoqueSimples/" />
+    
+    <!-- Diretório público de fotos (para compatibilidade com código antigo) -->
+    <external-path name="external_images" path="EstoqueSimples/Imagens/" />
+    
+    <!-- Diretório de arquivos externos da aplicação (usado pela câmera) -->
+    <external-files-path name="external_files" path="/" />
+    <external-files-path name="external_pictures" path="Pictures/" />
+    <external-files-path name="external_estoque_simples" path="Pictures/EstoqueSimples/" />
+    
+    <!-- Diretório de cache externo -->
+    <external-cache-path name="external_cache" path="/" />
+    
+    <!-- Diretório de PDFs exportados -->
+    <external-path name="pdf_files" path="EstoqueSimples/" />
+    
+    <!-- Diretórios de Downloads (Android 10+) -->
+    <external-path name="downloads" path="Download/EstoqueSimples/" />
+    <external-path name="downloads_alt" path="Downloads/EstoqueSimples/" />
+    
+    <!-- Diretório raiz externo (para casos gerais) -->
+    <external-path name="external_root" path="/" />
+    
+    <!-- 
+        Nota de segurança:
+        - external-path: Compartilha arquivos do armazenamento externo público
+        - external-files-path: Compartilha arquivos do diretório específico do app (mais seguro)
+        - files-path: Compartilha arquivos do armazenamento interno do app (mais seguro)
+        - cache-path: Compartilha arquivos do cache interno (temporário)
+        - external-cache-path: Compartilha arquivos do cache externo (temporário)
+        
+        Quanto mais restrito o caminho, mais seguro é o compartilhamento.
+    -->
+</paths>
+

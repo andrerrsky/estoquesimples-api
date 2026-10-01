@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    tools:context="br.com.gameloop.estoquesimples.ReportsActivity">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+
+        <Button
+            android:id="@+id/btnExportPdf"
+            style="@style/Widget.Estoque.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_complete"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Ponte para a Análise de Estoque, logo acima da dobra: sem isso,
+             as duas telas de números do estoque (esta e a Análise) não tinham
+             nenhuma relação visível entre si, e o link só aparecia depois de
+             rolar a tela inteira — quem estava com pressa nunca via. -->
+        <LinearLayout
+            android:id="@+id/openAnalyticsCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_reports"
+                app:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="@dimen/field_gap">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ver Análise de Estoque"
+                    android:textColor="@color/color_brand"
+                    android:textStyle="bold"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gráficos e tendências, além do resumo desta tela"
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/openAnalyticsBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/field_gap"
+                android:background="@drawable/bg_chip"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:text="Assinatura"
+                android:textColor="@color/color_text_muted"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Resumo geral"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <TextView
+                android:id="@+id/totalValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Valor do estoque: R$ 0,00"
+                android:textAppearance="@style/TextAppearance.Estoque.Value"
+                android:textSize="16sp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/stroke_width"
+                android:background="@color/color_border"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/averageValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Produtos para repor: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/stroke_width"
+                android:background="@color/color_border"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalProducts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Total de produtos: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalItems"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Itens em estoque: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:paddingTop="2dp"
+                android:paddingBottom="4dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <TextView
+                android:id="@+id/totalEntryValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Valor Total de Entradas: $ 0,00"
+                android:textAppearance="@style/TextAppearance.Estoque.Value"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/stroke_width"
+                android:background="@color/color_border"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalExitValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Valor Total de Saídas: $ 0,00"
+                android:textColor="@color/color_error"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/totalOtherValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cadastros, ajustes e estornos: R$ 0,00"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Soma do valor unitário cadastrado × quantidade movimentada. Não é faturamento nem despesa real."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Onde está o dinheiro do estoque (8 maiores)"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="420dp"
+                android:layout_marginTop="@dimen/field_gap"
+                android:layout_marginBottom="@dimen/field_gap">
+
+                <com.github.mikephil.charting.charts.HorizontalBarChart
+                    android:id="@+id/chart"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <LinearLayout
+                    android:id="@+id/chartEmptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:background="@color/color_surface"
+                    android:paddingLeft="24dp"
+                    android:paddingRight="24dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="Sem valor em estoque para exibir"
+                        android:textAppearance="@style/TextAppearance.Estoque.Section"
+                        android:textColor="@color/color_brand" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/field_gap"
+                        android:gravity="center"
+                        android:text="Cadastre produtos com valor e quantidade para ver onde está o dinheiro do estoque."
+                        android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Alertas de reposição"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <TextView
+                android:id="@+id/higher"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sem informações no momento."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/lower"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+            <View
+                android:id="@+id/dividerLowStock"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/stroke_width"
+                android:background="@color/color_border"
+                android:layout_marginTop="@dimen/field_gap"
+                android:layout_marginBottom="@dimen/field_gap"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/lowStockWarning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.Estoque.Warning"
+                android:textStyle="bold"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/lowStockList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/categoryTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Produtos por categoria"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/categorySection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/categoriesList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:textColor="@color/color_text" />
+        </LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/report_section_others"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportMovements"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_movements"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportExits"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_exits"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportEntries"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_entries"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportLowStock"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_low_stock"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportCategory"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_category"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <Button
+            android:id="@+id/btnReportFinancial"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/report_btn_financial"
+            android:layout_marginBottom="@dimen/section_gap" />
+    </LinearLayout>
+</ScrollView>
+
+    <include layout="@layout/include_bottom_nav" />
+
+</LinearLayout>

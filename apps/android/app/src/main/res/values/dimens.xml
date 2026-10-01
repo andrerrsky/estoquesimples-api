@@ -1,0 +1,28 @@
+<resources>
+    <dimen name="activity_horizontal_margin">20dp</dimen>
+    <dimen name="activity_vertical_margin">16dp</dimen>
+    <dimen name="screen_padding_horizontal">20dp</dimen>
+    <dimen name="screen_padding_top">16dp</dimen>
+    <dimen name="screen_padding_bottom">28dp</dimen>
+    <dimen name="section_gap">16dp</dimen>
+    <dimen name="group_padding">18dp</dimen>
+    <dimen name="group_padding_compact">16dp</dimen>
+    <dimen name="field_gap">8dp</dimen>
+    <dimen name="row_gap">10dp</dimen>
+    <dimen name="button_padding_vertical">14dp</dimen>
+    <dimen name="button_padding_vertical_secondary">12dp</dimen>
+    <dimen name="button_min_height">48dp</dimen>
+    <dimen name="input_field_height">60dp</dimen>
+    <dimen name="radius_hero">16dp</dimen>
+    <dimen name="radius_surface">14dp</dimen>
+    <dimen name="radius_muted">12dp</dimen>
+    <dimen name="radius_button">10dp</dimen>
+    <dimen name="radius_chip">8dp</dimen>
+    <dimen name="stroke_width">1dp</dimen>
+    <dimen name="stroke_width_button">1.5dp</dimen>
+    <dimen name="list_item_spacing">8dp</dimen>
+    <dimen name="photo_size">56dp</dimen>
+    <dimen name="search_padding_horizontal">4dp</dimen>
+    <dimen name="history_badge_size">48dp</dimen>
+    <dimen name="icon_inline">20dp</dimen>
+</resources>

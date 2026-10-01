@@ -1,0 +1,123 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'br.com.gameloop.estoquesimples'
+    compileSdk 36
+    // Necessário para extrair/empacotar símbolos nativos (ndk.debugSymbolLevel).
+    ndkVersion "27.0.12077973"
+
+
+    defaultConfig {
+        applicationId "br.com.gameloop.estoquesimples"
+        minSdkVersion 24
+        // targetSdk 36: requisito do Google Play (Android 16).
+        // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
+        targetSdkVersion 36
+        versionCode 24
+        versionName "24"
+
+        // Endereço da API e versão do protocolo de sincronização. Ficam aqui
+        // para que o app de depuração possa apontar para outro ambiente sem
+        // alterar código, e para que a versão do protocolo acompanhe o binário.
+        buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
+        buildConfigField "int", "SYNC_PROTOCOL", "1"
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
+        }
+
+        release {
+            // R8 ativo: reduz o tamanho do app e gera o mapping.txt de
+            // desofuscação, embutido automaticamente no AAB para o Play Console.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Símbolos nativos (ex.: lib do AppLovin) embutidos no AAB para
+            // simbolicar crashes/ANRs nativos no Play Console / Android Vitals.
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
+        }
+    }
+
+    compileOptions {
+        // Necessário para o Appodeal SDK 4.x quando minSdk < 26
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+}
+
+// Gera native-debug-symbols.zip para upload manual no Play Console.
+// Necessário porque o único .so do app (AppLovin) já vem stripped do vendor;
+// o AGP não consegue embutir símbolos no AAB automaticamente nesse caso.
+tasks.register('packageNativeDebugSymbols', Zip) {
+    dependsOn('mergeReleaseNativeLibs')
+    from("$buildDir/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib")
+    archiveFileName = 'native-debug-symbols.zip'
+    destinationDirectory = file("$buildDir/outputs/native-debug-symbols/release")
+}
+
+tasks.matching { it.name == 'bundleRelease' || it.name == 'assembleRelease' }.configureEach {
+    finalizedBy('packageNativeDebugSymbols')
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    
+    // AndroidX Libraries
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.activity:activity:1.9.3'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'com.google.android.material:material:1.13.0'
+    
+    // Image Loading
+    implementation 'com.squareup.picasso:picasso:2.71828'
+    
+    // Charts
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
+    
+    // Barcode Scanner
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    
+    // Bottom Navigation (Material Design replacement)
+    // Using Material Design's BottomNavigationView instead of deprecated library
+
+    // Core library desugaring (requisito de dependências com minSdk < 26)
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+
+    // Billing
+    implementation 'com.android.billingclient:billing:8.3.0'
+
+    // Splash screen padronizada (API nativa do Android 12+, com retrocompatibilidade)
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+    
+    // Armazenamento das credenciais de sincronização. O refresh token não pode
+    // ficar em SharedPreferences comum: com allowBackup ativo ele sairia do
+    // aparelho no backup do Android.
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // WorkManager for scheduled notifications
+    implementation 'androidx.work:work-runtime:2.10.0'
+    implementation 'com.google.guava:guava:31.1-android'
+
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:34.19.0')
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-messaging'
+    
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+}

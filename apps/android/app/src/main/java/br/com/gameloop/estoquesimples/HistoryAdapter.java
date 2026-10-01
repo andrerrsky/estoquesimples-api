@@ -1,0 +1,241 @@
+package br.com.gameloop.estoquesimples;
+
+import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.core.content.ContextCompat;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public class HistoryAdapter extends BaseAdapter {
+
+    public static class HistoryItem {
+        private String uuid;
+        private String productName;
+        private String type;
+        private double quantity;
+        private long timestamp;
+        private String note;
+        private String reversesUuid;
+        /** Marcado depois de carregar a lista inteira: outro item aponta para este em reversesUuid. */
+        private boolean reversed;
+        private String unit;
+        private String productUuid;
+        private Double balanceAfter;
+        private long recordedAt;
+        private boolean productDeleted;
+
+        public void setRecordedAt(long recordedAt) {
+            this.recordedAt = recordedAt;
+        }
+
+        /** Lançamento retroativo: registrado num dia diferente do da movimentação. */
+        public boolean isBackdated() {
+            return recordedAt > 0 && recordedAt - timestamp > 12 * 60 * 60 * 1000L;
+        }
+
+        public void setProductDeleted(boolean productDeleted) {
+            this.productDeleted = productDeleted;
+        }
+
+        public boolean isProductDeleted() {
+            return productDeleted;
+        }
+
+        public void setProductUuid(String productUuid) {
+            this.productUuid = productUuid;
+        }
+
+        public String getProductUuid() {
+            return productUuid;
+        }
+
+        public void setBalanceAfter(double balanceAfter) {
+            this.balanceAfter = balanceAfter;
+        }
+
+        public boolean hasBalanceAfter() {
+            return balanceAfter != null;
+        }
+
+        public double getBalanceAfter() {
+            return balanceAfter == null ? 0 : balanceAfter;
+        }
+
+        public void setUnit(String unit) {
+            this.unit = unit;
+        }
+
+        public String getUnit() {
+            return unit == null || unit.isEmpty() || "null".equals(unit) ? "" : unit;
+        }
+
+        public HistoryItem(String uuid, String productName, String type, double quantity,
+                           long timestamp, String note, String reversesUuid) {
+            this.uuid = uuid;
+            this.productName = productName;
+            this.type = type;
+            this.quantity = quantity;
+            this.timestamp = timestamp;
+            this.note = note;
+            this.reversesUuid = reversesUuid;
+        }
+
+        public String getReversesUuid() {
+            return reversesUuid;
+        }
+
+        public boolean isReversed() {
+            return reversed;
+        }
+
+        public void markReversed() {
+            this.reversed = true;
+        }
+
+        public String getUuid() {
+            return uuid;
+        }
+
+        public String getProductName() {
+            return productName;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public double getQuantity() {
+            return quantity;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public String getNote() {
+            return note;
+        }
+    }
+
+    private Context context;
+    private List<HistoryItem> items;
+
+    public HistoryAdapter(Context context, List<HistoryItem> items) {
+        this.context = context;
+        this.items = items;
+    }
+
+    @Override
+    public int getCount() {
+        return items.size();
+    }
+
+    @Override
+    public Object getItem(int position) {
+        return items.get(position);
+    }
+
+    @Override
+    public long getItemId(int position) {
+        return position;
+    }
+
+    @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        ViewHolder holder;
+
+        if (convertView == null) {
+            convertView = LayoutInflater.from(context).inflate(R.layout.history_item, parent, false);
+            holder = new ViewHolder();
+            holder.typeBadge = convertView.findViewById(R.id.typeBadge);
+            holder.typeSign = convertView.findViewById(R.id.typeSign);
+            holder.typeLabel = convertView.findViewById(R.id.typeLabel);
+            holder.productName = convertView.findViewById(R.id.productName);
+            holder.reversedBadge = convertView.findViewById(R.id.reversedBadge);
+            holder.quantity = convertView.findViewById(R.id.quantity);
+            holder.dateTime = convertView.findViewById(R.id.dateTime);
+            holder.note = convertView.findViewById(R.id.note);
+            holder.balanceAfter = convertView.findViewById(R.id.balanceAfter);
+            convertView.setTag(holder);
+        } else {
+            holder = (ViewHolder) convertView.getTag();
+        }
+
+        HistoryItem item = items.get(position);
+
+        holder.typeSign.setText(MovementDisplay.sign(item.getType(), item.getQuantity()));
+        holder.typeLabel.setText(MovementDisplay.label(item.getType()));
+        android.graphics.drawable.Drawable raw = ContextCompat.getDrawable(context, R.drawable.bg_type_badge);
+        if (raw instanceof GradientDrawable) {
+            GradientDrawable badge = (GradientDrawable) raw.mutate();
+            badge.setColor(MovementDisplay.color(context, item.getType(), item.getQuantity()));
+            holder.typeBadge.setBackground(badge);
+        }
+
+        // Nome do produto
+        // Produto excluído: as movimentações ficam, mas sem parecer de um item vivo.
+        holder.productName.setText(item.isProductDeleted()
+                ? item.getProductName() + " (produto excluído)"
+                : item.getProductName());
+        // Sem isso, uma entrada já cancelada continuava com a mesma cara de
+        // uma ativa na lista — só quem abria o detalhe descobria que ela não
+        // vale mais para o saldo atual.
+        holder.reversedBadge.setVisibility(item.isReversed() ? View.VISIBLE : View.GONE);
+
+        // Quantidade
+        // O sinal já está no selo ao lado; repeti-lo no número mostraria "--5".
+        holder.quantity.setText(CurrencyHelper.formatQuantity(Math.abs(item.getQuantity()))
+                + (item.getUnit().isEmpty() ? "" : " " + item.getUnit()));
+
+        if (holder.balanceAfter != null) {
+            if (item.hasBalanceAfter()) {
+                holder.balanceAfter.setText("Estoque depois: "
+                        + CurrencyHelper.formatQuantity(item.getBalanceAfter())
+                        + (item.getUnit().isEmpty() ? "" : " " + item.getUnit()));
+                holder.balanceAfter.setVisibility(View.VISIBLE);
+            } else {
+                holder.balanceAfter.setVisibility(View.GONE);
+            }
+        }
+
+        // Data e hora
+        String dateStr = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(item.getTimestamp()));
+        // Lançamento retroativo recalcula o "Estoque depois" das linhas
+        // seguintes; sem esta marca o número parecia ter mudado sozinho.
+        holder.dateTime.setText(item.isBackdated() ? dateStr + " · lançada depois" : dateStr);
+
+        // Observações
+        String note = item.getNote();
+        if (note != null && !note.isEmpty() && !"null".equals(note)) {
+            holder.note.setText(note);
+            holder.note.setVisibility(View.VISIBLE);
+        } else {
+            holder.note.setVisibility(View.GONE);
+        }
+
+        return convertView;
+    }
+
+    static class ViewHolder {
+        LinearLayout typeBadge;
+        TextView typeSign;
+        TextView typeLabel;
+        TextView productName;
+        TextView reversedBadge;
+        TextView quantity;
+        TextView dateTime;
+        TextView note;
+        TextView balanceAfter;
+    }
+}
+

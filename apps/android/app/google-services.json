@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "69044355158",
+    "project_id": "estoque-simples-f3604",
+    "storage_bucket": "estoque-simples-f3604.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:69044355158:android:36f4e45a789f4c57593bf7",
+        "android_client_info": {
+          "package_name": "br.com.gameloop.estoquesimples"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgDM0RiamxnyBO8kiao85neFy4S3vcc-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

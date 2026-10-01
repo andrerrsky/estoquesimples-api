@@ -1,0 +1,124 @@
+package br.com.gameloop.estoquesimples;
+
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+
+import br.com.gameloop.estoquesimples.data.LocalDb;
+
+/**
+ * Sugestões para campos de texto livre que, na prática, são listas
+ * (categoria, unidade, fornecedor). Sem isso o mesmo grupo virava
+ * "Vestuario", "Vestuário" e "vestuario" — e os relatórios por categoria
+ * contavam três categorias diferentes.
+ */
+public final class FieldSuggestions {
+
+    private static final String[] UNIDADES_COMUNS = {
+            "un", "kg", "g", "L", "ml", "caixa", "pacote", "dúzia", "par", "m", "saco", "pote", "fardo"
+    };
+
+    private FieldSuggestions() {
+    }
+
+    public static void attach(SQLiteDatabase db, AutoCompleteTextView category,
+                              AutoCompleteTextView unit, AutoCompleteTextView supplier) {
+        if (category != null) {
+            bind(category, distinct(db, "category", null));
+        }
+        if (unit != null) {
+            bind(unit, distinct(db, "unit", UNIDADES_COMUNS));
+        }
+        if (supplier != null) {
+            bind(supplier, distinct(db, "supplier", null));
+        }
+    }
+
+    private static void bind(AutoCompleteTextView field, List<String> values) {
+        field.setThreshold(1);
+        // Altura limitada: com o teclado aberto a lista inteira não cabia
+        // embaixo e o Android a jogava por cima da toolbar e do próprio campo.
+        field.setDropDownHeight(Math.round(150 * field.getResources().getDisplayMetrics().density));
+        field.setAdapter(new ArrayAdapter<>(field.getContext(),
+                android.R.layout.simple_dropdown_item_1line, values));
+        // Abre a lista também num toque, sem digitar nada: quem cadastra o
+        // vigésimo produto quer escolher a categoria, não lembrar como escreveu.
+        // O primeiro toque num campo só dá foco (não chega ao onClick), por
+        // isso a lista abre no foco; o onClick cobre o segundo toque.
+        Runnable abrir = () -> {
+            if (field.hasFocus() && !values.isEmpty() && !field.isPopupShowing()
+                    && field.getText().length() == 0) {
+                field.showDropDown();
+            }
+        };
+        field.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                // Duas tentativas: o teclado abrindo derruba o popup da primeira.
+                field.post(abrir);
+                field.postDelayed(abrir, 350);
+            }
+        });
+        field.setOnClickListener(v -> {
+            if (!values.isEmpty() && !field.isPopupShowing()) {
+                field.showDropDown();
+            }
+        });
+        // Toque no ícone de seta do campo (end icon do TextInputLayout): abre a
+        // lista inteira com o teclado fechado, para quem quer escolher em vez
+        // de digitar. As listas ficavam espremidas em duas linhas pelo teclado.
+        android.view.ViewParent parent = field.getParent();
+        while (parent != null && !(parent instanceof com.google.android.material.textfield.TextInputLayout)) {
+            parent = parent.getParent();
+        }
+        if (parent instanceof com.google.android.material.textfield.TextInputLayout) {
+            com.google.android.material.textfield.TextInputLayout layout =
+                    (com.google.android.material.textfield.TextInputLayout) parent;
+            layout.setEndIconMode(com.google.android.material.textfield.TextInputLayout.END_ICON_CUSTOM);
+            layout.setEndIconDrawable(R.drawable.ic_expand_more);
+            layout.setEndIconContentDescription("Ver opções");
+            layout.setEndIconOnClickListener(v -> {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        field.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(field.getWindowToken(), 0);
+                }
+                field.requestFocus();
+                field.setDropDownHeight(Math.round(320 * field.getResources().getDisplayMetrics().density));
+                field.postDelayed(() -> {
+                    field.showDropDown();
+                    field.setDropDownHeight(Math.round(150 * field.getResources().getDisplayMetrics().density));
+                }, 250);
+            });
+        }
+    }
+
+    private static List<String> distinct(SQLiteDatabase db, String column, String[] defaults) {
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        // As unidades comuns vêm primeiro, na ordem em que se usa ("un" antes
+        // de "dz"); o que o cadastro já tem de diferente entra depois.
+        if (defaults != null) {
+            for (String d : defaults) {
+                values.add(d);
+            }
+        }
+        if (db != null && db.isOpen()) {
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT DISTINCT " + column + " FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS
+                            + " AND " + column + " IS NOT NULL AND TRIM(" + column + ") != '' "
+                            + "AND " + column + " != 'null' ORDER BY " + column + " COLLATE NOCASE",
+                    null)) {
+                while (cursor.moveToNext()) {
+                    values.add(cursor.getString(0).trim());
+                }
+            } catch (Exception ignored) {
+                // Sugestão é conveniência: sem ela o campo continua funcionando.
+            }
+        }
+        return new ArrayList<>(values);
+    }
+}

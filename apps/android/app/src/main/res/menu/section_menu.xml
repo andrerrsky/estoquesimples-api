@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Menu ⋮ das seções (Histórico, Relatórios, Imp/Exp): o mesmo conjunto da
+     Início, menos "Edição em Massa" (que age sobre a lista da Início) e
+     "Sair". Antes cada tela inflava um menu diferente e tratava só parte
+     dos itens — tocar em "Conta e sincronização" no Histórico não fazia nada. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/menu_analytics"
+        android:title="Análise de Estoque"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_account"
+        android:title="Conta e nuvem"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_subscription"
+        android:title="@string/menu_subscription"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_settings"
+        android:title="@string/settings_title"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_support"
+        android:title="Ajuda e suporte"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_about"
+        android:title="Sobre"
+        app:showAsAction="never" />
+</menu>

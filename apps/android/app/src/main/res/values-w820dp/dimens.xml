@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="activity_horizontal_margin">64dp</dimen>
+    <dimen name="screen_padding_horizontal">64dp</dimen>
+</resources>
