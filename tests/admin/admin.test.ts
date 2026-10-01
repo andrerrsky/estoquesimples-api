@@ -429,3 +429,123 @@ describe('avaliações da Play Store', () => {
     expect(status.json().configured).toBe(false);
   });
 });
+
+describe('push notifications', () => {
+  it('registra token, envia campanha, revoga token morto e mede entrega e abertura', async () => {
+    const alice = await registerUser(context, { installId: 'instalacao-push-1' });
+    const bob = await registerUser(context, { installId: 'instalacao-push-2' });
+
+    const registerToken = (token: string, installId: string, auth?: Record<string, string>) =>
+      context.app.inject({
+        method: 'PUT',
+        url: '/v1/push/tokens',
+        headers: auth,
+        payload: { token, installId, platform: 'android', appVersionCode: 24, notificationsEnabled: true },
+      });
+    expect((await registerToken('token-alice-velho-xxxxxxxxxxxx', 'instalacao-push-1', alice.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-alice-novo-xxxxxxxxxxxxx', 'instalacao-push-1', alice.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-bob-xxxxxxxxxxxxxxxxxxxxx', 'instalacao-push-2', bob.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-anonimo-xxxxxxxxxxxxxxxxx', 'instalacao-push-3')).statusCode).toBe(200);
+    context.fcm.unregistered.add('token-bob-xxxxxxxxxxxxxxxxxxxxx');
+
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+
+    const preview = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/push/audience/preview',
+      headers: { cookie, ...CSRF },
+      payload: { audience: { type: 'all' } },
+    });
+    // O token antigo da Alice foi substituído: 3 aparelhos alcançáveis.
+    expect(preview.json()).toMatchObject({ total: 3, signedIn: 2 });
+
+    const created = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/push/campaigns',
+      headers: { cookie, ...CSRF },
+      payload: { title: 'Novidade', body: 'Relatórios em PDF melhoraram.', action: { screen: 'reports' }, audience: { type: 'signed_in' } },
+    });
+    expect(created.statusCode).toBe(201);
+    const campaignId = created.json().id as string;
+    expect(created.json().targeted).toBe(2);
+
+    const send = await context.app.inject({ method: 'POST', url: `/admin/api/push/campaigns/${campaignId}/send`, headers: { cookie, ...CSRF } });
+    expect(send.statusCode).toBe(200);
+
+    // O job roda fora da requisição; aqui executamos o envio diretamente.
+    const { PushService } = await import('../../src/modules/push/push.service.js');
+    const result = await new PushService(context.services).deliver(campaignId);
+    expect(result).toEqual({ targeted: 2, accepted: 1, failed: 1 });
+    expect(context.fcm.sent[0]).toMatchObject({ token: 'token-alice-novo-xxxxxxxxxxxxx', message: { title: 'Novidade', screen: 'reports' } });
+
+    const delivered = await context.app.inject({
+      method: 'POST',
+      url: '/v1/push/events',
+      payload: { campaignId, installId: 'instalacao-push-1', event: 'delivered' },
+    });
+    expect(delivered.json()).toEqual({ recorded: true });
+    const opened = await context.app.inject({
+      method: 'POST',
+      url: '/v1/push/events',
+      payload: { campaignId, installId: 'instalacao-push-1', event: 'opened' },
+    });
+    expect(opened.json()).toEqual({ recorded: true });
+    const again = await context.app.inject({
+      method: 'POST',
+      url: '/v1/push/events',
+      payload: { campaignId, installId: 'instalacao-push-1', event: 'opened' },
+    });
+    expect(again.json()).toEqual({ recorded: false });
+
+    const detail = await context.app.inject({ method: 'GET', url: `/admin/api/push/campaigns/${campaignId}`, headers: { cookie } });
+    expect(detail.json()).toMatchObject({ status: 'sent', targeted: 2, accepted: 1, failed: 1, delivered: 1, opened: 1 });
+    expect(detail.json().failures[0]).toMatchObject({ error: 'unregistered', count: 1 });
+
+    // O token do Bob foi revogado: a próxima prévia não o conta mais.
+    const after = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/push/audience/preview',
+      headers: { cookie, ...CSRF },
+      payload: { audience: { type: 'all' } },
+    });
+    expect(after.json().total).toBe(2);
+
+    const stats = await context.app.inject({ method: 'GET', url: '/admin/api/push/stats', headers: { cookie } });
+    expect(stats.json()).toMatchObject({ campaignsSent: 1, accepted: 1, delivered: 1, opened: 1 });
+  });
+
+  it('teste para um e-mail envia na hora e exige aparelho registrado', async () => {
+    const user = await registerUser(context, { installId: 'instalacao-push-9' });
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+
+    const none = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/push/test',
+      headers: { cookie, ...CSRF },
+      payload: { title: 'Teste', body: 'Olá', audience: { type: 'all' }, email: user.email },
+    });
+    expect(none.statusCode).toBe(400);
+
+    await context.app.inject({
+      method: 'PUT',
+      url: '/v1/push/tokens',
+      headers: user.authHeader,
+      payload: { token: 'token-teste-xxxxxxxxxxxxxxxxxxxx', installId: 'instalacao-push-9' },
+    });
+    const sent = await context.app.inject({
+      method: 'POST',
+      url: '/admin/api/push/test',
+      headers: { cookie, ...CSRF },
+      payload: { title: 'Teste', body: 'Olá', audience: { type: 'all' }, email: user.email },
+    });
+    expect(sent.statusCode).toBe(200);
+    expect(sent.json()).toMatchObject({ targeted: 1, accepted: 1 });
+
+    const list = await context.app.inject({ method: 'GET', url: '/admin/api/push/campaigns', headers: { cookie } });
+    expect(list.json().total).toBe(0);
+    const withTests = await context.app.inject({ method: 'GET', url: '/admin/api/push/campaigns?includeTests=true', headers: { cookie } });
+    expect(withTests.json().items[0]).toMatchObject({ isTest: true, status: 'sent' });
+  });
+});

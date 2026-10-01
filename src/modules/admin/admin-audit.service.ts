@@ -56,6 +56,13 @@ export const AdminAction = {
   SETTING_UPDATED: 'setting.updated',
   SETTING_REMOVED: 'setting.removed',
 
+  PUSH_CAMPAIGN_CREATED: 'push.campaign_created',
+  PUSH_CAMPAIGN_UPDATED: 'push.campaign_updated',
+  PUSH_CAMPAIGN_SENT: 'push.campaign_sent',
+  PUSH_CAMPAIGN_CANCELLED: 'push.campaign_cancelled',
+  PUSH_CAMPAIGN_DELETED: 'push.campaign_deleted',
+  PUSH_TEST_SENT: 'push.test_sent',
+
   DATA_EXPORTED: 'data.exported',
 } as const;
 

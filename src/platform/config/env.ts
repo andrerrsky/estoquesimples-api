@@ -149,6 +149,15 @@ const envSchema = z
     PLAY_REVIEWS_SYNC_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),
     /** Modelo usado para rascunhar respostas; a chave fica em admin_settings. */
     OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+
+    /**
+     * Push (Firebase Cloud Messaging). Sem FIREBASE_SERVICE_ACCOUNT_JSON a
+     * mesma conta de serviço do Google Play é usada (mesmo projeto GCP);
+     * ela precisa do papel "Firebase Cloud Messaging API Admin".
+     */
+    FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+    FIREBASE_PROJECT_ID: z.string().optional(),
+    PUSH_SEND_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(16),
   })
   .superRefine((value, ctx) => {
     const isProdLike = value.NODE_ENV === 'production' || value.NODE_ENV === 'staging';

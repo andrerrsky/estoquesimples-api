@@ -5,6 +5,7 @@ import type { Database, DbHandle } from '../db/client.js';
 import type { Mailer } from '../email/mailer.js';
 import type { Logger } from '../observability/logger.js';
 import type { PlayStoreClient } from '../../modules/billing/play-client.js';
+import type { FcmClient } from '../../modules/push/fcm-client.js';
 
 /**
  * Container de dependências da aplicação.
@@ -22,6 +23,8 @@ export interface AppServices {
   purchaseTokens: PurchaseTokenCipher;
   mailer: Mailer;
   playClient: PlayStoreClient;
+  /** Envio de push pelo Firebase; `configured` diz se há credencial. */
+  fcm: FcmClient;
   /**
    * Logger de processos que rodam fora de uma requisição (fila de tarefas,
    * reconciliação). Dentro de uma rota, prefira `request.log`, que já carrega

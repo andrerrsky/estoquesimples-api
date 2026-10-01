@@ -6,11 +6,13 @@ import { buildApp, type BuiltApp } from '../../src/app.js';
 import { loadEnv, type Env } from '../../src/platform/config/env.js';
 import { InMemoryMailer } from '../../src/platform/email/mailer.js';
 import { FakePlayStoreClient } from '../../src/modules/billing/play-client.js';
+import { FakeFcmClient } from '../../src/modules/push/fcm-client.js';
 
 export interface TestContext extends BuiltApp {
   app: FastifyInstance;
   mailer: InMemoryMailer;
   play: FakePlayStoreClient;
+  fcm: FakeFcmClient;
   env: Env;
 }
 
@@ -38,9 +40,10 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
 
   const mailer = new InMemoryMailer();
   const play = new FakePlayStoreClient();
-  const built = await buildApp({ env, mailer, playClient: play });
+  const fcm = new FakeFcmClient();
+  const built = await buildApp({ env, mailer, playClient: play, fcm });
 
-  return { ...built, mailer, play, env };
+  return { ...built, mailer, play, fcm, env };
 }
 
 /**

@@ -32,13 +32,14 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
       { to: '/empresas', label: 'Empresas', icon: 'building' },
       { to: '/assinaturas', label: 'Assinaturas', icon: 'card' },
       { to: '/avaliacoes', label: 'Avaliações', icon: 'mail' },
+      { to: '/notificacoes', label: 'Notificações', icon: 'zap' },
       { to: '/auditoria', label: 'Auditoria', icon: 'list' },
     ],
   },
   {
     section: 'Plataforma',
     items: [
-      { to: '/operacao', label: 'Operação', icon: 'zap', badge: (alerts) => alerts || undefined },
+      { to: '/operacao', label: 'Operação', icon: 'activity', badge: (alerts) => alerts || undefined },
       { to: '/planos', label: 'Planos', icon: 'tag' },
       { to: '/administradores', label: 'Administradores', icon: 'shield', minRole: 'owner' },
     ],

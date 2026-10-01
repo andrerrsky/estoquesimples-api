@@ -84,6 +84,7 @@ export const JOB_KIND: Record<string, string> = {
   'ops.watchdog': 'Vigia do sistema',
   'analytics.retention': 'Retenção de eventos',
   'play.reviews_sync': 'Coleta de avaliações da Play Store',
+  'push.send_campaign': 'Envio de campanha de push',
 };
 
 /**
@@ -167,6 +168,12 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'reviews.synced': { label: 'Avaliações buscadas no Google', tone: 'neutral' },
   'setting.updated': { label: 'Configuração alterada', tone: 'warning' },
   'setting.removed': { label: 'Configuração removida', tone: 'warning' },
+  'push.campaign_created': { label: 'Campanha de push criada', tone: 'neutral' },
+  'push.campaign_updated': { label: 'Campanha de push editada', tone: 'neutral' },
+  'push.campaign_sent': { label: 'Campanha de push enviada', tone: 'warning' },
+  'push.campaign_cancelled': { label: 'Campanha de push cancelada', tone: 'warning' },
+  'push.campaign_deleted': { label: 'Campanha de push apagada', tone: 'neutral' },
+  'push.test_sent': { label: 'Push de teste enviado', tone: 'neutral' },
 };
 
 export function auditLabel(action: string): { label: string; tone: Tone } {

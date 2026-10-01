@@ -6,6 +6,7 @@ import { registerAdminAuthRoutes } from './admin-auth.routes.js';
 import { registerAdminBillingRoutes } from './admin-billing.routes.js';
 import { registerAdminOpsRoutes } from './admin-ops.routes.js';
 import { registerAdminOverviewRoutes } from './admin-overview.routes.js';
+import { registerAdminPushRoutes } from './admin-push.routes.js';
 import { registerAdminReviewsRoutes } from './admin-reviews.routes.js';
 import { registerAdminStatic } from './admin-static.js';
 import { registerAdminUsersRoutes } from './admin-users.routes.js';
@@ -33,6 +34,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       await api.register(registerAdminAuditRoutes);
       await api.register(registerAdminOpsRoutes);
       await api.register(registerAdminReviewsRoutes);
+      await api.register(registerAdminPushRoutes);
     },
     { prefix: '/api' },
   );

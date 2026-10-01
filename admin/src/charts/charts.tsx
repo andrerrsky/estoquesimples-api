@@ -303,7 +303,7 @@ export function Funnel({ steps }: { steps: Array<{ key: string; label: string; c
   const max = Math.max(1, ...steps.map((step) => step.count));
   return (
     <div className="funnel">
-      {steps.map((step) => (
+      {steps.map((step, index) => (
         <div key={step.key} className="funnel__step">
           <span className="strong">{step.label}</span>
           <div className="funnel__bar">
@@ -313,7 +313,7 @@ export function Funnel({ steps }: { steps: Array<{ key: string; label: string; c
             {fmtNumber(step.count)}
           </span>
           <span className="muted small" style={{ textAlign: 'right' }}>
-            {step.ofPrevious === null ? (step.ofFirst === null ? '' : '100%') : fmtPercent(step.ofPrevious)}
+            {index === 0 ? (step.count > 0 ? '100%' : '—') : step.ofPrevious === null ? '—' : fmtPercent(step.ofPrevious)}
           </span>
         </div>
       ))}

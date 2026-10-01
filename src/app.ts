@@ -16,6 +16,8 @@ import { registerOpsJobs } from './modules/ops/ops.jobs.js';
 import { registerReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { registerSyncJobs } from './modules/sync/sync.jobs.js';
 import { GooglePlayClient, type PlayStoreClient } from './modules/billing/play-client.js';
+import { FirebaseFcmClient, type FcmClient } from './modules/push/fcm-client.js';
+import { registerPushJobs } from './modules/push/push.jobs.js';
 import type { AppServices } from './platform/http/context.js';
 import { buildServer } from './platform/http/server.js';
 
@@ -25,6 +27,8 @@ export interface BuildAppOptions {
   mailer?: Mailer;
   /** Permite injetar um cliente do Google Play controlado pelo teste. */
   playClient?: PlayStoreClient;
+  /** Permite injetar um cliente do FCM controlado pelo teste. */
+  fcm?: FcmClient;
 }
 
 export interface BuiltApp {
@@ -64,6 +68,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
     // Placeholder até o logger do Fastify existir; trocado abaixo.
     mailer: options.mailer ?? new LoggingMailer(console as never, true),
     playClient: options.playClient ?? new GooglePlayClient(env),
+    fcm: options.fcm ?? new FirebaseFcmClient(env),
   };
 
   const app = await buildServer(services);
@@ -77,6 +82,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerOpsJobs(services);
   registerAnalyticsJobs(services);
   registerReviewsJobs(services);
+  registerPushJobs(services);
 
   return {
     app,

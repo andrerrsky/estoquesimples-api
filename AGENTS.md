@@ -175,6 +175,7 @@ Servido pela própria API na mesma origem (SPA em `admin/`, build em
 | Auditoria | `audit/users`, `audit/admins`, `audit/actions` | — |
 | Operação | `ops/status`, `ops/sync` (owner), `ops/jobs`, `retry`, `cancel` | support |
 | Avaliações da Play Store | `reviews/stats`, `reviews`, `reviews/sync`, `reviews/:id/reply`, `reviews/:id/draft`, `settings/openai` (GET/PUT/DELETE) | support (chave da OpenAI: owner) |
+| Push (FCM) | `push/stats`, `push/screens`, `push/audience/preview`, `push/campaigns` (CRUD, `send`, `cancel`, `deliveries`), `push/test` | support |
 
 Princípios do painel:
 
@@ -217,6 +218,22 @@ por IA usa a chave da OpenAI guardada cifrada em `admin_settings`
 (`PurchaseTokenCipher`, mesma chave AES em repouso) e nunca devolve a chave ao
 painel; modelo em `OPENAI_MODEL`. Exige a permissão "Responder a avaliações"
 na conta de serviço do Play.
+
+### Push notifications (`src/modules/push/`)
+
+Firebase Cloud Messaging HTTP v1 com a mesma conta de serviço do Play
+(`FIREBASE_SERVICE_ACCOUNT_JSON` opcional para separar); exige a API do FCM
+ativada e o papel "Firebase Cloud Messaging API Admin". O app registra o
+token em `PUT /v1/push/tokens` (auth opcional; um token vivo por
+`install_id`) e reporta `delivered`/`opened` em `POST /v1/push/events`.
+Campanhas (`push_campaigns`) têm público declarativo (`push.schemas.ts`,
+resolvido no envio), estado `draft → queued → sending → sent|failed|cancelled`
+e uma linha por token em `push_deliveries`, que forma o funil alvo → aceita
+pelo FCM → entregue → aberta. O envio roda no job `push.send_campaign`
+(concorrência `PUSH_SEND_CONCURRENCY`); mensagens são **só de dados**, o app
+monta a notificação (por isso entrega e abertura são mensuráveis). Tokens
+`UNREGISTERED`/`INVALID_ARGUMENT` são revogados. Detalhes para os clientes
+em [docs/push.md](docs/push.md).
 
 ## 8. Analytics (eventos de uso)
 
