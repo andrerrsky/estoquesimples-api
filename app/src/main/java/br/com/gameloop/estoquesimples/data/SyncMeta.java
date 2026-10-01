@@ -35,6 +35,8 @@ public final class SyncMeta {
     public static final String DESVIO_RELOGIO = "desvio_relogio";
     /** Conflitos esperando decisão de uma pessoa na última sincronização. */
     public static final String CONFLITOS_PENDENTES = "conflitos_pendentes";
+    /** Mensagem do servidor quando o plano travou a sincronização (teto ou equipe). */
+    public static final String BLOQUEIO_PLANO = "bloqueio_plano";
 
     private final SQLiteDatabase db;
 

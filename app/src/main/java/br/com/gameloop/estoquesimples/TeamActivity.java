@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 
 import br.com.gameloop.estoquesimples.sync.AccountService;
 import br.com.gameloop.estoquesimples.sync.ApiException;
+import br.com.gameloop.estoquesimples.sync.EntitlementManager;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.TeamClient;
 
@@ -120,13 +121,30 @@ public final class TeamActivity extends BaseActivity {
                     }
                 }
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     mostrar(lista, pendentes);
                 });
             } catch (ApiException e) {
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    if (!ConnectivityPrompt.report(this, e, this::carregar)) {
+                        showMessage(e.userMessage());
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("TeamActivity", "falha ao carregar a equipe", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível falar com o servidor. Tente de novo.");
                 });
             }
         });
@@ -165,7 +183,35 @@ public final class TeamActivity extends BaseActivity {
     // Convidar
     // -------------------------------------------------------------------------
 
+    /**
+     * Equipe é recurso do plano Equipe. O proprietário vai direto para a
+     * assinatura; quem não é proprietário só pode pedir a ele.
+     */
+    private void oferecerPlanoEquipe(String mensagemServidor) {
+        boolean proprietario = "proprietario".equals(session.role());
+        String mensagem = mensagemServidor != null
+                ? mensagemServidor
+                : "Convidar pessoas faz parte do plano Equipe. Com ele, funcionários e sócios "
+                        + "trabalham no mesmo estoque, cada um com o próprio papel.";
+        AlertDialog.Builder dialogo = new AlertDialog.Builder(this)
+                .setTitle("Equipe é do plano Equipe")
+                .setMessage(proprietario
+                        ? mensagem
+                        : mensagem + "\n\nSó o proprietário da empresa pode assinar.")
+                .setNegativeButton("Agora não", null);
+        if (proprietario) {
+            dialogo.setPositiveButton("Conhecer o plano", (d, w) ->
+                    SubscriptionActivity.open(this, "team"));
+        }
+        dialogo.show();
+    }
+
     private void promptConvite() {
+        EntitlementManager direitos = new EntitlementManager(this);
+        if (direitos.hasSnapshot() && !direitos.teamEnabled()) {
+            oferecerPlanoEquipe(null);
+            return;
+        }
         if (session.needsEmailVerification()) {
             EmailVerificationUi.prompt(this, accounts, executor, main, () -> {
                 atualizarAvisoDeEmail();
@@ -246,12 +292,22 @@ public final class TeamActivity extends BaseActivity {
             try {
                 client.invite(email, papel);
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     Toast.makeText(this, "Convite enviado para " + email, Toast.LENGTH_LONG).show();
                     carregar();
                 });
             } catch (ApiException e) {
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
+                    if (e.isPlanBlocked()) {
+                        oferecerPlanoEquipe(e.userMessage());
+                        return;
+                    }
                     if (e.isEmailUnverified()) {
                         session.setEmailVerified(false);
                         atualizarAvisoDeEmail();
@@ -259,7 +315,18 @@ public final class TeamActivity extends BaseActivity {
                                 () -> convidar(email, papel));
                         return;
                     }
-                    showMessage(e.userMessage());
+                    if (!ConnectivityPrompt.report(this, e, () -> convidar(email, papel))) {
+                        showMessage(e.userMessage());
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("TeamActivity", "falha ao convidar", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível falar com o servidor. Tente de novo.");
                 });
             }
         });
@@ -377,13 +444,30 @@ public final class TeamActivity extends BaseActivity {
             try {
                 acao.run();
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     Toast.makeText(this, sucesso, Toast.LENGTH_SHORT).show();
                     carregar();
                 });
             } catch (ApiException e) {
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
-                    showMessage(e.userMessage());
+                    if (!ConnectivityPrompt.report(this, e, () -> executar(acao, sucesso))) {
+                        showMessage(e.userMessage());
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("TeamActivity", "falha na ação da equipe", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível falar com o servidor. Tente de novo.");
                 });
             }
         });

@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -337,6 +339,7 @@ public class ImportActivity extends BaseActivity {
                     return;
                 }
                 reopenAfterSwap();
+                Analytics.track(this, "backup.restored");
                 setImportExportDescText("Cópia restaurada. Os produtos já estão na lista.");
                 Toast.makeText(this, "Cópia restaurada.", Toast.LENGTH_LONG).show();
             });
@@ -347,6 +350,7 @@ public class ImportActivity extends BaseActivity {
         Toast.makeText(this, "Importando...", Toast.LENGTH_SHORT).show();
         executor.execute(() -> {
             DataExchange.Report report;
+            String formato = "csv";
             try (InputStream in = getContentResolver().openInputStream(uri)) {
                 if (in == null) {
                     main.post(() -> Toast.makeText(this, "Erro ao abrir arquivo", Toast.LENGTH_SHORT).show());
@@ -362,6 +366,7 @@ public class ImportActivity extends BaseActivity {
                 synchronized (MainActivity.DB_LOCK) {
                     DataExchange exchange = new DataExchange(MainActivity.stock);
                     if (text.startsWith("{")) {
+                        formato = "json";
                         report = exchange.importJson(new JSONObject(text));
                     } else {
                         report = exchange.importCsv(
@@ -381,6 +386,8 @@ public class ImportActivity extends BaseActivity {
             }
 
             DataExchange.Report done = report;
+            Analytics.track(this, "import.completed", Analytics.props(
+                    "format", formato, "count", done.created + done.updated, "failed", done.failed));
             main.post(() -> {
                 if (MainActivity.instance != null) {
                     MainActivity.instance.markListDirty(true);
@@ -427,6 +434,7 @@ public class ImportActivity extends BaseActivity {
                     return;
                 }
                 reopenAfterSwap();
+                Analytics.track(this, "import.completed", Analytics.props("format", "db"));
                 setImportExportDescText("Banco de dados importado com sucesso!\n\nOs produtos já estão disponíveis na lista.");
                 Toast.makeText(this, "Banco de dados importado com sucesso!", Toast.LENGTH_SHORT).show();
             });
@@ -465,6 +473,7 @@ public class ImportActivity extends BaseActivity {
                     setImportExportDescText("Erro ao exportar o banco de dados.");
                     return;
                 }
+                Analytics.track(this, "export.completed", Analytics.props("format", "db"));
                 setImportExportDescText("Banco de dados exportado com sucesso!\n\nO arquivo foi salvo no local escolhido.");
                 Toast.makeText(this, "Banco de dados exportado com sucesso!", Toast.LENGTH_SHORT).show();
             });
@@ -504,6 +513,10 @@ public class ImportActivity extends BaseActivity {
                 return;
             }
             DataExchange.Report done = report;
+            Analytics.track(this, "export.completed", Analytics.props(
+                    "format", kind == ExchangeKind.PRODUCTS_CSV ? "csv-produtos"
+                            : kind == ExchangeKind.MOVEMENTS_CSV ? "csv-movimentacoes" : "json",
+                    "count", done.exported));
             main.post(() -> {
                 String oQue;
                 if (kind == ExchangeKind.MOVEMENTS_CSV) {
@@ -535,6 +548,7 @@ public class ImportActivity extends BaseActivity {
                 }
                 int produtos = json.optJSONArray("products") == null
                         ? 0 : json.optJSONArray("products").length();
+                Analytics.track(this, "export.completed", Analytics.props("format", "cloud-json", "count", produtos));
                 main.post(() -> {
                     setImportExportDescText("Cópia da nuvem salva: "
                             + Texto.plural(produtos, "produto", "produtos")

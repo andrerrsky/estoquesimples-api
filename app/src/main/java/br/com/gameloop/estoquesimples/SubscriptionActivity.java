@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -105,8 +107,16 @@ public class SubscriptionActivity extends BaseActivity {
         setBusy(false);
     };
 
+    /** De onde a pessoa chegou à tela de assinatura; vira `trigger` no evento. */
+    private static final String EXTRA_ORIGEM = "br.com.gameloop.estoquesimples.PAYWALL_ORIGIN";
+
     public static void open(Context context) {
-        context.startActivity(new Intent(context, SubscriptionActivity.class));
+        open(context, "unknown");
+    }
+
+    public static void open(Context context, String origin) {
+        context.startActivity(new Intent(context, SubscriptionActivity.class)
+                .putExtra(EXTRA_ORIGEM, origin));
     }
 
     @Override
@@ -128,6 +138,9 @@ public class SubscriptionActivity extends BaseActivity {
         renderFromLocal();
         connectPlay();
         recognizeLegacyProQuietly();
+
+        Analytics.track(this, "paywall.viewed", Analytics.props(
+                "trigger", getIntent() != null ? getIntent().getStringExtra(EXTRA_ORIGEM) : null));
     }
 
     @Override
@@ -237,7 +250,7 @@ public class SubscriptionActivity extends BaseActivity {
     }
 
     private void renderFromLocal() {
-        boolean ativa = entitlements.canSync();
+        boolean ativa = entitlements.isPaid();
         boolean isPro = premiumManager.isPro();
 
         if (ativa) {
@@ -272,6 +285,7 @@ public class SubscriptionActivity extends BaseActivity {
         updatePendingNotice();
         updateActionVisibility();
         updateLegacyFooter();
+        renderFreeSummary();
     }
 
     private void updatePendingNotice() {
@@ -290,7 +304,7 @@ public class SubscriptionActivity extends BaseActivity {
         boolean signedInWithWorkspace =
                 session.isSignedIn() && session.workspaceId() != null;
         boolean proprietario = "proprietario".equals(session.role());
-        boolean ativa = entitlements.canSync();
+        boolean ativa = entitlements.isPaid();
 
         retryButton.setVisibility(offerLoadFailed && !ativa ? View.VISIBLE : View.GONE);
 
@@ -317,6 +331,21 @@ public class SubscriptionActivity extends BaseActivity {
 
         subscribeButton.setVisibility(ativa ? View.GONE : View.VISIBLE);
         restoreButton.setVisibility(View.VISIBLE);
+    }
+
+    /** O que já vem de graça, com o teto real do plano gratuito. */
+    private void renderFreeSummary() {
+        TextView resumo = findViewById(R.id.freePlanSummary);
+        if (resumo == null) {
+            return;
+        }
+        int limite = entitlements.productLimit();
+        String teto = limite == EntitlementManager.SEM_LIMITE || !entitlements.hasSnapshot()
+                ? "até 50 produtos"
+                : "até " + limite + " produtos";
+        resumo.setText("No plano gratuito você já tem: seus dados na nuvem, em todos os seus "
+                + "aparelhos, com " + teto + ". O plano Equipe tira o teto e abre a empresa "
+                + "para outras pessoas.");
     }
 
     private void updateLegacyFooter() {
@@ -441,7 +470,18 @@ public class SubscriptionActivity extends BaseActivity {
                     }
                     setBusy(false);
                     renderFromLocal();
-                    showMessage(e.userMessage());
+                    if (!ConnectivityPrompt.report(this, e, this::refreshEntitlementInBackground)) {
+                        showMessage(e.userMessage());
+                        retryButton.setVisibility(View.VISIBLE);
+                    }
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    showMessage("Não foi possível falar com o servidor. Tente de novo.");
                     retryButton.setVisibility(View.VISIBLE);
                 });
             }
@@ -464,7 +504,7 @@ public class SubscriptionActivity extends BaseActivity {
             Toast.makeText(this, "Só o proprietário pode assinar.", Toast.LENGTH_LONG).show();
             return;
         }
-        if (entitlements.canSync()) {
+        if (entitlements.isPaid()) {
             Toast.makeText(this, "Sua assinatura já está ativa.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -480,14 +520,19 @@ public class SubscriptionActivity extends BaseActivity {
         String obfuscated = PlayBilling.obfuscatedAccountId(session.workspaceId());
         BillingResult result = playBilling.launchSubscribe(this, currentOffer, obfuscated);
         if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+            Analytics.track(this, "purchase.failed",
+                    Analytics.props("reason", "launch", "code", result.getResponseCode()));
             showMessage("Não foi possível abrir a compra: " + result.getDebugMessage());
             retryButton.setVisibility(View.VISIBLE);
+        } else {
+            Analytics.track(this, "purchase.started");
         }
     }
 
     private void onPurchasesUpdated(@NonNull BillingResult billingResult,
                                     @Nullable List<Purchase> purchases) {
         if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.USER_CANCELED) {
+            Analytics.track(this, "purchase.failed", Analytics.props("reason", "user_canceled"));
             main.post(() -> {
                 setBusy(false);
                 Toast.makeText(this, "Compra cancelada.", Toast.LENGTH_SHORT).show();
@@ -496,6 +541,8 @@ public class SubscriptionActivity extends BaseActivity {
         }
         if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
                 || purchases == null) {
+            Analytics.track(this, "purchase.failed",
+                    Analytics.props("reason", "billing_error", "code", billingResult.getResponseCode()));
             main.post(() -> {
                 setBusy(false);
                 showMessage("Erro na compra: " + billingResult.getDebugMessage());
@@ -640,7 +687,7 @@ public class SubscriptionActivity extends BaseActivity {
                     if (isFinishing()) {
                         return;
                     }
-                    handleLinkFailure(e, enqueueOnTransient);
+                    handleLinkFailure(e, purchaseToken, enqueueOnTransient);
                 });
             } catch (Exception e) {
                 main.post(() -> {
@@ -656,7 +703,7 @@ public class SubscriptionActivity extends BaseActivity {
         });
     }
 
-    private void handleLinkFailure(ApiException e, boolean enqueueOnTransient) {
+    private void handleLinkFailure(ApiException e, String purchaseToken, boolean enqueueOnTransient) {
         setBusy(false);
         String message = e.userMessage();
         if (isPermanentLinkError(e)) {
@@ -668,6 +715,10 @@ public class SubscriptionActivity extends BaseActivity {
         }
         pending.recordTransientError(message);
         updatePendingNotice();
+        if (ConnectivityPrompt.isOffline(e)) {
+            ConnectivityPrompt.show(this, () -> linkToken(purchaseToken, enqueueOnTransient));
+            return;
+        }
         showMessage(message);
         retryButton.setVisibility(View.VISIBLE);
         if (enqueueOnTransient) {

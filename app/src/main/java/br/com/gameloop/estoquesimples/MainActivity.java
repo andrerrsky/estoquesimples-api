@@ -1,5 +1,9 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.push.PushRegistrar;
+import br.com.gameloop.estoquesimples.push.PushEvents;
+import br.com.gameloop.estoquesimples.analytics.AnalyticsScheduler;
+import br.com.gameloop.estoquesimples.analytics.Analytics;
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
@@ -139,6 +143,11 @@ public class MainActivity extends BaseActivity {
     // Um booleano, não texto livre: a MainActivity é exportada (launcher) e um
     // extra de texto viraria um jeito de qualquer app escrever na nossa tela.
     public static final String EXTRA_PRODUCT_ADDED = "br.com.gameloop.estoquesimples.PRODUCT_ADDED";
+    /** Marcado pela notificação de estoque baixo, para medir quem a toca. */
+    public static final String EXTRA_FROM_LOW_STOCK_NOTIFICATION =
+            "br.com.gameloop.estoquesimples.FROM_LOW_STOCK_NOTIFICATION";
+    private final android.os.Handler analyticsHandler = new android.os.Handler(Looper.getMainLooper());
+    private Runnable pendingSearchEvent;
 
     @Override
     protected void onNewIntent(Intent intent) {
@@ -149,6 +158,75 @@ public class MainActivity extends BaseActivity {
             pendingClearSearch = true;
             lowStockOnly = false;
             pendingListRefresh = true;
+        }
+        if (intent != null && intent.getBooleanExtra(EXTRA_FROM_LOW_STOCK_NOTIFICATION, false)) {
+            Analytics.track(this, "notification.opened", Analytics.props("kind", "low_stock"));
+        }
+        handlePushIntent(intent);
+    }
+
+    /**
+     * Toque numa notificação de campanha: reporta a abertura e leva à tela
+     * (ou ao link) que a campanha pediu.
+     */
+    private void handlePushIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        // Resposta do suporte: abre direto a conversa.
+        String ticketId = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_TICKET_ID);
+        if (ticketId != null && !ticketId.isEmpty()) {
+            intent.removeExtra(EstoqueFirebaseMessagingService.EXTRA_TICKET_ID);
+            Analytics.track(this, "notification.opened", Analytics.props("kind", "support"));
+            startActivity(SupportTicketActivity.intent(this, ticketId));
+            return;
+        }
+        String campaignId = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_CAMPAIGN_ID);
+        if (campaignId == null || campaignId.isEmpty()) {
+            return;
+        }
+        intent.removeExtra(EstoqueFirebaseMessagingService.EXTRA_CAMPAIGN_ID);
+        PushEvents.report(this, campaignId, PushEvents.OPENED);
+
+        String url = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_URL);
+        String screen = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_SCREEN);
+        try {
+            if (url != null && (url.startsWith("https://") || url.startsWith("http://"))) {
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
+                return;
+            }
+            Class<?> target = pushScreenTarget(screen);
+            if (target != null) {
+                startActivity(new Intent(this, target));
+            }
+        } catch (Exception e) {
+            Log.w("MainActivity", "não foi possível abrir o destino da notificação", e);
+        }
+    }
+
+    private static Class<?> pushScreenTarget(String screen) {
+        if (screen == null) {
+            return null;
+        }
+        switch (screen) {
+            case "history":
+                return HistoryActivity.class;
+            case "reports":
+                return ReportsActivity.class;
+            case "analysis":
+                return AnalyticsActivity.class;
+            case "account":
+                return AccountActivity.class;
+            case "subscription":
+                return SubscriptionActivity.class;
+            case "team":
+                return TeamActivity.class;
+            case "import":
+                return ImportActivity.class;
+            case "support":
+                return SupportActivity.class;
+            default:
+                return null;
         }
     }
 
@@ -248,6 +326,17 @@ public class MainActivity extends BaseActivity {
             pendingMessage = "Produto adicionado.";
         }
 
+        // Eventos de uso: abertura do app, envio periódico da fila e a origem
+        // desta abertura (toque na notificação de estoque baixo).
+        Analytics.appOpened(this);
+        AnalyticsScheduler.schedulePeriodic(this);
+        // Token do FCM: registra (ou renova o vínculo com a conta) a cada abertura.
+        PushRegistrar.register(this);
+        handlePushIntent(getIntent());
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_FROM_LOW_STOCK_NOTIFICATION, false)) {
+            Analytics.track(this, "notification.opened", Analytics.props("kind", "low_stock"));
+        }
+
         // Configurar Picasso com otimizações de memória para evitar crashes com imagens grandes
         ImageLoadHelper.configurePicasso(this);
 
@@ -314,6 +403,7 @@ public class MainActivity extends BaseActivity {
                         listAdapter.collapseAll();
                     }
                     filterList(newText);
+                    trackSearchDebounced(newText);
                     return true;
                 }
             });
@@ -326,6 +416,7 @@ public class MainActivity extends BaseActivity {
                 new ScanContract(),
                 result -> {
                     if (result.getContents() != null && searchView != null) {
+                        Analytics.track(this, "barcode.scanned", Analytics.props("context", "search"));
                         searchView.setQuery(result.getContents(), true);
                     }
                 }
@@ -521,6 +612,7 @@ public class MainActivity extends BaseActivity {
         }
 
         updateConflictsBanner();
+        updatePlanBanner();
 
         if (pendingMessage != null) {
             String message = pendingMessage;
@@ -538,6 +630,37 @@ public class MainActivity extends BaseActivity {
      * este aviso na tela inicial, um conflito só aparecia para quem lembrasse
      * de abrir "Conta e sincronização" por conta própria.
      */
+    /**
+     * Aviso de que o plano travou a sincronização (teto de produtos do plano
+     * gratuito, ou equipe sem assinatura). O texto vem do servidor e fica em
+     * SyncMeta até a próxima sincronização bem-sucedida.
+     */
+    private void updatePlanBanner() {
+        View banner = findViewById(R.id.planBanner);
+        if (banner == null || stock == null || !stock.isOpen()) {
+            return;
+        }
+        String bloqueio = new SyncMeta(stock).get(SyncMeta.BLOQUEIO_PLANO);
+        if (bloqueio == null || bloqueio.isEmpty()) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        TextView texto = findViewById(R.id.planBannerText);
+        if (texto != null) {
+            texto.setText("Sincronização pausada: " + bloqueio);
+        }
+        banner.setVisibility(View.VISIBLE);
+        boolean proprietario = "proprietario".equals(
+                br.com.gameloop.estoquesimples.sync.SessionManager.get(this).role());
+        banner.setOnClickListener(v -> {
+            if (proprietario) {
+                SubscriptionActivity.open(this, "product_limit");
+            } else {
+                startActivity(new Intent(this, AccountActivity.class));
+            }
+        });
+    }
+
     private void updateConflictsBanner() {
         View banner = findViewById(R.id.conflictsBanner);
         if (banner == null || stock == null || !stock.isOpen()) {
@@ -718,11 +841,36 @@ public class MainActivity extends BaseActivity {
         chipLow.setSelected(lowStockOnly);
     }
 
+    /**
+     * Uma busca conta uma vez, meio segundo depois da última tecla, com o
+     * tamanho do resultado; por tecla inflaria o número sem dizer nada.
+     */
+    private void trackSearchDebounced(String query) {
+        if (pendingSearchEvent != null) {
+            analyticsHandler.removeCallbacks(pendingSearchEvent);
+            pendingSearchEvent = null;
+        }
+        final String termo = query == null ? "" : query.trim();
+        if (termo.length() < 2) {
+            return;
+        }
+        pendingSearchEvent = () -> {
+            pendingSearchEvent = null;
+            int resultados = listAdapter != null ? listAdapter.getCount() : 0;
+            Analytics.track(this, "search.performed",
+                    Analytics.props("results", resultados, "length", termo.length()));
+        };
+        analyticsHandler.postDelayed(pendingSearchEvent, 500);
+    }
+
     private void setLowStockOnly(boolean enabled) {
         if (lowStockOnly == enabled) {
             return;
         }
         lowStockOnly = enabled;
+        if (enabled) {
+            Analytics.track(this, "low_stock.filter_used");
+        }
         stickyNames.clear();
         updateFilterChips();
         filterList(searchView != null ? searchView.getQuery().toString() : "");
@@ -1052,6 +1200,7 @@ public class MainActivity extends BaseActivity {
                             }
 
                             if (rowsDeleted) {
+                                Analytics.track(MainActivity.this, "product.deleted");
                                 updateList();
                                 // Única ação destrutiva sem volta: como a exclusão é
                                 // suave, restaurar é seguro e viaja pelo sync.
@@ -1206,10 +1355,13 @@ public class MainActivity extends BaseActivity {
             startActivity(new Intent(this, AccountActivity.class));
             return true;
         } else if (itemId == R.id.menu_subscription) {
-            SubscriptionActivity.open(this);
+            SubscriptionActivity.open(this, "menu");
             return true;
         } else if (itemId == R.id.menu_settings) {
             showSettingsActivity();
+            return true;
+        } else if (itemId == R.id.menu_support) {
+            startActivity(new Intent(this, SupportActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -1506,6 +1658,7 @@ public class MainActivity extends BaseActivity {
             // Mostra o primeiro produto alterado; antes a lista ficava onde estava.
             pendingShowName = products.get(0);
         }
+        Analytics.track(this, "bulk_edit.applied", Analytics.props("kind", "quantity", "count", updated));
         updateList();
         revealPendingProduct();
         String resumo = (adjustment > 0 ? "+" : "") + CurrencyHelper.formatQuantity(adjustment)
@@ -1561,6 +1714,7 @@ public class MainActivity extends BaseActivity {
                 Log.e("MainActivity", "Error updating category for product: " + productName, e);
             }
         }
+        Analytics.track(this, "bulk_edit.applied", Analytics.props("kind", "category", "count", updated));
         
         updateList();
         Feedback.show(this, getString(R.string.bulk_edit_success, Texto.plural(updated, "produto", "produtos")));
@@ -1591,6 +1745,7 @@ public class MainActivity extends BaseActivity {
             }
         }
         
+        Analytics.track(this, "bulk_edit.applied", Analytics.props("kind", "supplier", "count", updated));
         updateList();
         Feedback.show(this, getString(R.string.bulk_edit_success, Texto.plural(updated, "produto", "produtos")));
     }

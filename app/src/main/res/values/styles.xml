@@ -162,6 +162,7 @@
 
     <style name="Widget.Estoque.Button.Secondary" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/bg_button_secondary</item>
+        <item name="backgroundTint">@null</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textSize">15sp</item>
@@ -191,6 +192,7 @@
 
     <style name="Widget.Estoque.Button.Destructive" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/bg_button_danger_outline</item>
+        <item name="backgroundTint">@null</item>
         <item name="android:textColor">@color/button_destructive_text</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textSize">15sp</item>

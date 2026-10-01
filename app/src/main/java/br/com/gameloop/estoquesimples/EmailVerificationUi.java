@@ -95,7 +95,19 @@ final class EmailVerificationUi {
                         return;
                     }
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
-                    Toast.makeText(activity, e.userMessage(), Toast.LENGTH_LONG).show();
+                    if (!ConnectivityPrompt.report(activity, e, () ->
+                            confirmar(activity, accounts, executor, main, dialog, codigo, onVerified))) {
+                        Toast.makeText(activity, e.userMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    if (activity.isFinishing()) {
+                        return;
+                    }
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                    Toast.makeText(activity, "Não foi possível falar com o servidor. Tente de novo.",
+                            Toast.LENGTH_LONG).show();
                 });
             }
         });
@@ -117,8 +129,19 @@ final class EmailVerificationUi {
                 });
             } catch (ApiException e) {
                 main.post(() -> {
-                    if (!activity.isFinishing()) {
+                    if (activity.isFinishing()) {
+                        return;
+                    }
+                    if (!ConnectivityPrompt.report(activity, e, () ->
+                            reenviar(activity, accounts, executor, main))) {
                         Toast.makeText(activity, e.userMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    if (!activity.isFinishing()) {
+                        Toast.makeText(activity, "Não foi possível falar com o servidor. Tente de novo.",
+                                Toast.LENGTH_LONG).show();
                     }
                 });
             }

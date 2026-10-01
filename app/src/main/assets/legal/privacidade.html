@@ -10,7 +10,7 @@
   <article class="wrap">
     <p class="kicker">Estoque Simples</p>
     <h1>Política de Privacidade</h1>
-    <p class="meta">Vigência: 8 de setembro de 2026. Elaborada à luz da Lei nº 13.709/2018 (LGPD).</p>
+    <p class="meta">Vigência: 1º de outubro de 2026. Elaborada à luz da Lei nº 13.709/2018 (LGPD).</p>
 
     <p class="notice">
       Esta Política descreve como o Estoque Simples trata dados pessoais no cadastro,
@@ -34,9 +34,13 @@
     <ul>
       <li><strong>Cadastro:</strong> nome, e-mail, senha armazenada de forma irreversível (hash), data de criação e status da conta;</li>
       <li><strong>Empresa e equipe:</strong> nome da empresa, papéis, convites, e-mails de membros e registros de participação;</li>
-      <li><strong>Estoque em nuvem:</strong> produtos, quantidades, valores, categorias, movimentações, conflitos de sincronização e, se enviadas, imagens vinculadas ao cadastro;</li>
+      <li><strong>Estoque em nuvem:</strong> produtos, quantidades, valores, categorias, movimentações e conflitos de sincronização. As fotos de produtos ficam apenas no aparelho e não são enviadas à nuvem;</li>
       <li><strong>Aparelho e sessão:</strong> identificador de instalação, modelo, versão do sistema e do aplicativo, protocolo de sincronização, tokens de sessão e de renovação;</li>
-      <li><strong>Assinatura:</strong> evidências de compra da Google Play (como token de compra) para validar o direito de uso da nuvem;</li>
+      <li><strong>Assinatura:</strong> evidências de compra da Google Play (como token de compra) para validar o plano da empresa (equipe, limites e recursos premium);</li>
+      <li><strong>Uso do plano:</strong> contagem de produtos na nuvem e de pessoas na empresa, para aplicar os limites de cada plano;</li>
+      <li><strong>Suporte:</strong> solicitações abertas no aplicativo, com modelo do aparelho, versão do Android e do aplicativo e estado da sincronização, para atendimento;</li>
+      <li><strong>Uso do aplicativo:</strong> eventos técnicos e de navegação (tela aberta, recurso usado), sem conteúdo do estoque, para melhorar o produto;</li>
+      <li><strong>Notificações:</strong> identificador do aparelho junto ao serviço de notificações (Firebase Cloud Messaging), para avisos do serviço e respostas do suporte;</li>
       <li><strong>Registros técnicos:</strong> endereço IP, data, rota acessada e identificadores de correlação, para segurança e diagnóstico.</li>
     </ul>
     <p>
@@ -49,8 +53,10 @@
     <p>Tratamos dados para:</p>
     <ul>
       <li>criar e autenticar a conta, verificar e-mail e prestar o serviço contratado (<strong>execução de contrato</strong>, art. 7º, V, da LGPD);</li>
-      <li>sincronizar estoque entre aparelhos da mesma empresa e gerenciar equipe (<strong>execução de contrato</strong>);</li>
-      <li>validar assinatura, prevenir fraude, abuso, incidentes e reutilização indevida de tokens (<strong>legítimo interesse</strong>, art. 7º, IX, e/ou execução de contrato);</li>
+      <li>sincronizar estoque entre aparelhos da mesma empresa, no plano gratuito ou na assinatura, e gerenciar equipe (<strong>execução de contrato</strong>);</li>
+      <li>validar assinatura e aplicar os limites do plano, prevenir fraude, abuso, incidentes e reutilização indevida de tokens (<strong>legítimo interesse</strong>, art. 7º, IX, e/ou execução de contrato);</li>
+      <li>atender solicitações de suporte e enviar avisos do serviço por notificação (<strong>execução de contrato</strong>);</li>
+      <li>medir o uso do aplicativo de forma agregada para melhorá-lo (<strong>legítimo interesse</strong>, art. 7º, IX);</li>
       <li>cumprir ordem legal, fiscal ou de autoridade (<strong>obrigação legal</strong>, art. 7º, II).</li>
     </ul>
     <p>
@@ -62,8 +68,12 @@
     <h2>4. Compartilhamento e operadores</h2>
     <p>
       Dados podem ser processados por operadores que nos prestam infraestrutura,
-      sempre no limite da finalidade: hospedagem da API, envio de e-mail e
-      Google Play (cobrança e instalação).
+      sempre no limite da finalidade: hospedagem da API e do banco de dados, envio
+      de e-mail, Google Play (cobrança e instalação), Firebase Cloud Messaging
+      (Google, entrega de notificações) e, no atendimento de suporte, um serviço
+      de inteligência artificial (OpenAI) que pode receber o texto da sua
+      solicitação para sugerir à equipe um rascunho de resposta — a resposta é
+      sempre revisada e enviada por uma pessoa.
     </p>
     <p>
       Membros que você convidar acessam os dados da empresa conforme o papel

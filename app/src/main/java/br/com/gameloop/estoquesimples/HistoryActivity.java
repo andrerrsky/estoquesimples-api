@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 
@@ -457,6 +459,7 @@ public class HistoryActivity extends BaseActivity {
                     if (MainActivity.instance != null) {
                         MainActivity.instance.markListDirty(true);
                     }
+                    Analytics.track(this, "movement.cancelled", Analytics.props("batch", true, "count", ok));
                     Feedback.show(this, "Ajuste em massa estornado em " + Texto.plural(ok, "produto", "produtos") + ".");
                     loadHistory();
                 })
@@ -518,6 +521,7 @@ public class HistoryActivity extends BaseActivity {
             Toast.makeText(this, result.message, Toast.LENGTH_LONG).show();
             return;
         }
+        Analytics.track(this, "movement.cancelled", Analytics.props("type", item.getType(), "batch", false));
 
         if (MainActivity.instance != null) {
             MainActivity.instance.markListDirty(true);

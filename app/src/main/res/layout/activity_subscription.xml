@@ -93,6 +93,16 @@
                 android:drawablePadding="@dimen/row_gap" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/freePlanSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:background="@drawable/bg_surface_muted"
+            android:padding="@dimen/group_padding_compact"
+            android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+            android:text="@string/subscription_free_summary" />
+
         <LinearLayout
             android:id="@+id/subscriptionPrice"
             android:layout_width="match_parent"

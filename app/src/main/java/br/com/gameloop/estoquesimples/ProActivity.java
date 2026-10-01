@@ -14,7 +14,7 @@ public class ProActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        SubscriptionActivity.open(this);
+        SubscriptionActivity.open(this, "pro_legacy");
         finish();
     }
 }

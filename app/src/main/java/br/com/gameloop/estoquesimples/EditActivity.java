@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
@@ -313,6 +315,7 @@ public class EditActivity extends BaseActivity {
             result -> {
                 if (result.getContents() != null) {
                     if (barcode != null) {
+                        Analytics.track(this, "barcode.scanned", Analytics.props("context", "edit"));
                         barcode.setText(result.getContents());
                         Toast.makeText(this, "Código de barras: " + result.getContents(), Toast.LENGTH_SHORT).show();
                     } else {
@@ -710,6 +713,7 @@ public class EditActivity extends BaseActivity {
             }
 
             if (saved) {
+                Analytics.track(this, "product.updated");
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
                     // Busca e filtro ficam; a lista rola até o produto editado.

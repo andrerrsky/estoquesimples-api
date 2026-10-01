@@ -5,12 +5,11 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Spinner;
 
 import androidx.appcompat.widget.SwitchCompat;
+
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 
 /**
  * Tela de configurações do aplicativo.
@@ -29,7 +28,7 @@ public class SettingsActivity extends BaseActivity {
     public static final String KEY_LOW_STOCK_ALERTS = "low_stock_alerts";
 
     private SwitchCompat switchShowImages;
-    private Spinner spinnerDefaultCurrency;
+    private MaterialAutoCompleteTextView spinnerDefaultCurrency;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,27 +68,21 @@ public class SettingsActivity extends BaseActivity {
             return;
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, CurrencyHelper.AVAILABLE_CURRENCIES);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                android.R.layout.simple_list_item_1, CurrencyHelper.AVAILABLE_CURRENCIES);
         spinnerDefaultCurrency.setAdapter(adapter);
+        spinnerDefaultCurrency.setText(CurrencyHelper.getCurrencySymbol(this), false);
 
-        String current = CurrencyHelper.getCurrencySymbol(this);
-        for (int i = 0; i < CurrencyHelper.AVAILABLE_CURRENCIES.length; i++) {
-            if (CurrencyHelper.AVAILABLE_CURRENCIES[i].equals(current)) {
-                spinnerDefaultCurrency.setSelection(i);
-                break;
+        spinnerDefaultCurrency.setOnItemClickListener((parent, view, position, id) -> {
+            Object item = parent.getItemAtPosition(position);
+            if (item != null) {
+                CurrencyHelper.setCurrencySymbol(SettingsActivity.this, item.toString());
             }
-        }
-
-        spinnerDefaultCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selected = CurrencyHelper.AVAILABLE_CURRENCIES[position];
-                CurrencyHelper.setCurrencySymbol(SettingsActivity.this, selected);
+        });
+        spinnerDefaultCurrency.setOnDismissListener(() -> {
+            String saved = CurrencyHelper.getCurrencySymbol(SettingsActivity.this);
+            if (!saved.contentEquals(spinnerDefaultCurrency.getText())) {
+                spinnerDefaultCurrency.setText(saved, false);
             }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 

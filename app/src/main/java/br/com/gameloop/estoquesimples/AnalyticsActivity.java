@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 
@@ -67,7 +69,9 @@ public class AnalyticsActivity extends BaseActivity {
         lockedLayout = findViewById(R.id.analyticsLockedLayout);
         
         // Verificar acesso premium
-        if (premiumManager.hasPremiumAccess()) {
+        boolean liberado = premiumManager.hasPremiumAccess();
+        Analytics.track(this, "analysis.viewed", Analytics.props("locked", !liberado));
+        if (liberado) {
             showContent();
         } else {
             showLockedScreen();
@@ -82,7 +86,7 @@ public class AnalyticsActivity extends BaseActivity {
         lockedLayout.setVisibility(View.VISIBLE);
 
         findViewById(R.id.btnGoProFromAnalytics).setOnClickListener(v ->
-                SubscriptionActivity.open(this));
+                SubscriptionActivity.open(this, "analysis"));
     }
     
     /**

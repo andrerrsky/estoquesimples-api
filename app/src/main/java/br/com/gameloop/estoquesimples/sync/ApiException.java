@@ -20,6 +20,8 @@ public class ApiException extends Exception {
     public static final String ASSINATURA_INATIVA = "SUBSCRIPTION_INACTIVE";
     /** Código atual da API; o anterior fica como alias por aparelhos antigos. */
     public static final String ASSINATURA_OBRIGATORIA = "SUBSCRIPTION_REQUIRED";
+    /** Teto do plano (produtos na nuvem, pessoas na empresa) atingido. */
+    public static final String LIMITE_PLANO = "PLAN_LIMIT_REACHED";
     /**
      * O ponto de leitura deste aparelho não vale mais e a nuvem precisa ser
      * relida do zero. O texto tem de ser exatamente o que o servidor manda: a
@@ -85,6 +87,17 @@ public class ApiException extends Exception {
             return true;
         }
         return statusCode == 408 || statusCode == 429 || statusCode >= 500;
+    }
+
+    /** Assinatura ou teto do plano impedem a ação; o app oferece o plano Equipe. */
+    public boolean isPlanBlocked() {
+        return ASSINATURA_OBRIGATORIA.equals(code) || ASSINATURA_INATIVA.equals(code)
+                || LIMITE_PLANO.equals(code);
+    }
+
+    /** Teto do plano atingido (produtos ou pessoas). */
+    public boolean isPlanLimit() {
+        return LIMITE_PLANO.equals(code);
     }
 
     /** O servidor mandou recarregar a nuvem inteira. */
@@ -155,8 +168,14 @@ public class ApiException extends Exception {
             return "Sua sessão expirou. Entre novamente para continuar sincronizando.";
         }
         if (statusCode == 403) {
-            if (ASSINATURA_INATIVA.equals(code) || ASSINATURA_OBRIGATORIA.equals(code)) {
-                return "A sincronização na nuvem exige assinatura. Os dados continuam no aparelho.";
+            if (ASSINATURA_INATIVA.equals(code) || ASSINATURA_OBRIGATORIA.equals(code)
+                    || LIMITE_PLANO.equals(code)) {
+                // O servidor explica o que falta (equipe, teto de produtos);
+                // a mensagem dele é mais precisa do que qualquer texto fixo.
+                String message = getMessage();
+                return message != null && !message.isEmpty()
+                        ? message
+                        : "Este recurso faz parte do plano Equipe. Os dados continuam no aparelho.";
             }
             if (isEmailUnverified()) {
                 String message = getMessage();

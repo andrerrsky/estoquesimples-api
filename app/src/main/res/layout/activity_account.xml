@@ -33,6 +33,7 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <!-- Conta -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -51,7 +52,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+                    android:textAppearance="@style/TextAppearance.Estoque.Body"
+                    android:textColor="@color/color_text" />
+
+                <TextView
+                    android:id="@+id/accountRole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textAppearance="@style/TextAppearance.Estoque.Caption" />
 
                 <Button
                     android:id="@+id/verifyEmailButton"
@@ -61,56 +70,197 @@
                     android:layout_marginTop="12dp"
                     android:visibility="gone"
                     android:text="Confirmar e-mail" />
+            </LinearLayout>
+
+            <!-- Nuvem -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:orientation="vertical"
+                android:background="@drawable/bg_surface"
+                android:padding="@dimen/group_padding">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Nuvem"
+                        android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+                    <TextView
+                        android:id="@+id/cloudBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingLeft="10dp"
+                        android:paddingRight="10dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:background="@drawable/bg_type_badge"
+                        android:textAppearance="@style/TextAppearance.Estoque.Caption"
+                        android:textColor="@color/color_text_on_brand"
+                        android:textStyle="bold"
+                        android:text="Ativa" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/accountSubscription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+
+                <TextView
+                    android:id="@+id/planUsage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textAppearance="@style/TextAppearance.Estoque.Label"
+                    android:visibility="gone" />
+
+                <ProgressBar
+                    android:id="@+id/planProgress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="6dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="@color/color_brand"
+                    android:progressBackgroundTint="@color/color_border"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Última sincronização"
+                            android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+
+                        <TextView
+                            android:id="@+id/accountLastSync"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="@color/color_text"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Aguardando envio"
+                            android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+
+                        <TextView
+                            android:id="@+id/accountPending"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="@color/color_text"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/syncStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/section_gap"
-                    android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+                    android:layout_marginTop="12dp"
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/syncNowButton"
+                    style="@style/Widget.Estoque.Button.Primary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="Sincronizar agora" />
+
+                <Button
+                    android:id="@+id/conflictsButton"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:visibility="gone"
+                    android:text="Resolver conflitos" />
             </LinearLayout>
 
-            <Button
-                android:id="@+id/syncNowButton"
-                style="@style/Widget.Estoque.Button.Primary"
+            <!-- Plano e equipe -->
+            <LinearLayout
+                android:id="@+id/planCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="Sincronizar agora" />
+                android:layout_marginTop="@dimen/section_gap"
+                android:orientation="vertical"
+                android:background="@drawable/bg_surface"
+                android:padding="@dimen/group_padding">
 
-            <Button
-                android:id="@+id/conflictsButton"
-                style="@style/Widget.Estoque.Button.Secondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/field_gap"
-                android:visibility="gone"
-                android:text="Resolver conflitos" />
+                <TextView
+                    android:id="@+id/planTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Plano gratuito"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section" />
 
-            <Button
-                android:id="@+id/teamButton"
-                style="@style/Widget.Estoque.Button.Secondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/field_gap"
-                android:visibility="gone"
-                android:text="Equipe" />
+                <TextView
+                    android:id="@+id/planDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
 
-            <Button
-                android:id="@+id/subscriptionButton"
-                style="@style/Widget.Estoque.Button.Secondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/field_gap"
-                android:visibility="gone"
-                android:text="Assinatura" />
+                <Button
+                    android:id="@+id/subscriptionButton"
+                    style="@style/Widget.Estoque.Button.Primary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="Conhecer o plano Equipe" />
+
+                <Button
+                    android:id="@+id/teamButton"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Equipe" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/diagnosticsButton"
                 style="@style/Widget.Estoque.Button.Secondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/field_gap"
+                android:layout_marginTop="@dimen/section_gap"
                 android:text="Verificar dados do aparelho" />
 
             <Button
@@ -139,7 +289,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Sincronizar na nuvem"
+                android:text="Seu estoque na nuvem, de graça"
                 android:textAppearance="@style/TextAppearance.Estoque.Title" />
 
             <TextView
@@ -148,7 +298,7 @@
                 android:layout_marginTop="6dp"
                 android:layout_marginBottom="20dp"
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting"
-                android:text="Crie uma conta para gerenciar a equipe. A sincronização na nuvem entre aparelhos exige assinatura. Sem ela, o app continua funcionando normalmente neste aparelho." />
+                android:text="Crie uma conta e seus produtos ficam guardados na nuvem: troque de aparelho ou use mais de um sem perder nada. Para trabalhar em equipe, existe o plano Equipe. Sem conta, o app continua funcionando normalmente neste aparelho." />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/nameLayout"
@@ -205,6 +355,14 @@
                 layout="@layout/password_rules"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
+
+            <CheckBox
+                android:id="@+id/rememberLogin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Lembrar meus dados"
+                android:textColor="@color/color_text" />
 
             <Button
                 android:id="@+id/primaryButton"

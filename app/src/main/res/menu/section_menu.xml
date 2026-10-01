@@ -11,7 +11,7 @@
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_account"
-        android:title="Conta e sincronização"
+        android:title="Conta e nuvem"
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_subscription"
@@ -20,6 +20,10 @@
     <item
         android:id="@+id/menu_settings"
         android:title="@string/settings_title"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_support"
+        android:title="Ajuda e suporte"
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_about"

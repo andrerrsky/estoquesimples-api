@@ -79,8 +79,8 @@ public final class SyncWorker extends Worker {
 
         if (!entitlements.canSync()) {
             recordStatus(context, entitlements.isStale()
-                    ? "Não foi possível confirmar a assinatura. Os dados seguem no aparelho."
-                    : "A sincronização na nuvem exige assinatura. Abra Assinatura para liberar. "
+                    ? "Não foi possível confirmar sua conta na nuvem. Os dados seguem no aparelho."
+                    : "A sincronização na nuvem não está disponível para esta empresa agora. "
                             + "Os dados seguem no aparelho.");
             return Result.success();
         }
@@ -134,6 +134,7 @@ public final class SyncWorker extends Worker {
         meta.put(SyncMeta.ULTIMA_SINCRONIZACAO, System.currentTimeMillis());
         meta.put(SyncMeta.DESVIO_RELOGIO, api.getClockSkewMs());
         meta.remove(SyncMeta.ULTIMO_ERRO);
+        meta.remove(SyncMeta.BLOQUEIO_PLANO);
 
         Log.i(TAG, "sincronização concluída: " + resultado.enviadas + " enviada(s), "
                 + resultado.recebidas + " recebida(s), " + resultado.conflitos + " conflito(s), "
@@ -159,6 +160,16 @@ public final class SyncWorker extends Worker {
         }
 
         recordStatus(context, e.userMessage());
+
+        // Teto do plano ou equipe sem assinatura: nada foi perdido, a fila
+        // espera. A tela inicial mostra o aviso com o caminho para o plano.
+        if (e.isPlanBlocked()) {
+            try {
+                new SyncMeta(LocalDb.open(context)).put(SyncMeta.BLOQUEIO_PLANO, e.userMessage());
+            } catch (Exception ignored) {
+                // sem o aviso na tela inicial a tela de conta ainda explica
+            }
+        }
 
         if (e.isTransient()) {
             // O WorkManager aplica o próprio backoff; devolver retry evita

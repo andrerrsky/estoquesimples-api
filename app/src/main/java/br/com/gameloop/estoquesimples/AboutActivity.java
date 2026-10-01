@@ -1,7 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
@@ -28,8 +27,8 @@ public class AboutActivity extends BaseActivity {
         Button btnGoPro = findViewById(R.id.btnGoPro);
         View cardLegal = findViewById(R.id.cardLegal);
 
-        btnContact.setOnClickListener(v -> openEmailApp());
-        btnGoPro.setOnClickListener(v -> SubscriptionActivity.open(this));
+        btnContact.setOnClickListener(v -> startActivity(new Intent(this, SupportActivity.class)));
+        btnGoPro.setOnClickListener(v -> SubscriptionActivity.open(this, "about"));
 
         if (cardLegal != null) {
             cardLegal.setOnClickListener(v -> LegalDocuments.open(this, LegalDocuments.PAGE_TERMOS));
@@ -57,26 +56,13 @@ public class AboutActivity extends BaseActivity {
 
         cardGoPro.setVisibility(View.VISIBLE);
         if (premiumManager.isPro()) {
-            title.setText("Sincronize na nuvem");
-            subtitle.setText("Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos.");
+            title.setText("Plano Equipe");
+            subtitle.setText("Você já tem os recursos premium e a nuvem é grátis com conta. O plano Equipe abre a empresa para sua equipe, sem limite de produtos.");
             cta.setText("Conhecer o plano");
         } else {
-            title.setText("Assinatura");
-            subtitle.setText("Sincronize na nuvem e desbloqueie a Análise Avançada de Estoque");
+            title.setText("Plano Equipe");
+            subtitle.setText("Sua equipe no mesmo estoque, produtos sem limite na nuvem e Análise Avançada de Estoque.");
             cta.setText("Conhecer o plano");
-        }
-    }
-
-    private void openEmailApp() {
-        Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
-        emailIntent.setData(Uri.parse("mailto:rrandsky@gmail.com"));
-        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Contato - Estoque Simples");
-        emailIntent.putExtra(Intent.EXTRA_TEXT, "Olá, gostaria de entrar em contato sobre o aplicativo Estoque Simples.");
-
-        try {
-            startActivity(Intent.createChooser(emailIntent, "Enviar email usando:"));
-        } catch (android.content.ActivityNotFoundException ex) {
-            // Caso não tenha aplicativo de email instalado
         }
     }
 

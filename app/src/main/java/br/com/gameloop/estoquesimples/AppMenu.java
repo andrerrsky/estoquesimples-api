@@ -23,10 +23,13 @@ public final class AppMenu {
             activity.startActivity(new Intent(activity, AccountActivity.class));
             return true;
         } else if (id == R.id.menu_subscription) {
-            SubscriptionActivity.open(activity);
+            SubscriptionActivity.open(activity, "menu");
             return true;
         } else if (id == R.id.menu_settings) {
             activity.startActivity(new Intent(activity, SettingsActivity.class));
+            return true;
+        } else if (id == R.id.menu_support) {
+            activity.startActivity(new Intent(activity, SupportActivity.class));
             return true;
         } else if (id == R.id.menu_about) {
             activity.startActivity(new Intent(activity, AboutActivity.class));

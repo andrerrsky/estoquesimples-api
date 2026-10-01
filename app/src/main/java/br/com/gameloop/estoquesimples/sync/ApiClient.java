@@ -33,6 +33,9 @@ public final class ApiClient {
 
     private static final int TIMEOUT_CONEXAO_MS = 15_000;
     private static final int TIMEOUT_LEITURA_MS = 30_000;
+    /** Uma repetição depois da primeira falha de rede, sem contar erro do servidor. */
+    private static final int TENTATIVAS = 2;
+    private static final int PAUSA_ENTRE_TENTATIVAS_MS = 800;
 
     private final String baseUrl;
     private final int protocolVersion;
@@ -106,8 +109,40 @@ public final class ApiClient {
                 TIMEOUT_LEITURA_MS);
     }
 
+    /**
+     * Duas tentativas só quando a chamada não chega a ter resposta HTTP.
+     *
+     * Senha errada, 401 e 403 já são uma resposta: repetir não muda o resultado
+     * e, num POST, poderia aplicar a operação duas vezes. A chave de
+     * idempotência, quando existe, é a mesma nas duas tentativas.
+     */
     private Response execute(String method, String path, JSONObject body,
                              String accessToken, String idempotencyKey, int readTimeoutMs)
+            throws ApiException {
+        ApiException ultima = null;
+        for (int tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+            try {
+                return executeOnce(method, path, body, accessToken, idempotencyKey, readTimeoutMs);
+            } catch (ApiException e) {
+                ultima = e;
+                boolean rede = ApiException.SEM_REDE.equals(e.getCode());
+                if (!rede || tentativa == TENTATIVAS) {
+                    throw e;
+                }
+                Log.i(TAG, method + " " + path + " sem resposta; nova tentativa");
+                try {
+                    Thread.sleep(PAUSA_ENTRE_TENTATIVAS_MS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+        throw ultima;
+    }
+
+    private Response executeOnce(String method, String path, JSONObject body,
+                                 String accessToken, String idempotencyKey, int readTimeoutMs)
             throws ApiException {
         HttpURLConnection connection = null;
         Thread watchdog = null;

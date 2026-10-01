@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -131,10 +132,20 @@
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="@dimen/field_gap" />
 
-            <Spinner
-                android:id="@+id/spinnerDefaultCurrency"
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                app:endIconMode="dropdown_menu">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/spinnerDefaultCurrency"
+                    style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:importantForAutofill="no" />
+            </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

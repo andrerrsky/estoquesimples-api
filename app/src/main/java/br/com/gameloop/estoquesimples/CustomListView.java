@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
@@ -592,6 +594,8 @@ public class CustomListView extends ArrayAdapter<String> {
                 return;
             }
 
+            Analytics.track(getContext(), "movement.created",
+                    Analytics.props("type", isEntrada ? MovementRepository.ENTRADA : MovementRepository.SAIDA));
             dialog.dismiss();
 
             // Atualizar lista

@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
@@ -281,6 +283,7 @@ public class AddActivity extends BaseActivity {
             result -> {
                 if (result.getContents() != null) {
                     if (productBarcode != null) {
+                        Analytics.track(this, "barcode.scanned", Analytics.props("context", "add"));
                         productBarcode.setText(result.getContents());
                         Toast.makeText(this, "Código de barras: " + result.getContents(), Toast.LENGTH_SHORT).show();
                     } else {
@@ -430,6 +433,9 @@ public class AddActivity extends BaseActivity {
             }
 
             if (newUuid != null) {
+                Analytics.track(this, "product.created", Analytics.props(
+                        "withPhoto", newPhotoPath != null,
+                        "withBarcode", productBarcode != null && productBarcode.getText().length() > 0));
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
                     MainActivity.instance.showProductAfterSave(productName.getText().toString().trim(), true);

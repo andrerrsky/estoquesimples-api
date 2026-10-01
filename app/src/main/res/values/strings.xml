@@ -16,19 +16,23 @@
     <string name="settings_section_currency">Moeda</string>
     <string name="settings_default_currency_title">Moeda padrão</string>
     <string name="settings_default_currency_summary">Usada automaticamente nas telas de criação e edição</string>
+
+    <string name="push_channel_id" translatable="false">estoque_push</string>
+    <string name="push_channel_name">Avisos</string>
+    <string name="push_channel_description">Mensagens enviadas pelo Estoque Simples</string>
     
     <!-- Assinatura (oferta atual) -->
     <string name="subscription_title">Assinatura</string>
-    <string name="subscription_hero_title">Sua equipe, seu estoque, sempre em sincronia</string>
-    <string name="subscription_hero_subtitle">Atualize o estoque de qualquer aparelho, dê acesso para sua equipe e enxergue pra onde seu negócio está indo com a Análise Avançada.</string>
-    <string name="subscription_hero_title_active">Assinatura ativa</string>
-    <string name="subscription_hero_subtitle_active">Seus dados podem sincronizar na nuvem. A Análise Avançada de Estoque está liberada.</string>
-    <string name="subscription_hero_title_legacy_pro">Falta pouco para destravar a nuvem</string>
-    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium. A assinatura adiciona sincronização entre aparelhos e acesso para sua equipe.</string>
-    <string name="subscription_benefits_title">O que você desbloqueia</string>
-    <string name="subscription_benefit_sync">Sincronize o estoque entre todos os seus aparelhos em segundos</string>
-    <string name="subscription_benefit_devices">Convide sua equipe e trabalhem juntos, em tempo real</string>
-    <string name="subscription_benefit_backup">Backup automático — seus dados sempre protegidos na nuvem</string>
+    <string name="subscription_hero_title">Sua equipe inteira no mesmo estoque</string>
+    <string name="subscription_hero_subtitle">A nuvem já é sua de graça. O plano Equipe abre a empresa para funcionários e sócios, tira o teto de produtos e liga a Análise Avançada.</string>
+    <string name="subscription_hero_title_active">Plano Equipe ativo</string>
+    <string name="subscription_hero_subtitle_active">Sua equipe pode trabalhar no mesmo estoque, sem teto de produtos. A Análise Avançada de Estoque está liberada.</string>
+    <string name="subscription_hero_title_legacy_pro">Falta pouco para trabalhar em equipe</string>
+    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium e a nuvem é grátis com conta. O plano Equipe adiciona acesso para sua equipe e produtos sem limite.</string>
+    <string name="subscription_benefits_title">O que o plano Equipe libera</string>
+    <string name="subscription_benefit_sync">Convide funcionários e sócios: todos no mesmo estoque, em tempo real</string>
+    <string name="subscription_benefit_devices">Papéis por pessoa: quem cadastra, quem movimenta, quem só consulta</string>
+    <string name="subscription_benefit_backup">Produtos sem limite na nuvem — o plano gratuito tem teto</string>
     <string name="subscription_benefit_premium">Análise Avançada de Estoque: enxergue tendências antes de faltar produto</string>
     <string name="subscription_cta">Assinar</string>
     <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
@@ -39,13 +43,14 @@
     <string name="subscription_manage">Gerenciar no Google Play</string>
     <string name="subscription_go_account">Entrar para assinar</string>
     <string name="subscription_retry">Tentar novamente</string>
-    <string name="subscription_legal">A cobrança é feita pela Google Play na conta Google deste aparelho. Cancelamento e forma de pagamento ficam no Google Play. Cancelar a assinatura não apaga os dados deste aparelho — só para de sincronizar.</string>
+    <string name="subscription_legal">A cobrança é feita pela Google Play na conta Google deste aparelho. Cancelamento e forma de pagamento ficam no Google Play. Cancelar a assinatura não apaga nada: a empresa volta ao plano gratuito, que continua sincronizando para o proprietário dentro do teto de produtos.</string>
     <string name="subscription_legacy_title">Já adquiriu a antiga Versão PRO?</string>
-    <string name="subscription_legacy_body">Essa compra não está mais à venda. Se você já a fez, recupere-a aqui para manter os recursos premium. A sincronização em nuvem continua exigindo assinatura.</string>
+    <string name="subscription_legacy_body">Essa compra não está mais à venda. Se você já a fez, recupere-a aqui para manter os recursos premium neste aparelho.</string>
     <string name="subscription_legacy_restore">Recuperar compra antiga</string>
-    <string name="subscription_legacy_active">Sua antiga Versão PRO está ativa neste aparelho. Os recursos premium permanecem. A sincronização em nuvem exige assinatura.</string>
+    <string name="subscription_legacy_active">Sua antiga Versão PRO está ativa neste aparelho. Os recursos premium permanecem; equipe e produtos sem limite são do plano Equipe.</string>
     <string name="subscription_legacy_recognized">Compra antiga reconhecida. Seus benefícios PRO foram restaurados neste aparelho.</string>
-    <string name="menu_subscription">Assinatura</string>
+    <string name="menu_subscription">Plano Equipe</string>
+    <string name="subscription_free_summary">No plano gratuito você já tem: seus dados na nuvem, em todos os seus aparelhos, com até 50 produtos. O plano Equipe tira o teto e abre a empresa para outras pessoas.</string>
 
     <!-- Restauração da compra única antiga (não é oferta de venda) -->
     <string name="pro_restoring">Verificando compras anteriores…</string>
@@ -61,9 +66,9 @@
     <!-- Analytics Feature (Premium) -->
     <string name="analytics_title">Análise de Estoque</string>
     <string name="analytics_description">Análises preditivas e insights sobre seu estoque</string>
-    <string name="analytics_locked">Recurso exclusivo da assinatura</string>
+    <string name="analytics_locked">Recurso do plano Equipe</string>
     <string name="analytics_locked_message">A Análise Avançada de Estoque oferece previsões de esgotamento, taxa de rotatividade, recomendações de reabastecimento e muito mais.</string>
-    <string name="analytics_unlock_cta">Desbloquear com assinatura</string>
+    <string name="analytics_unlock_cta">Conhecer o plano Equipe</string>
     <string name="analytics_no_data">Não há dados suficientes para gerar análises. Continue registrando entradas e saídas no histórico.</string>
     <string name="analytics_urgent_restock">Reabastecimento urgente</string>
     <string name="analytics_soon_restock">Reabastecer em breve</string>

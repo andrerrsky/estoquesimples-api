@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +18,14 @@ public abstract class BaseActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         EdgeToEdgeHelper.enable(this);
         super.onCreate(savedInstanceState);
+        EstoqueFirebaseMessagingService.ensureChannel(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Uma linha por tela: o nome da Activity é o identificador do evento.
+        Analytics.screen(this);
     }
 
     @Override

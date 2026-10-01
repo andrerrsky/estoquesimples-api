@@ -66,7 +66,8 @@ public class PremiumManager {
     /**
      * Acesso aos recursos premium (hoje, a Análise de Estoque).
      *
-     * Vale para a compra antiga e para a assinatura. Não libera sincronização.
+     * Vale para a compra antiga e para o plano Equipe. A sincronização em
+     * nuvem não depende disto: ela é do plano gratuito, para quem tem conta.
      */
     public boolean hasPremiumAccess() {
         return isPro() || hasCloudSubscription();
@@ -83,7 +84,7 @@ public class PremiumManager {
      */
     public boolean hasCloudSubscription() {
         try {
-            return new br.com.gameloop.estoquesimples.sync.EntitlementManager(appContext).canSync();
+            return new br.com.gameloop.estoquesimples.sync.EntitlementManager(appContext).isPaid();
         } catch (Exception e) {
             return false;
         }

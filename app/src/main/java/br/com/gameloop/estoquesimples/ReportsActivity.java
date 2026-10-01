@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
 
@@ -947,6 +949,10 @@ public class ReportsActivity extends BaseActivity {
                 }
 
                 if (finalFile != null) {
+                    Analytics.track(ReportsActivity.this, "report.generated", Analytics.props(
+                            "format", "pdf",
+                            "type", pendingReportType != null ? pendingReportType.name().toLowerCase() : null,
+                            "period", pendingPeriod != null ? pendingPeriod.name().toLowerCase() : null));
                     showPdfExportedDialog(finalFile);
                 } else {
                     Toast.makeText(ReportsActivity.this,

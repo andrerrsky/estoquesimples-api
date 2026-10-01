@@ -21,7 +21,17 @@ completo com a API fora do ar.
   `X-Sync-Protocol: 1`, `X-App-Version`, `Idempotency-Key`.
 - Sessão em `EncryptedSharedPreferences` (`sync/SessionManager.java`).
 - Billing: Play Billing 8, assinatura `assinatura` / base plan `plano-basico`
-  (`billing/PlayBilling.java`); produto legado `pro`.
+  (`billing/PlayBilling.java`), exibida como **plano Equipe**; produto legado
+  `pro` (Versão PRO antiga: só recursos premium no aparelho).
+- Planos (desde 1º/10/2026): a nuvem é **grátis com conta** — só o
+  proprietário sincroniza, até o teto de produtos (`limits.products`, hoje 50)
+  que a API informa em `GET /entitlement`. O plano Equipe libera equipe,
+  produtos sem teto e Análise Avançada. `EntitlementManager` separa
+  `canSync()` (nuvem), `isPaid()` (assinatura), `teamEnabled()`,
+  `productLimit()/productsUsed()`. `PLAN_LIMIT_REACHED` e
+  `SUBSCRIPTION_REQUIRED` (403) pausam a fila sem perder nada; o worker grava
+  `SyncMeta.BLOQUEIO_PLANO` e a tela inicial mostra o aviso com atalho ao
+  plano. Convidar na Equipe passa pelo `teamEnabled()` antes do servidor.
 
 ## Identidade visual (fonte: `res/values/colors.xml`, `dimens.xml`, `styles.xml`)
 
@@ -49,18 +59,45 @@ administrativo e a futura versão web usam estes mesmos tokens.
 1. Nunca apagar dado local por causa de resposta da API; desligar a sync só
    pausa o envio.
 2. Movimentação é imutável; erro se corrige com `cancelamento` compensatório.
-3. Direito de sincronizar vem de `GET /entitlement` e vale offline até
-   `offlineValidUntil`; o app não decide sozinho.
+3. Direito de sincronizar (e o teto de produtos) vem de `GET /entitlement` e
+   vale offline até `offlineValidUntil`; o app não decide sozinho.
 4. Códigos de erro da API são contrato (`error.code`); nunca decidir pelo
    texto da mensagem. `426` = atualizar o app; `SYNC_RESYNC_REQUIRED` =
    recarregar do servidor.
 
 ## Pendências combinadas com a API
 
-- **Analytics**: o app ainda não emite eventos de uso. O contrato e o
-  catálogo estão em `estoquesimples-api/docs/analytics.md`
-  (`POST /v1/analytics/events`, lote idempotente, sem dado pessoal). Sugestão:
-  outbox em `LocalDb` + `Worker` que envia em lote. O Firebase Analytics atual
-  não alimenta o painel.
-- **Push**: `EstoqueFirebaseMessagingService.onNewToken` é no-op; a API ainda
-  não guarda tokens.
+- **Analytics (implementado)**: pacote `analytics/` — `Analytics.track(context,
+  nome, props)` grava na fila local (`analytics.db`, separado do banco do
+  estoque para não ser sobrescrito por restauração/importação),
+  `AnalyticsWorker` envia lotes de até 200 para `POST /v1/analytics/events`
+  (com Bearer quando há sessão), `AnalyticsScheduler` agenda o envio (1 min
+  após o evento, e a cada 6 h). `BaseActivity.onResume` emite `screen.viewed`;
+  `MainActivity.onCreate` emite `app.opened`. Os demais pontos (produto,
+  movimentação, estorno, edição em massa, busca, filtro, relatório, análise,
+  importação/exportação, backup, paywall com `trigger`, compra, notificação)
+  estão anotados com `Analytics.track(...)` junto da ação. Catálogo e regras
+  de privacidade: `estoquesimples-api/docs/analytics.md`. O Firebase
+  Analytics continua só com os eventos automáticos; o painel lê estes.
+- **Push (implementado)**: pacote `push/` — `PushRegistrar.register(context)`
+  pede o token ao Firebase e envia a `PUT /v1/push/tokens` (chamado em
+  `MainActivity.onCreate`, em `onNewToken` e após login/cadastro em
+  `AccountService`); `PushEvents.report(context, campaignId, evento)` manda
+  `delivered`/`opened` a `POST /v1/push/events`. As campanhas do painel chegam
+  como mensagens só de dados (`type=campaign`, `campaignId`, `title`, `body`,
+  `screen?`, `url?`); `EstoqueFirebaseMessagingService` monta a notificação e
+  reporta a entrega; `MainActivity.handlePushIntent` reporta a abertura e
+  abre a tela/link pedidos (`pushScreenTarget`). Contrato em
+  `estoquesimples-api/docs/push.md`.
+- **Suporte pelo app (implementado)**: `SupportActivity` (lista, menu ⋮
+  "Ajuda e suporte" e botão "Falar com o suporte" na tela Sobre),
+  `SupportNewActivity` (categoria em chips, assunto, mensagem; nome/e-mail
+  opcionais só sem conta) e `SupportTicketActivity` (conversa, responder,
+  marcar como resolvida). `sync/SupportClient` fala com `/v1/support` com
+  ou sem Bearer, sempre com o `installId`, e envia `deviceInfo()` +
+  `diagnostics()` (lê SyncMeta/Outbox/Diagnostics — fora da main thread).
+  A resposta do painel chega como push `type=support` com `ticketId`:
+  `EstoqueFirebaseMessagingService` põe `EXTRA_TICKET_ID` no Intent e
+  `MainActivity.handlePushIntent` abre a conversa. Contrato em
+  `estoquesimples-api/docs/support.md`. O e-mail de contato não é mais
+  oferecido na tela Sobre.

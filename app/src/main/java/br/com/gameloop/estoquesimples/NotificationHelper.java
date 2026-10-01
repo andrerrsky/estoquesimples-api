@@ -58,6 +58,7 @@ public class NotificationHelper {
         // Intent para abrir o app quando clicar na notificação
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(MainActivity.EXTRA_FROM_LOW_STOCK_NOTIFICATION, true);
         
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context, 

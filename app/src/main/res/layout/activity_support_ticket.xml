@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <LinearLayout
+            android:id="@+id/headerCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact">
+
+            <TextView
+                android:id="@+id/subject"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:id="@+id/meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/messageView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textAppearance="@style/TextAppearance.Estoque.Error"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="24dp"
+            android:visibility="gone" />
+
+        <ListView
+            android:id="@+id/messageList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="@dimen/field_gap"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:transcriptMode="normal"
+            android:stackFromBottom="false"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/resolvedView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption"
+            android:text="Solicitação resolvida. Se precisar, escreva de novo que ela reabre."
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:orientation="horizontal"
+            android:gravity="bottom">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/replyLayout"
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Escreva sua mensagem">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/replyField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="5"
+                    android:maxLength="4000" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <Button
+                android:id="@+id/sendButton"
+                style="@style/Widget.Estoque.Button.Primary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/field_gap"
+                android:layout_marginBottom="6dp"
+                android:text="Enviar" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/resolveButton"
+            style="@style/Widget.Estoque.Button.Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Marcar como resolvida" />
+    </LinearLayout>
+</LinearLayout>

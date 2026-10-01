@@ -1,8 +1,8 @@
 package br.com.gameloop.estoquesimples.sync;
 
+import br.com.gameloop.estoquesimples.push.PushRegistrar;
 import android.content.Context;
 import android.os.Build;
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -22,12 +22,12 @@ import br.com.gameloop.estoquesimples.BuildConfig;
  */
 public final class AccountService {
 
-    private static final String TAG = "AccountService";
-
+    private final Context context;
     private final ApiClient api;
     private final SessionManager session;
 
     public AccountService(Context context) {
+        this.context = context.getApplicationContext();
         this.api = new ApiClient();
         this.session = SessionManager.get(context);
     }
@@ -59,6 +59,7 @@ public final class AccountService {
 
             ApiClient.Response response = api.post("/v1/auth/register", body, null);
             session.storeSession(response.body);
+            PushRegistrar.register(context);
         } catch (JSONException e) {
             throw new ApiException(0, "PAYLOAD_INVALIDO", "Não foi possível montar o pedido.", null);
         }
@@ -73,6 +74,7 @@ public final class AccountService {
 
             ApiClient.Response response = api.post("/v1/auth/login", body, null);
             session.storeSession(response.body);
+            PushRegistrar.register(context);
         } catch (JSONException e) {
             throw new ApiException(0, "PAYLOAD_INVALIDO", "Não foi possível montar o pedido.", null);
         }
@@ -148,22 +150,18 @@ public final class AccountService {
     }
 
     /**
-     * Encerra a sessão.
+     * Pede ao servidor para invalidar o refresh token.
      *
-     * A revogação no servidor é tentada, mas a saída local acontece de qualquer
-     * jeito: alguém sem internet que pede para sair precisa sair. O refresh
-     * token que sobra no servidor expira sozinho, e o usuário pode encerrar a
-     * sessão pela lista de dispositivos.
+     * Não descarta a sessão local. Sem resposta HTTP a exceção sobe para a tela
+     * decidir entre tentar de novo e sair mesmo assim.
      */
-    public void logout() {
-        try {
-            JSONObject body = new JSONObject();
-            api.post("/v1/auth/logout", body, session.accessToken());
-        } catch (Exception e) {
-            Log.w(TAG, "logout remoto não concluído: " + e.getMessage());
-        } finally {
-            session.signOutLocally();
-        }
+    public void revokeRemote() throws ApiException {
+        api.post("/v1/auth/logout", new JSONObject(), session.accessToken());
+    }
+
+    /** Encerra a sessão neste aparelho, sem falar com o servidor. */
+    public void logoutLocal() {
+        session.signOutLocally();
     }
 
     private JSONObject deviceInfo() throws JSONException {

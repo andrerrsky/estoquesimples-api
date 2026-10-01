@@ -79,13 +79,31 @@ public final class ConflictsActivity extends Activity {
             try {
                 List<ConflictsClient.Conflict> pendentes = client.pending();
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
                     mostrar(pendentes);
                 });
             } catch (ApiException e) {
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
-                    Toast.makeText(this, e.userMessage(), Toast.LENGTH_LONG).show();
+                    if (!ConnectivityPrompt.report(this, e, this::carregar)) {
+                        Toast.makeText(this, e.userMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("ConflictsActivity", "falha ao carregar conflitos", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    Toast.makeText(this, "Não foi possível falar com o servidor. Tente de novo.",
+                            Toast.LENGTH_LONG).show();
                 });
             }
         });
@@ -158,6 +176,9 @@ public final class ConflictsActivity extends Activity {
             try {
                 client.resolve(conflito.id, escolha);
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     Toast.makeText(this, "Decisão registrada.", Toast.LENGTH_SHORT).show();
                     // A lista é recarregada do servidor em vez de apenas
                     // remover o item: a decisão pode ter resolvido outros
@@ -166,8 +187,23 @@ public final class ConflictsActivity extends Activity {
                 });
             } catch (ApiException e) {
                 main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
                     setBusy(false);
-                    Toast.makeText(this, e.userMessage(), Toast.LENGTH_LONG).show();
+                    if (!ConnectivityPrompt.report(this, e, () -> resolver(conflito, escolha))) {
+                        Toast.makeText(this, e.userMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.e("ConflictsActivity", "falha ao resolver conflito", e);
+                main.post(() -> {
+                    if (isFinishing()) {
+                        return;
+                    }
+                    setBusy(false);
+                    Toast.makeText(this, "Não foi possível falar com o servidor. Tente de novo.",
+                            Toast.LENGTH_LONG).show();
                 });
             }
         });

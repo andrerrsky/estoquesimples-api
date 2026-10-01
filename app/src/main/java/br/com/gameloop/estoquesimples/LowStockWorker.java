@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
+
 import br.com.gameloop.estoquesimples.data.LocalDb;
 
 import android.content.Context;
@@ -49,6 +51,8 @@ public class LowStockWorker extends Worker {
                 }
                 
                 notificationHelper.showLowStockNotification(productNames.toString(), lowStockProducts.size());
+                Analytics.track(getApplicationContext(), "low_stock.notified",
+                        Analytics.props("count", lowStockProducts.size()));
             }
 
             return Result.success();
