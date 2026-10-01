@@ -13,7 +13,7 @@ interface NavItem {
   label: string;
   icon: IconName;
   minRole?: 'owner' | 'support' | 'viewer';
-  badge?: (alerts: number) => number | undefined;
+  badge?: (counts: { alerts: number; support: number }) => number | undefined;
 }
 
 const NAV: Array<{ section: string; items: NavItem[] }> = [
@@ -28,6 +28,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
   {
     section: 'Suporte',
     items: [
+      { to: '/suporte', label: 'Atendimento', icon: 'message', badge: (counts) => counts.support || undefined },
       { to: '/usuarios', label: 'Usuários', icon: 'users' },
       { to: '/empresas', label: 'Empresas', icon: 'building' },
       { to: '/assinaturas', label: 'Assinaturas', icon: 'card' },
@@ -39,7 +40,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
   {
     section: 'Plataforma',
     items: [
-      { to: '/operacao', label: 'Operação', icon: 'activity', badge: (alerts) => alerts || undefined },
+      { to: '/operacao', label: 'Operação', icon: 'activity', badge: (counts) => counts.alerts || undefined },
       { to: '/planos', label: 'Planos', icon: 'tag' },
       { to: '/administradores', label: 'Administradores', icon: 'shield', minRole: 'owner' },
     ],
@@ -63,6 +64,12 @@ export function Shell({ children }: { children: ReactNode }) {
     refetchInterval: 120_000,
   });
   const alerts = status.data?.alerts.length ?? 0;
+  const supportStats = useQuery({
+    queryKey: ['support', 'stats'],
+    queryFn: () => api.get<{ open: number }>('/support/stats'),
+    refetchInterval: 60_000,
+  });
+  const counts = { alerts, support: supportStats.data?.open ?? 0 };
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -101,7 +108,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="sidebar__section">{group.section}</div>
               <nav className="sidebar__nav">
                 {items.map((item) => {
-                  const badge = item.badge?.(alerts);
+                  const badge = item.badge?.(counts);
                   return (
                     <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `navlink ${isActive ? 'active' : ''}`}>
                       <Icon name={item.icon} />

@@ -1606,3 +1606,120 @@ code,
     margin-top: 8px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Atendimento: conversa de uma solicitação
+ * ------------------------------------------------------------------------- */
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.msg {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--border);
+  background: var(--surface-content, #fff);
+  font-size: var(--fs-supporting);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg--user {
+  align-self: flex-start;
+  background: var(--chip);
+  border-color: transparent;
+}
+.msg--admin {
+  align-self: flex-end;
+  background: var(--brand-soft);
+  border-color: transparent;
+}
+.msg--internal {
+  align-self: flex-end;
+  background: var(--warning-soft);
+  border-color: transparent;
+}
+.msg--system {
+  align-self: center;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--fs-caption, 12px);
+  text-align: center;
+  padding: 2px 0;
+}
+.msg__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: var(--fs-caption, 12px);
+  color: var(--text-muted);
+}
+.msg__foot {
+  margin-top: 6px;
+  font-size: var(--fs-caption, 12px);
+  color: var(--text-muted);
+}
+.ticket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-muted);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.ticket-row:hover {
+  background: var(--chip);
+}
+.ticket-row:last-child {
+  border-bottom: none;
+}
+.ticket-row__title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font-weight: 600;
+}
+.ticket-row__title .ticket-row__subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-row__unread {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex: none;
+}
+.ticket-row__sub {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: var(--fs-caption, 12px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.ticket-row__side {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-self: end;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .msg {
+    max-width: 100%;
+  }
+  .ticket-row__side {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

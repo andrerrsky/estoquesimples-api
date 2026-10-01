@@ -63,6 +63,12 @@ export const AdminAction = {
   PUSH_CAMPAIGN_DELETED: 'push.campaign_deleted',
   PUSH_TEST_SENT: 'push.test_sent',
 
+  SUPPORT_REPLIED: 'support.replied',
+  SUPPORT_NOTE_ADDED: 'support.note_added',
+  SUPPORT_STATUS_CHANGED: 'support.status_changed',
+  SUPPORT_TICKET_UPDATED: 'support.ticket_updated',
+  SUPPORT_DRAFT_GENERATED: 'support.draft_generated',
+
   DATA_EXPORTED: 'data.exported',
 } as const;
 
@@ -76,6 +82,7 @@ export const READ_ONLY_ADMIN_ACTIONS: ReadonlySet<AdminActionValue> = new Set([
   AdminAction.DATA_EXPORTED,
   AdminAction.REVIEW_DRAFT_GENERATED,
   AdminAction.REVIEWS_SYNCED,
+  AdminAction.SUPPORT_DRAFT_GENERATED,
 ]);
 
 export interface AdminActor {

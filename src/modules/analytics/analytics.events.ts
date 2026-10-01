@@ -66,6 +66,12 @@ export const AnalyticsEventName = {
   // Notificações
   LOW_STOCK_NOTIFIED: 'low_stock.notified',
   NOTIFICATION_OPENED: 'notification.opened',
+
+  // Suporte (emitidos pela API)
+  SUPPORT_TICKET_OPENED: 'support.ticket_opened',
+  SUPPORT_MESSAGE_SENT: 'support.message_sent',
+  SUPPORT_TICKET_RESOLVED: 'support.ticket_resolved',
+  SUPPORT_TICKET_SUBMITTED: 'support.ticket_submitted',
 } as const;
 
 export type AnalyticsEventNameValue = (typeof AnalyticsEventName)[keyof typeof AnalyticsEventName];
@@ -116,6 +122,10 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'subscription.state_changed', source: 'server', description: 'Estado da assinatura mudou.', properties: { from: 'estado', to: 'estado' } },
   { name: 'low_stock.notified', source: 'app', description: 'Notificação de estoque baixo exibida.', properties: { count: 'produtos' } },
   { name: 'notification.opened', source: 'app', description: 'Notificação tocada.' },
+  { name: 'support.ticket_opened', source: 'server', description: 'Solicitação de suporte aberta pelo app.', properties: { category: 'question | problem | suggestion | billing | account | other', signedIn: 'boolean' } },
+  { name: 'support.message_sent', source: 'server', description: 'Usuário escreveu numa solicitação já aberta.' },
+  { name: 'support.ticket_resolved', source: 'server', description: 'Solicitação encerrada.', properties: { by: 'user | admin' } },
+  { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },
 ];
 
 /** Formato aceito para nomes de evento (o mesmo CHECK do banco). */

@@ -32,3 +32,4 @@ export * from './admin.js';
 export * from './analytics.js';
 export * from './reviews.js';
 export * from './push.js';
+export * from './support.js';

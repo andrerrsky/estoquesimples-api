@@ -52,6 +52,9 @@ const PATHS: Record<string, string> = {
   play: 'M5 3l14 9-14 9V3z',
   pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
   layers: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  message: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z',
+  sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8L19 17z',
 };
 
 export type IconName = keyof typeof PATHS;

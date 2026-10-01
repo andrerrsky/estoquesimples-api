@@ -11,7 +11,7 @@ export interface EmailMessage {
   subject: string;
   text: string;
   /** Tipo lógico da mensagem, usado em logs e métricas. */
-  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert';
+  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert' | 'support_reply';
 }
 
 export interface Mailer {

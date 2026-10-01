@@ -27,6 +27,27 @@ Regras:
 - Não invente funcionalidades que o app não tem.
 - Máximo de {MAX} caracteres. Não use aspas, títulos, hashtags nem assinatura.`;
 
+export interface SupportDraftInput {
+  subject: string;
+  category: string;
+  userName: string | null;
+  signedIn: boolean;
+  device: string | null;
+  diagnostics: string | null;
+  transcript: Array<{ author: string; body: string }>;
+  instructions: string | null;
+  maxLength: number;
+}
+
+const SUPPORT_SYSTEM_PROMPT = `Você é da equipe de suporte do aplicativo Android "Estoque Simples" e escreve a próxima resposta numa solicitação aberta pelo app.
+O Estoque Simples é um app brasileiro de controle de estoque para pequenos negócios: cadastro de produtos com foto e código de barras, entradas e saídas, histórico, relatórios em PDF, importação/exportação por planilha, backup, e um plano pago (assinatura pelo Google Play) que liga a sincronização em nuvem e o uso em equipe com vários aparelhos. Sem assinatura os dados ficam só no aparelho.
+Regras:
+- Responda em português do Brasil, como uma pessoa do time: cordial, direta, sem formalidade excessiva e sem emojis. Trate a pessoa pelo nome se ele for informado.
+- Responda ao que foi perguntado. Se for um problema, use o diagnóstico (versão do app, Android, assinatura, sincronização, operações pendentes) para orientar passos concretos; se faltar informação, faça no máximo duas perguntas objetivas.
+- Nunca prometa prazos, recursos futuros, reembolsos ou descontos. Reembolsos de assinatura são feitos pelo Google Play.
+- Não invente funcionalidades que o app não tem. Não peça senha.
+- Texto corrido, sem títulos, listas numeradas longas, assinatura ou aspas. Máximo de {MAX} caracteres.`;
+
 export class OpenAiClient {
   constructor(
     private readonly apiKey: string,
@@ -96,6 +117,62 @@ export class OpenAiClient {
     }
     // Garantia final do limite do Google, mesmo que o modelo passe do ponto.
     return text.length > input.maxLength ? `${text.slice(0, input.maxLength - 1).trimEnd()}…` : text;
+  }
+
+  /**
+   * Rascunho de resposta a uma solicitação de suporte, a partir da conversa
+   * e do diagnóstico que o app mandou. Quem atende revisa antes de enviar.
+   */
+  async draftSupportReply(input: SupportDraftInput): Promise<string> {
+    const context = [
+      `Assunto: ${input.subject}`,
+      `Categoria: ${input.category}`,
+      input.userName ? `Nome da pessoa: ${input.userName}.` : 'A pessoa não informou o nome.',
+      input.signedIn ? 'A pessoa tem conta no app.' : 'A pessoa usa o app sem conta (dados só no aparelho).',
+      input.device ? `Aparelho: ${input.device}.` : null,
+      input.diagnostics ? `Diagnóstico enviado pelo app: ${input.diagnostics}` : null,
+      input.instructions ? `Orientação de quem vai responder: ${input.instructions}` : null,
+      '',
+      'Conversa até agora (mais antiga primeiro):',
+      ...input.transcript.map((entry) => `[${entry.author}] ${entry.body}`),
+    ]
+      .filter((line) => line !== null)
+      .join('\n');
+
+    const text = await this.complete(SUPPORT_SYSTEM_PROMPT.replace('{MAX}', String(input.maxLength)), context, 700);
+    return text.length > input.maxLength ? `${text.slice(0, input.maxLength - 1).trimEnd()}…` : text;
+  }
+
+  private async complete(system: string, user: string, maxTokens: number): Promise<string> {
+    const response = await this.fetchWithTimeout(API_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0.5,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    });
+
+    if (response.status === 401) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
+    }
+    if (response.status === 429) {
+      throw new AppError(429, ErrorCode.RATE_LIMITED, 'A OpenAI está limitando as chamadas. Tente em instantes.');
+    }
+    if (!response.ok) {
+      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}.`);
+    }
+    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = body.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!text) {
+      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'A OpenAI não devolveu texto.');
+    }
+    return text;
   }
 
   private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {

@@ -176,6 +176,7 @@ Servido pela própria API na mesma origem (SPA em `admin/`, build em
 | Operação | `ops/status`, `ops/sync` (owner), `ops/jobs`, `retry`, `cancel` | support |
 | Avaliações da Play Store | `reviews/stats`, `reviews`, `reviews/sync`, `reviews/:id/reply`, `reviews/:id/draft`, `settings/openai` (GET/PUT/DELETE) | support (chave da OpenAI: owner) |
 | Push (FCM) | `push/stats`, `push/screens`, `push/audience/preview`, `push/campaigns` (CRUD, `send`, `cancel`, `deliveries`), `push/test` | support |
+| Atendimento (suporte pelo app) | `support/stats`, `support/tickets` (lista, detalhe, `messages`, `status`, `PATCH`, `draft`) | support |
 
 Princípios do painel:
 
@@ -234,6 +235,19 @@ pelo FCM → entregue → aberta. O envio roda no job `push.send_campaign`
 monta a notificação (por isso entrega e abertura são mensuráveis). Tokens
 `UNREGISTERED`/`INVALID_ARGUMENT` são revogados. Detalhes para os clientes
 em [docs/push.md](docs/push.md).
+
+### Suporte pelo app (`src/modules/support/`)
+
+Substitui o "mande um e-mail" da tela Sobre. O app abre solicitações em
+`/v1/support/tickets` (auth opcional; sempre com `installId`), mandando
+`device` e `diagnostics`; o painel responde em `/admin/api/support`. Quem
+não tem conta é dono pelo `install_id`; ao ganhar Bearer, as solicitações
+anônimas da instalação passam para a conta (claim). Estados `open →
+answered → resolved`, e escrever reabre. Responder ou resolver manda push
+**só de dados** `type=support` (`SupportService.notifyUser`) para os tokens
+da instalação e da conta; sem aparelho, e-mail (`kind: support_reply`).
+Notas internas (`internal`) não notificam. Rascunho por IA reutiliza a
+chave da OpenAI das avaliações. Contrato em [docs/support.md](docs/support.md).
 
 ## 8. Analytics (eventos de uso)
 
@@ -326,9 +340,9 @@ Variáveis novas do painel/analytics: `ADMIN_PANEL_ENABLED`,
 
 - Não existe rotina que apague definitivamente contas em `pending_deletion`
   após os 30 dias prometidos na resposta de `DELETE /v1/me`.
-- O app Android ainda não emite eventos de analytics nem envia token de push;
-  o painel mostra só o que a API observa até isso existir (§8 e
-  `docs/analytics.md`).
+- A versão do app Android com analytics, push e suporte pelo app ainda não
+  foi publicada na Play Store; até lá o painel mostra só o que a API observa
+  e nenhuma solicitação de suporte real chega.
 - `trustProxy: false` no Fastify: atrás da borda do Railway, o rate limit por
   IP de rotas anônimas agrupa clientes; trocar por `trustProxy: '<cidr>'`
   quando o endereço da borda for conhecido.

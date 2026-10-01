@@ -226,7 +226,57 @@ async function main(): Promise<void> {
       }
     }
 
-    console.log(`seed concluído: ${users.length} usuários, ${workspaces.length} empresas, ${total} eventos de uso. Senha de todos: ${PASSWORD}`);
+    // Solicitações de suporte: algumas abertas, uma respondida, uma resolvida e uma sem conta.
+    const DEVICES = [
+      { model: 'Galaxy A54', manufacturer: 'samsung', osVersion: '14', sdkInt: 34, appVersionCode: 25, appVersionName: '25', locale: 'pt-BR', timezone: 'America/Sao_Paulo' },
+      { model: 'moto g54', manufacturer: 'motorola', osVersion: '13', sdkInt: 33, appVersionCode: 24, appVersionName: '24', locale: 'pt-BR', timezone: 'America/Sao_Paulo' },
+      { model: 'Redmi Note 12', manufacturer: 'Xiaomi', osVersion: '12', sdkInt: 31, appVersionCode: 25, appVersionName: '25', locale: 'pt-BR', timezone: 'America/Manaus' },
+    ];
+    const TICKETS: Array<{ user: number | null; category: string; subject: string; message: string; status: 'open' | 'answered' | 'resolved'; reply?: string; daysAgo: number; priority?: string }> = [
+      { user: 0, category: 'problem', subject: 'Relatório em PDF não abre', message: 'Quando toco em gerar o relatório completo o app fecha sozinho. Já reiniciei o celular.', status: 'open', daysAgo: 0, priority: 'high' },
+      { user: 2, category: 'billing', subject: 'Cobrança duplicada no cartão', message: 'Apareceram duas cobranças da assinatura este mês. Podem verificar?', status: 'open', daysAgo: 2 },
+      { user: 4, category: 'account', subject: 'Estoque não aparece no celular novo', message: 'Comprei outro aparelho, fiz login mas os produtos não baixaram.', status: 'answered', reply: 'Olá! Abra Conta e sincronização e toque em Sincronizar agora. Se continuar, me diga qual mensagem aparece na tela.', daysAgo: 1 },
+      { user: 6, category: 'question', subject: 'Como convido um funcionário?', message: 'Quero que meu sócio também lance as saídas.', status: 'resolved', reply: 'Em Conta e sincronização > Equipe, toque em Convidar e informe o e-mail dele. Ele recebe um convite e entra com o papel que você escolher.', daysAgo: 5 },
+      { user: null, category: 'suggestion', subject: 'Leitor de código de barras na saída', message: 'Seria ótimo bipar o produto direto na tela de saída.', status: 'open', daysAgo: 3 },
+    ];
+    // Reexecução: os usuários já existem (ON CONFLICT DO NOTHING), então os
+    // donos das solicitações vêm do banco.
+    const owners = users.length > 0
+      ? users
+      : (await db.execute<{ id: string; email: string; install_id: string }>(sql`
+          SELECT u.id, u.email, d.install_id FROM users u JOIN devices d ON d.user_id = u.id
+          WHERE u.email LIKE '%@exemplo.com.br' AND u.status = 'active' ORDER BY u.created_at LIMIT 20
+        `)).rows.map((row) => ({ id: row.id, email: row.email, installId: row.install_id }));
+    await db.execute(sql`DELETE FROM support_tickets WHERE install_id LIKE 'instalacao-anonima-%' OR user_id IN (SELECT id FROM users WHERE email LIKE '%@exemplo.com.br')`);
+    let ticketsCreated = 0;
+    for (const spec of TICKETS) {
+      const owner = spec.user === null ? null : owners[spec.user];
+      const createdAt = daysAgo(spec.daysAgo, 10);
+      const device = DEVICES[ticketsCreated % DEVICES.length];
+      const diagnostics = owner
+        ? { signedIn: true, workspaceName: 'Empresa de exemplo', role: 'proprietario', subscriptionState: spec.category === 'billing' ? 'ativa' : 'sem_assinatura', canSync: spec.category === 'billing', lastSyncAt: createdAt.getTime() - 3_600_000, pendingOperations: spec.category === 'account' ? 7 : 0, failedOperations: 0, products: 120 + ticketsCreated * 13, notificationsEnabled: true }
+        : { signedIn: false, products: 18, movements: 55, notificationsEnabled: true };
+      const inserted = await db.execute<{ id: string }>(sql`
+        INSERT INTO support_tickets (user_id, install_id, contact_email, category, subject, status, priority, device, diagnostics, app_version_code, message_count, last_message_at, last_message_by, first_response_at, resolved_at, resolved_by, created_at)
+        VALUES (${owner?.id ?? null}, ${owner?.installId ?? `instalacao-anonima-${ticketsCreated}`}, ${owner ? null : 'visitante@exemplo.com.br'}, ${spec.category}, ${spec.subject}, ${spec.status}, ${spec.priority ?? 'normal'},
+                ${JSON.stringify(device)}::jsonb, ${JSON.stringify(diagnostics)}::jsonb, ${device?.appVersionCode ?? null},
+                ${spec.reply ? (spec.status === 'resolved' ? 3 : 2) : 1}, ${spec.reply ? new Date(createdAt.getTime() + 7_200_000) : createdAt}, ${spec.reply ? (spec.status === 'resolved' ? 'system' : 'admin') : 'user'},
+                ${spec.reply ? new Date(createdAt.getTime() + 5_400_000) : null}, ${spec.status === 'resolved' ? new Date(createdAt.getTime() + 7_200_000) : null}, ${spec.status === 'resolved' ? 'admin' : null}, ${createdAt})
+        RETURNING id
+      `);
+      const ticketId = inserted.rows[0]?.id;
+      if (!ticketId) continue;
+      await db.execute(sql`INSERT INTO support_messages (ticket_id, author, body, created_at) VALUES (${ticketId}, 'user', ${spec.message}, ${createdAt})`);
+      if (spec.reply) {
+        await db.execute(sql`INSERT INTO support_messages (ticket_id, author, admin_name, body, notify_status, notify_detail, created_at) VALUES (${ticketId}, 'admin', 'André', ${spec.reply}, 'push', '1 aparelho(s)', ${new Date(createdAt.getTime() + 5_400_000)})`);
+      }
+      if (spec.status === 'resolved') {
+        await db.execute(sql`INSERT INTO support_messages (ticket_id, author, body, created_at) VALUES (${ticketId}, 'system', 'Solicitação marcada como resolvida pela equipe.', ${new Date(createdAt.getTime() + 7_200_000)})`);
+      }
+      ticketsCreated += 1;
+    }
+
+    console.log(`seed concluído: ${ticketsCreated} solicitações de suporte, ${users.length} usuários, ${workspaces.length} empresas, ${total} eventos de uso. Senha de todos: ${PASSWORD}`);
   } finally {
     await handle.close();
   }

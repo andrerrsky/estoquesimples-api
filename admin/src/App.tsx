@@ -13,6 +13,7 @@ import { PlansPage } from './pages/PlansPage';
 import { CampaignDetailPage, NotificationsPage } from './pages/NotificationsPage';
 import { ReviewsPage } from './pages/ReviewsPage';
 import { SubscriptionDetailPage } from './pages/SubscriptionDetailPage';
+import { SupportPage, TicketDetailPage } from './pages/SupportPage';
 import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
@@ -61,6 +62,8 @@ export const router = createBrowserRouter(
         { path: '/assinaturas', element: <SubscriptionsPage /> },
         { path: '/assinaturas/:subscriptionId', element: <SubscriptionDetailPage /> },
         { path: '/planos', element: <PlansPage /> },
+        { path: '/suporte', element: <SupportPage /> },
+        { path: '/suporte/:ticketId', element: <TicketDetailPage /> },
         { path: '/avaliacoes', element: <ReviewsPage /> },
         { path: '/notificacoes', element: <NotificationsPage /> },
         { path: '/notificacoes/:campaignId', element: <CampaignDetailPage /> },

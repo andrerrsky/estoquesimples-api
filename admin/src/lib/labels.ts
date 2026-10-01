@@ -174,6 +174,41 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'push.campaign_cancelled': { label: 'Campanha de push cancelada', tone: 'warning' },
   'push.campaign_deleted': { label: 'Campanha de push apagada', tone: 'neutral' },
   'push.test_sent': { label: 'Push de teste enviado', tone: 'neutral' },
+  'support.replied': { label: 'Resposta de suporte enviada', tone: 'info' },
+  'support.note_added': { label: 'Nota interna no atendimento', tone: 'neutral' },
+  'support.status_changed': { label: 'Estado da solicitação alterado', tone: 'info' },
+  'support.ticket_updated': { label: 'Solicitação reclassificada', tone: 'neutral' },
+  'support.draft_generated': { label: 'Rascunho de resposta de suporte gerado', tone: 'neutral' },
+};
+
+export const SUPPORT_STATUS: Record<string, { label: string; tone: Tone; hint: string }> = {
+  open: { label: 'Aguardando equipe', tone: 'warning', hint: 'O usuário escreveu e ninguém respondeu ainda.' },
+  answered: { label: 'Respondida', tone: 'info', hint: 'A equipe respondeu; aguardando o usuário.' },
+  resolved: { label: 'Resolvida', tone: 'success', hint: 'Encerrada pela equipe ou pelo usuário.' },
+};
+
+export const SUPPORT_CATEGORY: Record<string, string> = {
+  question: 'Dúvida',
+  problem: 'Problema',
+  suggestion: 'Sugestão',
+  billing: 'Assinatura e pagamento',
+  account: 'Conta e sincronização',
+  other: 'Outro',
+};
+
+export const SUPPORT_PRIORITY: Record<string, { label: string; tone: Tone }> = {
+  low: { label: 'Baixa', tone: 'neutral' },
+  normal: { label: 'Normal', tone: 'neutral' },
+  high: { label: 'Alta', tone: 'error' },
+};
+
+export const NOTIFY_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: 'avisando…', tone: 'neutral' },
+  push: { label: 'avisado por push', tone: 'success' },
+  email: { label: 'avisado por e-mail', tone: 'info' },
+  muted: { label: 'notificações desligadas', tone: 'warning' },
+  none: { label: 'sem como avisar', tone: 'warning' },
+  failed: { label: 'push falhou', tone: 'error' },
 };
 
 export function auditLabel(action: string): { label: string; tone: Tone } {
@@ -203,6 +238,7 @@ export const EVENT_DOMAIN_LABEL: Record<string, string> = {
   purchase: 'Compra',
   subscription: 'Assinatura',
   notification: 'Notificações',
+  support: 'Suporte',
 };
 
 export function eventDomain(name: string): string {

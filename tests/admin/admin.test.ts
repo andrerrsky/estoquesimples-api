@@ -477,7 +477,7 @@ describe('push notifications', () => {
     const { PushService } = await import('../../src/modules/push/push.service.js');
     const result = await new PushService(context.services).deliver(campaignId);
     expect(result).toEqual({ targeted: 2, accepted: 1, failed: 1 });
-    expect(context.fcm.sent[0]).toMatchObject({ token: 'token-alice-novo-xxxxxxxxxxxxx', message: { title: 'Novidade', screen: 'reports' } });
+    expect(context.fcm.sent[0]).toMatchObject({ token: 'token-alice-novo-xxxxxxxxxxxxx', message: { title: 'Novidade', data: { type: 'campaign', screen: 'reports' } } });
 
     const delivered = await context.app.inject({
       method: 'POST',
@@ -547,5 +547,163 @@ describe('push notifications', () => {
     expect(list.json().total).toBe(0);
     const withTests = await context.app.inject({ method: 'GET', url: '/admin/api/push/campaigns?includeTests=true', headers: { cookie } });
     expect(withTests.json().items[0]).toMatchObject({ isTest: true, status: 'sent' });
+  });
+});
+
+describe('suporte pelo app', () => {
+  const INSTALL = 'instalacao-suporte-0001';
+  const device = { model: 'Galaxy A54', manufacturer: 'samsung', osVersion: '14', sdkInt: 34, appVersionCode: 25, appVersionName: '25', locale: 'pt-BR' };
+
+  it('abre sem conta, recebe resposta por push, reabre ao escrever e passa a ser do usuário após login', async () => {
+    context.fcm.sent.length = 0;
+    await context.app.inject({
+      method: 'PUT',
+      url: '/v1/push/tokens',
+      payload: { token: 'token-suporte-anonimo-xxxxxxxxxx', installId: INSTALL, platform: 'android', notificationsEnabled: true },
+    });
+
+    const created = await context.app.inject({
+      method: 'POST',
+      url: '/v1/support/tickets',
+      payload: {
+        installId: INSTALL,
+        subject: 'Relatório em PDF não abre',
+        message: 'Quando toco em gerar o PDF o app fecha.',
+        category: 'problem',
+        contactEmail: 'cliente@exemplo.com.br',
+        device,
+        diagnostics: { signedIn: false, products: 42, pendingOperations: 0 },
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const ticket = created.json();
+    expect(ticket).toMatchObject({ status: 'open', category: 'problem', messageCount: 1, unread: false });
+    expect(ticket.number).toBeGreaterThanOrEqual(1001);
+
+    // Outra instalação não enxerga.
+    const foreign = await context.app.inject({ method: 'GET', url: `/v1/support/tickets/${ticket.id}?installId=outra-instalacao-9999` });
+    expect(foreign.statusCode).toBe(404);
+
+    const viewer = await createAdmin('viewer');
+    const viewerSession = await loginAdmin(viewer);
+    const forbidden = await context.app.inject({
+      method: 'POST',
+      url: `/admin/api/support/tickets/${ticket.id}/messages`,
+      headers: { cookie: viewerSession.cookie, ...CSRF },
+      payload: { body: 'oi' },
+    });
+    expect(forbidden.statusCode).toBe(403);
+
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+
+    const list = await context.app.inject({ method: 'GET', url: '/admin/api/support/tickets?status=open', headers: { cookie } });
+    expect(list.json().total).toBe(1);
+    expect(list.json().items[0]).toMatchObject({ number: ticket.number, unread: true, deviceSummary: 'samsung Galaxy A54 · Android 14 · app 25 (25)', userId: null, contactEmail: 'cliente@exemplo.com.br' });
+
+    const detail = await context.app.inject({ method: 'GET', url: `/admin/api/support/tickets/${ticket.id}`, headers: { cookie } });
+    expect(detail.json()).toMatchObject({ device: { model: 'Galaxy A54' }, diagnostics: { products: 42 }, reachableDevices: 1, user: null });
+    expect(detail.json().messages).toHaveLength(1);
+
+    const note = await context.app.inject({
+      method: 'POST',
+      url: `/admin/api/support/tickets/${ticket.id}/messages`,
+      headers: { cookie, ...CSRF },
+      payload: { body: 'Parece o bug do PDF na versão 25.', internal: true },
+    });
+    expect(note.statusCode).toBe(201);
+    expect(context.fcm.sent).toHaveLength(0);
+
+    const reply = await context.app.inject({
+      method: 'POST',
+      url: `/admin/api/support/tickets/${ticket.id}/messages`,
+      headers: { cookie, ...CSRF },
+      payload: { body: 'Olá! Atualize para a versão 26, que corrige o PDF.' },
+    });
+    expect(reply.statusCode).toBe(201);
+    expect(reply.json().ticket).toMatchObject({ status: 'answered', assignedToEmail: support });
+    expect(reply.json().message).toMatchObject({ notifyStatus: 'push', internal: false });
+    expect(context.fcm.sent).toHaveLength(1);
+    expect(context.fcm.sent[0]).toMatchObject({
+      token: 'token-suporte-anonimo-xxxxxxxxxx',
+      message: { title: `Resposta do suporte · #${ticket.number}`, data: { type: 'support', ticketId: ticket.id, event: 'reply' } },
+    });
+
+    // O app vê a resposta (sem a nota interna) e marca como lida.
+    const mine = await context.app.inject({ method: 'GET', url: `/v1/support/tickets?installId=${INSTALL}` });
+    expect(mine.json().tickets[0]).toMatchObject({ status: 'answered', unread: true });
+    const thread = await context.app.inject({ method: 'GET', url: `/v1/support/tickets/${ticket.id}?installId=${INSTALL}` });
+    expect(thread.json().messages.map((m: { author: string }) => m.author)).toEqual(['user', 'support']);
+    expect(thread.json().ticket.unread).toBe(false);
+
+    const again = await context.app.inject({
+      method: 'POST',
+      url: `/v1/support/tickets/${ticket.id}/messages`,
+      payload: { installId: INSTALL, message: 'Atualizei e funcionou, obrigado!' },
+    });
+    expect(again.statusCode).toBe(201);
+    expect(again.json().ticket.status).toBe('open');
+
+    const resolved = await context.app.inject({
+      method: 'POST',
+      url: `/admin/api/support/tickets/${ticket.id}/status`,
+      headers: { cookie, ...CSRF },
+      payload: { status: 'resolved', note: 'Resolvido com a atualização.' },
+    });
+    expect(resolved.statusCode).toBe(200);
+    expect(resolved.json()).toMatchObject({ status: 'resolved', resolvedBy: 'admin' });
+    expect(context.fcm.sent[1]?.message.data).toMatchObject({ type: 'support', event: 'resolved' });
+
+    // Cria conta no mesmo aparelho: a solicitação anônima passa a ser dela.
+    const user = await registerUser(context, { installId: INSTALL });
+    const owned = await context.app.inject({ method: 'GET', url: `/v1/support/tickets?installId=${INSTALL}`, headers: user.authHeader });
+    expect(owned.json().tickets).toHaveLength(1);
+    const afterClaim = await context.app.inject({ method: 'GET', url: `/admin/api/support/tickets/${ticket.id}`, headers: { cookie } });
+    expect(afterClaim.json().user).toMatchObject({ email: user.email });
+
+    const stats = await context.app.inject({ method: 'GET', url: '/admin/api/support/stats', headers: { cookie } });
+    expect(stats.json()).toMatchObject({ open: 0, answered: 0, resolved7d: 1, total: 1 });
+    expect(stats.json().avgFirstResponseMinutes).not.toBeNull();
+  });
+
+  it('sem aparelho registrado avisa por e-mail; usuário pode encerrar e prioridade é ajustável', async () => {
+    const user = await registerUser(context, { installId: 'instalacao-suporte-0002' });
+    const created = await context.app.inject({
+      method: 'POST',
+      url: '/v1/support/tickets',
+      headers: user.authHeader,
+      payload: { installId: 'instalacao-suporte-0002', subject: 'Como convido alguém?', message: 'Quero adicionar um funcionário.', category: 'question', device },
+    });
+    expect(created.statusCode).toBe(201);
+    const ticketId = created.json().id as string;
+
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+    const patched = await context.app.inject({
+      method: 'PATCH',
+      url: `/admin/api/support/tickets/${ticketId}`,
+      headers: { cookie, ...CSRF },
+      payload: { priority: 'high', assign: 'me' },
+    });
+    expect(patched.json()).toMatchObject({ priority: 'high', assignedToEmail: support });
+
+    const reply = await context.app.inject({
+      method: 'POST',
+      url: `/admin/api/support/tickets/${ticketId}/messages`,
+      headers: { cookie, ...CSRF },
+      payload: { body: 'Em Conta e sincronização > Equipe, toque em Convidar.' },
+    });
+    expect(reply.json().message.notifyStatus).toBe('email');
+    const mail = context.mailer.lastOfKind('support_reply');
+    expect(mail?.to).toBe(user.email);
+    expect(mail?.text).toContain('Convidar');
+
+    const done = await context.app.inject({ method: 'POST', url: `/v1/support/tickets/${ticketId}/resolve`, headers: user.authHeader, payload: { installId: 'instalacao-suporte-0002' } });
+    expect(done.json()).toMatchObject({ status: 'resolved' });
+
+    const filtered = await context.app.inject({ method: 'GET', url: '/admin/api/support/tickets?assigned=me&status=resolved', headers: { cookie } });
+    expect(filtered.json().total).toBe(1);
+    const search = await context.app.inject({ method: 'GET', url: `/admin/api/support/tickets?q=${encodeURIComponent('convido')}`, headers: { cookie } });
+    expect(search.json().total).toBe(1);
   });
 });

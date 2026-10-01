@@ -11,7 +11,18 @@ import { OpenAiClient } from './openai-client.js';
 /** Limite do Google para a resposta do desenvolvedor. */
 export const REPLY_MAX_LENGTH = 350;
 
-const SETTING_OPENAI_KEY = 'openai_api_key';
+export const SETTING_OPENAI_KEY = 'openai_api_key';
+
+/** Chave da OpenAI guardada pelo painel (cifrada), ou null se não há. */
+export async function readOpenAiKey(services: AppServices): Promise<string | null> {
+  const rows = await services.db
+    .select({ valueEnc: adminSettings.valueEnc })
+    .from(adminSettings)
+    .where(eq(adminSettings.key, SETTING_OPENAI_KEY))
+    .limit(1);
+  const row = rows[0];
+  return row ? services.purchaseTokens.decrypt(row.valueEnc) : null;
+}
 
 export interface ReviewListFilters extends PaginationQuery {
   status?: 'unanswered' | 'answered';

@@ -12,11 +12,14 @@ import { AppError, ErrorCode } from '../../platform/http/errors.js';
  * notificação a partir dos dados e reporta os dois eventos.
  */
 export interface PushMessage {
-  campaignId: string;
   title: string;
   body: string;
-  screen?: string | null;
-  url?: string | null;
+  /**
+   * Dados extras entregues ao app como strings. `type` diz como o app trata
+   * a mensagem (`campaign` abre uma tela/URL e mede abertura; `support`
+   * abre a solicitação de suporte). Nunca leva dado pessoal.
+   */
+  data: Record<string, string>;
 }
 
 export type FcmSendResult =
@@ -90,14 +93,7 @@ export class FirebaseFcmClient implements FcmClient {
 
   async send(token: string, message: PushMessage): Promise<FcmSendResult> {
     const accessToken = await this.getAccessToken();
-    const data: Record<string, string> = {
-      type: 'campaign',
-      campaignId: message.campaignId,
-      title: message.title,
-      body: message.body,
-    };
-    if (message.screen) data['screen'] = message.screen;
-    if (message.url) data['url'] = message.url;
+    const data: Record<string, string> = { ...message.data, title: message.title, body: message.body };
 
     const response = await fetch(
       `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.projectId ?? '')}/messages:send`,

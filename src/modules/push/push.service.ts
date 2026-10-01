@@ -503,7 +503,10 @@ export class PushService {
       .where(eq(pushCampaigns.id, campaignId));
 
     const action = campaign.action as { screen?: string | null; url?: string | null };
-    const message = { campaignId, title: campaign.title, body: campaign.body, screen: action.screen ?? null, url: action.url ?? null };
+    const data: Record<string, string> = { type: 'campaign', campaignId };
+    if (action.screen) data['screen'] = action.screen;
+    if (action.url) data['url'] = action.url;
+    const message = { title: campaign.title, body: campaign.body, data };
     const concurrency = this.services.env.PUSH_SEND_CONCURRENCY;
     let accepted = 0;
     let failed = 0;
