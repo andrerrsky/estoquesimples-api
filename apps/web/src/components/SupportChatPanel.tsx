@@ -175,11 +175,20 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
   const ticket = detail.data?.ticket ?? null;
   const answered = messages.some((message) => message.author === 'support');
 
-  // Sempre na última mensagem, como em qualquer chat.
-  const total = lines.length + messages.length + (typing ? 1 : 0) + (sending ? 1 : 0);
+  // Sempre na última mensagem, como em qualquer chat. Observa a própria
+  // lista em vez de contar mensagens: quando o "digitando" dá lugar à fala,
+  // ou o "enviando" à mensagem entregue, a quantidade não muda, mas a altura
+  // sim — e era aí que a última mensagem ficava escondida.
   useLayoutEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [total]);
+    const element = scroller.current;
+    if (!element) return;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const toEnd = (behavior: ScrollBehavior) => element.scrollTo({ top: element.scrollHeight, behavior });
+    toEnd('auto');
+    const observer = new MutationObserver(() => toEnd(calm ? 'auto' : 'smooth'));
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     input.current?.focus();
