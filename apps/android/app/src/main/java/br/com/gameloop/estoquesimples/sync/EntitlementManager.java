@@ -48,6 +48,7 @@ public final class EntitlementManager {
     private static final String CHAVE_FIM_PERIODO = "fim_periodo";
     private static final String CHAVE_CARENCIA_ATE = "carencia_ate";
     private static final String CHAVE_AUTO_RENOVANDO = "auto_renovando";
+    private static final String CHAVE_PROVEDOR = "provedor";
 
     /** Valor guardado quando o plano não limita. */
     public static final int SEM_LIMITE = -1;
@@ -149,6 +150,16 @@ public final class EntitlementManager {
         return prefs.getLong(CHAVE_CARENCIA_ATE, 0L);
     }
 
+    /**
+     * A assinatura em vigor foi contratada pela versão web (cobrada pelo
+     * Asaas), e não pela Google Play. Para o direito de uso não muda nada;
+     * só muda onde ela é gerenciada. APIs antigas não mandam o provedor: aí
+     * vale o comportamento de sempre (Google Play).
+     */
+    public boolean managedOnWeb() {
+        return isPaid() && "asaas".equals(prefs.getString(CHAVE_PROVEDOR, null));
+    }
+
     public boolean autoRenewing() {
         return prefs.getBoolean(CHAVE_AUTO_RENOVANDO, false);
     }
@@ -241,6 +252,8 @@ public final class EntitlementManager {
                 .putLong(CHAVE_FIM_PERIODO, parseIso(body.optString("currentPeriodEnd", null)))
                 .putLong(CHAVE_CARENCIA_ATE, parseIso(body.optString("graceUntil", null)))
                 .putBoolean(CHAVE_AUTO_RENOVANDO, body.optBoolean("autoRenewing", false))
+                // isNull antes: optString devolveria o texto "null".
+                .putString(CHAVE_PROVEDOR, body.isNull("provider") ? null : body.optString("provider", null))
                 .apply();
     }
 

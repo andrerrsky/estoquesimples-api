@@ -34,6 +34,7 @@
     <string name="subscription_price_label">Por apenas</string>
     <string name="subscription_restore">Restaurar assinatura</string>
     <string name="subscription_manage">Gerenciar no Google Play</string>
+    <string name="subscription_manage_web">Gerenciar em estoquesimples.com.br</string>
     <string name="subscription_go_account">Entrar para assinar</string>
     <string name="subscription_retry">Tentar novamente</string>
     <string name="subscription_legal">A cobrança é feita pela Google Play na conta Google deste aparelho. Cancelamento e forma de pagamento ficam no Google Play. Cancelar a assinatura não apaga nada: a empresa volta ao plano gratuito, que continua sincronizando para o proprietário dentro do teto de produtos.</string>

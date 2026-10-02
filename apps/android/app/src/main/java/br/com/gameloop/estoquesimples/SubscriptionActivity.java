@@ -62,6 +62,9 @@ public class SubscriptionActivity extends BaseActivity {
                     + "?sku=" + Constants.SUBSCRIPTION_PRODUCT_ID
                     + "&package=br.com.gameloop.estoquesimples";
 
+    /** Onde se gerencia a assinatura contratada pela versão web. */
+    private static final String WEB_MANAGE_URL = "https://estoquesimples.com.br/app/plano";
+
     /** Tempo para a loja reconectar antes de acusar falha na tela. */
     private static final long PLAY_CONNECT_TIMEOUT_MS = 12_000L;
 
@@ -176,7 +179,8 @@ public class SubscriptionActivity extends BaseActivity {
         subscribeButton.setOnClickListener(v -> initiateSubscribe());
         restoreButton.setOnClickListener(v -> restorePurchase());
         manageButton.setOnClickListener(v ->
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_MANAGE_URL))));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(
+                        entitlements.managedOnWeb() ? WEB_MANAGE_URL : PLAY_MANAGE_URL))));
         goAccountButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AccountActivity.class)));
         retryButton.setOnClickListener(v -> retry());
@@ -318,6 +322,11 @@ public class SubscriptionActivity extends BaseActivity {
 
         goAccountButton.setVisibility(View.GONE);
         manageButton.setVisibility(View.VISIBLE);
+        // Assinatura feita pela web não aparece na Google Play: o botão leva
+        // para onde ela de fato é gerenciada.
+        manageButton.setText(entitlements.managedOnWeb()
+                ? R.string.subscription_manage_web
+                : R.string.subscription_manage);
 
         if (!proprietario) {
             subscribeButton.setVisibility(View.GONE);
