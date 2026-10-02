@@ -59,7 +59,6 @@ export function AppShell() {
   useEffect(() => {
     trackScreen(location.pathname.split('/').slice(1, 3).join('/'));
     setMoreOpen(false);
-    window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
   useEffect(() => {

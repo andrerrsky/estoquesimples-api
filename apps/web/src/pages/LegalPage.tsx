@@ -33,7 +33,6 @@ export function LegalPage() {
 
   useEffect(() => {
     document.title = `${document_.title} · Estoque Simples`;
-    window.scrollTo({ top: 0 });
     return () => {
       document.title = 'Estoque Simples';
     };

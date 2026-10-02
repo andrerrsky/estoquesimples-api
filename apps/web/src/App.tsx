@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react';
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
@@ -64,6 +64,10 @@ function Root() {
   return (
     <>
       <Outlet />
+      {/* Tela nova começa no topo; voltar restaura onde a pessoa estava; link com
+          #âncora vai até ela. A chave é o caminho: mudar só a busca ou o filtro
+          na URL (lista de produtos, ajuda) não joga a página para o topo. */}
+      <ScrollRestoration getKey={(location) => location.pathname} />
       <SupportChat />
     </>
   );
