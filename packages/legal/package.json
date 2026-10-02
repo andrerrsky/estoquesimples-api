@@ -1,0 +1,16 @@
+{
+  "name": "@estoquesimples/legal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Termos de Uso e Política de Privacidade: fonte única, exibida pela aplicação web e copiada para os assets do app Android.",
+  "type": "module",
+  "files": ["termos.html", "privacidade.html", "style.css", "sync-android.mjs"],
+  "exports": {
+    "./termos.html": "./termos.html",
+    "./privacidade.html": "./privacidade.html"
+  },
+  "scripts": {
+    "sync": "node sync-android.mjs",
+    "check": "node sync-android.mjs --check"
+  }
+}

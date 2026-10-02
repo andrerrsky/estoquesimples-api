@@ -1,0 +1,336 @@
+/* ==========================================================================
+   Estoque Simples · telas de histórico, relatórios, análise, importação e
+   conflitos. Complementa app.css com o que só estas telas usam; cores, raios
+   e tipografia continuam vindo dos tokens. Sem sombras nem gradientes.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Histórico
+   -------------------------------------------------------------------------- */
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.date-range__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.date-range__field .input {
+  width: auto;
+  min-width: 0;
+}
+
+/* Movimentação estornada: continua na lista, mas deixa de "valer". */
+.is-reversed .movement {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.is-reversed .product-row__name,
+.is-reversed .list__title {
+  color: var(--text-muted);
+}
+
+.history-item {
+  align-items: flex-start;
+}
+.history-item .list__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Relatórios
+   -------------------------------------------------------------------------- */
+
+.stat-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.stat {
+  padding: 12px 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  min-width: 0;
+}
+.stat__label {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.stat__value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.stat__foot {
+  margin-top: 4px;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+
+/* Colunas por dia: uma escala só, duas séries lado a lado. */
+.daychart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 8px;
+}
+.daychart__y {
+  position: relative;
+  height: 180px;
+  min-width: 28px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.daychart__y span {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+.daychart__scroll {
+  overflow-x: auto;
+  padding-bottom: 24px;
+}
+.daychart__plot {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 180px;
+  /* Folga lateral para o rótulo do primeiro e do último dia não cortar. */
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.daychart__grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-muted);
+  pointer-events: none;
+}
+.daychart__group {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 14px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 1px;
+  cursor: default;
+}
+.daychart__group.active {
+  background: var(--brand-tint);
+}
+.daychart__bar {
+  position: relative;
+  flex: 1 1 0;
+  max-width: 12px;
+  border-radius: 4px 4px 0 0;
+  background: var(--series-1);
+}
+.daychart__bar--2 {
+  background: var(--series-2);
+}
+.daychart__tick {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.daychart__readout {
+  min-height: 20px;
+  font-size: var(--fs-label);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Linhas que só entram na versão impressa (lista completa de reposição). */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Análise
+   -------------------------------------------------------------------------- */
+
+.pitch {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 4px;
+}
+.pitch__head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.pitch__title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.pitch__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pitch__item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  font-size: var(--fs-supporting);
+}
+.pitch__item .feature__icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+}
+
+/* --------------------------------------------------------------------------
+   Importar e exportar
+   -------------------------------------------------------------------------- */
+
+.file-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.file-pick__name {
+  min-width: 0;
+  flex: 1 1 160px;
+  font-size: var(--fs-supporting);
+  overflow-wrap: anywhere;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-supporting);
+  color: var(--text-muted);
+}
+.steps strong {
+  color: var(--text);
+}
+
+.preview-table th,
+.preview-table td {
+  padding: 8px 10px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --------------------------------------------------------------------------
+   Conflitos
+   -------------------------------------------------------------------------- */
+
+.versions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.version {
+  padding: 12px 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  min-width: 0;
+}
+.version--current {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+  background: var(--brand-tint);
+}
+.version__label {
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.version__value {
+  margin-top: 4px;
+  font-size: var(--fs-section);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.version__foot {
+  margin-top: 4px;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .stat-trio,
+  .pitch__grid,
+  .versions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .date-range {
+    width: 100%;
+  }
+  .date-range__field {
+    flex: 1 1 140px;
+  }
+  .date-range__field .input {
+    flex: 1;
+    width: 100%;
+  }
+  .conflict-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media print {
+  /* O gráfico cabe inteiro no papel: sem rolagem lateral. */
+  .daychart__scroll {
+    overflow: visible;
+  }
+  .daychart__bar,
+  .hbar__fill,
+  .legend__dot {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

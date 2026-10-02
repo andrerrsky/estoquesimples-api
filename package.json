@@ -27,6 +27,8 @@
     "seed:dev": "npm run seed:dev --workspace @estoquesimples/api",
     "admin:create": "npm run admin:create --workspace @estoquesimples/api --",
     "keys:generate": "npm run keys:generate --workspace @estoquesimples/api",
-    "openapi": "npm run --silent openapi --workspace @estoquesimples/api"
+    "openapi": "npm run --silent openapi --workspace @estoquesimples/api",
+    "legal:sync": "npm run sync -w @estoquesimples/legal",
+    "legal:check": "npm run check -w @estoquesimples/legal"
   }
 }

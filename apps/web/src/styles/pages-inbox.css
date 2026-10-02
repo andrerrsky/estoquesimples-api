@@ -1,0 +1,264 @@
+/* ==========================================================================
+   Estoque Simples · notificações e suporte
+   Complementa app.css com o que só estas telas usam (a conversa em si usa
+   .thread/.msg, que já estão lá). Cores, raios e tipografia vêm dos tokens.
+   Sem sombras: o que não foi lido se destaca por cor e peso.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Caixa de notificações
+   -------------------------------------------------------------------------- */
+
+.inbox {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.inbox > li {
+  border-bottom: 1px solid var(--border-muted);
+}
+.inbox > li:last-child {
+  border-bottom: none;
+}
+
+/* A linha inteira é um botão: clicar marca como lida e leva ao destino. */
+.inbox__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px var(--card-padding);
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  transition: background var(--transition);
+}
+.inbox__item:hover {
+  background: var(--brand-tint);
+}
+/* O cartão corta o que passa da borda; o anel de foco fica por dentro. */
+.inbox__item:focus-visible,
+.ticket-row:focus-visible {
+  box-shadow: inset var(--focus-ring);
+}
+.inbox__item--unread {
+  background: color-mix(in srgb, var(--brand-soft) 45%, var(--surface-content));
+}
+
+.inbox__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--chip);
+  color: var(--text-muted);
+  flex: none;
+}
+.inbox__item--unread .inbox__icon {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.inbox__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.inbox__title {
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.inbox__item--unread .inbox__title {
+  font-weight: 700;
+}
+.inbox__body {
+  font-size: var(--fs-supporting);
+  color: var(--text-muted);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.inbox__item--unread .inbox__body {
+  color: var(--text);
+}
+.inbox__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  margin-top: 3px;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+
+/* "Suporte · Minha Empresa · há 4 minutos". O ponto vai colado no fim de cada
+   item (espaço não separável), para nunca abrir uma linha quando quebra. */
+.inbox__meta > *:not(:last-child)::after,
+.ticket-row__sub > *:not(:last-child)::after {
+  content: '\00a0·';
+}
+
+.inbox__side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  align-self: center;
+  color: var(--text-faint);
+}
+
+/* Marca de "não lida", a mesma na caixa e na lista de solicitações. */
+.unread-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex: none;
+}
+
+.inbox__more {
+  display: flex;
+  justify-content: center;
+  padding: 12px var(--card-padding);
+  border-top: 1px solid var(--border-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Suporte: lista de solicitações
+   -------------------------------------------------------------------------- */
+
+.ticket-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--card-padding);
+  border-bottom: 1px solid var(--border-muted);
+  color: inherit;
+  min-width: 0;
+}
+.ticket-row:last-child {
+  border-bottom: none;
+}
+.ticket-row:hover {
+  background: var(--brand-tint);
+  text-decoration: none;
+}
+.ticket-row__main {
+  flex: 1;
+  min-width: 0;
+}
+.ticket-row__subject {
+  display: block;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.ticket-row--unread .ticket-row__subject {
+  font-weight: 700;
+}
+.ticket-row__sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  margin-top: 2px;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.ticket-row__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: none;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+/* Reserva o lugar da marca para os assuntos ficarem alinhados. */
+.ticket-row__dot {
+  width: 9px;
+  flex: none;
+  display: flex;
+}
+
+/* --------------------------------------------------------------------------
+   Suporte: conversa
+   -------------------------------------------------------------------------- */
+
+.ticket-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  overflow-wrap: anywhere;
+}
+
+/* A conversa fica sobre o fundo da página, como num aplicativo de mensagens:
+   o balão da equipe (branco com borda) e o seu (azul claro) se distinguem. */
+.thread-panel {
+  padding: var(--card-padding);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.msg__time {
+  font-weight: 400;
+}
+
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.reply__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* Ponto de chegada da rolagem: fica acima da barra inferior do celular. */
+.thread-end {
+  height: 1px;
+  scroll-margin-bottom: calc(var(--bottomnav-height) + env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.char-count {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.char-count--near {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .ticket-row {
+    align-items: flex-start;
+  }
+  .ticket-row__dot {
+    margin-top: 6px;
+  }
+  .inbox__side .inbox__chevron {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Tela estreita: o estado e a data descem para baixo do assunto, alinhados
+     com ele (9px da marca + 12px do espaço). */
+  .ticket-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .ticket-row__side {
+    flex-basis: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding-left: 21px;
+  }
+}

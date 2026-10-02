@@ -1,0 +1,321 @@
+/* ==========================================================================
+   Equipe, plano, empresas e conta.
+   Complementa app.css com o que só estas telas usam. Mesmas regras: tokens
+   de @estoquesimples/design, sem sombra e sem gradiente; a hierarquia vem de
+   borda, fundo e peso.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Linhas de lista com etiquetas e ações (pessoa, convite, sessão, empresa).
+   No celular as etiquetas descem para uma segunda linha, alinhadas ao texto.
+   -------------------------------------------------------------------------- */
+
+.co-row {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.co-row .list__main {
+  flex: 1 1 160px;
+}
+.co-row__tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.co-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.co-row__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-control);
+  background: var(--chip);
+  color: var(--text-muted);
+  flex: none;
+}
+.co-row--current {
+  background: var(--brand-tint);
+}
+
+@media (max-width: 560px) {
+  .co-row__tags {
+    order: 3;
+    flex-basis: 100%;
+    padding-left: 50px;
+  }
+  .co-row__actions--wide {
+    order: 4;
+    flex-basis: 100%;
+    padding-left: 50px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Opções em cartão (papel, ciclo, forma de pagamento): um rádio com título
+   e explicação, para a pessoa decidir sem abrir outra tela.
+   -------------------------------------------------------------------------- */
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.option-list > legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.option-list--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.option-list--grid > legend {
+  grid-column: 1 / -1;
+}
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-content);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--transition), background var(--transition);
+}
+.option:hover {
+  border-color: var(--brand);
+}
+.option input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: var(--brand);
+}
+.option--selected {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+}
+.option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.option__title {
+  font-size: var(--fs-supporting);
+  font-weight: 600;
+}
+.option__sub {
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.option__note {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--success);
+}
+
+@media (max-width: 560px) {
+  .option-list--grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Lista simples de consequências dentro de um diálogo de confirmação. */
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--fs-supporting);
+}
+
+/* --------------------------------------------------------------------------
+   Equipe
+   -------------------------------------------------------------------------- */
+
+.upsell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.upsell__title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.upsell__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  font-size: var(--fs-supporting);
+}
+.upsell__roles dt {
+  font-weight: 600;
+}
+.upsell__roles dd {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}
+
+/* --------------------------------------------------------------------------
+   Plano
+   -------------------------------------------------------------------------- */
+
+.plan-current {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.plan-current__name {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.plan-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.plan-usage__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-supporting);
+}
+.plan-usage__row strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cobrança em aberto: o que a pessoa precisa fazer agora. */
+.pay-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px var(--card-padding);
+  border: 1.5px solid var(--brand);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+}
+.pay-panel--late {
+  border-color: var(--warning);
+}
+.pay-panel__value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.pay-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-card {
+  height: 100%;
+}
+.plan-card--featured {
+  border: 1.5px solid var(--brand);
+}
+.plan-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.plan-card__name {
+  font-size: var(--fs-section);
+  font-weight: 700;
+}
+.plan-card__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .upsell,
+  .plan-current {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pay-panel__actions {
+    width: 100%;
+  }
+  .pay-panel__actions .btn {
+    flex: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Empresas e conta
+   -------------------------------------------------------------------------- */
+
+.onboard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 4px;
+}
+.onboard__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.inline-form .field {
+  flex: 1 1 220px;
+}
+
+.card--danger {
+  border-color: color-mix(in srgb, var(--error) 35%, var(--border));
+}
+.card--danger .card__title {
+  color: var(--error);
+}
