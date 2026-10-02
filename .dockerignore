@@ -1,0 +1,16 @@
+# Contexto do build no Railway (Nixpacks): só o que o serviço precisa.
+# O app Android, a documentação e o CI moram no mesmo repositório, mas não
+# entram na imagem.
+.git
+.github
+node_modules
+**/node_modules
+**/dist
+apps/android
+docs
+*.md
+.env
+.env.*
+estoque-simples-*.json
+*service-account*.json
+.DS_Store

@@ -43,6 +43,11 @@ jobs:
 
       - run: npm ci
 
+      # Termos e Política têm uma fonte só (packages/legal); o app Android
+      # carrega uma cópia nos assets. Cópia defasada reprova o build.
+      - name: Documentos legais do app em dia
+        run: npm run legal:check
+
       - name: Verificação de tipos
         run: npm run typecheck
 

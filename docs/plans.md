@@ -45,3 +45,16 @@ gratuito (retenção), não baixar o teto de produtos.
   `equipe.membros`. Se a assinatura acabar, os membros ficam na empresa mas
   só o proprietário sincroniza (403 para os demais, com mensagem explicando).
 - Nada é apagado da nuvem nem do aparelho por limite ou por fim de assinatura.
+
+## Onde se assina
+
+| Canal | Provedor | Preço |
+| --- | --- | --- |
+| App Android | Google Play (produto `assinatura`, base plan `plano-basico`) | definido no Play Console |
+| Web (`/app/plano`) | Asaas — Pix, boleto ou cartão ([billing-asaas.md](billing-asaas.md)) | `plans.web_price_monthly_cents` / `web_price_yearly_cents`, editáveis no painel (Planos); vazio = não vendido na web |
+
+A assinatura é da empresa e vale nos dois clientes, qualquer que seja o
+canal. Na web valem os mesmos limites: o teto de produtos é conferido a cada
+cadastro ou importação (403 `PLAN_LIMIT_REACHED`) e, sem o recurso de equipe,
+só o proprietário usa o estoque na nuvem (os demais veem a explicação em vez
+do estoque).

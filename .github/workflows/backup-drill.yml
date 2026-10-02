@@ -53,6 +53,7 @@ jobs:
           sudo apt-get install -y postgresql-client-16
 
       - name: Schema e dados de exercício
+        working-directory: apps/api
         run: npx tsx src/platform/db/migrate.ts up && npx tsx scripts/seed-drill.ts
         env:
           DATABASE_URL: ${{ env.ORIGEM }}
@@ -64,7 +65,7 @@ jobs:
         run: psql "$ORIGEM" -c 'CREATE DATABASE estoquesimples_restaurado'
 
       - name: Restaurar e conferir
-        run: npm run backup:verify -- --dump backup.dump --target "$DESTINO"
+        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO"
 
       - name: Guardar o dump do exercício
         if: failure()

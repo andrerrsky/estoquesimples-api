@@ -1,4 +1,4 @@
-# AGENTS.md — contexto do Estoque Simples (API, painel e base da versão web)
+# AGENTS.md — contexto do Estoque Simples (monorepo: API, painel, web e app Android)
 
 Leia este arquivo inteiro antes de alterar qualquer coisa. Ele descreve o que
 o sistema é, por que foi construído assim e o que não pode ser quebrado. O
@@ -7,22 +7,43 @@ sintaxe; eles são parte do contexto.
 
 ## 1. O produto
 
-**Estoque Simples** é um aplicativo Android (`br.com.gameloop.estoquesimples`,
-Java + XML, Material 2) de controle de estoque para pequenos negócios. Ele é
-**offline-first**: tudo é gravado no SQLite do aparelho, e a nuvem é uma camada
-adicional para assinantes. A API pode estar fora do ar ou desligada e o app
-continua funcionando por completo.
+**Estoque Simples** é um controle de estoque para pequenos negócios, com dois
+clientes da mesma API:
 
-Repositórios:
+- o **aplicativo Android** (`br.com.gameloop.estoquesimples`, Java + XML,
+  Material 2), **offline-first**: tudo é gravado no SQLite do aparelho e a
+  nuvem é uma camada adicional para quem cria conta. A API pode estar fora do
+  ar ou desligada e o app continua funcionando por completo;
+- a **aplicação web** (https://estoquesimples.com.br), online, que trabalha
+  direto sobre os dados da nuvem com a mesma conta, empresas e permissões.
 
-| Repositório | O que é |
+Este repositório é um **monorepo** (npm workspaces; o app Android é um projeto
+Gradle à parte, sem ligação com o npm):
+
+| Pasta | O que é |
 | --- | --- |
-| `estoquesimples-api` (este) | API Fastify + Postgres no Railway, painel administrativo em `/admin`, contrato de analytics |
-| `estoquesimples/EstoqueSimples/Codigo/EstoqueSimples` | app Android; fala com `https://api.estoquesimples.com.br` (URL fixa em `app/build.gradle`) |
+| `apps/api` | API Fastify + Postgres; serve também o painel e a aplicação web |
+| `apps/admin` | interface do painel administrativo (`/admin`) |
+| `apps/web` | aplicação web dos clientes |
+| `apps/android` | app Android; fala com `https://api.estoquesimples.com.br` (URL fixa em `app/build.gradle`); tem o próprio [AGENTS.md](apps/android/AGENTS.md) |
+| `packages/design` | tokens visuais (derivados do app) usados por web e painel |
+| `packages/legal` | Termos e Política — fonte única; `npm run legal:sync` copia para os assets do app |
+| `docs/` | contratos e decisões por assunto |
 
-Produção: um serviço no Railway (Nixpacks, `npm run build` → `npm run start`,
-healthcheck `/ready`), Postgres do Railway, domínio já cadastrado. Staging é
-um projeto separado com banco separado.
+O que se compartilha e o que não: regras de negócio vivem **só** na API; web
+e Android são clientes; web e painel dividem apenas os tokens visuais (cada
+um tem seus componentes, porque são produtos com públicos diferentes); web e
+Android dividem os documentos legais. Não crie um pacote compartilhado antes
+de existir o segundo consumidor real.
+
+Produção: **um** serviço no Railway (Nixpacks, `npm run build` → `npm run
+start`, healthcheck `/ready`) + Postgres do Railway. O mesmo processo atende
+`api.estoquesimples.com.br` (API, painel, `/docs`) e, pelo cabeçalho `Host`,
+`estoquesimples.com.br` (aplicação web + `/v1` na mesma origem). Staging é um
+projeto separado com banco separado.
+
+Os caminhos citados abaixo como `src/...` e `tests/...` são relativos a
+`apps/api`; `admin/...` é `apps/admin/...`.
 
 ## 2. Arquitetura da API
 
@@ -98,9 +119,11 @@ workspace na transação). Consequências:
 | `roles` / `permissions` / `role_permissions` | RBAC como dados | papéis: proprietario(100) > administrador(80) > gerente(60) > operador(40) > consulta(20); cache por processo em `authorize.ts` |
 | `workspace_members` | participação | `status` active/suspended/removed; uma linha por (workspace, user), readmissão reativa |
 | `invites` | convite por e-mail com token `esinv_…` | um pendente por e-mail/empresa; aceite cria a conta se não existir |
-| `plans` / `plan_features` | planos e recursos como dados | `gratuito` (sem sync) e `basico` (produto Google `assinatura`, base plan `plano-basico`) |
-| `subscriptions` | assinatura **da empresa** | estados: pendente, ativa, carencia, suspensa, cancelada_mas_ativa, expirada, reembolsada, substituida; uma viva por empresa (índice parcial); purchase token só cifrado (AES-GCM) + hash |
-| `subscription_events` | notificações RTDN do Google | idempotentes por `notification_id`; nunca fonte de verdade — disparam consulta à Play Developer API |
+| `plans` / `plan_features` | planos e recursos como dados | `gratuito` (nuvem para o proprietário, com teto de produtos) e `basico` (exibido como "Equipe"; produto Google `assinatura`, base plan `plano-basico`); `web_price_monthly_cents`/`web_price_yearly_cents` = preço cobrado pela web (NULL = não vendido) |
+| `subscriptions` | assinatura **da empresa** | `provider` ∈ google_play/asaas; estados (iguais para os dois): pendente, ativa, carencia, suspensa, cancelada_mas_ativa, expirada, reembolsada, substituida; uma viva por empresa (índice parcial); purchase token do Google só cifrado (AES-GCM) + hash; colunas do Google são nulas nas do Asaas e vice-versa |
+| `subscription_events` | avisos dos provedores (RTDN do Google, webhooks do Asaas) | idempotentes por `notification_id` (`asaas:<id do evento>` no Asaas); nunca fonte de verdade — disparam consulta ao provedor |
+| `billing_customers` / `billing_payments` | pagador e cobranças da assinatura da web | espelho do Asaas para a área Plano e o painel; do documento só o tipo e os dígitos finais; tabelas de sistema (sem GRANT para `app_user`) |
+| `notifications` | caixa de entrada da conta (app e web) | uma linha por aviso; tabela de sistema, filtrada por `user_id` no serviço ([docs/notifications.md](docs/notifications.md)) |
 | `products` / `stock_movements` | estoque na nuvem | ids UUID gerados no aparelho; movimentações são fatos imutáveis com quantidade **com sinal**; cancelamento = movimento compensatório (`reverses_movement_id`); `quantity_cache` mantido por trigger (desligado na carga inicial); exclusão de produto é lógica (lápide) |
 | `sync_operations` / `sync_cursors` / `initial_uploads(_batches)` / `conflict_log` | infraestrutura de sync | idempotência de operação, posição de cada aparelho, sessão de carga inicial retomável, três lados de cada conflito |
 | `audit_log` | trilha dos clientes | `AuditAction` fechado em `modules/audit/audit.service.ts`; gravada na mesma transação da ação |
@@ -116,6 +139,16 @@ confirma no banco que a sessão está viva e que `permission_version` bate
 (`authenticate.ts`), o que torna revogação imediata. Login bloqueia
 progressivamente; e-mail inexistente gasta o mesmo tempo (argon2 dummy).
 Senha: argon2id (OWASP), política mínima de 10 caracteres.
+
+**Web (cookie só para o refresh)**: as rotas `/v1/auth/web/*`
+(`modules/auth/web-session.routes.ts`) fazem o mesmo login do app, mas
+entregam o refresh token num cookie `httpOnly`, `SameSite=Strict`,
+`Path=/v1/auth/web` (`WEB_SESSION_COOKIE_NAME`), e o access token no corpo — a
+web o mantém só em memória e chama o resto da API com Bearer. Essas rotas
+exigem `x-requested-with: estoquesimples-web` + `Sec-Fetch-Site` (anti-CSRF).
+Reuso do refresh dentro de 20 s (duas abas) responde 409
+`AUTH_REFRESH_IN_PROGRESS` em vez de derrubar a sessão. O dispositivo é
+gravado com `platform: 'web'`, que é como o painel distingue a origem.
 
 **Empresa**: `requireWorkspace(permissao)` resolve a participação e as
 permissões; o `workspaceId` da URL nunca vale por si só. Regras estruturais:
@@ -141,8 +174,9 @@ sem o token configurado respondem 404.
    (`app_config.sync` ou `FEATURE_SYNC_ENABLED`) só pausa o envio.
 2. Assinatura é da empresa; o dono paga e todos os membros sincronizam.
    Direito de acesso (`ENTITLED_STATES` = ativa, carencia, cancelada_mas_ativa)
-   é sempre decidido no servidor a partir do que o Google diz. O app guarda o
-   retrato por `ENTITLEMENT_OFFLINE_MAX_DAYS`.
+   é sempre decidido no servidor a partir do que o provedor diz (Google Play
+   no app, Asaas na web) — nunca a partir do que o cliente ou um webhook
+   afirma. O app guarda o retrato por `ENTITLEMENT_OFFLINE_MAX_DAYS`.
 3. `SUBSCRIPTION_STATE_CANCELED` do Google significa "renovação desligada",
    não "sem acesso" (→ `cancelada_mas_ativa`). `REVOKED` tira acesso na hora.
 4. Um purchase token destrava uma empresa só. Compras não confirmadas
@@ -157,6 +191,18 @@ sem o token configurado respondem 404.
 7. Auditoria é gravada na mesma transação da ação (`recordAudit`); eventos
    fora do caminho crítico usam `recordAuditSafe`.
 8. Nomes duplicados de produto são barrados no banco, não no app.
+9. **O saldo é a soma das movimentações.** Produto criado por `push` nasce
+   com saldo zero e a movimentação de `cadastro`/`importacao` forma o saldo
+   (migration 0014); o `pull` devolve o saldo do produto descontando as
+   movimentações que o aparelho ainda vai receber. Nunca grave quantidade
+   direto no produto.
+10. A web grava estoque **pelo mesmo motor da sincronização**
+    (`modules/inventory` monta operações e chama `SyncService.push`): mesmas
+    permissões, limites de plano, mescla e conflitos. Não existe CRUD de
+    estoque por fora do motor.
+11. Permissão e plano nunca são confiados ao cliente: toda rota confere
+    participação, papel e plano no servidor (`requireWorkspace`,
+    `assertCloudAccess`), e o front só esconde o que a API recusaria.
 
 ## 7. Painel administrativo (`/admin`)
 
@@ -168,10 +214,10 @@ Servido pela própria API na mesma origem (SPA em `admin/`, build em
 | --- | --- | --- |
 | Sessão e administradores | `auth/*`, `admins/*` | owner |
 | Visão geral | `overview` | — |
-| Usuários | `users`, `users/:id`, `timeline`, `events`, `notes`, ações (`suspend`, `reactivate`, `unlock`, `verify-email`, `revoke-sessions`, `send-password-reset`, `cancel-deletion`, `devices/:id/revoke`, `PATCH`) | support |
+| Usuários | `users` (filtro `platform`), `users/:id`, `timeline`, `events`, `notes`, `notifications`, ações (`suspend`, `reactivate`, `unlock`, `verify-email`, `revoke-sessions`, `send-password-reset`, `cancel-deletion`, `devices/:id/revoke`, `PATCH`) | support |
 | Empresas | `workspaces`, detalhe, `products`, `movements`, `conflicts`, `timeline`, `notes`, ações (`PATCH`, `delete`, `restore`, `transfer-ownership`, membros, convites) | support |
-| Assinaturas | `billing/stats`, `subscriptions`, detalhe, `refresh`, `events`, `events/:id/retry`, `plans` | support (planos: owner) |
-| Analytics | `analytics/summary`, `metrics`, `events`, `event-names`, `events/:name/series`, `funnel`, `retention` | — |
+| Assinaturas | `billing/stats` (com `byProvider`), `subscriptions` (filtro `provider`), detalhe (bloco `asaas`: pagador, cobranças), `refresh`, `events`, `events/:id/retry`, `plans` (inclui preço da web) | support (planos e preços: owner) |
+| Analytics | `analytics/summary`, `metrics`, `events`, `event-names`, `events/:name/series`, `funnel`, `retention` — com `platform` (android/web) opcional e quebra `byPlatform` | — |
 | Auditoria | `audit/users`, `audit/admins`, `audit/actions` | — |
 | Operação | `ops/status`, `ops/sync` (owner), `ops/jobs`, `retry`, `cancel` | support |
 | Avaliações da Play Store | `reviews/stats`, `reviews`, `reviews/sync`, `reviews/:id/reply`, `reviews/:id/draft`, `settings/openai` (GET/PUT/DELETE) | support (chave da OpenAI: owner) |
@@ -190,7 +236,17 @@ Princípios do painel:
 - Exclusão de empresa é lógica e reversível; não existe purga. Ações
   destrutivas na interface pedem palavra de confirmação (`ConfirmDialog`).
 - O purchase token nunca é exposto (nem cifrado, nem hash). "Forçar" estado de
-  assinatura = reconsultar o Google (`BillingService.refreshWorkspaceSubscription`).
+  assinatura = reconsultar o provedor dela, Google ou Asaas
+  (`BillingService.refreshWorkspaceSubscription`).
+- **Android e web nas mesmas telas**: a origem aparece como selo e filtro, não
+  como telas separadas. Usuário → plataformas dos aparelhos
+  (`devices.platform`); assinatura → `provider`; evento de uso → plataforma do
+  evento; solicitação de suporte → plataforma do `device`. Métrica sem
+  dimensão de plataforma mantém o total e avisa (`platformNote`).
+- Da assinatura da web o painel mostra pagador (nome, e-mail, tipo e final do
+  documento), cobranças e eventos — nunca documento inteiro nem dado de
+  cartão (o backend não guarda: `scrubAsaasObject`). O preço da web é editado
+  em Planos (owner, com motivo, auditado como `plan.updated`).
 - Primeiro admin: `ADMIN_BOOTSTRAP_EMAIL/PASSWORD` no boot (idempotente) ou
   `npm run admin:create`. Não há cadastro público.
 - Listagens: `paginationQuerySchema` (`page`, `pageSize` ≤ 200), envelope
@@ -320,7 +376,7 @@ acrescentar uma entrada com `key`, `label` e a consulta.
 
 ## 10. Como estender
 
-- **Nova rota do app**: schema Zod → serviço → rota com `preHandler:
+- **Nova rota do app ou da web**: schema Zod → serviço → rota com `preHandler:
   [app.authenticate, requireWorkspace('permissao')]` → auditoria se muda
   estado → (opcional) `trackServerEvent` fora da transação → teste em
   `tests/<modulo>/`.
@@ -337,34 +393,68 @@ acrescentar uma entrada com `key`, `label` e a consulta.
   API conhecer o nome.
 - **Nova métrica**: entrada em `METRICS` (`admin-analytics.service.ts`).
 
-## 11. Base para a versão web do Estoque Simples
+## 11. Aplicação web e pagamento pela web
 
-A API já foi desenhada para mais de um cliente: `devices.platform` aceita
-`web`, o JWT tem `aud` fixo por produto, `CORS_ORIGINS` existe para liberar
-origens de navegador, o contrato de sync é o mesmo para qualquer cliente
-(`docs/`), e o painel prova que um front React consegue viver ao lado da API.
-O roteiro e as decisões já tomadas para a versão web estão em
-[docs/web-app.md](docs/web-app.md). Resumo do que **não** fazer: não
-duplicar regras de negócio no front (direitos, permissões e estados vêm da
-API); não criar uma segunda API; não reutilizar o cookie do painel para
-clientes finais (o app web usa Bearer + refresh, como o Android).
+Detalhes em [docs/web-app.md](docs/web-app.md) e
+[docs/billing-asaas.md](docs/billing-asaas.md). O essencial:
+
+- **Servida pela API, por Host** (`platform/http/web-app.ts`,
+  `WEB_APP_HOSTS`): nos hosts da web só existem `/v1`, `/health`, `/ready` e
+  os arquivos de `apps/web/dist` (com fallback para o `index.html`); `www.`
+  redireciona para o domínio principal. Mesma origem ⇒ sem CORS e sem o
+  prefixo `api.` no navegador. `registerWebApp` precisa ser registrado antes
+  de qualquer rota.
+- **Estoque** (`modules/inventory`): leitura paginada + escrita que vira
+  operações do `SyncService.push` (regra 10). Guarda de plano compartilhada
+  com a sincronização em `modules/billing/cloud-access.ts`.
+- **Asaas** (`modules/billing/asaas`): assinatura recorrente criada pelo
+  backend, paga na fatura hospedada do Asaas; estado derivado por função pura
+  (`asaas-state.ts`) do que o Asaas informa agora; webhook autenticado por
+  token, idempotente e sempre 200; reconciliação por job
+  (`billing.asaas_reconcile`). Chave e token só em variável de ambiente.
+- **Notificações** (`modules/notifications`): caixa de entrada única para app
+  e web + push opcional; novos tipos entram em `NotificationType`.
+- **Front** (`apps/web`): Vite + React 19 + React Router 7 + TanStack Query,
+  sem biblioteca de UI; tokens de `packages/design`; sessão em
+  `src/api/client.ts`; uma tela por arquivo em `src/pages`, carregadas sob
+  demanda. Rótulos em `src/lib/labels.ts`, contratos em `src/api/types.ts`
+  (espelham os schemas da API: mudou lá, muda aqui).
+
+Como estender a web: rota nova na API (seção 10) → contrato em
+`apps/web/src/api/types.ts` → tela em `apps/web/src/pages` + rota em
+`App.tsx` + item no `AppShell` se for navegação. Nada de regra no front.
 
 ## 12. Operação
 
 Deploy, alertas, backups, lançamento gradual e rollback: [DEPLOY.md](DEPLOY.md).
-Variáveis novas do painel/analytics: `ADMIN_PANEL_ENABLED`,
+Web e pagamento: `WEB_APP_HOSTS`, `WEB_APP_URL`, `WEB_SESSION_COOKIE_NAME`,
+`ASAAS_API_KEY`, `ASAAS_ENVIRONMENT`, `ASAAS_WEBHOOK_TOKEN`,
+`ASAAS_GRACE_DAYS`, `ASAAS_PENDING_EXPIRE_DAYS`,
+`ASAAS_SUSPENDED_CANCEL_DAYS`, `ASAAS_RECONCILE_INTERVAL_MINUTES`.
+Painel/analytics: `ADMIN_PANEL_ENABLED`,
 `ADMIN_COOKIE_SECRET`, `ADMIN_BOOTSTRAP_EMAIL/PASSWORD/NAME`,
 `ADMIN_SESSION_IDLE_HOURS`, `ADMIN_SESSION_MAX_DAYS`, `ADMIN_COOKIE_NAME`,
 `ANALYTICS_RETENTION_DAYS`, `ANALYTICS_MAX_BATCH`, `ANALYTICS_RATE_LIMIT_MAX`
-(todas com padrão; ver `.env.example`).
+(todas com padrão; ver `apps/api/.env.example`).
 
 ## 13. Pendências conhecidas (não são bugs a "corrigir" sem decidir)
 
 - Não existe rotina que apague definitivamente contas em `pending_deletion`
   após os 30 dias prometidos na resposta de `DELETE /v1/me`.
-- A versão do app Android com analytics, push e suporte pelo app ainda não
-  foi publicada na Play Store; até lá o painel mostra só o que a API observa
-  e nenhuma solicitação de suporte real chega.
+- A versão do app Android com analytics, push, suporte pelo app e o botão
+  "Gerenciar em estoquesimples.com.br" (assinatura feita pela web) ainda não
+  foi publicada na Play Store; até lá o painel mostra, do app, só o que a
+  API observa.
+- Excluir a conta (`DELETE /v1/me`) é recusado a quem é proprietário de
+  alguma empresa (409 `LAST_OWNER`), e não existe rota para o próprio cliente
+  excluir uma empresa: hoje isso passa pelo suporte (painel). Decidir se a
+  empresa de uma pessoa só deve ser encerrada junto com a conta.
+- Só papéis com `membros.remover` conseguem sair de uma empresa; não há rota
+  de "sair" para gerente, operador e consulta.
+- Campanhas exigem o FCM configurado mesmo quando o alcance seria só a caixa
+  de notificações (conta que só usa a web).
+- O cursor de `GET /v1/notifications` é só `created_at`; dois avisos da mesma
+  pessoa no mesmo milissegundo, na fronteira de uma página, podem pular um.
 - `trustProxy: false` no Fastify: atrás da borda do Railway, o rate limit por
   IP de rotas anônimas agrupa clientes; trocar por `trustProxy: '<cidr>'`
   quando o endereço da borda for conhecido.

@@ -37,12 +37,13 @@ GET  /v1/support/categories
 POST /v1/support/tickets
      { installId, subject (≤120), message (≤4000), category,
        contactEmail?, contactName?,            # só fazem sentido sem conta
-       device { model, manufacturer, osVersion, sdkInt, appVersionCode,
+       device { platform? (android|web; ausente = android), model,
+                manufacturer, osVersion, sdkInt, appVersionCode,
                 appVersionName, locale, timezone },
        diagnostics { chave: string|number|boolean|null, ... (≤40) } }
      → 201 ticket
 GET  /v1/support/tickets?installId=…          → { tickets: [ticket] }
-GET  /v1/support/tickets/:id?installId=…      → { ticket, messages }   # marca como lida
+GET  /v1/support/tickets/:id?installId=…      → { ticket, messages }   # marca como lida (e lê os avisos da conversa na caixa de notificações)
 POST /v1/support/tickets/:id/messages { installId, message } → 201 { ticket, message }
 POST /v1/support/tickets/:id/resolve  { installId }          → ticket
 ```

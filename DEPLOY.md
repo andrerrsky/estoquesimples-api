@@ -1,4 +1,4 @@
-# Operação da API
+# Operação (API, painel e aplicação web)
 
 Guia de plantão: como o serviço sobe, o que observar, o que fazer quando algo
 sai do lugar e como voltar atrás. Escrito para ser lido às três da manhã.
@@ -21,14 +21,14 @@ Variáveis obrigatórias fora de desenvolvimento: `DATABASE_URL`,
 `OPS_TOKEN` (`openssl rand -base64 32`), `GOOGLE_PUBSUB_VERIFICATION_TOKEN`,
 `PURCHASE_TOKEN_ENCRYPTION_KEY` e o e-mail (`EMAIL_PROVIDER=resend` +
 `RESEND_API_KEY` + `EMAIL_FROM`). As demais têm padrão em
-[`src/platform/config/env.ts`](src/platform/config/env.ts) e a aplicação recusa
+[`apps/api/src/platform/config/env.ts`](apps/api/src/platform/config/env.ts) e a aplicação recusa
 subir se alguma estiver inválida — falhar no boot é preferível a descobrir o
 erro na primeira requisição de um cliente.
 
 ### Painel administrativo
 
 O painel (`/admin`) sobe junto com a API e é compilado no mesmo `npm run
-build` (workspace `admin/` → `admin/dist`). Para ele funcionar em produção:
+build` (workspace `apps/admin` → `apps/admin/dist`). Para ele funcionar em produção:
 
 | Variável | Para quê |
 | --- | --- |
@@ -41,6 +41,54 @@ Alternativa ao bootstrap: `railway run --service <api> -- sh -c
 Depois do primeiro owner, novos administradores são criados pelo próprio
 painel (menu Administradores). A trilha de tudo o que os administradores
 fazem fica em `admin_audit_log` e é consultável em Auditoria › Administradores.
+
+## Um serviço, dois endereços
+
+API, painel e aplicação web são **um** serviço no Railway (projeto
+`estoquesimples-api`, serviço `estoquesimples-api`) com o Postgres ao lado. O
+processo escolhe o que responder pelo cabeçalho `Host`:
+
+| Endereço | Responde |
+| --- | --- |
+| `api.estoquesimples.com.br` | API (`/v1`), painel (`/admin`), `/docs`, `/health`, `/ready`, `/metrics`, `/ops` |
+| `estoquesimples.com.br` | aplicação web (`apps/web/dist`) + `/v1` na mesma origem |
+
+Variáveis da web: `WEB_APP_HOSTS=estoquesimples.com.br,www.estoquesimples.com.br`
+e `WEB_APP_URL=https://estoquesimples.com.br`. Sem `WEB_APP_HOSTS` a web fica
+desligada e o domínio cairia na raiz da API. O app Android continua usando
+`api.estoquesimples.com.br`; nada nele muda.
+
+Configuração de build e deploy versionada: `railway.json` (comandos,
+healthcheck e `watchPatterns` — commits que só tocam `apps/android` ou `docs`
+não disparam deploy), `nixpacks.toml` (instala devDependencies para o build)
+e `.dockerignore` (o app Android e a documentação não entram na imagem).
+O formato `railway.json` foi marcado como obsoleto pela Railway e funciona
+até **1º/12/2026**; antes disso, migrar com `railway config migrate`.
+
+### DNS do domínio principal
+
+O domínio está registrado no registro.br. O Railway pede, para
+`estoquesimples.com.br` (domínio já adicionado ao serviço):
+
+| Tipo | Nome | Valor |
+| --- | --- | --- |
+| CNAME (ou ALIAS/flattening) | `@` | `tpvf0p43.up.railway.app` |
+| TXT | `_railway-verify` | `railway-verify=b92e59bfe8bfa0a630073837e725ec2f7860d77b10c29dfb5fd94982789a2fee` |
+
+A raiz de um domínio não aceita CNAME comum, e o DNS do registro.br não tem
+ALIAS. O caminho suportado é hospedar a zona num provedor com *CNAME
+flattening* (Cloudflare, gratuito): criar a zona, **recriar os registros
+existentes** (`api` CNAME → `5fm3slen.up.railway.app`; os registros de e-mail
+do Resend: `send` e `resend._domainkey`), acrescentar os dois acima com o
+proxy desligado ("DNS only") e trocar os servidores DNS no registro.br.
+`railway domain status estoquesimples.com.br` mostra quando o domínio foi
+verificado e o certificado emitido.
+
+O plano atual do Railway permite dois domínios próprios por serviço (`api.` e
+a raiz). O `www.` não coube: ou se faz o redirecionamento `www → raiz` no
+provedor de DNS (regra de redirecionamento do Cloudflare), ou se sobe o plano
+e adiciona `www.estoquesimples.com.br` ao serviço — a API já redireciona
+`www.` para o domínio principal quando o host chega até ela.
 
 ## Deploy
 
@@ -105,7 +153,7 @@ exercício de restauração:
 - `.github/workflows/backup-drill.yml` roda toda segunda-feira, gera um dump,
   restaura num banco descartável e confere que as tabelas essenciais têm
   conteúdo e que o histórico de migrations veio junto.
-- Com um dump real: `npm run backup:verify -- --dump arquivo.dump --target postgres://...`.
+- Com um dump real: `npm run backup:verify -w @estoquesimples/api -- --dump /caminho/absoluto/arquivo.dump --target postgres://...`.
   O alvo é apagado e recriado; nunca aponte para produção.
 - O resultado fica em `/ops/backup`. `dentroDoPrazo: false` significa que
   ninguém verificou nas últimas `BACKUP_MAX_AGE_HOURS` horas — o backup voltou
