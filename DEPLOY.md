@@ -87,14 +87,16 @@ certificado e o e-mail quebra):
 | TXT | `resend._domainkey` | chave DKIM | envio de e-mail (Resend) |
 
 `railway domain status estoquesimples.com.br` mostra a verificação e o
-certificado. O DNSSEC foi desligado na troca de servidores; para religar,
-ative no Cloudflare (DNS › Settings) e cadastre o DS no registro.br.
+certificado. O DNSSEC está ativo: o Cloudflare assina a zona e o DS
+(keytag 2371) está cadastrado no registro.br. Se a zona mudar de provedor,
+retire o DS no registro.br **antes** de trocar os servidores — DS que não
+corresponde à chave em uso faz o domínio parar de resolver.
 
 O plano atual do Railway permite dois domínios próprios por serviço (`api.` e
-a raiz), então `www.` não está cadastrado. Para atendê-lo sem subir o plano:
-no Cloudflare, registro `A` `www` → `192.0.2.1` com o proxy **ligado** e uma
-Redirect Rule de `www.estoquesimples.com.br/*` para
-`https://estoquesimples.com.br/$1` (301).
+a raiz), então `www.` é atendido no Cloudflare: registro `A` `www` →
+`192.0.2.1` com o proxy **ligado** (o único registro com proxy), uma Redirect
+Rule de `www` para `https://estoquesimples.com.br` (301) e "Sempre usar
+HTTPS" ativado, para que `http://www…` também chegue à regra.
 
 ## Deploy
 
