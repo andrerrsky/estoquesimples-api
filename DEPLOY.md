@@ -54,15 +54,11 @@ processo escolhe o que responder pelo cabeçalho `Host`:
 | `estoquesimples.com.br` | aplicação web (`apps/web/dist`) + `/v1` na mesma origem |
 
 Variáveis da web: `WEB_APP_HOSTS=estoquesimples.com.br,www.estoquesimples.com.br`
-(já definida) e `WEB_APP_URL=https://estoquesimples.com.br`. Sem
-`WEB_APP_HOSTS` a web fica desligada e o domínio cairia na raiz da API.
-
-`WEB_APP_URL` **só deve ser definida depois que o domínio estiver no ar**
-(DNS verificado e certificado emitido, ver abaixo): é ela que põe os links
-da web nos e-mails de convite, confirmação e redefinição de senha e que
-informa ao Asaas para onde voltar depois do pagamento. Definida antes, os
-e-mails sairiam com links que não abrem.
-`railway variables --set "WEB_APP_URL=https://estoquesimples.com.br"`. O app Android continua usando
+e `WEB_APP_URL=https://estoquesimples.com.br`. Sem `WEB_APP_HOSTS` a web fica
+desligada e o domínio cairia na raiz da API. `WEB_APP_URL` é a que põe os
+links da web nos e-mails de convite, confirmação e redefinição de senha e
+informa ao Asaas para onde voltar depois do pagamento — num ambiente novo,
+só a defina depois que o domínio estiver no ar. O app Android continua usando
 `api.estoquesimples.com.br`; nada nele muda.
 
 Configuração de build e deploy versionada: `railway.json` (comandos,
@@ -72,32 +68,33 @@ e `.dockerignore` (o app Android e a documentação não entram na imagem).
 O formato `railway.json` foi marcado como obsoleto pela Railway e funciona
 até **1º/12/2026**; antes disso, migrar com `railway config migrate`.
 
-### DNS do domínio principal
+### DNS
 
-O domínio está registrado no registro.br. O Railway pede, para
-`estoquesimples.com.br` (domínio já adicionado ao serviço):
+O domínio é registrado no registro.br, mas a zona DNS fica no **Cloudflare**
+(servidores `thea.ns.cloudflare.com` e `wilson.ns.cloudflare.com`) desde
+02/10/2026: a raiz de um domínio não aceita CNAME comum, o DNS do registro.br
+não tem ALIAS e o Cloudflare resolve isso com *CNAME flattening*. Registros
+da zona, todos como **Somente DNS** (com o proxy ligado o Railway não emite
+certificado e o e-mail quebra):
 
-| Tipo | Nome | Valor |
-| --- | --- | --- |
-| CNAME (ou ALIAS/flattening) | `@` | `tpvf0p43.up.railway.app` |
-| TXT | `_railway-verify` | `railway-verify=b92e59bfe8bfa0a630073837e725ec2f7860d77b10c29dfb5fd94982789a2fee` |
+| Tipo | Nome | Valor | Para quê |
+| --- | --- | --- | --- |
+| CNAME | `@` | `tpvf0p43.up.railway.app` | aplicação web |
+| TXT | `_railway-verify` | `railway-verify=b92e59bf…` | verificação do Railway (raiz) |
+| CNAME | `api` | `5fm3slen.up.railway.app` | API e painel |
+| TXT | `_railway-verify.api` | `railway-verify=2d72ec8d…` | verificação do Railway (api) |
+| CNAME | `send`, `rsend` | `send.forge.rmta.net`, `rsend.forge.rmta.net` | envio de e-mail (Resend) |
+| TXT | `resend._domainkey` | chave DKIM | envio de e-mail (Resend) |
 
-A raiz de um domínio não aceita CNAME comum, e o DNS do registro.br não tem
-ALIAS. O caminho suportado é hospedar a zona num provedor com *CNAME
-flattening* (Cloudflare, gratuito): criar a zona, **recriar os registros
-existentes** (`api` CNAME → `5fm3slen.up.railway.app`; os registros de e-mail
-do Resend: `send` e `resend._domainkey`), acrescentar os dois acima com o
-proxy desligado ("DNS only") e trocar os servidores DNS no registro.br.
-`railway domain status estoquesimples.com.br` mostra quando o domínio foi
-verificado e o certificado emitido. Depois disso: definir `WEB_APP_URL`
-(acima) e conferir `https://estoquesimples.com.br` (página inicial, entrar,
-`/v1/config` respondendo JSON na mesma origem).
+`railway domain status estoquesimples.com.br` mostra a verificação e o
+certificado. O DNSSEC foi desligado na troca de servidores; para religar,
+ative no Cloudflare (DNS › Settings) e cadastre o DS no registro.br.
 
 O plano atual do Railway permite dois domínios próprios por serviço (`api.` e
-a raiz). O `www.` não coube: ou se faz o redirecionamento `www → raiz` no
-provedor de DNS (regra de redirecionamento do Cloudflare), ou se sobe o plano
-e adiciona `www.estoquesimples.com.br` ao serviço — a API já redireciona
-`www.` para o domínio principal quando o host chega até ela.
+a raiz), então `www.` não está cadastrado. Para atendê-lo sem subir o plano:
+no Cloudflare, registro `A` `www` → `192.0.2.1` com o proxy **ligado** e uma
+Redirect Rule de `www.estoquesimples.com.br/*` para
+`https://estoquesimples.com.br/$1` (301).
 
 ## Deploy
 

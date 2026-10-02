@@ -109,6 +109,7 @@ export function isWebAppHost(app: FastifyInstance, request: FastifyRequest): boo
 export async function registerWebApp(app: FastifyInstance): Promise<void> {
   const hosts = new Set(app.services.env.WEB_APP_HOSTS);
   if (hosts.size === 0) return;
+  const secure = app.services.env.NODE_ENV === 'production' || app.services.env.NODE_ENV === 'staging';
 
   const distDir = resolveAppDist('web');
   const files = distDir ? loadFiles(distDir) : new Map<string, StaticFile>();
@@ -133,6 +134,9 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
       body = file.gzip;
       reply.header('Content-Encoding', 'gzip');
     }
+    // Esta resposta sai antes dos plugins (helmet), então os cabeçalhos de
+    // segurança da página são postos aqui. HSTS só onde há HTTPS de verdade.
+    if (secure) reply.header('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
     return reply
       .code(status)
       .header('Content-Type', file.contentType)
@@ -140,6 +144,7 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
       .header('Vary', 'Accept-Encoding')
       .header('Content-Security-Policy', CSP)
       .header('X-Frame-Options', 'DENY')
+      .header('X-Content-Type-Options', 'nosniff')
       .header('Referrer-Policy', 'strict-origin-when-cross-origin')
       .send(request.method === 'HEAD' ? '' : body);
   };
