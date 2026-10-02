@@ -70,8 +70,19 @@ describe('hosts: aplicação web e API na mesma instância', () => {
     const post = await context.app.inject({ method: 'POST', url: '/admin/api/auth/login', headers: { host: 'web.test' }, payload: {} });
     expect(post.statusCode).toBe(404);
 
-    const asset = await context.app.inject({ method: 'GET', url: '/assets/nao-existe.js', headers: { host: 'web.test' } });
-    expect(asset.statusCode).toBe(404);
+    // Script de uma versão anterior (aba aberta durante um deploy): em vez de
+    // 404, um módulo que recarrega a página, sem cache.
+    const staleScript = await context.app.inject({ method: 'GET', url: '/assets/SupportPage-OU6pYmGZ.js', headers: { host: 'web.test' } });
+    expect(staleScript.statusCode).toBe(200);
+    expect(staleScript.headers['content-type']).toContain('text/javascript');
+    expect(staleScript.headers['cache-control']).toBe('no-store');
+    expect(staleScript.body).toContain('location.reload()');
+
+    // Os demais arquivos que não existem continuam sendo 404 de verdade.
+    for (const missing of ['/assets/nao-existe.css', '/imagem.png', '/assets/sub/pasta.js']) {
+      const asset = await context.app.inject({ method: 'GET', url: missing, headers: { host: 'web.test' } });
+      expect(asset.statusCode, missing).toBe(404);
+    }
 
     const www = await context.app.inject({ method: 'GET', url: '/entrar?x=1', headers: { host: 'www.web.test' } });
     expect(www.statusCode).toBe(301);

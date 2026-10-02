@@ -9,6 +9,7 @@ import './styles/app.css';
 import { ApiError } from './api/client';
 import { router } from './App';
 import { AuthProvider } from './auth/AuthProvider';
+import { reloadForNewVersion } from './lib/chunks';
 import { ToastProvider } from './components/ui';
 import { WorkspaceProvider } from './workspace/WorkspaceProvider';
 
@@ -25,6 +26,12 @@ const queryClient = new QueryClient({
     },
     mutations: { retry: false },
   },
+});
+
+// O Vite avisa quando um arquivo da versão anterior não existe mais (aba
+// aberta durante um deploy): recarrega para pegar a versão nova.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForNewVersion()) event.preventDefault();
 });
 
 createRoot(document.getElementById('root') as HTMLElement).render(

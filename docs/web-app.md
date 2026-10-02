@@ -28,6 +28,25 @@ subida, com gzip/brotli, `Cache-Control: immutable` para `/assets/` e
 `/admin`, `/docs`, `/metrics` e `/ops` **não** existem nesses hosts. CSP
 `default-src 'self'`: nada de script, fonte ou imagem de terceiros.
 
+### Aba aberta durante um deploy
+
+Cada tela é um arquivo com o nome da versão (`SupportPage-<hash>.js`). Depois
+de um deploy, uma aba que já estava aberta ainda pede as telas pelos nomes
+antigos, que não existem mais. Três camadas evitam que isso vire tela de erro:
+
+1. **Servidor** (`web-app.ts`): um `/assets/*.js` que não existe responde com
+   um módulo mínimo que recarrega a página (no máximo uma vez a cada 30 s),
+   em vez de 404. Vale inclusive para abas com o código antigo.
+2. **Cliente** (`apps/web/src/lib/chunks.ts`): a importação de tela que falha
+   por esse motivo recarrega a página, com a mesma trava; o evento
+   `vite:preloadError` faz o mesmo.
+3. **Tela de erro** (`components/RouteError.tsx`): se ainda assim algo
+   quebrar, a pessoa vê uma explicação e o botão de recarregar — nunca o erro
+   cru do roteador.
+
+O `index.html` nunca é guardado em cache, então recarregar sempre traz a
+versão nova.
+
 ## Sessão
 
 | | Android | Web |

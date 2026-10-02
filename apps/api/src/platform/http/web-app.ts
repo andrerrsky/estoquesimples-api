@@ -97,6 +97,19 @@ main{background:#fff;border:1px solid #E3E8EE;border-radius:14px;padding:32px;ma
 <p style="color:#5C6B7A;margin:0">A aplicação web ainda não foi compilada nesta instância. Rode <code>npm run build</code> na raiz do repositório e reinicie.</p></main></body></html>`,
 );
 
+/** Arquivos de tela gerados pelo build: `/assets/<Nome>-<hash>.js`. */
+const STALE_SCRIPT = /^\/assets\/[A-Za-z0-9_.-]+\.js$/;
+
+/**
+ * Recarrega a página no máximo uma vez a cada 30 s (a mesma trava de
+ * `apps/web/src/lib/chunks.ts`, pela mesma chave): se o arquivo faltar por
+ * outro motivo, a aplicação mostra a tela de erro em vez de entrar em laço.
+ */
+const RELOAD_MODULE =
+  "try{var k='es_web_reloaded_at',t=Number(sessionStorage.getItem(k)||0);" +
+  "if(Date.now()-t>30000){sessionStorage.setItem(k,String(Date.now()));location.reload()}}catch(e){}\n" +
+  'export {};\n';
+
 function hostOf(request: FastifyRequest): string {
   const header = request.headers.host ?? '';
   return header.split(':')[0]?.toLowerCase() ?? '';
@@ -174,9 +187,20 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     const file = files.get(path);
     if (file) return send(request, reply, file);
 
-    // Arquivo com extensão que não existe é 404 de verdade (um asset antigo
-    // depois de um deploy); devolver o index faria o navegador tentar
-    // executar HTML como script.
+    // Script de uma versão que já saiu do ar: uma aba aberta antes do deploy
+    // pede a tela pelo nome antigo. Em vez de um 404 (que vira tela de erro),
+    // vai um módulo mínimo que recarrega a página — e ela volta na versão nova.
+    if (STALE_SCRIPT.test(path)) {
+      return reply
+        .code(200)
+        .header('Cache-Control', 'no-store')
+        .header('X-Content-Type-Options', 'nosniff')
+        .type('text/javascript; charset=utf-8')
+        .send(request.method === 'HEAD' ? '' : RELOAD_MODULE);
+    }
+
+    // Outro arquivo com extensão que não existe é 404 de verdade; devolver o
+    // index faria o navegador tentar interpretar HTML como imagem ou estilo.
     if (/\.[a-z0-9]{2,5}$/i.test(path)) {
       return reply.code(404).header('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send('Não encontrado.');
     }
