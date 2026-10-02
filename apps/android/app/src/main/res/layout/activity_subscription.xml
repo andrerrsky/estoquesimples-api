@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_hero"
+            android:orientation="vertical"
+            android:padding="22dp">
+
+            <TextView
+                android:id="@+id/heroTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_hero_title"
+                android:textAppearance="@style/TextAppearance.Estoque.Title.OnBrand" />
+
+            <TextView
+                android:id="@+id/heroSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="@string/subscription_hero_subtitle"
+                android:textColor="@color/color_text_on_brand_muted"
+                android:textSize="15sp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:background="@drawable/bg_surface"
+            android:orientation="vertical"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefits_title"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefit_sync"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="14dp"
+                tools:ignore="UseCompatTextViewDrawableXml" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefit_devices"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefit_backup"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefit_premium"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/freePlanSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:background="@drawable/bg_surface_muted"
+            android:padding="@dimen/group_padding_compact"
+            android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+            android:text="@string/subscription_free_summary" />
+
+        <LinearLayout
+            android:id="@+id/subscriptionPrice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_surface"
+            android:orientation="vertical"
+            android:padding="@dimen/group_padding"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_price_label"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption"
+                android:textColor="@color/color_text_muted" />
+
+            <TextView
+                android:id="@+id/subscriptionPriceAmount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:includeFontPadding="false" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/subscriptionState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/row_gap"
+            android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+        <TextView
+            android:id="@+id/subscriptionNotice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/row_gap"
+            android:textAppearance="@style/TextAppearance.Estoque.Warning"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/subscribeButton"
+            style="@style/Widget.Estoque.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:text="@string/subscription_cta"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/goAccountButton"
+            style="@style/Widget.Estoque.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:text="@string/subscription_go_account"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/restoreButton"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:text="@string/subscription_restore"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/manageButton"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:text="@string/subscription_manage"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/retryButton"
+            style="@style/Widget.Estoque.Button.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:text="@string/subscription_retry"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="@dimen/section_gap"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/messageView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textAppearance="@style/TextAppearance.Estoque.Error"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption"
+            android:text="@string/subscription_legal" />
+
+        <LinearLayout
+            android:id="@+id/legacyProSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:background="@drawable/bg_surface_muted"
+            android:orientation="vertical"
+            android:padding="@dimen/group_padding_compact">
+
+            <TextView
+                android:id="@+id/legacyProTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_legacy_title"
+                android:textAppearance="@style/TextAppearance.Estoque.Label"
+                android:textColor="@color/color_text_muted" />
+
+            <TextView
+                android:id="@+id/legacyProMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/subscription_legacy_body"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+
+            <TextView
+                android:id="@+id/restoreLegacyProButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="@string/subscription_legacy_restore"
+                android:textColor="@color/color_brand"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/legalFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+
+    </LinearLayout>
+</ScrollView>

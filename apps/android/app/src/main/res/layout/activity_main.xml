@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/color_surface"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    tools:context="br.com.gameloop.estoquesimples.MainActivity">
+    <!-- A raiz é focável para que, quando a janela recupera o foco (ao fechar
+         um diálogo de Entrada/Saída, por exemplo), o foco não caia no campo
+         de busca — o primeiro focável da tela — abrindo o teclado sozinho. -->
+
+    <LinearLayout
+        android:id="@+id/searchBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/field_gap"
+        android:paddingBottom="@dimen/field_gap">
+
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
+            style="@style/Widget.Estoque.SearchView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            app:iconifiedByDefault="false"
+            app:queryHint="Buscar por nome, SKU, código..."
+            app:queryBackground="@android:color/transparent"
+            app:submitBackground="@android:color/transparent" />
+
+        <Button
+            android:id="@+id/scanSearchButton"
+            style="@style/Widget.Estoque.Button.Icon.Subtle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/field_gap"
+            android:drawableStart="@drawable/ic_barcode"
+            android:contentDescription="Buscar por código de barras" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/filterBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/searchBar"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingBottom="@dimen/field_gap"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/chipAll"
+            style="@style/Widget.Estoque.FilterChip"
+            android:text="Todos" />
+
+        <TextView
+            android:id="@+id/chipLowStock"
+            style="@style/Widget.Estoque.FilterChip"
+            android:layout_marginStart="@dimen/field_gap"
+            android:drawableStart="@drawable/ic_warning_small"
+            android:drawablePadding="4dp"
+            android:text="Estoque baixo" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/conflictsBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/filterBar"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_message_warning"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingLeft="@dimen/group_padding_compact"
+        android:paddingRight="@dimen/group_padding_compact"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/conflictsBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/field_gap"
+            android:text="Resolver"
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/planBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/conflictsBanner"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_message_warning"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingLeft="@dimen/group_padding_compact"
+        android:paddingRight="@dimen/group_padding_compact"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/planBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/field_gap"
+            android:text="Ver plano"
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/planBanner"
+        android:layout_above="@+id/bottomNavigation"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/field_gap"
+        android:paddingBottom="@dimen/field_gap"
+        android:clipToPadding="false"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="@dimen/list_item_spacing"
+        android:background="@color/color_surface" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/bg_bottom_nav"
+        app:elevation="0dp"
+        app:menu="@menu/bottom_navigation_menu"
+        app:itemIconTint="@color/bottom_navigation_selector"
+        app:itemTextColor="@color/bottom_navigation_selector"
+        app:labelVisibilityMode="labeled" />
+
+    <LinearLayout
+        android:id="@+id/empty_list_item"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/planBanner"
+        android:layout_above="@+id/bottomNavigation"
+        android:visibility="gone"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal">
+
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="@drawable/bg_empty_icon"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <ImageView
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_package"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/emptyTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nenhum produto cadastrado"
+            android:textAppearance="@style/TextAppearance.Estoque.Title"
+            android:gravity="center"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/emptyMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textAppearance="@style/TextAppearance.Estoque.Empty"
+            android:layout_marginBottom="@dimen/section_gap" />
+
+        <LinearLayout
+            android:id="@+id/emptyActionAdd"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:layout_marginBottom="@dimen/field_gap">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_add"
+                app:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Adicionar meu primeiro produto"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/emptyActionSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_settings"
+                app:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Ver configurações do app"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/emptyActionClear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:paddingLeft="@dimen/group_padding_compact"
+            android:paddingRight="@dimen/group_padding_compact"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/color_brand"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/emptyActionClearLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/field_gap"
+                android:text="Limpar busca"
+                android:textColor="@color/color_brand"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>

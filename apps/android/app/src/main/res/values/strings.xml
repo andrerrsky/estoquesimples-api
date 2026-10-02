@@ -1,0 +1,98 @@
+<resources>
+    <string name="app_name">Estoque Simples</string>
+    <string name="history_title">Histórico</string>
+
+    <!-- Settings Activity -->
+    <string name="settings_title">Configurações</string>
+    <string name="settings_section_display">Exibição</string>
+    <string name="settings_show_images_title">Exibir imagens dos produtos</string>
+    <string name="settings_show_images_summary">Mostra ou oculta as fotos na listagem principal</string>
+    <string name="settings_section_currency">Moeda</string>
+    <string name="settings_default_currency_title">Moeda padrão</string>
+    <string name="settings_default_currency_summary">Usada automaticamente nas telas de criação e edição</string>
+
+    <string name="push_channel_id" translatable="false">estoque_push</string>
+    <string name="push_channel_name">Avisos</string>
+    <string name="push_channel_description">Mensagens enviadas pelo Estoque Simples</string>
+    
+    <!-- Assinatura (oferta atual) -->
+    <string name="subscription_title">Assinatura</string>
+    <string name="subscription_hero_title">Sua equipe inteira no mesmo estoque</string>
+    <string name="subscription_hero_subtitle">A nuvem já é sua de graça. O plano Equipe abre a empresa para funcionários e sócios, tira o teto de produtos e liga a Análise Avançada.</string>
+    <string name="subscription_hero_title_active">Plano Equipe ativo</string>
+    <string name="subscription_hero_subtitle_active">Sua equipe pode trabalhar no mesmo estoque, sem teto de produtos. A Análise Avançada de Estoque está liberada.</string>
+    <string name="subscription_hero_title_legacy_pro">Falta pouco para trabalhar em equipe</string>
+    <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium e a nuvem é grátis com conta. O plano Equipe adiciona acesso para sua equipe e produtos sem limite.</string>
+    <string name="subscription_benefits_title">O que o plano Equipe libera</string>
+    <string name="subscription_benefit_sync">Convide funcionários e sócios: todos no mesmo estoque, em tempo real</string>
+    <string name="subscription_benefit_devices">Papéis por pessoa: quem cadastra, quem movimenta, quem só consulta</string>
+    <string name="subscription_benefit_backup">Produtos sem limite na nuvem — o plano gratuito tem teto</string>
+    <string name="subscription_benefit_premium">Análise Avançada de Estoque: enxergue tendências antes de faltar produto</string>
+    <string name="subscription_cta">Assinar</string>
+    <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
+    <string name="subscription_price_suffix">/ mês</string>
+    <string name="subscription_price_label">Por apenas</string>
+    <string name="subscription_restore">Restaurar assinatura</string>
+    <string name="subscription_manage">Gerenciar no Google Play</string>
+    <string name="subscription_manage_web">Gerenciar em estoquesimples.com.br</string>
+    <string name="subscription_go_account">Entrar para assinar</string>
+    <string name="subscription_retry">Tentar novamente</string>
+    <string name="subscription_legal">A cobrança é feita pela Google Play na conta Google deste aparelho. Cancelamento e forma de pagamento ficam no Google Play. Cancelar a assinatura não apaga nada: a empresa volta ao plano gratuito, que continua sincronizando para o proprietário dentro do teto de produtos.</string>
+    <string name="subscription_legacy_title">Já adquiriu a antiga Versão PRO?</string>
+    <string name="subscription_legacy_body">Essa compra não está mais à venda. Se você já a fez, recupere-a aqui para manter os recursos premium neste aparelho.</string>
+    <string name="subscription_legacy_restore">Recuperar compra antiga</string>
+    <string name="subscription_legacy_active">Sua antiga Versão PRO está ativa neste aparelho. Os recursos premium permanecem; equipe e produtos sem limite são do plano Equipe.</string>
+    <string name="subscription_legacy_recognized">Compra antiga reconhecida. Seus benefícios PRO foram restaurados neste aparelho.</string>
+    <string name="menu_subscription">Plano Equipe</string>
+    <string name="subscription_free_summary">No plano gratuito você já tem: seus dados na nuvem, em todos os seus aparelhos, com até 50 produtos. O plano Equipe tira o teto e abre a empresa para outras pessoas.</string>
+
+    <!-- Restauração da compra única antiga (não é oferta de venda) -->
+    <string name="pro_restoring">Verificando compras anteriores…</string>
+    <string name="pro_no_purchase_found">Nenhuma compra da antiga Versão PRO encontrada nesta conta Google.</string>
+    <string name="pro_restore_error">Erro ao verificar compras. Tente novamente mais tarde.</string>
+    <string name="pro_store_not_connected">Aguarde a conexão com a loja…</string>
+    <string name="pro_purchase_pending">Sua compra antiga ainda está sendo processada. O acesso PRO entra quando o pagamento for confirmado.</string>
+
+    <!-- Bulk Edit Feature (Free) -->
+    <string name="bulk_edit_title">Edição em Massa</string>
+    <string name="bulk_edit_success">%s editados</string>
+    
+    <!-- Analytics Feature (Premium) -->
+    <string name="analytics_title">Análise de Estoque</string>
+    <string name="analytics_locked_message">A Análise Avançada de Estoque oferece previsões de esgotamento, taxa de rotatividade, recomendações de reabastecimento e muito mais.</string>
+    <string name="analytics_unlock_cta">Conhecer o plano Equipe</string>
+    <string name="analytics_no_data">Não há dados suficientes para gerar análises. Continue registrando entradas e saídas no histórico.</string>
+    <string name="analytics_urgent_restock">Reabastecimento urgente</string>
+    <string name="analytics_soon_restock">Reabastecer em breve</string>
+    <string name="analytics_fast_moving">Produtos de movimento rápido</string>
+    <string name="analytics_slow_moving">Produtos de movimento lento</string>
+    <string name="analytics_summary_title">Resumo da análise</string>
+    <string name="analytics_benefits_title">O que a análise inclui</string>
+    <string name="analytics_benefit_forecast">Previsão de esgotamento de estoque por produto</string>
+    <string name="analytics_benefit_turnover">Taxa de rotatividade e velocidade de movimento</string>
+    <string name="analytics_benefit_restock">Recomendações de reabastecimento</string>
+    <string name="analytics_benefit_speed">Identificação de produtos de alto e baixo giro</string>
+    <string name="analytics_benefit_trends">Análise de tendências de consumo</string>
+    <string name="analytics_footnote">As análises usam o histórico de entradas e saídas registradas no aplicativo.</string>
+    <string name="analytics_insufficient_title">Dados insuficientes</string>
+    <string name="analytics_recommendation">Recomendação: reabastecer em breve.</string>
+    
+    <!-- Currency / Monetary Formatting -->
+    <string name="currency_label_value">Valor unitário (%s)</string>
+    <string name="report_total_value">Valor do estoque: %s</string>
+    <string name="total_entry_value">Entradas (desde o início): %s</string>
+    <string name="total_exit_value">Saídas (desde o início): %s</string>
+    <string name="report_total_value_zero">Valor do estoque: %s 0,00</string>
+    <string name="total_entry_value_zero">Entradas (desde o início): %s 0,00</string>
+    <string name="total_exit_value_zero">Saídas (desde o início): %s 0,00</string>
+
+    <!-- Report Buttons (Reports Activity) -->
+    <string name="report_section_others">Outros relatórios (PDF)</string>
+    <string name="report_btn_complete">Relatório completo (PDF)</string>
+    <string name="report_btn_movements">Movimentações (entradas e saídas)</string>
+    <string name="report_btn_exits">Saídas detalhado</string>
+    <string name="report_btn_entries">Entradas detalhado</string>
+    <string name="report_btn_low_stock">Estoque baixo</string>
+    <string name="report_btn_category">Por categoria</string>
+    <string name="report_btn_financial">Financeiro / valor de inventário</string>
+</resources>

@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/editScrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    tools:context="br.com.gameloop.estoquesimples.EditActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Informações Básicas"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/editNameLayout"
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nome do Produto *">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="SKU / Código do Produto"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editSku"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Estoque.TextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Código de Barras">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editBarcode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <Button
+                    android:id="@+id/editScanButton"
+                    style="@style/Widget.Estoque.Button.Icon.Subtle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="56dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="@dimen/field_gap"
+                    android:layout_marginTop="3dp"
+                    android:drawableStart="@drawable/ic_barcode"
+                    android:contentDescription="Ler código de barras"
+                    android:onClick="scanBarcode" />
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Categoria"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
+                    android:id="@+id/editCategory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Descrição"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textMultiLine"
+                    android:minLines="3"
+                    android:maxLines="5"
+                    android:gravity="top|start" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Estoque e Valores"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/editAmountLayout"
+                    style="@style/Widget.Estoque.TextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Quantidade *">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editAmount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal|numberSigned"
+                        android:digits="0123456789.," />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/editUnitLayout"
+                    style="@style/Widget.Estoque.TextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Unidade"
+                    android:layout_marginLeft="@dimen/field_gap">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
+                        android:id="@+id/editUnit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/editValueLayout"
+                    style="@style/Widget.Estoque.TextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Valor unitário ($)">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal|numberSigned"
+                        android:digits="0123456789.,$" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- A moeda é uma configuração do app (Configurações > Moeda);
+                     um seletor aqui trocava a moeda de todo o estoque sem avisar. -->
+                <Spinner
+                    android:visibility="gone"
+                    android:id="@+id/editCurrencySpinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="@dimen/input_field_height"
+                    android:layout_gravity="top"
+                    android:layout_marginLeft="@dimen/field_gap"
+                    android:minWidth="104dp"
+                    android:background="@drawable/bg_dropdown"
+                    android:paddingLeft="@dimen/field_gap"
+                    android:paddingRight="@dimen/field_gap" />
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:hint="Estoque Mínimo">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editMinStock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal|numberSigned"
+                    android:digits="0123456789.," />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Foto do Produto"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <ImageButton
+                android:id="@+id/editPhoto"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:src="@drawable/ic_camera"
+                android:scaleType="fitXY"
+                android:background="@drawable/bg_photo"
+                android:contentDescription="Foto do produto" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginLeft="@dimen/section_gap"
+                android:gravity="center_vertical"
+                android:layout_gravity="center_vertical">
+
+                <Button
+                    android:id="@+id/editGallery"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Galeria"
+                    android:onClick="editTakeGalleryPhoto" />
+
+                <Button
+                    android:id="@+id/editCamera"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Câmera"
+                    android:onClick="editTakeCameraPhoto" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Informações Adicionais"
+            android:textAppearance="@style/TextAppearance.Estoque.Label"
+            android:layout_marginBottom="@dimen/field_gap" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding_compact"
+            android:layout_marginBottom="@dimen/section_gap">
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Fornecedor">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    style="@style/Widget.MaterialComponents.AutoCompleteTextView.OutlinedBox"
+                    android:id="@+id/editSupplier"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Estoque.TextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Localização no Estoque"
+                android:layout_marginTop="@dimen/field_gap">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/editLocation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="* Campos obrigatórios"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:layout_marginLeft="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/field_gap"
+            android:layout_marginBottom="@dimen/section_gap">
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

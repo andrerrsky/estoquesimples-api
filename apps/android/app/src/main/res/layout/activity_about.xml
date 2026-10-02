@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    tools:context="br.com.gameloop.estoquesimples.AboutActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_hero"
+            android:padding="22dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Estoque Simples"
+                android:textAppearance="@style/TextAppearance.Estoque.Title.OnBrand" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Versão 11.0"
+                android:textColor="@color/color_text_on_brand_muted"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sobre o app"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Aplicativo desenvolvido para facilitar o gerenciamento de estoque de forma simples e eficiente. Controle suas entradas, saídas, gere relatórios e muito mais."
+                android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Funcionalidades"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cadastro completo de produtos"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="@dimen/row_gap" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Leitor de código de barras"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="@dimen/row_gap" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Relatórios e gráficos"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="@dimen/row_gap" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Exportação em PDF e CSV"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Desenvolvido por"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="André Fortunato"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:textStyle="bold"
+                android:layout_marginBottom="@dimen/section_gap" />
+
+            <Button
+                android:id="@+id/btnContact"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Falar com o suporte" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Abra uma solicitação pelo app: respondemos por aqui e você recebe uma notificação."
+                android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cardGoPro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_hero"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:id="@+id/subscriptionCardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Plano Equipe"
+                android:textAppearance="@style/TextAppearance.Estoque.Title.OnBrand"
+                android:layout_marginBottom="@dimen/field_gap" />
+
+            <TextView
+                android:id="@+id/subscriptionCardSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sua equipe no mesmo estoque, produtos sem limite e Análise Avançada"
+                android:textColor="@color/color_text_on_brand_muted"
+                android:textSize="15sp"
+                android:lineSpacingExtra="3dp"
+                android:layout_marginBottom="@dimen/section_gap" />
+
+            <Button
+                android:id="@+id/btnGoPro"
+                style="@style/Widget.Estoque.Button.OnBrand"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Conhecer o plano" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cardLegal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Política e termos"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:layout_marginBottom="@dimen/field_gap" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Leia os Termos de Uso e a Política de Privacidade do Estoque Simples."
+                android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="© 2026"
+            android:textAppearance="@style/TextAppearance.Estoque.Caption"
+            android:gravity="center"
+            android:layout_marginTop="24dp" />
+
+    </LinearLayout>
+</ScrollView>

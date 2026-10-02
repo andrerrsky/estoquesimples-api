@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paleta única (referência: tela Assinatura) -->
+    <color name="color_brand">#1C679D</color>
+    <color name="color_brand_dark">#15537E</color>
+    <color name="color_brand_pressed">#155A87</color>
+    <color name="color_surface">#F4F7FA</color>
+    <color name="color_surface_content">#FFFFFF</color>
+    <color name="color_text">#1A2330</color>
+    <color name="color_text_muted">#5C6B7A</color>
+    <color name="color_text_on_brand">#FFFFFF</color>
+    <color name="color_text_on_brand_muted">#E8F1F8</color>
+    <color name="color_border">#E3E8EE</color>
+    <color name="color_border_muted">#E0E6ED</color>
+    <color name="color_success">#1B7A3D</color>
+    <color name="color_warning">#E65100</color>
+    <color name="color_error">#C62828</color>
+    <color name="color_disabled">#C5CDD6</color>
+    <color name="color_disabled_text">#8A97A6</color>
+    <color name="color_chip">#EEF2F6</color>
+    <color name="color_ripple_on_brand">#33FFFFFF</color>
+    <color name="color_ripple_brand">#331C679D</color>
+    <color name="color_ripple_error">#33C62828</color>
+
+    <!-- Tema / chrome (aliases da paleta) -->
+    <color name="colorPrimary">@color/color_brand</color>
+    <color name="colorPrimaryDark">@color/color_brand_dark</color>
+    <color name="colorAccent">@color/color_brand</color>
+    <color name="colorActionBar">@color/color_brand</color>
+    <color name="system_bar">@color/color_brand</color>
+    <color name="bottom_nav_active">#FFFFFF</color>
+    <color name="bottom_nav_inactive">#B3FFFFFF</color>
+</resources>

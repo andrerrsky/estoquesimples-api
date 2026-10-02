@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_surface"
+    android:padding="@dimen/group_padding_compact">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:id="@+id/typeBadge"
+            android:layout_width="@dimen/history_badge_size"
+            android:layout_height="@dimen/history_badge_size"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/bg_type_badge">
+
+            <TextView
+                android:id="@+id/typeSign"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:textColor="@color/color_text_on_brand"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/typeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ENTRADA"
+                android:textColor="@color/color_text_on_brand"
+                android:textSize="8sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:maxLines="2"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginLeft="14dp">
+
+            <TextView
+                android:id="@+id/productName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Nome do Produto"
+                android:textAppearance="@style/TextAppearance.Estoque.Section"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/reversedBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_chip"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="Estornada"
+                android:textColor="@color/color_text_muted"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Quantidade: "
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+                <TextView
+                    android:id="@+id/quantity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/color_text" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/balanceAfter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Estoque depois: 0"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/dateTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="01/01/2025 10:30"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption"
+                android:drawableLeft="@drawable/ic_calendar"
+                android:drawablePadding="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Observação sobre a movimentação"
+        android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+        android:background="@drawable/bg_surface_muted"
+        android:padding="@dimen/row_gap"
+        android:layout_marginTop="@dimen/field_gap"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    tools:context="br.com.gameloop.estoquesimples.ImportActivity">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="@dimen/screen_padding_top"
+        android:paddingBottom="@dimen/screen_padding_bottom">
+
+        <!-- Três caminhos, do mais comum ao mais raro: guardar/restaurar uma
+             cópia, trocar com planilha e, escondido, o nível técnico (.db,
+             nuvem, cópia automática). Antes eram oito botões e três formatos
+             no mesmo plano. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Backup"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Guarde uma cópia completa (produtos e histórico) ou traga uma de volta. Ao restaurar, o que já existe é atualizado, nada é duplicado. As fotos não vão junto."
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+            <Button
+                android:id="@+id/buttonExportJson"
+                style="@style/Widget.Estoque.Button.Primary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:text="Fazer backup agora"
+                android:onClick="exportJsonFile" />
+
+            <Button
+                android:id="@+id/buttonImport"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Restaurar de um arquivo"
+                android:onClick="importFile" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Planilha (CSV)"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:id="@+id/importDesc2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+            <Button
+                android:id="@+id/buttonExportCSV"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:text="Exportar produtos"
+                android:onClick="exportCSVFile" />
+
+            <Button
+                android:id="@+id/buttonExportMovementsCSV"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Exportar movimentações"
+                android:onClick="exportMovementsCsvFile" />
+
+            <Button
+                android:id="@+id/buttonImportCsv"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/field_gap"
+                android:text="Importar planilha"
+                android:onClick="importFile" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/importStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+            android:textColor="@color/color_text" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/section_gap"
+            android:orientation="vertical"
+            android:background="@drawable/bg_surface"
+            android:padding="@dimen/group_padding">
+
+            <LinearLayout
+                android:id="@+id/advancedHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/importExportTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Avançado"
+                        android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+                    <TextView
+                        android:id="@+id/importExportDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Banco deste aparelho, cópia da nuvem e cópia automática"
+                        android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/advancedChevron"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="@dimen/field_gap"
+                    android:src="@drawable/ic_expand_more"
+                    android:contentDescription="Mostrar opções avançadas" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/advancedContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/section_gap"
+                    android:text="Cópia exata deste aparelho (arquivo .db), inclusive o que ainda não foi enviado para a nuvem. Substituir apaga o estoque atual (uma cópia automática é gravada antes)."
+                    android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+                <Button
+                    android:id="@+id/buttonExportDB"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Exportar banco de dados"
+                    android:onClick="exportDBFile" />
+
+                <Button
+                    android:id="@+id/buttonImportDB"
+                    style="@style/Widget.Estoque.Button.Destructive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Substituir pelo banco de um arquivo"
+                    android:onClick="importDBFile" />
+
+                <Button
+                    android:id="@+id/buttonRestoreBackup"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Restaurar cópia automática"
+                    android:onClick="restoreAutomaticBackup" />
+
+                <Button
+                    android:id="@+id/buttonExportCloud"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Baixar cópia da nuvem"
+                    android:onClick="exportCloudJson" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
+
+    <include layout="@layout/include_bottom_nav" />
+
+</LinearLayout>
