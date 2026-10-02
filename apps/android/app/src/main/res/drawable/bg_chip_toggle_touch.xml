@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- O mesmo chip de filtro (bg_chip_toggle), desenhado com 36dp dentro de
+     uma área de toque de 48dp: a folga de 6dp em cima e embaixo é do dedo,
+     não do desenho. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/bg_chip_toggle"
+    android:insetTop="6dp"
+    android:insetBottom="6dp" />

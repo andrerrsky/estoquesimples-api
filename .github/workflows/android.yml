@@ -8,11 +8,13 @@ on:
     paths:
       - 'apps/android/**'
       - 'packages/legal/**'
+      - 'packages/help/**'
       - '.github/workflows/android.yml'
   pull_request:
     paths:
       - 'apps/android/**'
       - 'packages/legal/**'
+      - 'packages/help/**'
       - '.github/workflows/android.yml'
 
 concurrency:

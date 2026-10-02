@@ -27,6 +27,8 @@ const SupportTicketPage = page(() => import('./pages/SupportPage'), 'SupportTick
 const AccountPage = page(() => import('./pages/AccountPage'), 'AccountPage');
 const CompaniesPage = page(() => import('./pages/CompaniesPage'), 'CompaniesPage');
 const LegalPage = page(() => import('./pages/LegalPage'), 'LegalPage');
+const HelpPage = page(() => import('./pages/HelpPage'), 'HelpPage');
+const PublicHelpPage = page(() => import('./pages/HelpPage'), 'PublicHelpPage');
 
 const lazyPage = (Component: ComponentType, gated = false) => (
   <Suspense fallback={<PageLoading />}>
@@ -62,6 +64,7 @@ export const router = createBrowserRouter([
   { path: '/convite/:token', element: <InvitePage /> },
   { path: '/termos', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
   { path: '/privacidade', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
+  { path: '/ajuda', element: <Suspense fallback={<FullScreenLoading />}><PublicHelpPage /></Suspense> },
   {
     path: '/app',
     element: <AppShell />,
@@ -76,6 +79,7 @@ export const router = createBrowserRouter([
       { path: 'equipe', element: lazyPage(TeamPage) },
       { path: 'plano', element: lazyPage(PlanPage) },
       { path: 'notificacoes', element: lazyPage(NotificationsPage) },
+      { path: 'ajuda', element: lazyPage(HelpPage) },
       { path: 'suporte', element: lazyPage(SupportPage) },
       { path: 'suporte/novo', element: lazyPage(SupportNewPage) },
       { path: 'suporte/:ticketId', element: lazyPage(SupportTicketPage) },

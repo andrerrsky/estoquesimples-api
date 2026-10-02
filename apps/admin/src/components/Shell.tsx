@@ -43,6 +43,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
       { to: '/operacao', label: 'Operação', icon: 'activity', badge: (counts) => counts.alerts || undefined },
       { to: '/planos', label: 'Planos', icon: 'tag' },
       { to: '/administradores', label: 'Administradores', icon: 'shield', minRole: 'owner' },
+      { to: '/ajuda', label: 'Ajuda', icon: 'book' },
     ],
   },
 ];

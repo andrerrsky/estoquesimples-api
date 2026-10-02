@@ -74,8 +74,14 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
+            android:name=".HelpActivity"
+            android:label="Central de ajuda"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
             android:name=".SupportActivity"
-            android:label="Ajuda e suporte"
+            android:label="Falar com o suporte"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity

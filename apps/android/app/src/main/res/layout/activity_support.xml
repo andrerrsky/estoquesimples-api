@@ -15,6 +15,56 @@
         android:paddingTop="@dimen/screen_padding_top"
         android:paddingBottom="@dimen/screen_padding_bottom">
 
+        <LinearLayout
+            android:id="@+id/faqEntry"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_surface"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="@dimen/group_padding_compact"
+            android:paddingEnd="@dimen/field_gap"
+            android:paddingTop="@dimen/row_gap"
+            android:paddingBottom="@dimen/row_gap"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Perguntas frequentes"
+                    android:textAppearance="@style/TextAppearance.Estoque.Body"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Veja se a sua dúvida já tem resposta"
+                    android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+            </LinearLayout>
+
+            <!-- A mesma seta das linhas que expandem, deitada: aqui ela leva a outra tela. -->
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="8dp"
+                android:rotation="-90"
+                android:src="@drawable/ic_expand_more"
+                android:importantForAccessibility="no"
+                android:contentDescription="@null" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -484,7 +484,7 @@ export function LandingPage() {
             <li><Link to="/termos">Termos de Uso</Link></li>
             <li><Link to="/privacidade">Política de Privacidade</Link></li>
             <li><Link to="/entrar">Entrar</Link></li>
-            <li><Link to="/app/suporte">Ajuda</Link></li>
+            <li><Link to="/ajuda">Central de ajuda</Link></li>
             <li><PlayLink className="">App Android</PlayLink></li>
           </ul>
         </div>

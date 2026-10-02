@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Um cartão por pergunta. O espaço entre os cartões é o divisor
+     (transparente) da lista, em activity_help.xml. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_surface">
+
+    <LinearLayout
+        android:id="@+id/articleHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/group_padding_compact"
+        android:paddingEnd="@dimen/field_gap"
+        android:paddingTop="@dimen/row_gap"
+        android:paddingBottom="@dimen/row_gap"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"
+        android:baselineAligned="false">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/articleCategory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:textAppearance="@style/TextAppearance.Estoque.Caption"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/articleQuestion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Decorativo: o estado aberto/fechado é anunciado pela própria
+             linha (stateDescription), não pelo ícone. -->
+        <ImageView
+            android:id="@+id/articleChevron"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_expand_more"
+            android:importantForAccessibility="no"
+            android:contentDescription="@null" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/articleDivider"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/stroke_width"
+        android:background="@color/color_border"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/articleAnswer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="@dimen/group_padding_compact"
+        android:paddingRight="@dimen/group_padding_compact"
+        android:paddingTop="14dp"
+        android:paddingBottom="@dimen/group_padding_compact"
+        android:textAppearance="@style/TextAppearance.Estoque.Body"
+        android:lineSpacingExtra="4dp"
+        android:visibility="gone" />
+</LinearLayout>

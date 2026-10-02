@@ -29,6 +29,8 @@
     "keys:generate": "npm run keys:generate --workspace @estoquesimples/api",
     "openapi": "npm run --silent openapi --workspace @estoquesimples/api",
     "legal:sync": "npm run sync -w @estoquesimples/legal",
-    "legal:check": "npm run check -w @estoquesimples/legal"
+    "legal:check": "npm run check -w @estoquesimples/legal",
+    "help:sync": "npm run sync -w @estoquesimples/help",
+    "help:check": "npm run check -w @estoquesimples/help"
   }
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chip de categoria: o estilo dos filtros do app, com área de toque de
+     48dp e altura livre para a letra grande das configurações de
+     acessibilidade não ficar cortada. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.Estoque.FilterChip"
+    android:layout_height="wrap_content"
+    android:minHeight="48dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:layout_marginEnd="@dimen/field_gap"
+    android:background="@drawable/bg_chip_toggle_touch" />

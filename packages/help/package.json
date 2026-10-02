@@ -1,0 +1,22 @@
+{
+  "name": "@estoquesimples/help",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Central de ajuda: perguntas e respostas em fonte única, exibidas pela web, pelo painel e (copiadas para os assets) pelo app Android.",
+  "type": "module",
+  "files": [
+    "index.ts",
+    "faq.json",
+    "faq-admin.json",
+    "sync-android.mjs"
+  ],
+  "exports": {
+    ".": "./index.ts",
+    "./faq.json": "./faq.json",
+    "./faq-admin.json": "./faq-admin.json"
+  },
+  "scripts": {
+    "sync": "node sync-android.mjs",
+    "check": "node sync-android.mjs --check"
+  }
+}

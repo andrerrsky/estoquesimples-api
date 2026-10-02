@@ -30,7 +30,10 @@ const COMPANY_NAV: NavItem[] = [
   { to: '/app/plano', label: 'Plano', icon: 'card' },
 ];
 
-const HELP_NAV: NavItem[] = [{ to: '/app/suporte', label: 'Ajuda e suporte', icon: 'help' }];
+const HELP_NAV: NavItem[] = [
+  { to: '/app/ajuda', label: 'Central de ajuda', icon: 'book' },
+  { to: '/app/suporte', label: 'Falar com o suporte', icon: 'help' },
+];
 
 function useUnreadNotifications(): number {
   const query = useQuery({
@@ -68,7 +71,7 @@ export function AppShell() {
   if (status === 'guest') return <Navigate to="/entrar" replace state={{ from: `${location.pathname}${location.search}` }} />;
 
   // Sem empresa, só fazem sentido as telas que não dependem de uma.
-  const worksWithoutCompany = ['/app/empresas', '/app/conta', '/app/suporte', '/app/notificacoes'].some((path) => location.pathname.startsWith(path));
+  const worksWithoutCompany = ['/app/empresas', '/app/conta', '/app/ajuda', '/app/suporte', '/app/notificacoes'].some((path) => location.pathname.startsWith(path));
   if (loading && !workspace) return <FullScreenLoading />;
   if (error && !workspace) {
     return (

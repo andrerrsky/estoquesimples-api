@@ -29,7 +29,9 @@ public final class AppMenu {
             activity.startActivity(new Intent(activity, SettingsActivity.class));
             return true;
         } else if (id == R.id.menu_support) {
-            activity.startActivity(new Intent(activity, SupportActivity.class));
+            // "Ajuda e suporte" começa pelas perguntas frequentes; falar com
+            // o suporte fica a um toque, no fim daquela tela.
+            HelpActivity.open(activity);
             return true;
         } else if (id == R.id.menu_about) {
             activity.startActivity(new Intent(activity, AboutActivity.class));

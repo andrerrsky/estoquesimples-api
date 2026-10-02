@@ -51,7 +51,7 @@ public class SupportActivity extends BaseActivity {
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Ajuda e suporte");
+            getSupportActionBar().setTitle("Falar com o suporte");
         }
 
         client = new SupportClient(this);
@@ -70,6 +70,13 @@ public class SupportActivity extends BaseActivity {
 
         findViewById(R.id.newTicketButton).setOnClickListener(v ->
                 startActivity(new Intent(this, SupportNewActivity.class)));
+
+        // Antes de abrir uma solicitação, a pessoa pode achar a resposta
+        // pronta. CLEAR_TOP + SINGLE_TOP: quem veio da Central de ajuda
+        // volta para ela em vez de empilhar ajuda → suporte → ajuda…
+        findViewById(R.id.faqEntry).setOnClickListener(v ->
+                startActivity(HelpActivity.intent(this, null)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)));
     }
 
     @Override

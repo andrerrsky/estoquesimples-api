@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Busca sem resultado, ou ajuda que não pôde ser lida: o texto muda,
+         o caminho é o mesmo — o cartão de suporte logo abaixo. -->
+    <LinearLayout
+        android:id="@+id/helpEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="24dp"
+        android:paddingBottom="@dimen/field_gap"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/helpEmptyTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+        <TextView
+            android:id="@+id/helpEmptyMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.Estoque.Empty" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/field_gap"
+        android:orientation="vertical"
+        android:background="@drawable/bg_surface"
+        android:padding="@dimen/group_padding">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Não encontrou o que procurava?"
+            android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Conte o que aconteceu ou tire sua dúvida. Respondemos por aqui e você recebe uma notificação."
+            android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+        <Button
+            android:id="@+id/helpContactButton"
+            style="@style/Widget.Estoque.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Falar com o suporte" />
+
+        <Button
+            android:id="@+id/helpTicketsButton"
+            style="@style/Widget.Estoque.Button.Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Minhas solicitações" />
+    </LinearLayout>
+</LinearLayout>

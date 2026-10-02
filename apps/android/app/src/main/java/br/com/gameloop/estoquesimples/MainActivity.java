@@ -1361,7 +1361,8 @@ public class MainActivity extends BaseActivity {
             showSettingsActivity();
             return true;
         } else if (itemId == R.id.menu_support) {
-            startActivity(new Intent(this, SupportActivity.class));
+            // Mesmo destino do AppMenu: a ajuda primeiro, o suporte a um toque.
+            HelpActivity.open(this);
             return true;
         }
         return super.onOptionsItemSelected(item);

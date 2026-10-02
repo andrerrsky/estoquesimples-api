@@ -135,6 +135,14 @@
                 android:layout_marginBottom="@dimen/section_gap" />
 
             <Button
+                android:id="@+id/btnHelp"
+                style="@style/Widget.Estoque.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/field_gap"
+                android:text="Central de ajuda" />
+
+            <Button
                 android:id="@+id/btnContact"
                 style="@style/Widget.Estoque.Button.Secondary"
                 android:layout_width="match_parent"

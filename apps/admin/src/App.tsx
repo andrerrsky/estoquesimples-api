@@ -6,6 +6,7 @@ import { AdminsPage } from './pages/AdminsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { AuditPage } from './pages/AuditPage';
 import { EventsPage } from './pages/EventsPage';
+import { HelpPage } from './pages/HelpPage';
 import { LoginPage } from './pages/LoginPage';
 import { OpsPage } from './pages/OpsPage';
 import { OverviewPage } from './pages/OverviewPage';
@@ -72,6 +73,7 @@ export const router = createBrowserRouter(
         { path: '/auditoria', element: <AuditPage /> },
         { path: '/operacao', element: <OpsPage /> },
         { path: '/administradores', element: <AdminsPage /> },
+        { path: '/ajuda', element: <HelpPage /> },
         { path: '*', element: <NotFound /> },
       ],
     },

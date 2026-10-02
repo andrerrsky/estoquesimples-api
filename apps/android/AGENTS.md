@@ -114,8 +114,8 @@ administrativo e a aplicação web usam estes mesmos tokens, copiados em
   reporta a entrega; `MainActivity.handlePushIntent` reporta a abertura e
   abre a tela/link pedidos (`pushScreenTarget`). Contrato em
   [docs/push.md](../../docs/push.md).
-- **Suporte pelo app (implementado)**: `SupportActivity` (lista, menu ⋮
-  "Ajuda e suporte" e botão "Falar com o suporte" na tela Sobre),
+- **Suporte pelo app (implementado)**: `SupportActivity` (lista; chega-se
+  pela Central de ajuda e pelo botão "Falar com o suporte" na tela Sobre),
   `SupportNewActivity` (categoria em chips, assunto, mensagem; nome/e-mail
   opcionais só sem conta) e `SupportTicketActivity` (conversa, responder,
   marcar como resolvida). `sync/SupportClient` fala com `/v1/support` com
@@ -126,3 +126,21 @@ administrativo e a aplicação web usam estes mesmos tokens, copiados em
   `MainActivity.handlePushIntent` abre a conversa. Contrato em
   [docs/support.md](../../docs/support.md). O e-mail de contato não é mais
   oferecido na tela Sobre.
+- **Central de ajuda (implementado)**: `HelpActivity` — perguntas
+  frequentes com busca, lidas de `app/src/main/assets/help/faq.json`, por
+  isso abre sem internet. O arquivo é **cópia** de `packages/help/faq.json`
+  (raiz do monorepo, o mesmo da web e do painel): não edite aqui; altere lá
+  e rode `npm run help:sync` na raiz. O pacote `help/` espelha em Java as
+  regras de `packages/help/index.ts` — `HelpSearch` (busca sem acento, todas
+  as palavras, pergunta > palavra-chave > resposta), `HelpMarkup`/`HelpSpans`
+  ("• " é item de lista, `**texto**` é negrito) e `HelpContent` (artigo com
+  `platforms` sem `android` fica de fora); mudou lá, mude aqui
+  (`HelpSearchTest`). Entradas: menu ⋮ "Ajuda e suporte" (`AppMenu` e
+  `MainActivity`), cartão "Perguntas frequentes" no topo de `SupportActivity`
+  e botão "Central de ajuda" na tela Sobre; `HelpActivity.open(context,
+  articleId)` abre já no artigo. O suporte fica a um toque no rodapé da
+  lista ("Falar com o suporte" → `SupportNewActivity`, "Minhas solicitações"
+  → `SupportActivity`); o push `type=support` continua abrindo a conversa
+  direto. Eventos: `help.article_opened` (`article` = id do artigo) e
+  `help.searched` (`results`; uma vez por busca, 1 s depois da última tecla,
+  nunca com o texto digitado).

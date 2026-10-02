@@ -11,6 +11,7 @@ API e painel administrativo, num repositório só.
 | [`apps/admin`](apps/admin) | painel administrativo (Vite + React) | https://api.estoquesimples.com.br/admin |
 | [`packages/design`](packages/design) | tokens visuais (os do app) usados pela web e pelo painel | — |
 | [`packages/legal`](packages/legal) | Termos de Uso e Política de Privacidade: fonte única da web e do app | — |
+| [`packages/help`](packages/help) | central de ajuda (perguntas e respostas): fonte única da web, do app e do painel | — |
 
 API, painel e web são um **único serviço** no Railway: a API serve o painel em
 `/admin` e, nos hosts da web, a aplicação web (ver
@@ -73,6 +74,7 @@ não ficam no repositório. Contexto do app: [apps/android/AGENTS.md](apps/andro
 | `npm run admin:create` | cria ou redefine a senha de um administrador do painel |
 | `npm run seed:dev` | dados de demonstração |
 | `npm run legal:sync` / `legal:check` | copia (ou confere) os documentos legais nos assets do app |
+| `npm run help:sync` / `help:check` | copia (ou confere) a central de ajuda nos assets do app e valida os arquivos |
 | `npm run openapi` | imprime o contrato OpenAPI |
 
 ## Estrutura
@@ -103,6 +105,7 @@ docs/         contratos e decisões (web, Asaas, notificações, analytics,
 | [docs/billing-asaas.md](docs/billing-asaas.md) | assinatura pela web e passo a passo de produção do Asaas |
 | [docs/plans.md](docs/plans.md) | planos e limites |
 | [docs/notifications.md](docs/notifications.md) | caixa de notificações e push |
+| [docs/help.md](docs/help.md) | central de ajuda: onde fica o conteúdo e como alterar |
 | [docs/support.md](docs/support.md) · [docs/push.md](docs/push.md) · [docs/analytics.md](docs/analytics.md) | contratos para os clientes |
 
 Segredos nunca entram no repositório: `.env` local é ignorado e a produção

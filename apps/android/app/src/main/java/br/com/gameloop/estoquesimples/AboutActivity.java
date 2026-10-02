@@ -27,6 +27,7 @@ public class AboutActivity extends BaseActivity {
         Button btnGoPro = findViewById(R.id.btnGoPro);
         View cardLegal = findViewById(R.id.cardLegal);
 
+        findViewById(R.id.btnHelp).setOnClickListener(v -> HelpActivity.open(this));
         btnContact.setOnClickListener(v -> startActivity(new Intent(this, SupportActivity.class)));
         btnGoPro.setOnClickListener(v -> SubscriptionActivity.open(this, "about"));
 

@@ -48,6 +48,11 @@ jobs:
       - name: Documentos legais do app em dia
         run: npm run legal:check
 
+      # A central de ajuda segue a mesma regra: fonte em packages/help, cópia
+      # nos assets do app. Também valida a estrutura dos arquivos.
+      - name: Central de ajuda válida e em dia no app
+        run: npm run help:check
+
       - name: Verificação de tipos
         run: npm run typecheck
 

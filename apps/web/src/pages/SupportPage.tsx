@@ -70,7 +70,11 @@ export function SupportPage() {
 
   return (
     <div className="page page--narrow">
-      <PageHeader title="Ajuda e suporte" subtitle="Fale com a equipe do Estoque Simples. A resposta chega por aqui." actions={newTicket} />
+      <PageHeader title="Falar com o suporte" subtitle="Fale com a equipe do Estoque Simples. A resposta chega por aqui." actions={newTicket} />
+
+      <Notice tone="info" action={<Link to="/app/ajuda" className="btn btn--secondary btn--sm">Abrir a central de ajuda</Link>}>
+        Muitas dúvidas já têm resposta pronta: sincronização, equipe, pagamento, reembolso.
+      </Notice>
 
       <Card flush>
         {list.isLoading || (list.error && !list.data) ? (
@@ -180,7 +184,7 @@ export function SupportNewPage() {
   return (
     <div className="page page--narrow">
       <PageHeader
-        crumbs={[{ label: 'Ajuda e suporte', to: '/app/suporte' }, { label: 'Nova solicitação' }]}
+        crumbs={[{ label: 'Suporte', to: '/app/suporte' }, { label: 'Nova solicitação' }]}
         title="Nova solicitação"
         subtitle="Conte o que está acontecendo. Quem lê e responde é a equipe do Estoque Simples."
       />
@@ -333,7 +337,7 @@ function TicketConversation({ ticketId }: { ticketId: string }) {
     }
   };
 
-  const crumbs = [{ label: 'Ajuda e suporte', to: '/app/suporte' }, { label: ticket ? `#${ticket.number}` : 'Solicitação' }];
+  const crumbs = [{ label: 'Suporte', to: '/app/suporte' }, { label: ticket ? `#${ticket.number}` : 'Solicitação' }];
 
   // 404: não existe ou é de outra conta (a API não diz qual, de propósito).
   // 400: o endereço não tem um identificador válido. Para a pessoa, dá no mesmo.

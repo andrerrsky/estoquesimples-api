@@ -1,0 +1,840 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-02",
+  "categories": [
+    {
+      "id": "comecar",
+      "title": "Primeiros passos",
+      "summary": "O que é, como começar e por onde usar"
+    },
+    {
+      "id": "estoque",
+      "title": "Produtos e movimentações",
+      "summary": "Cadastro, entradas, saídas, correções e relatórios"
+    },
+    {
+      "id": "nuvem",
+      "title": "Celular, computador e sincronização",
+      "summary": "Como os dados chegam de um lugar ao outro"
+    },
+    {
+      "id": "equipe",
+      "title": "Equipe",
+      "summary": "Convidar pessoas e definir o que cada uma pode fazer"
+    },
+    {
+      "id": "plano",
+      "title": "Plano, pagamento e reembolso",
+      "summary": "O que é grátis, como assinar, cancelar e pedir o dinheiro de volta"
+    },
+    {
+      "id": "conta",
+      "title": "Conta e segurança",
+      "summary": "Senha, e-mail, aparelhos e exclusão da conta"
+    },
+    {
+      "id": "limites",
+      "title": "Limites e o que o Estoque Simples não faz",
+      "summary": "Para você saber antes de contar com isso"
+    }
+  ],
+  "articles": [
+    {
+      "id": "o-que-e",
+      "category": "comecar",
+      "question": "O que é o Estoque Simples?",
+      "answer": [
+        "É um controle de estoque para pequenos negócios: você cadastra os produtos, registra o que entra e o que sai, e o sistema mostra quanto tem de cada coisa, o que está acabando e quanto vale o que está parado.",
+        "Ele existe em dois lugares que mostram **os mesmos dados**: o aplicativo para celular Android e a versão web, em estoquesimples.com.br, que abre em qualquer navegador."
+      ],
+      "keywords": [
+        "para que serve",
+        "o que faz",
+        "como funciona"
+      ]
+    },
+    {
+      "id": "precisa-de-conta",
+      "category": "comecar",
+      "question": "Preciso criar uma conta para usar?",
+      "answer": [
+        "No aplicativo Android, **não**. Ele funciona completo sem conta e sem internet: tudo fica guardado no próprio celular.",
+        "A conta é necessária para três coisas:",
+        "• guardar uma cópia do estoque na nuvem e usar em mais de um aparelho;",
+        "• usar a versão web no computador;",
+        "• trabalhar em equipe.",
+        "Criar a conta é grátis e não pede cartão."
+      ],
+      "keywords": [
+        "cadastro",
+        "login",
+        "registrar",
+        "gratis",
+        "sem conta"
+      ]
+    },
+    {
+      "id": "primeiro-produto",
+      "category": "comecar",
+      "question": "Como cadastro meu primeiro produto?",
+      "answer": [
+        "**No aplicativo:** toque em **Novo**, na barra de baixo, preencha o nome e a quantidade que você tem hoje e salve.",
+        "**Na web:** em **Estoque**, clique em **Novo produto**.",
+        "Só o nome e a quantidade são obrigatórios. O restante (preço, categoria, código de barras, estoque mínimo, fornecedor, localização) pode ser preenchido depois.",
+        "Se você já tem uma lista numa planilha, dá para importar tudo de uma vez em vez de cadastrar um por um."
+      ],
+      "keywords": [
+        "cadastrar",
+        "adicionar produto",
+        "novo item",
+        "começar"
+      ]
+    },
+    {
+      "id": "entrada-e-saida",
+      "category": "comecar",
+      "question": "Como registro uma entrada ou uma saída?",
+      "answer": [
+        "Em cada produto da lista há os botões **Entrada** e **Saída**. Informe a quantidade e, se quiser, uma observação (por exemplo, \"venda no balcão\" ou \"compra do fornecedor\").",
+        "Cada registro vai para o **Histórico**, com data, quantidade e quanto ficou em estoque depois (na web, também quem fez). É por ele que você confere o que aconteceu.",
+        "Esqueceu de lançar ontem? Ao registrar, você pode escolher a data em que a movimentação de fato aconteceu."
+      ],
+      "keywords": [
+        "movimentar",
+        "vender",
+        "comprar",
+        "baixa",
+        "lançar",
+        "retroativo"
+      ]
+    },
+    {
+      "id": "app-ou-web",
+      "category": "comecar",
+      "question": "Qual a diferença entre o aplicativo e a versão web?",
+      "answer": [
+        "Os dois mostram o mesmo estoque e seguem as mesmas regras. As diferenças são:",
+        "• **Aplicativo Android:** funciona sem internet, guarda fotos dos produtos, avisa por notificação quando algo está acabando e faz backup no próprio aparelho.",
+        "• **Versão web:** precisa de internet, tem tela grande para cadastrar e conferir com mais conforto, e é onde se assina o plano por Pix, boleto ou cartão.",
+        "Você pode usar só um deles ou os dois juntos, com a mesma conta."
+      ],
+      "keywords": [
+        "computador",
+        "navegador",
+        "site",
+        "celular",
+        "android"
+      ]
+    },
+    {
+      "id": "corrigir-movimentacao",
+      "category": "estoque",
+      "question": "Errei uma movimentação. Como corrijo?",
+      "answer": [
+        "Logo depois de registrar, aparece um aviso com o botão **Desfazer**. É o jeito mais rápido.",
+        "Se o aviso já sumiu, abra o **Histórico**, encontre a movimentação e use **Estornar**. O sistema lança a operação contrária e o estoque volta ao que era.",
+        "A movimentação errada continua aparecendo no histórico, marcada como estornada. Isso é de propósito: assim o saldo sempre pode ser explicado, linha por linha."
+      ],
+      "keywords": [
+        "erro",
+        "desfazer",
+        "estornar",
+        "cancelar",
+        "lancei errado",
+        "apagar movimentação"
+      ]
+    },
+    {
+      "id": "por-que-nao-apaga",
+      "category": "estoque",
+      "question": "Por que não consigo apagar uma movimentação do histórico?",
+      "answer": [
+        "Porque o histórico funciona como um livro-caixa: nada é apagado, e todo erro é corrigido com um lançamento contrário (o estorno).",
+        "Isso protege você. Se uma quantidade não bater, dá para ver exatamente o que foi lançado, quando e por quem — inclusive o que foi corrigido."
+      ],
+      "keywords": [
+        "excluir histórico",
+        "deletar",
+        "remover lançamento"
+      ]
+    },
+    {
+      "id": "ajustar-quantidade",
+      "category": "estoque",
+      "question": "Contei o estoque e a quantidade está diferente. O que faço?",
+      "answer": [
+        "Edite o produto e corrija a quantidade para o número que você contou. O sistema registra a diferença no histórico como um **ajuste**, e você pode anotar o motivo (por exemplo, \"contagem de inventário\").",
+        "Para corrigir vários produtos de uma vez, use a **edição em massa**: selecione os produtos e escolha somar ou subtrair uma quantidade."
+      ],
+      "keywords": [
+        "inventário",
+        "contagem",
+        "ajuste",
+        "diferença",
+        "acertar estoque"
+      ]
+    },
+    {
+      "id": "estoque-baixo",
+      "category": "estoque",
+      "question": "Como sou avisado quando um produto está acabando?",
+      "answer": [
+        "Defina o **estoque mínimo** no cadastro do produto. Quando a quantidade chega a esse número (ou zera), o produto aparece destacado na lista e no filtro **Estoque baixo**.",
+        "No aplicativo Android você também recebe uma notificação no celular. Na web, os relatórios trazem a lista **Para repor**."
+      ],
+      "keywords": [
+        "mínimo",
+        "alerta",
+        "acabando",
+        "repor",
+        "notificação",
+        "aviso"
+      ]
+    },
+    {
+      "id": "excluir-produto",
+      "category": "estoque",
+      "question": "Excluí um produto sem querer. E agora?",
+      "answer": [
+        "Logo depois de excluir aparece o botão **Desfazer**: toque nele e o produto volta como estava.",
+        "Se o aviso já sumiu, cadastre o produto de novo. As movimentações antigas dele não se perdem: continuam no Histórico, identificadas como de um produto excluído."
+      ],
+      "keywords": [
+        "apagar produto",
+        "restaurar",
+        "recuperar",
+        "deletar"
+      ]
+    },
+    {
+      "id": "importar-planilha",
+      "category": "estoque",
+      "question": "Como importo meus produtos de uma planilha?",
+      "answer": [
+        "Salve a planilha como **CSV** (o Excel e o Planilhas Google fazem isso em \"Salvar como\" ou \"Fazer download\") e use **Importar e exportar** na web ou a aba **Imp/Exp** no aplicativo.",
+        "Cada linha é comparada com o que você já tem, nesta ordem: código interno, SKU, código de barras e, por último, o nome.",
+        "• Produto que já existe é **atualizado**, e só nas colunas preenchidas.",
+        "• Produto que não existe é **cadastrado**.",
+        "• Se a quantidade da planilha for diferente da atual, a diferença entra no histórico como ajuste.",
+        "Na web há um modelo pronto para baixar e uma prévia antes de gravar. No aplicativo, a planilha é importada assim que você escolhe o arquivo; se quiser poder voltar atrás, faça um backup antes (na mesma tela)."
+      ],
+      "keywords": [
+        "excel",
+        "csv",
+        "planilha",
+        "importação",
+        "google planilhas",
+        "vários produtos"
+      ]
+    },
+    {
+      "id": "relatorios",
+      "category": "estoque",
+      "question": "Quais relatórios existem e como salvo em PDF?",
+      "answer": [
+        "Os relatórios mostram quantos produtos você tem, quanto vale o estoque, o que precisa repor, o que entrou e saiu no período e quais produtos concentram mais dinheiro parado.",
+        "**No aplicativo:** a aba **Relatórios** gera os arquivos em PDF.",
+        "**Na web:** em **Relatórios**, use **Imprimir / salvar PDF** e escolha \"Salvar como PDF\" na janela de impressão.",
+        "Também dá para exportar produtos e movimentações em CSV, para abrir no Excel."
+      ],
+      "keywords": [
+        "pdf",
+        "imprimir",
+        "exportar",
+        "valor do estoque",
+        "relatório"
+      ]
+    },
+    {
+      "id": "codigo-de-barras",
+      "category": "estoque",
+      "question": "Posso usar leitor de código de barras?",
+      "answer": [
+        "Sim. No aplicativo, a câmera do celular lê o código para buscar ou cadastrar um produto.",
+        "Na web, um leitor USB funciona direto no campo de busca, como se fosse um teclado. Em alguns navegadores (como o Chrome) também aparece um botão para ler pela câmera."
+      ],
+      "keywords": [
+        "scanner",
+        "leitor",
+        "câmera",
+        "ean",
+        "qr code"
+      ]
+    },
+    {
+      "id": "fracao",
+      "category": "estoque",
+      "question": "Por que o sistema não aceita quantidade com vírgula em alguns produtos?",
+      "answer": [
+        "Produtos contados por unidade, caixa, pacote ou peça só aceitam número inteiro: não existe meia caixa em estoque.",
+        "Para vender fracionado, cadastre o produto em uma unidade de medida, como **kg**, **g**, **L**, **ml** ou **m**. Aí quantidades como 1,5 são aceitas."
+      ],
+      "keywords": [
+        "decimal",
+        "meio",
+        "quilo",
+        "unidade",
+        "kg",
+        "fracionado"
+      ]
+    },
+    {
+      "id": "como-sincroniza",
+      "category": "nuvem",
+      "question": "Como funciona a sincronização?",
+      "answer": [
+        "O aplicativo guarda tudo primeiro no celular. Quando você tem uma conta e há internet, ele envia as novidades para a nuvem e busca o que mudou em outros lugares. Isso acontece sozinho, de tempos em tempos, e também quando você toca em **Sincronizar agora**, em **Conta e nuvem**.",
+        "A versão web não guarda nada no computador: ela lê e grava direto na nuvem. Por isso, o que você faz na web vale na hora, e aparece no celular na próxima sincronização dele.",
+        "Resumindo: a nuvem é o ponto de encontro. Celular e computador conversam com ela, não um com o outro."
+      ],
+      "keywords": [
+        "sincronizar",
+        "nuvem",
+        "backup",
+        "atualizar",
+        "dados"
+      ]
+    },
+    {
+      "id": "sem-internet",
+      "category": "nuvem",
+      "question": "Funciona sem internet?",
+      "answer": [
+        "O **aplicativo Android**, sim. Você cadastra, movimenta e consulta normalmente; o que foi feito fica na fila e sobe para a nuvem quando a conexão voltar.",
+        "A **versão web**, não: ela precisa de internet para abrir e para gravar."
+      ],
+      "keywords": [
+        "offline",
+        "sem conexão",
+        "sem sinal",
+        "wifi"
+      ]
+    },
+    {
+      "id": "nao-apareceu",
+      "category": "nuvem",
+      "question": "Lancei no computador e não apareceu no celular (ou o contrário)",
+      "answer": [
+        "Confira, nesta ordem:",
+        "• **Internet no celular.** Sem conexão, ele não recebe nem envia.",
+        "• **Sincronizar agora.** No aplicativo, abra **Conta e nuvem** e toque em **Sincronizar agora**. A mesma tela mostra quando foi a última sincronização e se há algo pendente.",
+        "• **Mesma conta e mesma empresa.** Quem participa de mais de uma empresa precisa estar com a mesma selecionada nos dois lugares.",
+        "• **Plano.** No plano gratuito, só o proprietário da empresa usa a nuvem. Se a conta é de um funcionário, veja as perguntas sobre Equipe.",
+        "Se nada disso resolver, fale com o suporte por esta mesma área de ajuda."
+      ],
+      "keywords": [
+        "não sincroniza",
+        "diferente",
+        "desatualizado",
+        "não atualiza",
+        "sumiu"
+      ]
+    },
+    {
+      "id": "conflitos",
+      "category": "nuvem",
+      "question": "O que são os conflitos de sincronização?",
+      "answer": [
+        "Um conflito acontece quando duas pessoas (ou dois aparelhos) mudam a **mesma informação** do mesmo produto antes de sincronizar — por exemplo, cada uma coloca um preço diferente. O aplicativo chama de **conflitos**; a web, de **alterações para revisar**.",
+        "O sistema não escolhe por conta própria, porque não tem como saber qual está certo. Ele mantém uma versão valendo, guarda a outra e pede que alguém decida.",
+        "Nada é perdido. Mudanças em informações diferentes do mesmo produto (uma pessoa muda o preço, outra muda a categoria) são juntadas sozinhas, sem perguntar."
+      ],
+      "keywords": [
+        "conflito",
+        "duas pessoas",
+        "ao mesmo tempo",
+        "revisar",
+        "versão",
+        "alterações para revisar",
+        "resolver conflitos"
+      ]
+    },
+    {
+      "id": "fotos",
+      "category": "nuvem",
+      "question": "As fotos dos produtos vão para a nuvem?",
+      "answer": [
+        "Não. As fotos ficam só no celular em que foram tiradas. Elas não aparecem na versão web nem em outros aparelhos.",
+        "Todo o resto do cadastro (nome, quantidade, preço, categoria, códigos, histórico) sincroniza normalmente."
+      ],
+      "keywords": [
+        "imagem",
+        "foto",
+        "câmera",
+        "galeria"
+      ]
+    },
+    {
+      "id": "troquei-de-celular",
+      "category": "nuvem",
+      "question": "Troquei de celular. Como levo meu estoque?",
+      "answer": [
+        "Se você usa conta, é só instalar o aplicativo no celular novo e entrar com o mesmo e-mail e senha: o estoque que está na nuvem é baixado.",
+        "Antes de se desfazer do celular antigo, abra **Conta e nuvem** e confira se não há nada pendente de envio. As fotos não vêm junto, porque ficam só no aparelho.",
+        "Se você não usa conta, faça um backup pelo aplicativo (em **Imp/Exp**) no celular antigo e restaure no novo."
+      ],
+      "keywords": [
+        "novo aparelho",
+        "mudar de celular",
+        "restaurar",
+        "backup",
+        "transferir"
+      ]
+    },
+    {
+      "id": "ja-tinha-estoque",
+      "category": "nuvem",
+      "question": "Já uso o aplicativo há tempos sem conta. O que acontece quando eu criar uma?",
+      "answer": [
+        "Ao criar a conta **pelo aplicativo**, o estoque que está no celular é enviado para a nuvem e passa a aparecer também na web.",
+        "Atenção a um detalhe: se a empresa já tiver dados na nuvem (porque você começou pela web ou por outro aparelho), o celular passa a usar os dados da nuvem e guarda uma cópia do que havia nele. Por isso, quem já tem o estoque no celular deve criar a conta por ele, e não pela web."
+      ],
+      "keywords": [
+        "primeira sincronização",
+        "enviar estoque",
+        "criar conta depois",
+        "dados antigos"
+      ]
+    },
+    {
+      "id": "sincronizacao-pausada",
+      "category": "nuvem",
+      "question": "Apareceu \"sincronização pausada\". O que significa?",
+      "answer": [
+        "Quase sempre é o limite de produtos do plano gratuito: quando o estoque passa do limite, o aplicativo para de enviar para a nuvem até que você reduza o número de produtos ou assine o plano Equipe.",
+        "Nada é apagado. O aplicativo continua funcionando normalmente no celular e guarda as novidades para enviar depois."
+      ],
+      "keywords": [
+        "pausada",
+        "limite",
+        "parou de sincronizar",
+        "plano"
+      ]
+    },
+    {
+      "id": "convidar",
+      "category": "equipe",
+      "question": "Como coloco um funcionário para usar o mesmo estoque?",
+      "answer": [
+        "Trabalhar em equipe faz parte do **plano Equipe**. Com ele ativo:",
+        "• abra **Equipe** e escolha **Convidar pessoa**;",
+        "• informe o e-mail e o papel (o que ela vai poder fazer);",
+        "• a pessoa recebe um e-mail com o convite. Na web, basta abrir o link; no aplicativo, ela toca em **Recebi um convite** e cola o código que veio no e-mail. Se ainda não tiver conta, cria na hora.",
+        "Para convidar, o seu próprio e-mail precisa estar confirmado. O convite vale por alguns dias; se vencer, é só reenviar."
+      ],
+      "keywords": [
+        "convite",
+        "adicionar pessoa",
+        "colaborador",
+        "usuário",
+        "funcionário",
+        "sócio"
+      ]
+    },
+    {
+      "id": "papeis",
+      "category": "equipe",
+      "question": "O que cada papel pode fazer?",
+      "answer": [
+        "• **Proprietário:** controle total, inclusive a assinatura e a transferência da empresa. Só existe um.",
+        "• **Administrador:** cuida de produtos, movimentações e equipe. Não mexe na assinatura nem transfere a empresa.",
+        "• **Gerente:** cuida de produtos e movimentações e vê quem está na equipe, mas não convida nem remove pessoas.",
+        "• **Operador:** cadastra e edita produtos e registra entradas e saídas. Não exclui produtos.",
+        "• **Somente consulta:** apenas vê o estoque. Não altera nada.",
+        "Ninguém consegue dar a outra pessoa um papel igual ou maior que o seu."
+      ],
+      "keywords": [
+        "permissão",
+        "papel",
+        "administrador",
+        "gerente",
+        "operador",
+        "consulta",
+        "acesso"
+      ]
+    },
+    {
+      "id": "remover-pessoa",
+      "category": "equipe",
+      "question": "Como tiro o acesso de alguém?",
+      "answer": [
+        "Em **Equipe**, abra as opções da pessoa. Há dois caminhos:",
+        "• **Suspender:** ela continua na lista, mas não entra. Serve para afastamentos; dá para reativar depois.",
+        "• **Remover:** ela sai da empresa.",
+        "Nos dois casos a pessoa é desconectada na hora, em todos os aparelhos. O que ela registrou continua no histórico, com o nome dela."
+      ],
+      "keywords": [
+        "demitir",
+        "excluir usuário",
+        "bloquear",
+        "suspender",
+        "desligar"
+      ]
+    },
+    {
+      "id": "funcionario-nao-ve",
+      "category": "equipe",
+      "question": "Meu funcionário entrou, mas não vê o estoque",
+      "answer": [
+        "As causas mais comuns:",
+        "• **A empresa está no plano gratuito.** Nele, a nuvem é só do proprietário. Com o plano Equipe ativo, as pessoas convidadas voltam a ver e movimentar.",
+        "• **O acesso dele está suspenso.** Reative em Equipe.",
+        "• **Ele não aceitou o convite**, ou entrou com um e-mail diferente do convidado.",
+        "• **Outra empresa selecionada.** Quem participa de mais de uma precisa escolher a certa."
+      ],
+      "keywords": [
+        "sem acesso",
+        "não aparece",
+        "membro",
+        "convite não funciona"
+      ]
+    },
+    {
+      "id": "transferir-empresa",
+      "category": "equipe",
+      "question": "Como passo a empresa para outra pessoa?",
+      "answer": [
+        "O proprietário pode **transferir a propriedade** para alguém que já esteja na equipe. Isso é feito pela versão web, em **Equipe**. A partir daí, a outra pessoa vira proprietária e você passa a ser administrador.",
+        "A assinatura é da empresa, então continua valendo depois da transferência."
+      ],
+      "keywords": [
+        "dono",
+        "transferir",
+        "vender negócio",
+        "mudar proprietário"
+      ]
+    },
+    {
+      "id": "mais-de-uma-empresa",
+      "category": "equipe",
+      "question": "Posso ter mais de uma empresa na mesma conta?",
+      "answer": [
+        "Sim. Cada empresa tem o seu próprio estoque, a sua equipe e o seu plano. Isso também vale se você for convidado para a empresa de outra pessoa: ela aparece na sua lista ao lado das suas.",
+        "**Na web**, você troca de uma para outra pelo seletor de empresas, no alto do menu.",
+        "**No aplicativo**, a empresa é escolhida ao entrar na conta. Para trocar, saia da conta em **Conta e nuvem** e entre de novo, escolhendo a outra."
+      ],
+      "keywords": [
+        "duas lojas",
+        "filial",
+        "várias empresas",
+        "trocar empresa"
+      ]
+    },
+    {
+      "id": "gratis-e-pago",
+      "category": "plano",
+      "question": "O que é grátis e o que é pago?",
+      "answer": [
+        "**Sempre grátis:** o aplicativo no celular, com produtos, movimentações, histórico, relatórios, importação e exportação.",
+        "**Grátis com conta:** o estoque na nuvem e na versão web, para **uma pessoa** (quem criou a empresa) e até um limite de produtos. O número aparece em **Plano**, na web, e em **Conta e nuvem**, no aplicativo.",
+        "**Plano Equipe (pago):** produtos sem limite na nuvem, equipe com papéis e permissões e a Análise Avançada (ritmo de consumo, previsão de quando cada produto acaba e o que repor primeiro).",
+        "O preço aparece antes de qualquer confirmação: na tela **Plano** da web ou em **Plano Equipe**, no menu do aplicativo."
+      ],
+      "keywords": [
+        "preço",
+        "quanto custa",
+        "gratuito",
+        "mensalidade",
+        "plano equipe",
+        "valor"
+      ]
+    },
+    {
+      "id": "como-assinar",
+      "category": "plano",
+      "question": "Como assino o plano Equipe?",
+      "answer": [
+        "Só o **proprietário** da empresa pode assinar. Há dois caminhos, e basta um:",
+        "• **Pelo aplicativo Android:** no menu, abra **Plano Equipe**. A cobrança é feita pela Google Play, com a forma de pagamento da sua conta Google.",
+        "• **Pela versão web:** em **Plano**, escolha mensal ou anual e pague por **Pix, boleto ou cartão**.",
+        "A assinatura é da empresa. Uma pessoa paga e toda a equipe usa, no celular e no computador, não importa por onde foi contratada."
+      ],
+      "keywords": [
+        "assinar",
+        "contratar",
+        "pix",
+        "boleto",
+        "cartão",
+        "google play",
+        "pagar"
+      ]
+    },
+    {
+      "id": "dados-de-pagamento",
+      "category": "plano",
+      "question": "Por que a web pede CPF ou CNPJ? Meu cartão fica guardado?",
+      "answer": [
+        "O CPF ou CNPJ é exigido para emitir a cobrança (Pix, boleto ou cartão). Ele é repassado à empresa que processa os pagamentos, o Asaas.",
+        "Os dados do cartão são digitados direto na página do Asaas. O Estoque Simples não recebe nem guarda o número do seu cartão."
+      ],
+      "keywords": [
+        "cpf",
+        "cnpj",
+        "documento",
+        "seguro",
+        "asaas",
+        "dados do cartão"
+      ]
+    },
+    {
+      "id": "paguei-nao-liberou",
+      "category": "plano",
+      "question": "Paguei e o plano não foi liberado",
+      "answer": [
+        "Depende da forma de pagamento:",
+        "• **Pix e cartão:** a confirmação costuma chegar em instantes.",
+        "• **Boleto:** o banco pode levar alguns dias úteis para compensar.",
+        "Na web, abra **Plano** e use **Já paguei, atualizar**: isso consulta o pagamento na hora. No aplicativo, abra **Plano Equipe**, no menu, para ele conferir de novo.",
+        "Se o pagamento já foi confirmado pelo seu banco e mesmo assim não liberou, fale com o suporte e informe a data e a forma de pagamento."
+      ],
+      "keywords": [
+        "não ativou",
+        "pagamento pendente",
+        "aguardando",
+        "compensar",
+        "demora"
+      ]
+    },
+    {
+      "id": "cancelar",
+      "category": "plano",
+      "question": "Como cancelo a assinatura?",
+      "answer": [
+        "Cancele **no mesmo lugar em que assinou**:",
+        "• **Assinou pela web:** em **Plano**, use a opção de cancelar a assinatura.",
+        "• **Assinou pelo aplicativo:** nas assinaturas da sua conta na Google Play.",
+        "Ao cancelar, as próximas cobranças param e o plano **continua valendo até o fim do período já pago**. Depois, a empresa volta ao plano gratuito."
+      ],
+      "keywords": [
+        "cancelamento",
+        "parar de pagar",
+        "desistir",
+        "encerrar assinatura"
+      ]
+    },
+    {
+      "id": "reembolso",
+      "category": "plano",
+      "question": "Posso pedir reembolso?",
+      "answer": [
+        "**Assinatura feita pela web:** você pode desistir em até **7 dias** depois da contratação e receber o valor de volta. Peça pelo suporte, nesta mesma área de ajuda, informando a empresa.",
+        "**Assinatura feita pela Google Play:** o reembolso segue as regras da Google e é pedido na própria Google Play.",
+        "Fora desses casos, cancelar interrompe as próximas cobranças, e o plano segue ativo até o fim do período pago. Se houver cobrança em duplicidade ou indevida, fale com o suporte."
+      ],
+      "keywords": [
+        "devolução",
+        "estorno",
+        "dinheiro de volta",
+        "arrependimento",
+        "reembolsar",
+        "cobrança indevida"
+      ]
+    },
+    {
+      "id": "atraso",
+      "category": "plano",
+      "question": "E se eu atrasar o pagamento?",
+      "answer": [
+        "O plano não cai na hora. Há alguns dias de tolerância (na web, o prazo aparece na tela **Plano**), em que tudo continua funcionando e você pode pagar a cobrança em aberto.",
+        "Se a tolerância acabar sem pagamento, a empresa volta ao plano gratuito até a regularização. Nada é apagado."
+      ],
+      "keywords": [
+        "vencido",
+        "inadimplência",
+        "atrasado",
+        "boleto vencido",
+        "tolerância"
+      ]
+    },
+    {
+      "id": "fim-da-assinatura",
+      "category": "plano",
+      "question": "O que acontece com meus dados se a assinatura acabar?",
+      "answer": [
+        "**Nada é apagado**, nem na nuvem nem nos celulares. A empresa volta ao plano gratuito, o que significa:",
+        "• só o proprietário continua usando a nuvem e a web; as outras pessoas ficam na equipe, mas sem acesso até a assinatura voltar;",
+        "• se o estoque estiver acima do limite de produtos do plano gratuito, não dá para cadastrar novos produtos na nuvem até reduzir ou assinar de novo;",
+        "• a Análise Avançada deixa de ficar disponível.",
+        "Assinando novamente, tudo volta como estava."
+      ],
+      "keywords": [
+        "perder dados",
+        "cancelar e depois",
+        "voltar ao gratuito",
+        "expirou"
+      ]
+    },
+    {
+      "id": "assinei-no-celular",
+      "category": "plano",
+      "question": "Assinei pelo celular. Vale na versão web também?",
+      "answer": [
+        "Sim. A assinatura é da empresa e vale nos dois lugares, para toda a equipe.",
+        "O que muda é só onde ela é gerenciada: quem assinou pela Google Play cancela ou troca a forma de pagamento na Google Play; quem assinou pela web faz isso na tela Plano da web."
+      ],
+      "keywords": [
+        "duas assinaturas",
+        "pagar duas vezes",
+        "google play e web"
+      ]
+    },
+    {
+      "id": "versao-pro",
+      "category": "plano",
+      "question": "Comprei a Versão PRO antiga. Ainda vale?",
+      "answer": [
+        "Sim. Quem comprou a Versão PRO (compra única, que não é mais vendida) mantém os recursos premium **naquele aparelho**.",
+        "Ela não inclui equipe nem produtos sem limite na nuvem, que fazem parte do plano Equipe."
+      ],
+      "keywords": [
+        "pro",
+        "compra única",
+        "premium",
+        "antiga"
+      ],
+      "platforms": [
+        "android"
+      ]
+    },
+    {
+      "id": "esqueci-a-senha",
+      "category": "conta",
+      "question": "Esqueci minha senha",
+      "answer": [
+        "A senha é redefinida pela versão web. Abra **estoquesimples.com.br**, clique em **Entrar** e depois em **Esqueci minha senha**. Informe o e-mail da conta e siga as instruções da mensagem que você vai receber. O link vale por pouco tempo; se vencer, peça outro.",
+        "A senha nova vale também no aplicativo: é a mesma conta.",
+        "Não recebeu o e-mail? Olhe a caixa de spam e confira se digitou o mesmo e-mail usado no cadastro."
+      ],
+      "keywords": [
+        "recuperar senha",
+        "redefinir",
+        "trocar senha",
+        "não lembro"
+      ]
+    },
+    {
+      "id": "confirmar-email",
+      "category": "conta",
+      "question": "Não recebi o e-mail de confirmação",
+      "answer": [
+        "Procure na caixa de spam ou de promoções. Se não estiver lá, peça o reenvio na tela da sua conta.",
+        "Confirmar o e-mail é necessário para convidar pessoas para a empresa e para recuperar a senha se você a esquecer."
+      ],
+      "keywords": [
+        "verificar e-mail",
+        "confirmação",
+        "spam",
+        "reenviar"
+      ]
+    },
+    {
+      "id": "onde-estou-conectado",
+      "category": "conta",
+      "question": "Como vejo onde minha conta está aberta e saio de um aparelho?",
+      "answer": [
+        "Na versão web, a tela **Minha conta** lista os aparelhos e navegadores em que a conta está aberta. Dali você encerra um por um ou sai de todos de uma vez.",
+        "Use isso se perder o celular ou se tiver entrado num computador que não é seu."
+      ],
+      "keywords": [
+        "sessão",
+        "sair",
+        "deslogar",
+        "perdi o celular",
+        "outro computador",
+        "segurança"
+      ]
+    },
+    {
+      "id": "excluir-conta",
+      "category": "conta",
+      "question": "Como excluo minha conta?",
+      "answer": [
+        "A exclusão é feita pela versão web, em **Minha conta**, e pede a sua senha. A conta fica em um período de recuperação de 30 dias; nesse tempo, o suporte consegue reverter se você mudar de ideia.",
+        "Se você é **proprietário de uma empresa**, é preciso antes transferir a empresa para outra pessoa da equipe ou pedir ao suporte que a encerre.",
+        "Excluir a conta não apaga o que está guardado no aplicativo do seu celular."
+      ],
+      "keywords": [
+        "apagar conta",
+        "encerrar conta",
+        "deletar",
+        "lgpd",
+        "remover meus dados"
+      ]
+    },
+    {
+      "id": "seguranca",
+      "category": "conta",
+      "question": "Meus dados estão seguros?",
+      "answer": [
+        "A comunicação com a nuvem é cifrada, a senha é guardada de um jeito que nem a nossa equipe consegue ler, e o estoque de cada empresa só é acessível às pessoas que fazem parte dela.",
+        "A sua parte: use uma senha que você não usa em outros lugares e saia da conta em computadores compartilhados.",
+        "Os detalhes estão na Política de Privacidade."
+      ],
+      "keywords": [
+        "privacidade",
+        "segurança",
+        "senha",
+        "lgpd",
+        "quem vê"
+      ]
+    },
+    {
+      "id": "o-que-nao-faz",
+      "category": "limites",
+      "question": "O que o Estoque Simples não faz?",
+      "answer": [
+        "Ele é um controle de estoque. Para você não contar com o que não existe:",
+        "• **não emite nota fiscal** nem cupom;",
+        "• **não é frente de caixa**: não recebe pagamento nem controla contas a pagar e a receber;",
+        "• **não tem aplicativo para iPhone** (no iPhone, use a versão web pelo navegador);",
+        "• **não se integra** sozinho a lojas virtuais ou marketplaces. A troca de dados com outros sistemas é por planilha (CSV)."
+      ],
+      "keywords": [
+        "nota fiscal",
+        "nfe",
+        "pdv",
+        "caixa",
+        "iphone",
+        "ios",
+        "integração",
+        "marketplace",
+        "financeiro"
+      ]
+    },
+    {
+      "id": "limites-gratuito",
+      "category": "limites",
+      "question": "Quais são os limites do plano gratuito?",
+      "answer": [
+        "• **Uma pessoa na nuvem:** só quem criou a empresa usa a web e a sincronização.",
+        "• **Limite de produtos na nuvem:** o número aparece em **Plano** (web) ou em **Conta e nuvem** (aplicativo), junto com quantos você já usa.",
+        "• **Sem Análise Avançada.**",
+        "No celular, sem usar a nuvem, o aplicativo não tem limite de produtos."
+      ],
+      "keywords": [
+        "limite",
+        "máximo de produtos",
+        "gratuito",
+        "quantos produtos"
+      ]
+    },
+    {
+      "id": "limites-web",
+      "category": "limites",
+      "question": "O que a versão web não tem em relação ao aplicativo?",
+      "answer": [
+        "• Não funciona sem internet.",
+        "• Não mostra nem guarda fotos dos produtos.",
+        "• Não envia notificação de estoque baixo (o destaque aparece na lista e nos relatórios).",
+        "• O backup em arquivo é um recurso do aplicativo; na web, use as exportações."
+      ],
+      "keywords": [
+        "web não tem",
+        "falta",
+        "diferença",
+        "foto",
+        "offline"
+      ]
+    }
+  ]
+}

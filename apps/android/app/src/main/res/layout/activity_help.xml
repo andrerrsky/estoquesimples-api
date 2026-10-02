@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:defaultFocusHighlightEnabled="false"
+    tools:targetApi="26">
+    <!-- A raiz é focável para que o foco inicial não caia no campo de busca
+         (o primeiro focável da tela), abrindo o teclado antes de a pessoa
+         ver as perguntas. Mesmo cuidado da tela inicial. Sem o realce
+         padrão de foco: com teclado físico ele escureceria a tela inteira. -->
+
+    <LinearLayout
+        android:id="@+id/searchBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginTop="@dimen/field_gap"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_search">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="12dp"
+            android:src="@drawable/ic_search"
+            android:importantForAccessibility="no"
+            android:contentDescription="@null" />
+
+        <EditText
+            android:id="@+id/searchField"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:paddingLeft="@dimen/row_gap"
+            android:paddingRight="@dimen/row_gap"
+            android:background="@android:color/transparent"
+            android:hint="Buscar uma dúvida"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Estoque.Body"
+            android:textColorHint="@color/color_text_muted" />
+
+        <ImageView
+            android:id="@+id/clearSearch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Limpar busca"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/chipScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:scrollbars="none"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:id="@+id/chipRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Durante a busca os chips saem e entra a contagem. accessibilityLiveRegion
+         faz o leitor de tela avisar o número de resultados enquanto se digita. -->
+    <TextView
+        android:id="@+id/resultCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+        android:accessibilityLiveRegion="polite"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/helpList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingBottom="@dimen/screen_padding_bottom"
+        android:clipToPadding="false"
+        android:scrollbarStyle="outsideOverlay"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="@dimen/list_item_spacing"
+        android:listSelector="@android:color/transparent" />
+</LinearLayout>

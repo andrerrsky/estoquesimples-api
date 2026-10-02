@@ -28,6 +28,7 @@ Gradle à parte, sem ligação com o npm):
 | `apps/android` | app Android; fala com `https://api.estoquesimples.com.br` (URL fixa em `app/build.gradle`); tem o próprio [AGENTS.md](apps/android/AGENTS.md) |
 | `packages/design` | tokens visuais (derivados do app) usados por web e painel |
 | `packages/legal` | Termos e Política — fonte única; `npm run legal:sync` copia para os assets do app |
+| `packages/help` | central de ajuda (FAQ com busca) — fonte única da web, do painel e do app; `npm run help:sync` copia para os assets do app ([docs/help.md](docs/help.md)) |
 | `docs/` | contratos e decisões por assunto |
 
 O que se compartilha e o que não: regras de negócio vivem **só** na API; web

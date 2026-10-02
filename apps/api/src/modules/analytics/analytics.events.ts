@@ -74,6 +74,8 @@ export const AnalyticsEventName = {
   SUPPORT_MESSAGE_SENT: 'support.message_sent',
   SUPPORT_TICKET_RESOLVED: 'support.ticket_resolved',
   SUPPORT_TICKET_SUBMITTED: 'support.ticket_submitted',
+  HELP_ARTICLE_OPENED: 'help.article_opened',
+  HELP_SEARCHED: 'help.searched',
 } as const;
 
 export type AnalyticsEventNameValue = (typeof AnalyticsEventName)[keyof typeof AnalyticsEventName];
@@ -127,6 +129,8 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'support.ticket_opened', source: 'server', description: 'Solicitação de suporte aberta pelo app.', properties: { category: 'question | problem | suggestion | billing | account | other', signedIn: 'boolean' } },
   { name: 'support.message_sent', source: 'server', description: 'Usuário escreveu numa solicitação já aberta.' },
   { name: 'support.ticket_resolved', source: 'server', description: 'Solicitação encerrada.', properties: { by: 'user | admin' } },
+  { name: 'help.article_opened', source: 'app', description: 'Resposta aberta na central de ajuda (app ou web).', properties: { article: 'id do artigo em packages/help' } },
+  { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda (só a contagem, nunca o texto).', properties: { results: 'quantidade' } },
   { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },
   { name: 'subscription.checkout_started', source: 'server', description: 'Contratação do plano iniciada pela web (Asaas).', properties: { provider: 'asaas', cycle: 'MONTHLY | YEARLY', billingType: 'forma de pagamento' } },
   { name: 'subscription.cancel_requested', source: 'server', description: 'Proprietário cancelou a renovação pela web.', properties: { provider: 'asaas' } },
