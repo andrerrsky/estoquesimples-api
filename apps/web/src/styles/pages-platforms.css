@@ -200,3 +200,15 @@
     padding: 12px;
   }
 }
+
+/* O botão nunca passa da caixa: ocupa a largura do cartão e quebra o texto se faltar espaço. */
+.plat-card {
+  min-width: 0;
+}
+.plat-card__action .btn {
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}

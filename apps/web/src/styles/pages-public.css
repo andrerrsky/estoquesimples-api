@@ -816,3 +816,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.lp-platform {
+  min-width: 0;
+}
+.lp-platform__cta {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  justify-content: center;
+}
