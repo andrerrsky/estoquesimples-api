@@ -40,6 +40,7 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
     // Aplicação web e Asaas de teste (o cliente do Asaas é em memória).
     WEB_APP_HOSTS: 'web.test,www.web.test',
     WEB_APP_URL: 'https://web.test',
+    ADMIN_PANEL_URL: 'https://api.web.test/admin',
     ASAAS_WEBHOOK_TOKEN: 'token-de-webhook-do-asaas-para-os-testes',
     ASAAS_ENVIRONMENT: 'sandbox',
     ...overrides,

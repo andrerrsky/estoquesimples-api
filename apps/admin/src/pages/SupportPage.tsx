@@ -608,6 +608,7 @@ export function TicketDetailPage() {
 }
 
 const DIAGNOSTIC_LABEL: Record<string, string> = {
+  channel: 'Canal',
   path: 'Tela em que estava (web)',
   workspaceId: 'Empresa (id)',
   signedIn: 'Com sessão',

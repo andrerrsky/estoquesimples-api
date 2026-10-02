@@ -2,6 +2,7 @@ import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
 import { notifications, platformAdmins, pushTokens, supportMessages, supportTickets, users } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
+import { enqueueJob } from '../../platform/jobs/runner.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from '../admin/admin-audit.service.js';
@@ -41,6 +42,9 @@ function entityToRow(ticket: SupportTicket): TicketRow {
   }
   return row;
 }
+
+/** Tarefa que avisa a equipe, por e-mail, de uma solicitação nova (ver `support.jobs.ts`). */
+export const SUPPORT_NOTIFY_TEAM_JOB = 'support.notify_team';
 
 const CATEGORY_LABEL: Record<string, string> = {
   question: 'Dúvida',
@@ -180,6 +184,14 @@ export class SupportService {
       const created = inserted[0];
       if (!created) throw new Error('Falha ao abrir solicitação');
       await tx.insert(supportMessages).values({ ticketId: created.id, author: 'user', body: body.message });
+      // Na mesma transação: ou a solicitação existe e a equipe é avisada, ou
+      // nenhuma das duas coisas. A chave impede aviso em dobro.
+      await enqueueJob(tx, {
+        kind: SUPPORT_NOTIFY_TEAM_JOB,
+        uniqueKey: `${SUPPORT_NOTIFY_TEAM_JOB}:${created.id}`,
+        payload: { ticketId: created.id },
+        maxAttempts: 5,
+      });
       return created;
     });
 
@@ -192,6 +204,75 @@ export class SupportService {
     });
 
     return this.toUserView(ticket);
+  }
+
+  /**
+   * E-mail para a equipe avisando de uma solicitação nova (qualquer origem:
+   * app, web ou chat). Destinatários: `SUPPORT_NOTIFY_EMAILS` ou, sem ela, os
+   * administradores ativos de papel owner.
+   *
+   * Lança se nenhum envio der certo, para a fila repetir.
+   */
+  async notifyTeamOfNewTicket(ticketId: string): Promise<{ recipients: number; sent: number }> {
+    const rows = await this.db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+    const ticket = rows[0];
+    if (!ticket) return { recipients: 0, sent: 0 };
+
+    const configured = this.services.env.SUPPORT_NOTIFY_EMAILS;
+    const recipients =
+      configured.length > 0
+        ? configured
+        : (
+            await this.db
+              .select({ email: platformAdmins.email })
+              .from(platformAdmins)
+              .where(and(eq(platformAdmins.role, 'owner'), eq(platformAdmins.status, 'active')))
+          ).map((row) => row.email.toLowerCase());
+    if (recipients.length === 0) return { recipients: 0, sent: 0 };
+
+    const first = await this.db
+      .select({ body: supportMessages.body })
+      .from(supportMessages)
+      .where(eq(supportMessages.ticketId, ticketId))
+      .orderBy(supportMessages.createdAt)
+      .limit(1);
+    const account = ticket.userId
+      ? (await this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, ticket.userId)).limit(1))[0]
+      : undefined;
+
+    const device = (ticket.device ?? {}) as { platform?: string; model?: string; osVersion?: string };
+    const diagnostics = (ticket.diagnostics ?? {}) as Record<string, unknown>;
+    const origin =
+      (device.platform === 'web' ? 'Web' : 'App Android') + (diagnostics['channel'] === 'chat' ? ' (chat)' : '');
+    const who = account
+      ? `${account.name} <${account.email}> (com conta)`
+      : `${ticket.contactName ?? 'Sem nome'}${ticket.contactEmail ? ` <${ticket.contactEmail}>` : ' (sem e-mail informado)'} (sem conta)`;
+    const message = (first[0]?.body ?? '').trim();
+    const panel = this.services.env.ADMIN_PANEL_URL;
+
+    const text =
+      `Chegou uma solicitação de suporte nova no Estoque Simples.\n\n` +
+      `Número: #${ticket.number}\n` +
+      `Assunto: ${ticket.subject}\n` +
+      `Categoria: ${CATEGORY_LABEL[ticket.category] ?? ticket.category}\n` +
+      `De: ${who}\n` +
+      `Origem: ${origin}${device.model ? ` · ${device.model}` : ''}${device.osVersion ? ` · ${device.osVersion}` : ''}\n\n` +
+      `Mensagem:\n${message.length > 1500 ? `${message.slice(0, 1500)}…` : message}\n\n` +
+      (panel ? `Responder no painel: ${panel}/suporte/${ticket.id}\n` : 'Responda pelo painel, em Atendimento.\n');
+
+    let sent = 0;
+    let lastError: unknown = null;
+    for (const to of recipients) {
+      try {
+        await this.services.mailer.send({ to, subject: `[Suporte #${ticket.number}] ${ticket.subject}`.slice(0, 160), text, kind: 'support_new_ticket' });
+        sent += 1;
+      } catch (error) {
+        lastError = error;
+        this.services.logger?.warn({ err: error, ticketId }, 'aviso de solicitação nova não enviado');
+      }
+    }
+    if (sent === 0 && lastError) throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    return { recipients: recipients.length, sent };
   }
 
   private async memberWorkspace(userId: string, workspaceId: string): Promise<string | null> {

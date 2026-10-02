@@ -697,6 +697,25 @@
       ]
     },
     {
+      "id": "falar-com-suporte",
+      "category": "conta",
+      "question": "Como falo com o suporte?",
+      "answer": [
+        "**Na web:** pelo botão redondo no canto inferior direito da tela (em computadores) ou em **Falar com o suporte**, no menu. Não precisa ter conta: sem ela, informe o nome e o e-mail para receber a resposta.",
+        "**No aplicativo:** no menu, **Ajuda e suporte**, e depois **Falar com o suporte**.",
+        "Quem responde é uma pessoa da equipe, então a resposta não é na hora. Ela aparece na própria conversa e você é avisado por notificação ou por e-mail."
+      ],
+      "keywords": [
+        "contato",
+        "atendimento",
+        "chat",
+        "ajuda",
+        "falar com alguém",
+        "reclamar",
+        "sugestão"
+      ]
+    },
+    {
       "id": "esqueci-a-senha",
       "category": "conta",
       "question": "Esqueci minha senha",

@@ -2,13 +2,41 @@
   "version": 1,
   "updatedAt": "2026-10-02",
   "categories": [
-    { "id": "atendimento", "title": "Atendimento", "summary": "Responder solicitações e avaliações" },
-    { "id": "contas", "title": "Contas e empresas", "summary": "Acesso, senha, exclusão e propriedade" },
-    { "id": "cobranca", "title": "Assinaturas, cobrança e reembolso", "summary": "Google Play e Asaas no dia a dia" },
-    { "id": "planos", "title": "Planos, preços e limites", "summary": "O que cada plano libera e quanto custa" },
-    { "id": "comunicacao", "title": "Notificações e campanhas", "summary": "Push no aplicativo e caixa de notificações" },
-    { "id": "operacao", "title": "Operação e acompanhamento", "summary": "Saúde do serviço, uso e auditoria" },
-    { "id": "painel", "title": "Sobre o painel", "summary": "Papéis, limites e boas práticas" }
+    {
+      "id": "atendimento",
+      "title": "Atendimento",
+      "summary": "Responder solicitações e avaliações"
+    },
+    {
+      "id": "contas",
+      "title": "Contas e empresas",
+      "summary": "Acesso, senha, exclusão e propriedade"
+    },
+    {
+      "id": "cobranca",
+      "title": "Assinaturas, cobrança e reembolso",
+      "summary": "Google Play e Asaas no dia a dia"
+    },
+    {
+      "id": "planos",
+      "title": "Planos, preços e limites",
+      "summary": "O que cada plano libera e quanto custa"
+    },
+    {
+      "id": "comunicacao",
+      "title": "Notificações e campanhas",
+      "summary": "Push no aplicativo e caixa de notificações"
+    },
+    {
+      "id": "operacao",
+      "title": "Operação e acompanhamento",
+      "summary": "Saúde do serviço, uso e auditoria"
+    },
+    {
+      "id": "painel",
+      "title": "Sobre o painel",
+      "summary": "Papéis, limites e boas práticas"
+    }
   ],
   "articles": [
     {
@@ -21,7 +49,49 @@
         "**Nota interna** fica só para a equipe: o cliente não vê e não é avisado.",
         "Ao terminar, marque como **resolvida**. Se o cliente escrever de novo, a solicitação reabre sozinha."
       ],
-      "keywords": ["ticket", "chamado", "responder", "nota interna", "resolver"]
+      "keywords": [
+        "ticket",
+        "chamado",
+        "responder",
+        "nota interna",
+        "resolver"
+      ]
+    },
+    {
+      "id": "adm-aviso-email",
+      "category": "atendimento",
+      "question": "Como fico sabendo que chegou uma solicitação nova?",
+      "answer": [
+        "De três jeitos: o número no menu **Atendimento**, a visão geral e um **e-mail** enviado na hora em que a solicitação é aberta, com quem escreveu, de onde (aplicativo, web ou chat), a mensagem e o link para responder.",
+        "O e-mail vai para os administradores **owner** ativos. Para mandar a outros endereços (uma caixa da equipe, por exemplo), defina `SUPPORT_NOTIFY_EMAILS` nas variáveis do serviço, com os e-mails separados por vírgula.",
+        "O aviso é só para solicitação **nova**. Mensagens seguintes na mesma conversa aparecem no painel, sem novo e-mail."
+      ],
+      "keywords": [
+        "e-mail",
+        "aviso",
+        "notificação",
+        "novo ticket",
+        "alerta",
+        "owner"
+      ]
+    },
+    {
+      "id": "adm-chat",
+      "category": "atendimento",
+      "question": "O que é o chat da web e como respondo nele?",
+      "answer": [
+        "É o botão flutuante no canto da versão web. Para o cliente parece um chat; para a equipe é uma **solicitação normal**, que aparece em Atendimento com o canal \"chat\" no diagnóstico. Responde-se do mesmo jeito.",
+        "A resposta aparece no balão do cliente em alguns segundos, se ele estiver com a página aberta. Se não estiver, ele é avisado pela caixa de notificações (quem tem conta) ou por e-mail.",
+        "Visitante sem conta informa nome e e-mail antes da dúvida; a solicitação fica ligada ao navegador dele. Se depois ele entrar na conta nesse navegador, a conversa passa para a conta.",
+        "Não é atendimento em tempo real: ninguém vê o cliente \"digitando\", e ele não vê se há alguém online."
+      ],
+      "keywords": [
+        "chat",
+        "botão flutuante",
+        "widget",
+        "visitante",
+        "sem conta"
+      ]
     },
     {
       "id": "adm-rascunho-ia",
@@ -31,7 +101,12 @@
         "É uma sugestão de resposta gerada a partir da conversa, para você revisar. Nada é enviado sozinho: o texto só vai para o cliente quando você clica em enviar.",
         "Leia sempre antes de enviar e confira os fatos (plano do cliente, prazos, valores). A chave do serviço de IA é configurada por um administrador **owner**."
       ],
-      "keywords": ["inteligência artificial", "sugestão", "openai", "rascunho"]
+      "keywords": [
+        "inteligência artificial",
+        "sugestão",
+        "openai",
+        "rascunho"
+      ]
     },
     {
       "id": "adm-origem",
@@ -41,7 +116,13 @@
         "Pelo selo **Android** ou **Web** que aparece nas solicitações, na lista de usuários e nos aparelhos da conta. Quase todas as listas têm um filtro de plataforma.",
         "Um mesmo cliente pode ter os dois selos: a conta é uma só. Isso muda a orientação. Por exemplo, \"Sincronizar agora\" só existe no aplicativo; na web, o que ele faz já vale na hora."
       ],
-      "keywords": ["plataforma", "android", "web", "origem", "filtro"]
+      "keywords": [
+        "plataforma",
+        "android",
+        "web",
+        "origem",
+        "filtro"
+      ]
     },
     {
       "id": "adm-avaliacoes",
@@ -51,7 +132,12 @@
         "Em **Avaliações** aparecem as avaliações com comentário. A resposta é publicada na Play Store em nome do aplicativo e tem limite de 350 caracteres.",
         "A resposta é pública: não cite dados da conta do cliente. Se precisar de detalhes, convide-o a abrir uma solicitação pela Ajuda do aplicativo."
       ],
-      "keywords": ["play store", "review", "nota", "estrelas"]
+      "keywords": [
+        "play store",
+        "review",
+        "nota",
+        "estrelas"
+      ]
     },
     {
       "id": "adm-nao-consegue-entrar",
@@ -66,7 +152,13 @@
         "• **Exclusão pendente:** veja a pergunta sobre recuperar conta.",
         "Você nunca vê nem define a senha do cliente."
       ],
-      "keywords": ["login", "bloqueado", "senha", "desbloquear", "acesso"]
+      "keywords": [
+        "login",
+        "bloqueado",
+        "senha",
+        "desbloquear",
+        "acesso"
+      ]
     },
     {
       "id": "adm-recuperar-conta",
@@ -76,7 +168,12 @@
         "Dentro do período de recuperação, abra a conta em **Usuários** e use **Cancelar exclusão**. A conta volta a funcionar e ele entra com a mesma senha.",
         "Enquanto a exclusão está pendente, o login dele é recusado com uma mensagem pedindo para falar com o suporte."
       ],
-      "keywords": ["exclusão", "recuperar", "arrependeu", "reativar conta"]
+      "keywords": [
+        "exclusão",
+        "recuperar",
+        "arrependeu",
+        "reativar conta"
+      ]
     },
     {
       "id": "adm-excluir-conta-dono",
@@ -88,7 +185,12 @@
         "• **Excluir a empresa** pelo painel, em **Empresas**. A exclusão é lógica e reversível.",
         "Depois disso ele consegue excluir a conta pela web. Antes de excluir uma empresa, confirme se há assinatura ativa: ela precisa ser cancelada no provedor (Google Play ou Asaas) para não haver novas cobranças."
       ],
-      "keywords": ["excluir empresa", "proprietário", "lgpd", "apagar"]
+      "keywords": [
+        "excluir empresa",
+        "proprietário",
+        "lgpd",
+        "apagar"
+      ]
     },
     {
       "id": "adm-transferir",
@@ -98,7 +200,11 @@
         "Em **Empresas**, abra a empresa e use **Transferir**. O novo proprietário precisa já ser membro. O antigo vira administrador.",
         "Só faça com pedido claro e verificável do proprietário atual (ou, se ele não existe mais, com comprovação de quem pede). O motivo fica registrado na auditoria."
       ],
-      "keywords": ["dono", "propriedade", "transferência"]
+      "keywords": [
+        "dono",
+        "propriedade",
+        "transferência"
+      ]
     },
     {
       "id": "adm-sessoes",
@@ -108,7 +214,13 @@
         "Na conta dele, use **Encerrar sessões**: todos os aparelhos e navegadores são desconectados na hora. Também dá para revogar um aparelho específico.",
         "Em seguida, envie a redefinição de senha. Na web, o próprio cliente vê onde a conta está aberta em **Minha conta**."
       ],
-      "keywords": ["roubo", "invasão", "sessões", "segurança", "aparelho"]
+      "keywords": [
+        "roubo",
+        "invasão",
+        "sessões",
+        "segurança",
+        "aparelho"
+      ]
     },
     {
       "id": "adm-estoque-do-cliente",
@@ -118,7 +230,12 @@
         "Não. O painel **só lê** produtos, movimentações e conflitos de uma empresa. O estoque é do cliente, e qualquer correção é feita por ele, no aplicativo ou na web.",
         "O que você pode fazer é orientar: estorno para movimentação errada, edição do produto para acertar a quantidade, e a tela de alterações para revisar quando há conflito."
       ],
-      "keywords": ["editar estoque", "corrigir", "produtos", "somente leitura"]
+      "keywords": [
+        "editar estoque",
+        "corrigir",
+        "produtos",
+        "somente leitura"
+      ]
     },
     {
       "id": "adm-dois-provedores",
@@ -130,7 +247,13 @@
         "• **Asaas:** contratada na versão web, por Pix, boleto ou cartão. Preço definido em **Planos**; cobranças visíveis no detalhe da assinatura.",
         "A origem aparece como selo em **Assinaturas** e há filtro por origem. Uma empresa tem uma assinatura valendo por vez."
       ],
-      "keywords": ["provedor", "origem", "asaas", "google play", "web"]
+      "keywords": [
+        "provedor",
+        "origem",
+        "asaas",
+        "google play",
+        "web"
+      ]
     },
     {
       "id": "adm-pagou-nao-liberou",
@@ -142,7 +265,13 @@
         "**Google Play:** uma compra não confirmada aparece sinalizada; a reconsulta tenta confirmar de novo.",
         "Se o cliente pagou uma cobrança antiga (vencida) e há outra em aberto, explique que o acesso depende da cobrança atual."
       ],
-      "keywords": ["pagamento", "não ativou", "reconsultar", "pendente", "boleto"]
+      "keywords": [
+        "pagamento",
+        "não ativou",
+        "reconsultar",
+        "pendente",
+        "boleto"
+      ]
     },
     {
       "id": "adm-reembolso",
@@ -155,7 +284,14 @@
         "**Regra para o cliente:** na web, ele pode desistir em até 7 dias da contratação. Fora disso, o cancelamento interrompe as próximas cobranças e o plano segue até o fim do período pago. Cobrança em duplicidade ou indevida deve ser estornada.",
         "Registre na solicitação o que foi feito e quando."
       ],
-      "keywords": ["estorno", "devolução", "reembolsar", "arrependimento", "7 dias", "chargeback"]
+      "keywords": [
+        "estorno",
+        "devolução",
+        "reembolsar",
+        "arrependimento",
+        "7 dias",
+        "chargeback"
+      ]
     },
     {
       "id": "adm-cancelar-para-cliente",
@@ -166,7 +302,11 @@
         "Se ele não conseguir e for assinatura do Asaas, cancele a assinatura no painel do Asaas e depois use **Reconsultar** aqui. Assinatura da Google Play só o próprio cliente cancela, na conta Google dele.",
         "Em qualquer caso, o plano segue ativo até o fim do período já pago."
       ],
-      "keywords": ["cancelamento", "cancelar", "encerrar"]
+      "keywords": [
+        "cancelamento",
+        "cancelar",
+        "encerrar"
+      ]
     },
     {
       "id": "adm-estados",
@@ -182,7 +322,14 @@
         "• **Estornada:** pagamento devolvido. Sem acesso.",
         "• **Substituída:** deu lugar a uma assinatura mais nova da mesma empresa."
       ],
-      "keywords": ["estado", "status", "carência", "suspensa", "expirada", "pendente"]
+      "keywords": [
+        "estado",
+        "status",
+        "carência",
+        "suspensa",
+        "expirada",
+        "pendente"
+      ]
     },
     {
       "id": "adm-contestacao",
@@ -192,7 +339,12 @@
         "A assinatura fica **suspensa**, sem acesso, enquanto a contestação é analisada. Se for revertida a favor da empresa, volta a ativa; se confirmada, encerra.",
         "Nesse estado, a web não deixa o cliente contratar de novo e pede que ele fale com o suporte. Acompanhe a disputa no painel do Asaas."
       ],
-      "keywords": ["chargeback", "contestação", "disputa", "cartão"]
+      "keywords": [
+        "chargeback",
+        "contestação",
+        "disputa",
+        "cartão"
+      ]
     },
     {
       "id": "adm-webhook-parado",
@@ -203,7 +355,12 @@
         "No painel do Asaas, em Integrações › Webhooks, confira se a fila não está pausada (o Asaas pausa depois de várias falhas seguidas). Corrija a causa e reative a fila.",
         "Eventos pendentes aparecem em **Assinaturas › Notificações dos provedores** e podem ser reprocessados um a um."
       ],
-      "keywords": ["webhook", "fila pausada", "reconciliação", "não atualiza"]
+      "keywords": [
+        "webhook",
+        "fila pausada",
+        "reconciliação",
+        "não atualiza"
+      ]
     },
     {
       "id": "adm-preco",
@@ -215,7 +372,13 @@
         "• O novo preço vale para **novas** contratações. Quem já assina continua pagando o valor contratado.",
         "• O preço do aplicativo Android é definido no Play Console, não aqui."
       ],
-      "keywords": ["preço", "valor", "mensal", "anual", "owner"]
+      "keywords": [
+        "preço",
+        "valor",
+        "mensal",
+        "anual",
+        "owner"
+      ]
     },
     {
       "id": "adm-limites",
@@ -225,7 +388,13 @@
         "Em **Planos**, cada recurso do plano tem um interruptor e, quando faz sentido, um limite. O limite de produtos na nuvem do plano gratuito é um desses.",
         "A mudança vale para todas as empresas daquele plano na próxima consulta de direitos, sem atualização do aplicativo. Baixar um limite não apaga nada: quem estiver acima apenas não consegue cadastrar mais produtos na nuvem."
       ],
-      "keywords": ["limite", "produtos", "recursos", "gratuito", "teto"]
+      "keywords": [
+        "limite",
+        "produtos",
+        "recursos",
+        "gratuito",
+        "teto"
+      ]
     },
     {
       "id": "adm-campanhas",
@@ -236,7 +405,13 @@
         "A mensagem sai por dois caminhos: **push** para os celulares com o aplicativo e **caixa de notificações** para as contas, que aparece também na web. Quem só usa a web recebe pela caixa.",
         "Envie primeiro um teste para o seu aparelho. Uma campanha enviada não pode ser desfeita."
       ],
-      "keywords": ["push", "campanha", "aviso", "comunicado", "caixa de notificações"]
+      "keywords": [
+        "push",
+        "campanha",
+        "aviso",
+        "comunicado",
+        "caixa de notificações"
+      ]
     },
     {
       "id": "adm-caixa",
@@ -246,7 +421,12 @@
         "Respostas e encerramentos do suporte, mudanças na assinatura da web (pagamento confirmado, atraso, suspensão, encerramento, estorno), convites aceitos e as campanhas.",
         "Na conta do cliente, a aba **Notificações** mostra o que ele recebeu e o que já leu. Útil quando ele diz que não foi avisado."
       ],
-      "keywords": ["inbox", "sino", "avisos", "não recebeu"]
+      "keywords": [
+        "inbox",
+        "sino",
+        "avisos",
+        "não recebeu"
+      ]
     },
     {
       "id": "adm-pausar-sync",
@@ -256,7 +436,12 @@
         "É uma medida de incidente, restrita a **owner**, em **Operação**. Pausar impede o envio e o recebimento de dados dos aplicativos e deixa o estoque da web indisponível enquanto durar.",
         "Nada é perdido: os aplicativos continuam funcionando no aparelho e guardam as novidades para enviar depois. Religue assim que a causa for resolvida e registre o motivo."
       ],
-      "keywords": ["incidente", "pausar", "desligar sincronização", "emergência"]
+      "keywords": [
+        "incidente",
+        "pausar",
+        "desligar sincronização",
+        "emergência"
+      ]
     },
     {
       "id": "adm-alertas",
@@ -268,7 +453,13 @@
         "• **Assinaturas sem verificação:** assinatura ativa sem confirmação recente do provedor. Reconsulte; se persistir, verifique as credenciais do provedor.",
         "• **Conflitos esquecidos:** clientes com decisões pendentes há mais de uma semana. Vale avisá-los, porque os aparelhos seguem com dados diferentes."
       ],
-      "keywords": ["alerta", "jobs", "fila", "conflitos", "sem verificação"]
+      "keywords": [
+        "alerta",
+        "jobs",
+        "fila",
+        "conflitos",
+        "sem verificação"
+      ]
     },
     {
       "id": "adm-analytics",
@@ -278,7 +469,13 @@
         "Mostra quem usa, o que usa e como evolui. O filtro de plataforma (Todas, Android, Web) se aplica aos números que vêm de eventos de uso; os que não têm essa dimensão continuam totais e são sinalizados.",
         "\"Ativo\" é quem teve algum evento ou ação registrada no período. Os eventos não carregam nome de produto, valores nem dados pessoais."
       ],
-      "keywords": ["analytics", "métricas", "ativos", "funil", "plataforma"]
+      "keywords": [
+        "analytics",
+        "métricas",
+        "ativos",
+        "funil",
+        "plataforma"
+      ]
     },
     {
       "id": "adm-auditoria",
@@ -288,7 +485,12 @@
         "Para responder \"quem fez o quê e quando\". Há duas trilhas: a dos **clientes** (o que aconteceu nas contas e empresas) e a dos **administradores** (tudo o que foi feito pelo painel, com o motivo informado).",
         "A linha do tempo de uma conta ou empresa junta as duas visões."
       ],
-      "keywords": ["log", "histórico", "quem fez", "trilha"]
+      "keywords": [
+        "log",
+        "histórico",
+        "quem fez",
+        "trilha"
+      ]
     },
     {
       "id": "adm-papeis",
@@ -300,7 +502,13 @@
         "• **Owner:** tudo isso, mais preços e recursos dos planos, pausa da sincronização, chave do serviço de IA e gestão de administradores.",
         "As contas do painel são separadas das contas de clientes."
       ],
-      "keywords": ["owner", "support", "viewer", "permissão", "administrador"]
+      "keywords": [
+        "owner",
+        "support",
+        "viewer",
+        "permissão",
+        "administrador"
+      ]
     },
     {
       "id": "adm-motivo",
@@ -310,7 +518,12 @@
         "Toda ação que altera dados de um cliente fica registrada com quem fez, quando e por quê. O motivo é o que permite entender a decisão meses depois, e protege tanto o cliente quanto quem executou.",
         "Escreva algo que outra pessoa entenda: \"cliente pediu por e-mail em 02/10, solicitação #1012\", e não \"teste\"."
       ],
-      "keywords": ["motivo", "justificativa", "auditoria", "reason"]
+      "keywords": [
+        "motivo",
+        "justificativa",
+        "auditoria",
+        "reason"
+      ]
     },
     {
       "id": "adm-o-que-nao-ve",
@@ -320,7 +533,13 @@
         "Senhas, dados de cartão, CPF ou CNPJ completos (só o tipo e os dígitos finais) e os identificadores de compra da Google Play.",
         "Se um cliente enviar esse tipo de dado numa solicitação, não copie para outros lugares e não peça que ele envie."
       ],
-      "keywords": ["privacidade", "cartão", "cpf", "senha", "dados sensíveis"]
+      "keywords": [
+        "privacidade",
+        "cartão",
+        "cpf",
+        "senha",
+        "dados sensíveis"
+      ]
     }
   ]
 }

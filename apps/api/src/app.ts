@@ -20,6 +20,7 @@ import { FirebaseFcmClient, type FcmClient } from './modules/push/fcm-client.js'
 import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas-client.js';
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
+import { registerSupportJobs } from './modules/support/support.jobs.js';
 import type { AppServices } from './platform/http/context.js';
 import { buildServer } from './platform/http/server.js';
 
@@ -89,6 +90,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerReviewsJobs(services);
   registerPushJobs(services);
   registerAsaasJobs(services);
+  registerSupportJobs(services);
 
   return {
     app,

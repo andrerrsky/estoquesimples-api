@@ -1,8 +1,9 @@
 import { lazy, Suspense, type ComponentType } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
+import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
 import { ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
 import { LandingPage } from './pages/LandingPage';
@@ -56,8 +57,19 @@ function NotFound() {
   );
 }
 
+/** Moldura de todas as rotas: a tela da vez e o chat de suporte por cima. */
+function Root() {
+  return (
+    <>
+      <Outlet />
+      <SupportChat />
+    </>
+  );
+}
+
 export const router = createBrowserRouter([
   {
+    element: <Root />,
     // Qualquer falha fora da área interna: tela cheia, com o caminho de volta.
     errorElement: <RouteError fullScreen />,
     children: [

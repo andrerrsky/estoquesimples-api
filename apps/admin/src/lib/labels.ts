@@ -193,6 +193,7 @@ export const JOB_KIND: Record<string, string> = {
   'analytics.retention': 'Retenção de eventos',
   'play.reviews_sync': 'Coleta de avaliações da Play Store',
   'push.send_campaign': 'Envio de campanha (push e caixa de notificações)',
+  'support.notify_team': 'Aviso à equipe de solicitação nova (e-mail)',
 };
 
 /**

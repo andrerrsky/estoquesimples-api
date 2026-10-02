@@ -131,6 +131,20 @@ const envSchema = z
     ADMIN_SESSION_IDLE_HOURS: z.coerce.number().int().positive().default(12),
     ADMIN_SESSION_MAX_DAYS: z.coerce.number().int().positive().default(7),
     ADMIN_COOKIE_NAME: z.string().min(1).max(40).default('es_admin'),
+    /** Endereço público do painel, usado nos links dos e-mails para a equipe. */
+    ADMIN_PANEL_URL: z
+      .string()
+      .url()
+      .optional()
+      .transform((value) => value?.replace(/\/+$/, '')),
+    /**
+     * Quem recebe o e-mail de "solicitação de suporte nova" (separados por
+     * vírgula). Vazio = os administradores ativos de papel owner do painel.
+     */
+    SUPPORT_NOTIFY_EMAILS: z
+      .string()
+      .default('')
+      .transform((value) => csv(value).map((email) => email.toLowerCase()).filter((email) => email.includes('@'))),
     /**
      * Segredo que assina o cookie de sessão do painel. Sem ele, um valor
      * efêmero é gerado a cada boot: o painel funciona, mas todo restart

@@ -305,6 +305,11 @@ answered → resolved`, e escrever reabre. Responder ou resolver manda push
 da instalação e da conta; sem aparelho, e-mail (`kind: support_reply`).
 Notas internas (`internal`) não notificam. Rascunho por IA reutiliza a
 chave da OpenAI das avaliações. Contrato em [docs/support.md](docs/support.md).
+A web tem ainda um **chat flutuante** (`SupportChat`), que é só outra porta
+para as mesmas rotas — visitante sem conta informa nome e e-mail e a
+solicitação nasce pela instalação. Toda solicitação nova enfileira
+`support.notify_team`, que avisa a equipe por e-mail (`SUPPORT_NOTIFY_EMAILS`
+ou, sem ela, os owners do painel).
 
 ### Planos e limites (`src/modules/billing/plan-limits.ts`)
 
@@ -428,6 +433,7 @@ Como estender a web: rota nova na API (seção 10) → contrato em
 ## 12. Operação
 
 Deploy, alertas, backups, lançamento gradual e rollback: [DEPLOY.md](DEPLOY.md).
+Suporte: `SUPPORT_NOTIFY_EMAILS`, `ADMIN_PANEL_URL`.
 Web e pagamento: `WEB_APP_HOSTS`, `WEB_APP_URL`, `WEB_SESSION_COOKIE_NAME`,
 `ASAAS_API_KEY`, `ASAAS_ENVIRONMENT`, `ASAAS_WEBHOOK_TOKEN`,
 `ASAAS_GRACE_DAYS`, `ASAAS_PENDING_EXPIRE_DAYS`,

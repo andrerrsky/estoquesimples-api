@@ -90,3 +90,42 @@ se ninguém assumiu. Tudo é auditado (`support.*`).
 `support.message_sent` (API), `support.ticket_resolved` (API, `by`),
 `support.ticket_submitted` (app, intenção), `notification.opened` com
 `kind=support` (app).
+
+## Chat da web
+
+Na versão web há um botão flutuante no canto inferior direito (só em telas a
+partir de 900 px; fica oculto em `/app/suporte`, onde a conversa já está). Ele
+abre um balão de conversa (`apps/web/src/components/SupportChat.tsx` e
+`SupportChatPanel.tsx`). **Não é um canal novo**: usa as rotas acima, e o que
+nasce ali é uma solicitação comum, marcada com `diagnostics.channel = "chat"`.
+
+- **Com sessão**: a primeira mensagem abre a solicitação ligada à conta
+  (assunto = primeira linha do texto). Se a pessoa já tem uma solicitação não
+  resolvida, o chat continua nela.
+- **Sem sessão**: três perguntas automáticas — nome, e-mail, dúvida — e a
+  solicitação nasce da instalação (`installId` do navegador), com
+  `contactName`/`contactEmail`. O balão avisa que as primeiras perguntas são
+  automáticas e que quem responde é uma pessoa. Nome e e-mail ficam só na
+  memória da página até o envio; no navegador fica guardado apenas o id da
+  conversa (`es_web_chat_ticket`).
+- **Respostas**: o balão consulta a conversa a cada 8 s enquanto está aberto;
+  fechado, o botão consulta a lista a cada 60 s e mostra um ponto quando há
+  resposta não lida. Fora da página, valem os avisos de sempre (caixa de
+  notificações para quem tem conta; e-mail para o contato informado).
+- Não há presença nem "digitando" de verdade: o efeito de digitação é só das
+  perguntas automáticas.
+
+## Aviso por e-mail de solicitação nova
+
+Toda solicitação nova (app, web ou chat) enfileira a tarefa
+`support.notify_team` na mesma transação. Ela envia um e-mail
+(`kind: support_new_ticket`) com número, assunto, quem escreveu, origem, a
+primeira mensagem e o link do painel.
+
+| Variável | Efeito |
+| --- | --- |
+| `SUPPORT_NOTIFY_EMAILS` | destinatários, separados por vírgula. Vazia = administradores ativos de papel owner do painel |
+| `ADMIN_PANEL_URL` | base do link "responder no painel" (produção: `https://api.estoquesimples.com.br/admin`) |
+
+Mensagens seguintes na mesma solicitação não geram e-mail. Falha de envio é
+repetida pela fila (até 5 tentativas) e aparece em Operação › Jobs.
