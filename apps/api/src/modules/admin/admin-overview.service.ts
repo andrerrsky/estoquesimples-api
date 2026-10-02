@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { AppServices } from '../../platform/http/context.js';
 import { ENTITLED_STATES } from '../billing/billing.service.js';
 import { OpsService } from '../ops/ops.service.js';
-import { ACTIVITY_SQL as ACTIVITY_UNION, bucketExpr, fillSeries, resolveRange, sqlList, type SeriesPoint } from './admin-series.js';
+import { ACTIVITY_SQL as ACTIVITY_UNION, activitySql, bucketExpr, fillSeries, resolveRange, sqlList, type SeriesPoint } from './admin-series.js';
 
 /**
  * Retrato da plataforma para a primeira tela do painel.
@@ -29,9 +29,15 @@ export type OverviewKpis = {
   subscriptionsOnHold: number;
   subscriptionsNew30d: number;
   subscriptionsEnded30d: number;
+  /** Assinaturas com acesso, por provedor: Google Play (app) e Asaas (web). */
+  subscriptionsEntitledGooglePlay: number;
+  subscriptionsEntitledAsaas: number;
   dau: number;
   wau: number;
   mau: number;
+  /** Ativos em 30 dias por plataforma (só eventos de uso; quem usa as duas conta nas duas). */
+  mauAndroid: number;
+  mauWeb: number;
   devicesActive7d: number;
   syncOps24h: number;
   conflictsPending: number;
@@ -55,6 +61,7 @@ export interface OverviewResponse {
     subscriptionId: string | null;
     workspaceId: string | null;
     workspaceName: string | null;
+    provider: string | null;
     from: string | null;
     to: string | null;
     at: string;
@@ -99,6 +106,12 @@ export class AdminOverviewService {
             (SELECT count(DISTINCT user_id) FROM (${ACTIVITY_UNION}) a WHERE at > now() - interval '1 day') AS dau,
             (SELECT count(DISTINCT user_id) FROM (${ACTIVITY_UNION}) a WHERE at > now() - interval '7 days') AS wau,
             (SELECT count(DISTINCT user_id) FROM (${ACTIVITY_UNION}) a WHERE at > now() - interval '30 days') AS mau,
+            (SELECT count(DISTINCT user_id) FROM (${activitySql('android')}) a WHERE at > now() - interval '30 days') AS mau_android,
+            (SELECT count(DISTINCT user_id) FROM (${activitySql('web')}) a WHERE at > now() - interval '30 days') AS mau_web,
+            (SELECT count(*) FROM subscriptions
+               WHERE provider = 'google_play' AND state IN ${sqlList(ENTITLED_STATES)}) AS subs_entitled_google_play,
+            (SELECT count(*) FROM subscriptions
+               WHERE provider = 'asaas' AND state IN ${sqlList(ENTITLED_STATES)}) AS subs_entitled_asaas,
             (SELECT count(*) FROM subscription_events WHERE processed_at IS NULL) AS billing_events_pending
         `),
         this.ops.snapshot(),
@@ -121,9 +134,11 @@ export class AdminOverviewService {
           SELECT id, email, name, created_at, (email_verified_at IS NOT NULL) AS verified
           FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 8
         `),
-        db.execute<{ entity_id: string | null; workspace_id: string | null; workspace_name: string | null; metadata: Record<string, unknown>; created_at: string }>(sql`
-          SELECT a.entity_id, a.workspace_id, w.name AS workspace_name, a.metadata, a.created_at
-          FROM audit_log a LEFT JOIN workspaces w ON w.id = a.workspace_id
+        db.execute<{ entity_id: string | null; workspace_id: string | null; workspace_name: string | null; provider: string | null; metadata: Record<string, unknown>; created_at: string }>(sql`
+          SELECT a.entity_id, a.workspace_id, w.name AS workspace_name, s.provider, a.metadata, a.created_at
+          FROM audit_log a
+          LEFT JOIN workspaces w ON w.id = a.workspace_id
+          LEFT JOIN subscriptions s ON a.entity_type = 'subscription' AND s.id::text = a.entity_id
           WHERE a.action IN ('subscription.state_changed', 'subscription.linked')
           ORDER BY a.created_at DESC LIMIT 8
         `),
@@ -157,9 +172,13 @@ export class AdminOverviewService {
         subscriptionsOnHold: n('subs_on_hold'),
         subscriptionsNew30d: n('subs_new_30d'),
         subscriptionsEnded30d: n('subs_ended_30d'),
+        subscriptionsEntitledGooglePlay: n('subs_entitled_google_play'),
+        subscriptionsEntitledAsaas: n('subs_entitled_asaas'),
         dau: n('dau'),
         wau: n('wau'),
         mau: n('mau'),
+        mauAndroid: n('mau_android'),
+        mauWeb: n('mau_web'),
         devicesActive7d: snapshot.dispositivosAtivos7d,
         syncOps24h: snapshot.operacoesSync24h,
         conflictsPending: snapshot.conflitosPendentes,
@@ -185,6 +204,7 @@ export class AdminOverviewService {
         subscriptionId: row.entity_id,
         workspaceId: row.workspace_id,
         workspaceName: row.workspace_name,
+        provider: row.provider,
         from: typeof row.metadata['from'] === 'string' ? (row.metadata['from'] as string) : null,
         to:
           typeof row.metadata['to'] === 'string'

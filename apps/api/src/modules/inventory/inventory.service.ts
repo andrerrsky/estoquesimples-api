@@ -343,6 +343,9 @@ export class InventoryService {
                coalesce(sum(-m.quantity) FILTER (WHERE m.quantity < 0), 0) AS exits
         FROM stock_movements m
         WHERE m.workspace_id = ${workspaceId}
+          -- Mesmo recorte dos totais acima: só entradas e saídas lançadas
+          -- como tal, para o gráfico fechar com os números do período.
+          AND m.type IN ('entrada','compra','saida','venda')
           AND m.occurred_at >= greatest(${cutoff}, now() - interval '90 days')
         GROUP BY 1 ORDER BY 1
       `),

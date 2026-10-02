@@ -19,6 +19,8 @@ interface EventRow {
   workspaceName: string | null;
   installId: string | null;
   platform: string;
+  /** Plataforma atribuída: para evento da API, de onde ele veio quando o emissor registrou; `server` = sem plataforma. */
+  attributedPlatform: string;
   appVersionCode: number | null;
   sessionKey: string | null;
   source: string;
@@ -72,8 +74,14 @@ export function EventsPage() {
             </select>
             <select className="select select--sm" value={values['source'] ?? ''} onChange={(event) => set({ source: event.target.value })} aria-label="Origem">
               <option value="">Origem: todas</option>
-              <option value="app">Aplicativo</option>
+              <option value="app">Clientes (app e web)</option>
               <option value="server">API</option>
+            </select>
+            <select className="select select--sm" value={values['platform'] ?? ''} onChange={(event) => set({ platform: event.target.value })} aria-label="Plataforma" title="Eventos da API entram na plataforma quando registram de onde vieram (cadastro, login, convite, contratação pela web).">
+              <option value="">Plataforma: todas</option>
+              <option value="android">Android</option>
+              <option value="web">Web</option>
+              <option value="server">API, sem plataforma</option>
             </select>
             <input className="input input--sm" type="date" value={values['from'] ?? ''} onChange={(event) => set({ from: event.target.value })} aria-label="De" />
             <input className="input input--sm" type="date" value={values['to'] ?? ''} onChange={(event) => set({ to: event.target.value })} aria-label="Até" />
@@ -96,7 +104,11 @@ export function EventsPage() {
                       <td><code>{event.name}</code><div className="cell-sub">{eventDomain(event.name)}</div></td>
                       <td>{event.userEmail ? <Link to={`/usuarios/${event.userId}`}>{event.userEmail}</Link> : event.installId ? <span className="muted mono small" title={event.installId}>instalação {event.installId.slice(0, 8)}</span> : <span className="muted">—</span>}</td>
                       <td>{event.workspaceName ? <Link to={`/empresas/${event.workspaceId}`}>{event.workspaceName}</Link> : <span className="muted">—</span>}</td>
-                      <td className="muted">{event.source === 'server' ? 'API' : `${PLATFORM_LABEL[event.platform] ?? event.platform}${event.appVersionCode ? ` v${event.appVersionCode}` : ''}`}</td>
+                      <td className="muted">
+                        {event.source === 'server'
+                          ? `API${event.attributedPlatform !== 'server' ? ` · ${PLATFORM_LABEL[event.attributedPlatform] ?? event.attributedPlatform}` : ''}`
+                          : `${PLATFORM_LABEL[event.platform] ?? event.platform}${event.appVersionCode ? ` v${event.appVersionCode}` : ''}`}
+                      </td>
                       <td>{Object.keys(event.properties).length > 0 ? <Details summary="ver"><Props value={event.properties} /></Details> : <span className="muted">—</span>}</td>
                     </tr>
                   ))
@@ -121,7 +133,7 @@ export function EventsPage() {
                     <tr key={item.name}>
                       <td><code>{item.name}</code>{!item.inCatalog && <Badge tone="warning"> fora do catálogo</Badge>}</td>
                       <td className="muted">{item.description ?? '—'}</td>
-                      <td><Badge plain>{item.source === 'server' ? 'API' : item.source === 'both' ? 'app + API' : 'app'}</Badge></td>
+                      <td><Badge plain>{item.source === 'server' ? 'API' : item.source === 'both' ? 'clientes + API' : 'clientes (app/web)'}</Badge></td>
                       <td className="num">{fmtNumber(item.total)}</td>
                       <td><Time value={item.firstSeen} /></td>
                       <td><Time value={item.lastSeen} /></td>

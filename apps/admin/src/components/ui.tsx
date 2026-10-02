@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { fmtNumber, fmtRelative, fmtDateTime } from '../lib/format';
-import type { Tone } from '../lib/labels';
+import { PLATFORM_LABEL, PLATFORM_TONE, SUBSCRIPTION_PROVIDER, type Tone } from '../lib/labels';
 import { Icon, type IconName } from './Icon';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +142,53 @@ export function Card({
 export function Badge({ tone = 'neutral', children, plain }: { tone?: Tone; children: ReactNode; plain?: boolean }) {
   const cls = tone === 'neutral' ? '' : `badge--${tone}`;
   return <span className={`badge ${cls} ${plain ? 'badge--plain' : ''}`}>{children}</span>;
+}
+
+/** De onde veio: app Android, web… Mesmo selo em usuários, aparelhos, eventos e suporte. */
+export function PlatformBadge({ platform }: { platform: string | null | undefined }) {
+  if (!platform) return <span className="muted">—</span>;
+  return (
+    <Badge tone={PLATFORM_TONE[platform] ?? 'neutral'} plain>
+      {PLATFORM_LABEL[platform] ?? platform}
+    </Badge>
+  );
+}
+
+export function PlatformBadges({ platforms, empty = '—' }: { platforms: string[] | null | undefined; empty?: ReactNode }) {
+  if (!platforms || platforms.length === 0) return <span className="muted">{empty}</span>;
+  return (
+    <span className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+      {platforms.map((platform) => (
+        <PlatformBadge key={platform} platform={platform} />
+      ))}
+    </span>
+  );
+}
+
+/** Provedor da assinatura: Google Play (app) ou Asaas (web). */
+export function ProviderBadge({ provider, short }: { provider: string | null | undefined; short?: boolean }) {
+  if (!provider) return <span className="muted">—</span>;
+  const info = SUBSCRIPTION_PROVIDER[provider];
+  return (
+    <span title={info?.hint}>
+      <Badge tone={info?.tone ?? 'neutral'} plain>
+        {info ? (short ? info.short : info.label) : provider}
+      </Badge>
+    </span>
+  );
+}
+
+/**
+ * Link para fora do painel (fatura, comprovante). A URL vem de terceiros:
+ * só `https://` vira link, e sempre em aba nova sem `opener` nem `referrer`.
+ */
+export function ExternalLink({ href, children }: { href: string | null | undefined; children: ReactNode }) {
+  if (!href || !/^https:\/\//i.test(href)) return <span className="muted">—</span>;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
 }
 
 export function StatTile({

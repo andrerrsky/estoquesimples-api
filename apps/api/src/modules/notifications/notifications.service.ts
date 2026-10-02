@@ -14,7 +14,7 @@ import { notFound } from '../../platform/http/errors.js';
  *   support.reply / support.resolved   { ticketId, ticketNumber }
  *   billing.payment_confirmed|payment_overdue|subscription_suspended|
  *     subscription_ended|subscription_refunded   { workspaceId }
- *   team.invite_accepted | team.member_joined    { workspaceId }
+ *   team.invite_accepted                         { workspaceId }
  *   campaign                                     { campaignId, screen?, url? }
  */
 export const NotificationType = {

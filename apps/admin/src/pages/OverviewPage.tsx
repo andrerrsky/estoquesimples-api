@@ -5,7 +5,7 @@ import { api, type SeriesPoint } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { LineChart, Sparkline, SERIES_COLORS } from '../charts/charts';
 import { Icon } from '../components/Icon';
-import { Badge, Card, Empty, Notice, PageHeader, Skeleton, StatTile, Time } from '../components/ui';
+import { Badge, Card, Empty, Notice, PageHeader, ProviderBadge, Skeleton, StatTile, Time } from '../components/ui';
 import { deltaRatio, fmtNumber } from '../lib/format';
 import { auditLabel, SUBSCRIPTION_STATE } from '../lib/labels';
 
@@ -15,7 +15,7 @@ interface Overview {
   series: Record<string, SeriesPoint[]>;
   alerts: Array<{ nome: string; detalhe: string }>;
   recentUsers: Array<{ id: string; email: string; name: string; createdAt: string; emailVerified: boolean }>;
-  recentSubscriptionChanges: Array<{ subscriptionId: string | null; workspaceId: string | null; workspaceName: string | null; from: string | null; to: string | null; at: string }>;
+  recentSubscriptionChanges: Array<{ subscriptionId: string | null; workspaceId: string | null; workspaceName: string | null; provider: string | null; from: string | null; to: string | null; at: string }>;
   recentAdminActions: Array<{ id: string; adminEmail: string; action: string; targetType: string | null; targetId: string | null; at: string }>;
 }
 
@@ -62,7 +62,7 @@ export function OverviewPage() {
               ? data.alerts.length === 0
                 ? 'Nenhum alerta operacional. A API, a fila de tarefas e as assinaturas estão em ordem.'
                 : `${data.alerts.length} alerta(s) precisam de atenção. Veja a seção de operação.`
-              : 'Reunindo contas, assinaturas e uso do aplicativo.'}
+              : 'Reunindo contas, assinaturas e uso do app e da web.'}
           </p>
         </div>
         <div className="hero__stat">
@@ -73,7 +73,9 @@ export function OverviewPage() {
         <div className="hero__stat">
           <div className="hero__stat-label">Empresas com assinatura</div>
           <div className="hero__stat-value">{data ? fmtNumber(k['workspacesWithSubscription']) : '—'}</div>
-          <div className="hero__stat-delta">de {fmtNumber(k['workspacesActive'] ?? 0)} empresas</div>
+          <div className="hero__stat-delta">
+            de {fmtNumber(k['workspacesActive'] ?? 0)} empresas · {fmtNumber(k['subscriptionsEntitledGooglePlay'] ?? 0)} Google Play · {fmtNumber(k['subscriptionsEntitledAsaas'] ?? 0)} web
+          </div>
         </div>
         <div className="hero__stat">
           <div className="hero__stat-label">Ativos hoje</div>
@@ -106,7 +108,13 @@ export function OverviewPage() {
           label="Assinaturas com acesso"
           value={fmtNumber(entitled)}
           foot={`${fmtNumber(k['subscriptionsActive'] ?? 0)} ativas · ${fmtNumber(k['subscriptionsGrace'] ?? 0)} em carência · ${fmtNumber(k['subscriptionsCanceledButActive'] ?? 0)} canceladas`}
-          hint="Estados que concedem sincronização: ativa, carência e cancelada mas ativa."
+          hint="Estados que concedem o plano pago: ativa, carência e cancelada mas ativa. Soma Google Play (app) e Asaas (web)."
+        />
+        <StatTile
+          label="Ativos na web (30d)"
+          value={fmtNumber(k['mauWeb'])}
+          foot={`${fmtNumber(k['mauAndroid'] ?? 0)} no app Android · ${fmtNumber(k['mau'] ?? 0)} no total`}
+          hint="Contas com evento de uso na plataforma nos últimos 30 dias. Quem usa o app e a web conta nas duas; o total inclui também ações auditadas, que não guardam a plataforma."
         />
         <StatTile
           label="Assinaturas novas (30d)"
@@ -120,7 +128,7 @@ export function OverviewPage() {
           foot={`${fmtNumber(k['subscriptionsOnHold'] ?? 0)} suspensas · ${fmtNumber(k['usersPendingDeletion'] ?? 0)} exclusões · ${fmtNumber(k['usersSuspended'] ?? 0)} contas suspensas`}
           tone={((k['subscriptionsOnHold'] ?? 0) + (k['usersPendingDeletion'] ?? 0)) > 0 ? 'alert' : undefined}
         />
-        <StatTile label="Aparelhos ativos (7d)" value={fmtNumber(k['devicesActive7d'])} foot={`${fmtNumber(k['syncOps24h'] ?? 0)} operações de sync em 24h`} />
+        <StatTile label="Aparelhos ativos (7d)" value={fmtNumber(k['devicesActive7d'])} foot={`${fmtNumber(k['syncOps24h'] ?? 0)} operações de sync em 24h`} hint="Instalações do app e navegadores da web vistos nos últimos 7 dias." />
         <StatTile
           label="Pendências técnicas"
           value={fmtNumber((k['conflictsPending'] ?? 0) + (k['jobsFailed'] ?? 0) + (k['billingEventsPending'] ?? 0))}
@@ -136,7 +144,7 @@ export function OverviewPage() {
         <Card title="Usuários ativos" subtitle="Pessoas com alguma atividade no dia">
           {data ? <LineChart series={[{ key: 'act', label: 'Ativos', points: s['activeUsers'] ?? [] }]} /> : <Skeleton lines={5} />}
         </Card>
-        <Card title="Assinaturas" subtitle="Vinculadas e encerradas por dia">
+        <Card title="Assinaturas" subtitle="Vinculadas (Google Play) ou contratadas (web) e encerradas, por dia">
           {data ? (
             <LineChart
               series={[
@@ -149,7 +157,7 @@ export function OverviewPage() {
             <Skeleton lines={5} />
           )}
         </Card>
-        <Card title="Sincronização" subtitle="Operações recebidas dos aparelhos por dia">
+        <Card title="Sincronização" subtitle="Operações recebidas dos clientes por dia">
           {data ? <LineChart series={[{ key: 'sync', label: 'Operações', points: s['syncOperations'] ?? [] }]} /> : <Skeleton lines={5} />}
         </Card>
       </div>
@@ -192,7 +200,7 @@ export function OverviewPage() {
                   onClick={() => change.subscriptionId && navigate(`/assinaturas/${change.subscriptionId}`)}
                 >
                   <div className="list__main">
-                    <div className="list__title">{change.workspaceName ?? 'Empresa'}</div>
+                    <div className="list__title">{change.workspaceName ?? 'Empresa'} {change.provider && <ProviderBadge provider={change.provider} short />}</div>
                     <div className="list__sub row" style={{ gap: 6 }}>
                       {change.from && <Badge tone={SUBSCRIPTION_STATE[change.from]?.tone}>{SUBSCRIPTION_STATE[change.from]?.label ?? change.from}</Badge>}
                       {change.from && <Icon name="chevronRight" size={12} />}

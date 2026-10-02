@@ -76,7 +76,7 @@ export function OpsPage() {
         <StatTile label="Tarefas na fila" value={fmtNumber(s['jobsPendentes'])} foot={`${fmtNumber(s['jobsAtrasados'] ?? 0)} atrasadas`} tone={(s['jobsAtrasados'] ?? 0) > 20 ? 'alert' : undefined} />
         <StatTile label="Tarefas falhas" value={fmtNumber(s['jobsFalhos'])} foot="esgotaram as tentativas" tone={(s['jobsFalhos'] ?? 0) > 0 ? 'alert' : undefined} />
         <StatTile label="Conflitos pendentes" value={fmtNumber(s['conflitosPendentes'])} foot={`${fmtNumber(s['conflitosAntigos'] ?? 0)} há mais de 7 dias`} tone={(s['conflitosAntigos'] ?? 0) > 0 ? 'alert' : undefined} />
-        <StatTile label="Assinaturas sem verificação" value={fmtNumber(s['assinaturasDesatualizadas'])} foot="ativas, sem confirmação há 48h" tone={(s['assinaturasDesatualizadas'] ?? 0) > 0 ? 'alert' : undefined} />
+        <StatTile label="Assinaturas sem verificação" value={fmtNumber(s['assinaturasDesatualizadas'])} foot="ativas (Google Play ou web), sem confirmação há 48h" tone={(s['assinaturasDesatualizadas'] ?? 0) > 0 ? 'alert' : undefined} />
         <StatTile label="Aparelhos ativos (7d)" value={fmtNumber(s['dispositivosAtivos7d'])} foot={`${fmtNumber(s['operacoesSync24h'] ?? 0)} operações de sync em 24h`} />
       </div>
 
@@ -104,7 +104,13 @@ export function OpsPage() {
           {data ? (
             <KeyValue
               items={[
-                { label: 'Google Play', value: data.environment['playConfigured'] ? <Badge tone="success">configurado</Badge> : <Badge tone="warning">sem conta de serviço</Badge> },
+                { label: 'Google Play (app)', value: data.environment['playConfigured'] ? <Badge tone="success">configurado</Badge> : <Badge tone="warning">sem conta de serviço</Badge> },
+                {
+                  label: 'Asaas (web)',
+                  value: data.environment['asaasConfigured']
+                    ? <Badge tone={data.environment['asaasEnvironment'] === 'production' ? 'success' : 'info'}>{data.environment['asaasEnvironment'] === 'production' ? 'configurado · produção' : 'configurado · sandbox'}</Badge>
+                    : <Badge tone="warning">sem chave: checkout da web desligado</Badge>,
+                },
                 { label: 'E-mail', value: String(data.environment['emailProvider']) },
                 { label: 'Fila de tarefas', value: data.environment['jobsEnabled'] ? 'ligada nesta instância' : <Badge tone="warning">desligada nesta instância</Badge> },
                 { label: 'Token de operação', value: data.environment['opsTokenConfigured'] ? 'configurado (/metrics, /ops)' : <Badge tone="warning">ausente: /metrics responde 404</Badge> },

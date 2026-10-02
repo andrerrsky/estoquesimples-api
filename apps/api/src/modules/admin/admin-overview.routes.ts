@@ -26,6 +26,7 @@ const overviewSchema = z.object({
       subscriptionId: z.string().nullable(),
       workspaceId: z.string().nullable(),
       workspaceName: z.string().nullable(),
+      provider: z.string().nullable(),
       from: z.string().nullable(),
       to: z.string().nullable(),
       at: z.string(),

@@ -246,7 +246,12 @@ export class AsaasBillingService {
         // aberto, é ela que a pessoa precisa pagar.
         const result = await this.checkoutResult(live);
         if (result.payment) return result;
-        throw conflict(ErrorCode.CONFLICT, 'O plano Equipe já está ativo nesta empresa.');
+        throw conflict(
+          ErrorCode.CONFLICT,
+          live.state === 'suspensa'
+            ? 'A assinatura desta empresa está suspensa por uma contestação de pagamento em análise. Fale com o suporte.'
+            : 'O plano Equipe já está ativo nesta empresa.',
+        );
       }
     }
 
@@ -293,7 +298,7 @@ export class AsaasBillingService {
             autoRenewing: true,
             startedAt: null,
             currentPeriodEnd: carryPaidUntil,
-            raw: { subscription: remote, carryPaidUntil: carryPaidUntil?.toISOString() ?? null },
+            raw: { subscription: scrubAsaasObject(remote), carryPaidUntil: carryPaidUntil?.toISOString() ?? null },
           })
           .onConflictDoNothing({ target: [subscriptions.provider, subscriptions.providerSubscriptionId], where: sql`${subscriptions.providerSubscriptionId} IS NOT NULL` })
           .returning();
@@ -511,7 +516,7 @@ export class AsaasBillingService {
           canceledAt:
             current.canceledAt ?? (derived.state === 'cancelada_mas_ativa' || derived.state === 'expirada' ? new Date() : null),
           lastVerifiedAt: new Date(),
-          raw: { ...raw, subscription: remote ?? { deleted: true } },
+          raw: { ...raw, subscription: remote ? scrubAsaasObject(remote) : { deleted: true } },
         })
         .where(eq(subscriptions.id, current.id));
 
@@ -800,6 +805,46 @@ export class AsaasBillingService {
   }
 
   /**
+   * Reprocessa um único evento pendente, a pedido do suporte (painel). Mesmo
+   * caminho da reconciliação — o evento só dispara a consulta ao Asaas — e a
+   * mesma contabilidade de tentativas. Devolve como a linha ficou, para o
+   * painel dizer a verdade: `processed` só quando o evento saiu da fila.
+   */
+  async retryEvent(eventRowId: string): Promise<{ processed: boolean; error: string | null }> {
+    const rows = await this.db
+      .select({
+        id: subscriptionEvents.id,
+        provider: subscriptionEvents.provider,
+        providerSubscriptionId: subscriptionEvents.providerSubscriptionId,
+        processedAt: subscriptionEvents.processedAt,
+      })
+      .from(subscriptionEvents)
+      .where(eq(subscriptionEvents.id, eventRowId))
+      .limit(1);
+    const event = rows[0];
+    if (!event || event.provider !== 'asaas') throw notFound('Evento não encontrado.');
+    if (event.processedAt) throw conflict(ErrorCode.CONFLICT, 'Este evento já foi processado.');
+
+    try {
+      await this.processEvent(event.id, event.providerSubscriptionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.db
+        .update(subscriptionEvents)
+        .set({ processError: message.slice(0, 1000), attempts: sql`${subscriptionEvents.attempts} + 1` })
+        .where(eq(subscriptionEvents.id, event.id));
+    }
+
+    const after = await this.db
+      .select({ processedAt: subscriptionEvents.processedAt, processError: subscriptionEvents.processError })
+      .from(subscriptionEvents)
+      .where(eq(subscriptionEvents.id, event.id))
+      .limit(1);
+    const processed = after[0]?.processedAt != null;
+    return { processed, error: processed ? null : (after[0]?.processError ?? 'evento continua pendente') };
+  }
+
+  /**
    * Revalida as assinaturas vivas do Asaas e aplica as regras de prazo:
    * pendente que nunca foi paga e suspensa há muito tempo são canceladas no
    * provedor, para ele parar de gerar cobranças de algo que ninguém usa.
@@ -855,15 +900,26 @@ export class AsaasBillingService {
   }
 }
 
-/** Remove do payload o que não precisamos guardar (dados de cartão, endereço). */
+/** Campos que o Asaas devolve e que não devem ficar guardados em lugar nenhum. */
+const ASAAS_SENSITIVE_KEYS = ['creditCard', 'creditCardToken', 'creditCardHolderInfo', 'pixTransaction', 'nossoNumero', 'bankSlipUrl'];
+
+/**
+ * Cópia de um objeto do Asaas (assinatura ou cobrança) sem dados de cartão.
+ * O Asaas devolve o token e os últimos dígitos do cartão nas assinaturas
+ * pagas com cartão; nada disso é necessário aqui.
+ */
+export function scrubAsaasObject<T>(value: T): T {
+  if (!value || typeof value !== 'object') return value;
+  const clone = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  for (const key of ASAAS_SENSITIVE_KEYS) delete clone[key];
+  return clone as T;
+}
+
+/** Remove do payload do webhook o que não precisamos guardar (dados de cartão, conta). */
 export function scrubAsaasPayload(payload: Record<string, unknown>): Record<string, unknown> {
   const clone = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
-  const payment = clone['payment'] as Record<string, unknown> | undefined;
-  if (payment) {
-    delete payment['creditCard'];
-    delete payment['pixTransaction'];
-    delete payment['nossoNumero'];
-    delete payment['bankSlipUrl'];
+  for (const key of ['payment', 'subscription']) {
+    if (clone[key] && typeof clone[key] === 'object') clone[key] = scrubAsaasObject(clone[key]);
   }
   delete clone['account'];
   return clone;

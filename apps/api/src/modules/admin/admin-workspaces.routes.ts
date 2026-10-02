@@ -26,6 +26,7 @@ const listItemSchema = z.object({
   membersCount: z.number().int(),
   productsCount: z.number().int(),
   subscriptionState: z.string().nullable(),
+  subscriptionProvider: z.string().nullable(),
   planKey: z.string().nullable(),
   seededAt: z.string().nullable(),
   lastSyncAt: z.string().nullable(),

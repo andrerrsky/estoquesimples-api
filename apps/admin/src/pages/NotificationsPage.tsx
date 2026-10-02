@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { Badge, Card, ConfirmDialog, Empty, errorMessage, KeyValue, Notice, PageHeader, Pagination, Skeleton, StatTile, Tabs, Time, useToast } from '../components/ui';
 import { fmtNumber, fmtPercent } from '../lib/format';
 import { useListParams } from '../lib/hooks';
-import type { Tone } from '../lib/labels';
+import { PLATFORM_LABEL, type Tone } from '../lib/labels';
 
 // ---------------------------------------------------------------------------
 // Tipos e rótulos
@@ -35,6 +35,8 @@ interface Stats {
   accepted: number;
   delivered: number;
   opened: number;
+  /** Contas que receberam campanhas na caixa de notificações (app e web). */
+  inbox: number;
   inProgress: number;
   fcmConfigured: boolean;
   projectId: string | null;
@@ -54,6 +56,8 @@ interface Campaign {
   failed: number;
   delivered: number;
   opened: number;
+  /** Contas que receberam a campanha na caixa de notificações; é como ela chega a quem usa só a web. */
+  inboxCount: number;
   error: string | null;
   createdByEmail: string;
   createdAt: string;
@@ -66,6 +70,8 @@ interface Preview {
   signedIn: number;
   installs: number;
   users: number;
+  /** Contas que receberão na caixa de notificações (com ou sem aparelho). */
+  inboxUsers: number;
   versions: Array<{ version: string; count: number }>;
   label: string;
 }
@@ -101,12 +107,12 @@ const FAILURE_LABEL: Record<string, string> = {
 type AudienceKind = Audience['type'];
 
 const AUDIENCE_OPTIONS: Array<{ key: AudienceKind; label: string; hint: string }> = [
-  { key: 'all', label: 'Todos os aparelhos', hint: 'Com ou sem conta.' },
-  { key: 'signed_in', label: 'Com conta', hint: 'Aparelhos onde alguém fez login.' },
-  { key: 'anonymous', label: 'Sem conta', hint: 'Usam o app só no modo local.' },
+  { key: 'all', label: 'Todos', hint: 'Aparelhos com ou sem conta; na caixa, todas as contas ativas.' },
+  { key: 'signed_in', label: 'Com conta', hint: 'Aparelhos onde alguém fez login; na caixa, todas as contas ativas (inclui quem usa só a web).' },
+  { key: 'anonymous', label: 'Sem conta', hint: 'Usam o app só no modo local. Só push: sem conta não há caixa.' },
   { key: 'subscription', label: 'Por assinatura', hint: 'Com ou sem assinatura ativa.' },
   { key: 'inactive', label: 'Inativos', hint: 'Sem nenhuma atividade há N dias.' },
-  { key: 'app_version', label: 'Versão antiga do app', hint: 'Para pedir atualização.' },
+  { key: 'app_version', label: 'Versão antiga do app', hint: 'Para pedir atualização. Só push para esses aparelhos; a web não entra.' },
   { key: 'users', label: 'E-mails específicos', hint: 'Até 200 contas.' },
   { key: 'workspace', label: 'Uma empresa', hint: 'Todos os membros ativos.' },
 ];
@@ -158,19 +164,19 @@ export function NotificationsPage() {
   return (
     <div className="page">
       <PageHeader
-        title="Notificações push"
-        subtitle={s?.projectId ? `Firebase Cloud Messaging · projeto ${s.projectId}` : 'Mensagens enviadas pelo Firebase Cloud Messaging'}
+        title="Notificações"
+        subtitle={s?.projectId ? `Push no app Android (Firebase · projeto ${s.projectId}) e caixa de notificações no app e na web` : 'Push no app Android e caixa de notificações no app e na web'}
         actions={can('support') && tab !== 'compose' && <button type="button" className="btn btn--primary" onClick={() => set({ tab: 'compose' })}><Icon name="plus" /> Nova campanha</button>}
       />
 
       {s && !s.fcmConfigured && (
         <Notice tone="warning" title="Firebase não configurado">
-          Falta a conta de serviço (a mesma do Google Play serve, com o papel “Firebase Cloud Messaging API Admin” e a API do FCM ativada no projeto).
+          Falta a conta de serviço (a mesma do Google Play serve, com o papel “Firebase Cloud Messaging API Admin” e a API do FCM ativada no projeto). Sem ela nenhuma campanha é enviada — nem para a caixa de notificações da web.
         </Notice>
       )}
       {s && s.fcmConfigured && s.reachable === 0 && (
         <Notice tone="info" title="Nenhum aparelho registrado ainda">
-          Os tokens chegam quando a versão do app com push registrado for publicada e aberta pelos usuários.
+          Os tokens chegam quando a versão do app com push registrado for publicada e aberta pelos usuários. Campanhas para públicos com conta já chegam pela caixa de notificações.
         </Notice>
       )}
 
@@ -180,6 +186,7 @@ export function NotificationsPage() {
         <StatTile label="Campanhas enviadas" value={fmtNumber(s?.campaignsSent)} foot={s?.inProgress ? `${fmtNumber(s.inProgress)} em andamento` : 'sem envio em andamento'} />
         <StatTile label="Taxa de entrega" value={deliveryRate === null ? '—' : fmtPercent(deliveryRate)} foot={`${fmtNumber(s?.delivered ?? 0)} entregues de ${fmtNumber(s?.accepted ?? 0)} aceitas pelo FCM`} hint="Entregue = o app confirmou que recebeu." />
         <StatTile label="Taxa de abertura" value={openRate === null ? '—' : fmtPercent(openRate)} foot={`${fmtNumber(s?.opened ?? 0)} abertas de ${fmtNumber(s?.delivered ?? 0)} entregues`} />
+        <StatTile label="Na caixa de notificações" value={fmtNumber(s?.inbox)} foot="contas alcançadas pelas campanhas, no app e na web" hint="Toda campanha também é gravada na caixa de notificações das contas do público. A web não tem push: é por aqui que a campanha chega a quem usa só o navegador." />
       </div>
 
       <Tabs value={tab} onChange={(next) => set({ tab: next })} items={[{ key: 'campaigns', label: 'Campanhas', count: campaigns.data?.total }, { key: 'compose', label: 'Nova campanha' }]} />
@@ -200,13 +207,13 @@ export function NotificationsPage() {
           <div className="table-wrap">
             <table className="table">
               <thead>
-                <tr><th>Campanha</th><th>Público</th><th>Situação</th><th className="num">Alvo</th><th className="num">Aceitas</th><th className="num">Entregues</th><th className="num">Abertas</th><th>Criada</th></tr>
+                <tr><th>Campanha</th><th>Público</th><th>Situação</th><th className="num" title="Aparelhos com push no público">Alvo</th><th className="num">Aceitas</th><th className="num">Entregues</th><th className="num">Abertas</th><th className="num" title="Contas que receberam na caixa de notificações (app e web)">Caixa</th><th>Criada</th></tr>
               </thead>
               <tbody>
                 {campaigns.isLoading ? (
-                  <tr><td colSpan={8}><Skeleton /></td></tr>
+                  <tr><td colSpan={9}><Skeleton /></td></tr>
                 ) : (campaigns.data?.items.length ?? 0) === 0 ? (
-                  <tr><td colSpan={8}><Empty icon="mail" title="Nenhuma campanha ainda">Crie a primeira em “Nova campanha”.</Empty></td></tr>
+                  <tr><td colSpan={9}><Empty icon="mail" title="Nenhuma campanha ainda">Crie a primeira em “Nova campanha”.</Empty></td></tr>
                 ) : (
                   campaigns.data?.items.map((campaign) => (
                     <tr key={campaign.id} className="clickable" onClick={() => navigate(`/notificacoes/${campaign.id}`)}>
@@ -217,6 +224,7 @@ export function NotificationsPage() {
                       <td className="num">{fmtNumber(campaign.accepted)}</td>
                       <td className="num">{fmtNumber(campaign.delivered)}</td>
                       <td className="num">{fmtNumber(campaign.opened)}{campaign.delivered > 0 && <span className="caption"> ({Math.round((campaign.opened / campaign.delivered) * 100)}%)</span>}</td>
+                      <td className="num">{campaign.status === 'sent' ? fmtNumber(campaign.inboxCount) : <span className="muted">—</span>}</td>
                       <td><Time value={campaign.createdAt} /><div className="cell-sub">{campaign.createdByEmail}</div></td>
                     </tr>
                   ))
@@ -292,7 +300,7 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
   return (
     <div className="grid grid--2-1">
       <div className="stack">
-        <Card title="Mensagem" subtitle="O que aparece na notificação do aparelho">
+        <Card title="Mensagem" subtitle="O que aparece na notificação do aparelho e na caixa de notificações">
           <div className="stack stack--tight">
             <label className="field">
               <span className="field__label">Título</span>
@@ -308,7 +316,7 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
               <label className="field">
                 <span className="field__label">Ao tocar, abrir</span>
                 <select className="select" value={screen} onChange={(event) => setScreen(event.target.value)}>
-                  <option value="">Tela inicial do app</option>
+                  <option value="">Tela inicial</option>
                   {Object.entries(SCREEN_LABEL).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
@@ -323,7 +331,7 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
           </div>
         </Card>
 
-        <Card title="Público" subtitle="Resolvido na hora do envio; a estimativa ao lado é de agora">
+        <Card title="Público" subtitle="Resolvido na hora do envio; a estimativa ao lado é de agora. O push vai para os aparelhos; a caixa, para as contas.">
           <div className="chips" style={{ marginBottom: 12 }}>
             {AUDIENCE_OPTIONS.map((option) => (
               <button key={option.key} type="button" className={`chip ${kind === option.key ? 'active' : ''}`} title={option.hint} onClick={() => changeKind(option.key)}>{option.label}</button>
@@ -369,10 +377,14 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
             <label className="field">
               <span className="field__label">Só aparelhos vistos nos últimos (dias)</span>
               <input className="input" type="number" min={1} max={365} value={activeWithinDays} onChange={(event) => setActiveWithinDays(Math.max(1, Math.min(365, Number(event.target.value) || 90)))} />
-              <span className="field__hint">Evita gastar cota com tokens de aparelhos abandonados.</span>
+              <span className="field__hint">Evita gastar cota com tokens de aparelhos abandonados. Vale só para o push; a caixa de notificações não depende de aparelho.</span>
             </label>
           </div>
         </Card>
+
+        <Notice tone="info" title="Push e caixa de notificações">
+          A campanha sai por dois canais ao mesmo tempo. <strong>Push</strong>: só o app Android, nos aparelhos do público. <strong>Caixa de notificações</strong>: fica na conta de quem o público alcança e aparece no app e na web — é como a campanha chega a quem usa só a web, que não tem push. A caixa é sempre gravada (não há opção por campanha); públicos definidos pelo aparelho (“Sem conta”, “Versão antiga do app”) só entram na caixa de quem recebeu o push com conta.
+        </Notice>
       </div>
 
       <div className="stack">
@@ -387,6 +399,7 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
               <div className="tile__value">{fmtNumber(preview.data.total)} <span className="muted" style={{ fontSize: 'var(--fs-supporting)', fontWeight: 500 }}>aparelho(s)</span></div>
               <div className="caption">{preview.data.label}</div>
               <div className="caption">{fmtNumber(preview.data.signedIn)} com conta · {fmtNumber(preview.data.users)} usuário(s) distinto(s)</div>
+              <div><strong>{fmtNumber(preview.data.inboxUsers)}</strong> <span className="muted small">conta(s) pela caixa de notificações (app e web)</span></div>
               {preview.data.versions.length > 0 && <HorizontalBars items={preview.data.versions.map((item) => ({ label: `v${item.version}`, value: item.count }))} />}
             </div>
           ) : (
@@ -401,12 +414,12 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
                 <input className="input input--sm" value={testEmail} onChange={(event) => setTestEmail(event.target.value)} placeholder="e-mail de uma conta do app" style={{ flex: 1 }} />
                 <button type="button" className="btn btn--ghost btn--sm" disabled={!ready || !testEmail.includes('@') || sendTest.isPending} onClick={() => sendTest.mutate()}>{sendTest.isPending ? 'Enviando…' : 'Enviar teste'}</button>
               </div>
-              <span className="field__hint">Vai só para os aparelhos onde esse e-mail fez login; fica registrado como teste.</span>
+              <span className="field__hint">Vai só para os aparelhos onde esse e-mail fez login (e para a caixa dessa conta); fica registrado como teste. Conta que usa só a web não tem aparelho para o teste.</span>
             </label>
             <hr className="divider" />
             <div className="row" style={{ justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn--ghost" disabled={!ready || saveDraft.isPending} onClick={() => saveDraft.mutate()}>Salvar rascunho</button>
-              <button type="button" className="btn btn--primary" disabled={!ready || (preview.data?.total ?? 0) === 0} onClick={() => setConfirm(true)}><Icon name="zap" /> Enviar agora</button>
+              <button type="button" className="btn btn--primary" disabled={!ready || ((preview.data?.total ?? 0) === 0 && (preview.data?.inboxUsers ?? 0) === 0)} onClick={() => setConfirm(true)}><Icon name="zap" /> Enviar agora</button>
             </div>
           </div>
         </Card>
@@ -416,7 +429,7 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
         open={confirm}
         onClose={() => setConfirm(false)}
         title="Enviar campanha"
-        description={<>Vai para <strong>{fmtNumber(preview.data?.total ?? 0)} aparelho(s)</strong> ({preview.data?.label}). Depois de aceita pelo FCM a mensagem não pode ser retirada.</>}
+        description={<>Vai por push para <strong>{fmtNumber(preview.data?.total ?? 0)} aparelho(s)</strong> ({preview.data?.label}) e para a caixa de notificações de <strong>{fmtNumber(preview.data?.inboxUsers ?? 0)} conta(s)</strong>, no app e na web. Depois de aceita pelo FCM ou gravada na caixa, a mensagem não pode ser retirada.</>}
         confirmLabel="Enviar para todos"
         confirmWord="enviar"
         requireReason={false}
@@ -530,7 +543,7 @@ export function CampaignDetailPage() {
       {campaign.status === 'sending' && <Notice tone="info">Envio em andamento; os números atualizam sozinhos.</Notice>}
 
       <div className="grid grid--2-1">
-        <Card title="Funil de entrega" subtitle="Aceita = o FCM recebeu; entregue e aberta = o app reportou">
+        <Card title="Funil de entrega (push)" subtitle="Aceita = o FCM recebeu; entregue e aberta = o app reportou. A caixa de notificações não entra neste funil.">
           <Funnel steps={steps} />
           {campaign.failed > 0 && (
             <div style={{ marginTop: 16 }}>
@@ -546,6 +559,12 @@ export function CampaignDetailPage() {
               <KeyValue
                 items={[
                   { label: 'Ao tocar', value: campaign.action.url ? <a href={campaign.action.url} target="_blank" rel="noreferrer">{campaign.action.url}</a> : (SCREEN_LABEL[campaign.action.screen ?? ''] ?? 'Tela inicial') },
+                  {
+                    label: 'Caixa de notificações',
+                    value: campaign.status === 'sent'
+                      ? <span title="Contas que receberam a campanha na caixa, no app e na web. Inclui quem usa só a web, que não tem push.">{fmtNumber(campaign.inboxCount)} conta(s)</span>
+                      : <span className="muted">gravada ao concluir o envio</span>,
+                  },
                   { label: 'Início', value: <Time value={campaign.startedAt} relative={false} /> },
                   { label: 'Conclusão', value: <Time value={campaign.completedAt} relative={false} /> },
                 ]}
@@ -562,7 +581,7 @@ export function CampaignDetailPage() {
 
       <Card
         title="Aparelhos"
-        subtitle="Uma linha por token alvo"
+        subtitle="Uma linha por token de push; quem recebeu só pela caixa de notificações não aparece aqui"
         flush
         actions={
           <select className="select select--sm" value={deliveryStatus} onChange={(event) => { setDeliveryStatus(event.target.value); setDeliveriesPage(1); }}>
@@ -588,7 +607,7 @@ export function CampaignDetailPage() {
                   <tr key={`${item.installId}-${item.status}`}>
                     <td>{item.email ? <Link to={`/usuarios/${item.userId}`}>{item.email}</Link> : <span className="muted">sem conta</span>}</td>
                     <td className="mono small">{item.installId.slice(0, 8)}</td>
-                    <td className="muted">{item.platform ?? '—'}{item.appVersionCode ? ` v${item.appVersionCode}` : ''}</td>
+                    <td className="muted">{item.platform ? PLATFORM_LABEL[item.platform] ?? item.platform : '—'}{item.appVersionCode ? ` v${item.appVersionCode}` : ''}</td>
                     <td>
                       <Badge tone={item.status === 'opened' ? 'success' : item.status === 'delivered' ? 'info' : item.status === 'failed' ? 'error' : 'neutral'}>{item.status}</Badge>
                       {item.error && <div className="caption">{FAILURE_LABEL[item.error] ?? item.error}</div>}

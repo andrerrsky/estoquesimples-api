@@ -128,6 +128,67 @@ export const ACTIVITY_SQL = sql`
   SELECT actor_user_id AS user_id, created_at AS at FROM audit_log WHERE actor_user_id IS NOT NULL
 `;
 
+// ---------------------------------------------------------------------------
+// Dimensão de plataforma (app Android × web)
+// ---------------------------------------------------------------------------
+
+/** De onde um evento de cliente ou um aparelho pode vir. */
+export const CLIENT_PLATFORMS = ['android', 'ios', 'web'] as const;
+export type ClientPlatform = (typeof CLIENT_PLATFORMS)[number];
+
+export const platformQuerySchema = z.object({ platform: z.enum(CLIENT_PLATFORMS).optional() });
+
+/**
+ * Plataforma de um evento de analytics.
+ *
+ * Evento enviado pelo cliente já traz a plataforma na coluna. Evento
+ * observado pela API é gravado como `server` e só é atribuído quando quem o
+ * emitiu registrou de onde veio: `properties.platform` (cadastro, login e
+ * convite) ou `properties.provider = 'asaas'` (a contratação pelo Asaas só
+ * existe na web). O resto continua `server` — sem plataforma — e fica fora
+ * de qualquer recorte; o painel diz isso em vez de chutar.
+ *
+ * `alias` é sempre constante do código (nunca entrada do usuário).
+ */
+export function eventPlatformExpr(alias?: 'e'): SQL {
+  const p = sql.raw(alias ? `${alias}.` : '');
+  return sql`(CASE
+    WHEN ${p}platform <> 'server' THEN ${p}platform
+    WHEN ${p}properties->>'platform' IN ('android', 'ios', 'web') THEN ${p}properties->>'platform'
+    WHEN ${p}properties->>'provider' = 'asaas' THEN 'web'
+    ELSE 'server'
+  END)`;
+}
+
+/**
+ * "Usa a plataforma": a conta tem aparelho (o navegador também é um)
+ * registrado nela. É o recorte para o que não é evento — contas, empresas,
+ * etapas do funil. Quem usa app e web aparece nos dois recortes; conta sem
+ * aparelho registrado, em nenhum.
+ */
+export function userOnPlatform(userId: SQL, platform: ClientPlatform): SQL {
+  return sql`EXISTS (SELECT 1 FROM devices pd WHERE pd.user_id = ${userId} AND pd.platform = ${platform})`;
+}
+
+/** Provedor de pagamento de cada plataforma: Google Play no app, Asaas na web. */
+export function providerOfPlatform(platform: ClientPlatform): 'google_play' | 'asaas' | null {
+  if (platform === 'android') return 'google_play';
+  if (platform === 'web') return 'asaas';
+  return null;
+}
+
+/**
+ * Atividade restrita a uma plataforma. A auditoria não guarda de onde a
+ * ação veio, então com recorte só os eventos de analytics contam.
+ */
+export function activitySql(platform?: ClientPlatform): SQL {
+  if (!platform) return ACTIVITY_SQL;
+  return sql`
+    SELECT user_id, occurred_at AS at FROM analytics_events
+    WHERE user_id IS NOT NULL AND ${eventPlatformExpr()} = ${platform}
+  `;
+}
+
 /** `('a','b')` parametrizado, para `IN` com listas de constantes do código. */
 export function sqlList(values: readonly string[]): SQL {
   return sql`(${sql.join(values.map((value) => sql`${value}`), sql`, `)})`;

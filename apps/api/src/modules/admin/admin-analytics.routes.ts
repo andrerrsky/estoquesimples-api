@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { ANALYTICS_EVENT_CATALOG, EVENT_NAME_PATTERN } from '../analytics/analytics.events.js';
 import { AdminAnalyticsService } from './admin-analytics.service.js';
 import { requireAdmin } from './admin-auth.plugin.js';
-import { rangeQuerySchema, resolveRange, seriesPointSchema } from './admin-series.js';
+import { platformQuerySchema, rangeQuerySchema, resolveRange, seriesPointSchema } from './admin-series.js';
 import { commonAdminErrors, paginationQuerySchema } from './admin.schemas.js';
 
 export async function registerAdminAnalyticsRoutes(app: FastifyInstance): Promise<void> {
   const routes = app.withTypeProvider<ZodTypeProvider>();
   const service = new AdminAnalyticsService(app.services);
+  // Recorte opcional de plataforma (Android × web), comum às consultas de uso.
+  const rangeAndPlatformSchema = rangeQuerySchema.merge(platformQuerySchema);
 
   routes.get(
     '/analytics/summary',
@@ -18,13 +20,13 @@ export async function registerAdminAnalyticsRoutes(app: FastifyInstance): Promis
       preHandler: requireAdmin('viewer'),
       schema: {
         tags: ['admin'],
-        summary: 'Usuários ativos, séries e eventos mais usados',
+        summary: 'Usuários ativos, séries, eventos mais usados e recorte por plataforma',
         hide: true,
-        querystring: rangeQuerySchema,
+        querystring: rangeAndPlatformSchema,
         response: { 200: z.any(), ...commonAdminErrors },
       },
     },
-    async (request) => service.summary(resolveRange(request.query)),
+    async (request) => service.summary(resolveRange(request.query), request.query.platform),
   );
 
   routes.get(
@@ -35,11 +37,11 @@ export async function registerAdminAnalyticsRoutes(app: FastifyInstance): Promis
         tags: ['admin'],
         summary: 'Todas as métricas do registro, com o período anterior',
         hide: true,
-        querystring: rangeQuerySchema,
+        querystring: rangeAndPlatformSchema,
         response: { 200: z.any(), ...commonAdminErrors },
       },
     },
-    async (request) => service.metrics(resolveRange(request.query)),
+    async (request) => service.metrics(resolveRange(request.query), request.query.platform),
   );
 
   routes.get(
@@ -89,14 +91,14 @@ export async function registerAdminAnalyticsRoutes(app: FastifyInstance): Promis
         summary: 'Série temporal de um evento',
         hide: true,
         params: z.object({ name: z.string().regex(EVENT_NAME_PATTERN).max(80) }),
-        querystring: rangeQuerySchema.extend({ metric: z.enum(['events', 'users']).default('events') }),
+        querystring: rangeAndPlatformSchema.extend({ metric: z.enum(['events', 'users']).default('events') }),
         response: { 200: z.object({ name: z.string(), metric: z.string(), points: z.array(seriesPointSchema) }), ...commonAdminErrors },
       },
     },
     async (request) => ({
       name: request.params.name,
       metric: request.query.metric,
-      points: await service.eventSeries(request.params.name, resolveRange(request.query), request.query.metric),
+      points: await service.eventSeries(request.params.name, resolveRange(request.query), request.query.metric, request.query.platform),
     }),
   );
 
@@ -108,11 +110,11 @@ export async function registerAdminAnalyticsRoutes(app: FastifyInstance): Promis
         tags: ['admin'],
         summary: 'Funil da instalação à assinatura',
         hide: true,
-        querystring: rangeQuerySchema,
+        querystring: rangeAndPlatformSchema,
         response: { 200: z.any(), ...commonAdminErrors },
       },
     },
-    async (request) => service.funnel(resolveRange(request.query, 90)),
+    async (request) => service.funnel(resolveRange(request.query, 90), request.query.platform),
   );
 
   routes.get(

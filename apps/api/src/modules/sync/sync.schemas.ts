@@ -253,6 +253,8 @@ export const conflictSchema = z.object({
   keptValue: z.unknown(),
   discardedValue: z.unknown(),
   createdAt: z.string(),
+  resolution: z.string().nullable(),
+  resolvedAt: z.string().nullable(),
 });
 
 export const conflictsResponseSchema = z.object({

@@ -82,6 +82,12 @@ export interface EntitlementSnapshot {
   active: boolean;
   planKey: string;
   state: string;
+  /**
+   * De onde vem a assinatura da empresa (`google_play` ou `asaas`); `null`
+   * quando ela nunca assinou. Só informa onde a assinatura é gerenciada: o
+   * direito de uso (`active`) é o mesmo, qualquer que seja a origem.
+   */
+  provider: string | null;
   currentPeriodEnd: string | null;
   graceUntil: string | null;
   autoRenewing: boolean;
@@ -448,6 +454,7 @@ export class BillingService {
       active,
       planKey,
       state: subscription?.state ?? 'sem_assinatura',
+      provider: subscription?.provider ?? null,
       currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
       graceUntil: subscription?.graceUntil?.toISOString() ?? null,
       autoRenewing: subscription?.autoRenewing ?? false,

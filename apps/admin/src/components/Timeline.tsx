@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
-import { auditLabel } from '../lib/labels';
+import { auditLabel, PLATFORM_LABEL } from '../lib/labels';
 import { Icon, type IconName } from './Icon';
 import { Details, Empty, Pagination, Props, Skeleton, Time } from './ui';
 
@@ -130,7 +130,7 @@ export function EventsPanel({ path, queryKey }: { path: string; queryKey: unknow
   if (items.length === 0) {
     return (
       <Empty icon="activity" title="Nenhum evento de uso">
-        Eventos aparecem quando o aplicativo envia telemetria ou quando a API registra marcos (login, sincronização, assinatura).
+        Eventos aparecem quando o app ou a web enviam telemetria, ou quando a API registra marcos (login, sincronização, assinatura).
       </Empty>
     );
   }
@@ -157,7 +157,7 @@ export function EventsPanel({ path, queryKey }: { path: string; queryKey: unknow
                   <code>{event.name}</code>
                 </td>
                 <td className="muted">
-                  {event.source === 'server' ? 'API' : `${event.platform}${event.appVersionCode ? ` v${event.appVersionCode}` : ''}`}
+                  {event.source === 'server' ? 'API' : `${PLATFORM_LABEL[event.platform] ?? event.platform}${event.appVersionCode ? ` v${event.appVersionCode}` : ''}`}
                 </td>
                 <td>{event.workspaceName ? <Link to={`/empresas/${event.workspaceId}`}>{event.workspaceName}</Link> : <span className="muted">—</span>}</td>
                 <td>

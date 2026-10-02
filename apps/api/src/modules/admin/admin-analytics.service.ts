@@ -3,10 +3,14 @@ import { sql, type SQL } from 'drizzle-orm';
 import type { AppServices } from '../../platform/http/context.js';
 import { ANALYTICS_EVENT_CATALOG, DEFAULT_FUNNEL } from '../analytics/analytics.events.js';
 import {
-  ACTIVITY_SQL as ACTIVITY,
+  activitySql,
   bucketExpr,
+  eventPlatformExpr,
   fillSeries,
+  providerOfPlatform,
   resolveRange,
+  userOnPlatform,
+  type ClientPlatform,
   type ResolvedRange,
   type SeriesPoint,
 } from './admin-series.js';
@@ -20,15 +24,32 @@ import { offsetOf, type PaginationQuery } from './admin.schemas.js';
  * e o painel as exibe sem saber de antemão quais existem. A consulta recebe
  * o intervalo e devolve um número; o `previous` (mesmo intervalo, deslocado)
  * dá a variação sem cada tela ter de calculá-la.
+ *
+ * Plataforma (app × web): só a métrica que tem essa dimensão de verdade a
+ * aplica, e declara como em `platformNote`. As demais ignoram o recorte e o
+ * painel as marca como "todas as plataformas" — melhor do que um número que
+ * parece filtrado e não é.
  */
 export interface MetricDefinition {
   key: string;
   label: string;
   description: string;
   unit: 'count' | 'percent' | 'users' | 'events';
-  /** Consulta que devolve um único número para o intervalo. */
-  query: (range: { from: Date; to: Date }) => SQL;
+  /** Como o recorte de plataforma é aplicado; ausente = a métrica não tem essa dimensão. */
+  platformNote?: string;
+  /** Consulta que devolve um único número para o intervalo. `platform` só chega a quem declara `platformNote`. */
+  query: (range: { from: Date; to: Date }, platform?: ClientPlatform) => SQL;
 }
+
+/** `AND provider = …` do provedor da plataforma; iOS não tem provedor e zera. */
+function providerFilter(platform?: ClientPlatform): SQL {
+  if (!platform) return sql``;
+  const provider = providerOfPlatform(platform);
+  return provider ? sql`AND provider = ${provider}` : sql`AND false`;
+}
+
+const eventPlatformFilter = (platform?: ClientPlatform): SQL =>
+  platform ? sql`AND ${eventPlatformExpr()} = ${platform}` : sql``;
 
 export const METRICS: MetricDefinition[] = [
   {
@@ -36,21 +57,31 @@ export const METRICS: MetricDefinition[] = [
     label: 'Contas criadas',
     description: 'Cadastros concluídos no período.',
     unit: 'users',
-    query: (r) => sql`SELECT count(*)::int AS v FROM users WHERE created_at >= ${r.from} AND created_at < ${r.to}`,
+    platformNote: 'Contas criadas no período que têm aparelho (ou navegador) registrado na plataforma.',
+    query: (r, platform) => sql`
+      SELECT count(*)::int AS v FROM users u
+      WHERE u.created_at >= ${r.from} AND u.created_at < ${r.to}
+        ${platform ? sql`AND ${userOnPlatform(sql`u.id`, platform)}` : sql``}
+    `,
   },
   {
     key: 'active_users',
     label: 'Usuários ativos',
     description: 'Usuários com ao menos um evento ou ação no período.',
     unit: 'users',
-    query: (r) => sql`SELECT count(DISTINCT user_id)::int AS v FROM (${ACTIVITY}) a WHERE at >= ${r.from} AND at < ${r.to}`,
+    platformNote: 'Só eventos de uso da plataforma; ações da auditoria não guardam de onde vieram.',
+    query: (r, platform) => sql`SELECT count(DISTINCT user_id)::int AS v FROM (${activitySql(platform)}) a WHERE at >= ${r.from} AND at < ${r.to}`,
   },
   {
     key: 'events',
     label: 'Eventos registrados',
-    description: 'Total de eventos de uso recebidos (app + API).',
+    description: 'Total de eventos de uso recebidos (app, web e API).',
     unit: 'events',
-    query: (r) => sql`SELECT count(*)::int AS v FROM analytics_events WHERE occurred_at >= ${r.from} AND occurred_at < ${r.to}`,
+    platformNote: 'Eventos enviados pela plataforma e os da API que registram de onde vieram.',
+    query: (r, platform) => sql`
+      SELECT count(*)::int AS v FROM analytics_events
+      WHERE occurred_at >= ${r.from} AND occurred_at < ${r.to} ${eventPlatformFilter(platform)}
+    `,
   },
   {
     key: 'workspaces_created',
@@ -69,23 +100,26 @@ export const METRICS: MetricDefinition[] = [
   {
     key: 'subscriptions_started',
     label: 'Assinaturas vinculadas',
-    description: 'Comprovantes de compra vinculados a empresas no período.',
+    description: 'Compras do Google Play vinculadas e contratações iniciadas na web (inclui as ainda não pagas).',
     unit: 'count',
-    query: (r) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE created_at >= ${r.from} AND created_at < ${r.to}`,
+    platformNote: 'Pelo provedor: Google Play no app Android, Asaas na web.',
+    query: (r, platform) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE created_at >= ${r.from} AND created_at < ${r.to} ${providerFilter(platform)}`,
   },
   {
     key: 'subscriptions_churned',
     label: 'Assinaturas encerradas',
     description: 'Assinaturas que expiraram ou foram reembolsadas no período.',
     unit: 'count',
-    query: (r) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE state IN ('expirada','reembolsada') AND updated_at >= ${r.from} AND updated_at < ${r.to}`,
+    platformNote: 'Pelo provedor: Google Play no app Android, Asaas na web.',
+    query: (r, platform) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE state IN ('expirada','reembolsada') AND updated_at >= ${r.from} AND updated_at < ${r.to} ${providerFilter(platform)}`,
   },
   {
     key: 'cancellations',
     label: 'Renovação desligada',
-    description: 'Assinaturas cujo usuário desligou a renovação automática no período.',
+    description: 'Assinaturas cuja renovação automática foi desligada no período.',
     unit: 'count',
-    query: (r) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE canceled_at >= ${r.from} AND canceled_at < ${r.to}`,
+    platformNote: 'Pelo provedor: Google Play no app Android, Asaas na web.',
+    query: (r, platform) => sql`SELECT count(*)::int AS v FROM subscriptions WHERE canceled_at >= ${r.from} AND canceled_at < ${r.to} ${providerFilter(platform)}`,
   },
   {
     key: 'sync_operations',
@@ -122,7 +156,8 @@ export interface EventListFilters extends PaginationQuery {
   userId?: string;
   workspaceId?: string;
   source?: 'app' | 'server';
-  platform?: string;
+  /** Plataforma atribuída ao evento (`eventPlatformExpr`); `server` = sem plataforma. */
+  platform?: ClientPlatform | 'server';
   from?: Date;
   to?: Date;
   q?: string;
@@ -141,15 +176,18 @@ export class AdminAnalyticsService {
   }
 
   /** Todas as métricas do registro, com o período anterior para comparação. */
-  async metrics(range: ResolvedRange) {
+  async metrics(range: ResolvedRange, platform?: ClientPlatform) {
     const span = range.to.getTime() - range.from.getTime();
     const previous = { from: new Date(range.from.getTime() - span), to: range.from };
 
     const values = await Promise.all(
       METRICS.map(async (metric) => {
+        // Só recebe o recorte quem declarou como o aplica.
+        const applied = platform !== undefined && metric.platformNote !== undefined;
+        const scope = applied ? platform : undefined;
         const [current, prior] = await Promise.all([
-          this.scalar(metric.query(range)),
-          this.scalar(metric.query(previous)),
+          this.scalar(metric.query(range, scope)),
+          this.scalar(metric.query(previous, scope)),
         ]);
         return {
           key: metric.key,
@@ -158,53 +196,72 @@ export class AdminAnalyticsService {
           unit: metric.unit,
           value: current,
           previous: prior,
+          /** O número acima já está recortado pela plataforma pedida. */
+          platformApplied: applied,
+          platformNote: metric.platformNote ?? null,
         };
       }),
     );
 
     return {
       range: { from: range.from.toISOString(), to: range.to.toISOString(), days: range.days },
+      platform: platform ?? null,
       items: values,
     };
   }
 
-  async summary(range: ResolvedRange) {
-    const [activeSeries, eventSeries, topEvents, screens, platforms, versions, activeNow] = await Promise.all([
+  async summary(range: ResolvedRange, platform?: ClientPlatform) {
+    const activity = activitySql(platform);
+    const onPlatform = eventPlatformFilter(platform);
+    const [activeSeries, eventSeries, topEvents, screens, platforms, versions, activeNow, byPlatform] = await Promise.all([
       this.db.execute<{ bucket: string; value: string }>(sql`
         SELECT ${bucketExpr(sql`at`, range.granularity)} AS bucket, count(DISTINCT user_id)::int AS value
-        FROM (${ACTIVITY}) a WHERE at >= ${range.from} AND at < ${range.to}
+        FROM (${activity}) a WHERE at >= ${range.from} AND at < ${range.to}
         GROUP BY 1 ORDER BY 1
       `),
       this.db.execute<{ bucket: string; value: string }>(sql`
         SELECT ${bucketExpr(sql`occurred_at`, range.granularity)} AS bucket, count(*)::int AS value
-        FROM analytics_events WHERE occurred_at >= ${range.from} AND occurred_at < ${range.to}
+        FROM analytics_events WHERE occurred_at >= ${range.from} AND occurred_at < ${range.to} ${onPlatform}
         GROUP BY 1 ORDER BY 1
       `),
       this.db.execute<{ name: string; source: string; events: number; users: number; installs: number }>(sql`
         SELECT name, min(source) AS source, count(*)::int AS events,
                count(DISTINCT user_id)::int AS users, count(DISTINCT install_id)::int AS installs
-        FROM analytics_events WHERE occurred_at >= ${range.from} AND occurred_at < ${range.to}
+        FROM analytics_events WHERE occurred_at >= ${range.from} AND occurred_at < ${range.to} ${onPlatform}
         GROUP BY name ORDER BY events DESC LIMIT 30
       `),
       this.db.execute<{ screen: string; views: number; users: number }>(sql`
         SELECT properties->>'screen' AS screen, count(*)::int AS views, count(DISTINCT coalesce(user_id::text, install_id))::int AS users
         FROM analytics_events
-        WHERE name = 'screen.viewed' AND properties ? 'screen' AND occurred_at >= ${range.from} AND occurred_at < ${range.to}
+        WHERE name = 'screen.viewed' AND properties ? 'screen' AND occurred_at >= ${range.from} AND occurred_at < ${range.to} ${onPlatform}
         GROUP BY 1 ORDER BY views DESC LIMIT 15
       `),
-      this.db.execute<{ platform: string; count: number }>(sql`
-        SELECT platform, count(*)::int AS count FROM devices WHERE revoked_at IS NULL GROUP BY platform ORDER BY count DESC
+      // Aparelhos por plataforma: é a própria dimensão, então nunca é recortado.
+      this.db.execute<{ platform: string; count: number; active_30d: number; users_30d: number }>(sql`
+        SELECT platform, count(*)::int AS count,
+               count(*) FILTER (WHERE last_seen_at > now() - interval '30 days')::int AS active_30d,
+               count(DISTINCT user_id) FILTER (WHERE last_seen_at > now() - interval '30 days')::int AS users_30d
+        FROM devices WHERE revoked_at IS NULL GROUP BY platform ORDER BY count DESC
       `),
       this.db.execute<{ version: string; count: number }>(sql`
         SELECT coalesce(app_version_name, 'desconhecida') AS version, count(*)::int AS count
         FROM devices WHERE revoked_at IS NULL AND last_seen_at > now() - interval '30 days'
+          ${platform ? sql`AND platform = ${platform}` : sql``}
         GROUP BY 1 ORDER BY count DESC LIMIT 10
       `),
       this.db.execute<{ dau: number; wau: number; mau: number }>(sql`
         SELECT
-          (SELECT count(DISTINCT user_id)::int FROM (${ACTIVITY}) a WHERE at > now() - interval '1 day') AS dau,
-          (SELECT count(DISTINCT user_id)::int FROM (${ACTIVITY}) a WHERE at > now() - interval '7 days') AS wau,
-          (SELECT count(DISTINCT user_id)::int FROM (${ACTIVITY}) a WHERE at > now() - interval '30 days') AS mau
+          (SELECT count(DISTINCT user_id)::int FROM (${activity}) a WHERE at > now() - interval '1 day') AS dau,
+          (SELECT count(DISTINCT user_id)::int FROM (${activity}) a WHERE at > now() - interval '7 days') AS wau,
+          (SELECT count(DISTINCT user_id)::int FROM (${activity}) a WHERE at > now() - interval '30 days') AS mau
+      `),
+      // Eventos do período por plataforma atribuída (também sem recorte). A
+      // linha `server` são os marcos da API que não dizem de onde vieram.
+      this.db.execute<{ platform: string; events: number; users: number; installs: number }>(sql`
+        SELECT ${eventPlatformExpr()} AS platform, count(*)::int AS events,
+               count(DISTINCT user_id)::int AS users, count(DISTINCT install_id)::int AS installs
+        FROM analytics_events WHERE occurred_at >= ${range.from} AND occurred_at < ${range.to}
+        GROUP BY 1 ORDER BY events DESC
       `),
     ]);
 
@@ -213,6 +270,7 @@ export class AdminAnalyticsService {
 
     return {
       range: { from: range.from.toISOString(), to: range.to.toISOString(), granularity: range.granularity, days: range.days },
+      platform: platform ?? null,
       active: { dau: now?.dau ?? 0, wau: now?.wau ?? 0, mau: now?.mau ?? 0 },
       series: {
         activeUsers: fillSeries(activeSeries.rows, range),
@@ -227,20 +285,21 @@ export class AdminAnalyticsService {
         installs: row.installs,
       })),
       topScreens: screens.rows.map((row) => ({ screen: row.screen, views: row.views, users: row.users })),
-      platforms: platforms.rows,
+      platforms: platforms.rows.map((row) => ({ platform: row.platform, count: row.count, active30d: row.active_30d, users30d: row.users_30d })),
+      byPlatform: byPlatform.rows,
       appVersions: versions.rows,
     };
   }
 
   /** Série de um evento específico, contando eventos ou usuários distintos. */
-  async eventSeries(name: string, range: ResolvedRange, metric: 'events' | 'users'): Promise<SeriesPoint[]> {
+  async eventSeries(name: string, range: ResolvedRange, metric: 'events' | 'users', platform?: ClientPlatform): Promise<SeriesPoint[]> {
     const value = metric === 'users'
       ? sql`count(DISTINCT coalesce(user_id::text, install_id))::int`
       : sql`count(*)::int`;
     const rows = await this.db.execute<{ bucket: string; value: string }>(sql`
       SELECT ${bucketExpr(sql`occurred_at`, range.granularity)} AS bucket, ${value} AS value
       FROM analytics_events
-      WHERE name = ${name} AND occurred_at >= ${range.from} AND occurred_at < ${range.to}
+      WHERE name = ${name} AND occurred_at >= ${range.from} AND occurred_at < ${range.to} ${eventPlatformFilter(platform)}
       GROUP BY 1 ORDER BY 1
     `);
     return fillSeries(rows.rows, range);
@@ -284,7 +343,7 @@ export class AdminAnalyticsService {
     if (filters.userId) conditions.push(sql`e.user_id = ${filters.userId}`);
     if (filters.workspaceId) conditions.push(sql`e.workspace_id = ${filters.workspaceId}`);
     if (filters.source) conditions.push(sql`e.source = ${filters.source}`);
-    if (filters.platform) conditions.push(sql`e.platform = ${filters.platform}`);
+    if (filters.platform) conditions.push(sql`${eventPlatformExpr('e')} = ${filters.platform}`);
     if (filters.from) conditions.push(sql`e.occurred_at >= ${filters.from}`);
     if (filters.to) conditions.push(sql`e.occurred_at < ${filters.to}`);
     if (filters.q) {
@@ -302,11 +361,12 @@ export class AdminAnalyticsService {
     const [rows, total] = await Promise.all([
       this.db.execute<{
         id: string; name: string; occurred_at: string; received_at: string; user_id: string | null; user_email: string | null;
-        workspace_id: string | null; workspace_name: string | null; install_id: string | null; platform: string;
+        workspace_id: string | null; workspace_name: string | null; install_id: string | null; platform: string; attributed_platform: string;
         app_version_code: number | null; session_key: string | null; source: string; properties: Record<string, unknown>;
       }>(sql`
         SELECT e.id::text, e.name, e.occurred_at, e.received_at, e.user_id, u.email AS user_email,
-               e.workspace_id, w.name AS workspace_name, e.install_id, e.platform, e.app_version_code,
+               e.workspace_id, w.name AS workspace_name, e.install_id, e.platform,
+               ${eventPlatformExpr('e')} AS attributed_platform, e.app_version_code,
                e.session_key, e.source, e.properties
         ${base}
         ORDER BY e.occurred_at DESC, e.id DESC
@@ -327,6 +387,8 @@ export class AdminAnalyticsService {
         workspaceName: row.workspace_name,
         installId: row.install_id,
         platform: row.platform,
+        // Para evento da API: de onde ele veio, quando o emissor registrou.
+        attributedPlatform: row.attributed_platform,
         appVersionCode: row.app_version_code,
         sessionKey: row.session_key,
         source: row.source,
@@ -344,8 +406,17 @@ export class AdminAnalyticsService {
    * A identidade é o usuário quando existe; antes da conta, é a instalação.
    * Para não contar a mesma pessoa duas vezes (uma como instalação, outra
    * como usuário), a instalação é traduzida para o usuário que a registrou.
+   *
+   * Com recorte de plataforma o funil é o das *pessoas que usam a
+   * plataforma*: a conta entra se tem aparelho (ou navegador) registrado
+   * nela (`userOnPlatform`); a instalação ainda sem conta, pela plataforma
+   * do próprio evento. Recortar evento a evento zeraria as etapas que só a
+   * API observa (empresa criada, carga inicial), que não têm plataforma.
    */
-  async funnel(range: ResolvedRange) {
+  async funnel(range: ResolvedRange, platform?: ClientPlatform) {
+    const identityOnPlatform = platform
+      ? sql`AND (CASE WHEN e.user_id IS NOT NULL THEN ${userOnPlatform(sql`e.user_id`, platform)} ELSE e.platform = ${platform} END)`
+      : sql``;
     const steps = await Promise.all(
       DEFAULT_FUNNEL.map(async (step) => {
         const count = await this.scalar(sql`
@@ -357,6 +428,7 @@ export class AdminAnalyticsService {
             ) AS identity
             FROM analytics_events e
             WHERE e.name = ${step.event} AND e.occurred_at >= ${range.from} AND e.occurred_at < ${range.to}
+              ${identityOnPlatform}
           ) t WHERE identity IS NOT NULL
         `);
         return { key: step.key, label: step.label, event: step.event, count };
@@ -367,11 +439,19 @@ export class AdminAnalyticsService {
     // empresa, carga inicial e assinatura têm tabela própria. Vale o maior
     // dos dois números — o evento de servidor pode não existir para dados
     // anteriores à instalação do analytics.
+    const on = (userId: SQL): SQL => (platform ? sql`AND ${userOnPlatform(userId, platform)}` : sql``);
     const [registered, workspaced, uploaded, subscribed] = await Promise.all([
-      this.scalar(sql`SELECT count(*)::int AS v FROM users WHERE created_at >= ${range.from} AND created_at < ${range.to}`),
-      this.scalar(sql`SELECT count(DISTINCT owner_user_id)::int AS v FROM workspaces WHERE created_at >= ${range.from} AND created_at < ${range.to}`),
-      this.scalar(sql`SELECT count(DISTINCT created_by)::int AS v FROM initial_uploads WHERE status = 'concluida' AND completed_at >= ${range.from} AND completed_at < ${range.to}`),
-      this.scalar(sql`SELECT count(DISTINCT purchaser_user_id)::int AS v FROM subscriptions WHERE created_at >= ${range.from} AND created_at < ${range.to}`),
+      this.scalar(sql`SELECT count(*)::int AS v FROM users WHERE created_at >= ${range.from} AND created_at < ${range.to} ${on(sql`users.id`)}`),
+      this.scalar(sql`SELECT count(DISTINCT owner_user_id)::int AS v FROM workspaces WHERE created_at >= ${range.from} AND created_at < ${range.to} ${on(sql`workspaces.owner_user_id`)}`),
+      this.scalar(sql`SELECT count(DISTINCT created_by)::int AS v FROM initial_uploads WHERE status = 'concluida' AND completed_at >= ${range.from} AND completed_at < ${range.to} ${on(sql`initial_uploads.created_by`)}`),
+      // "Assinou" = comprou. No Google a linha só nasce com a compra; na web
+      // ela nasce no checkout e só conta depois do primeiro pagamento.
+      this.scalar(sql`
+        SELECT count(DISTINCT purchaser_user_id)::int AS v FROM subscriptions
+        WHERE created_at >= ${range.from} AND created_at < ${range.to}
+          AND (provider = 'google_play' OR started_at IS NOT NULL)
+          ${on(sql`subscriptions.purchaser_user_id`)}
+      `),
     ]);
     const fallback: Record<string, number> = { registered, workspace: workspaced, uploaded, subscribed };
 
@@ -379,6 +459,7 @@ export class AdminAnalyticsService {
     const first = merged[0]?.count ?? 0;
     return {
       range: { from: range.from.toISOString(), to: range.to.toISOString() },
+      platform: platform ?? null,
       steps: merged.map((step, index) => ({
         ...step,
         ofFirst: first > 0 ? step.count / first : null,
@@ -399,7 +480,7 @@ export class AdminAnalyticsService {
         WHERE deleted_at IS NULL AND created_at >= date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo') - (${weeks} || ' weeks')::interval
       ),
       activity AS (
-        SELECT user_id, date_trunc('week', at AT TIME ZONE 'America/Sao_Paulo') AS week FROM (${ACTIVITY}) a
+        SELECT user_id, date_trunc('week', at AT TIME ZONE 'America/Sao_Paulo') AS week FROM (${activitySql()}) a
       ),
       sizes AS (SELECT cohort, count(*)::int AS size FROM cohorts GROUP BY cohort)
       SELECT to_char(c.cohort, 'YYYY-MM-DD') AS cohort, s.size,

@@ -35,6 +35,8 @@ export interface WorkspaceListItem {
   membersCount: number;
   productsCount: number;
   subscriptionState: string | null;
+  /** `google_play` (app) ou `asaas` (web) da assinatura viva. */
+  subscriptionProvider: string | null;
   planKey: string | null;
   seededAt: string | null;
   lastSyncAt: string | null;
@@ -99,13 +101,13 @@ export class AdminWorkspacesService {
     const [rows, total] = await Promise.all([
       this.db.execute<{
         id: string; name: string; owner_id: string; owner_email: string; owner_name: string;
-        members_count: number; products_count: number; sub_state: string | null; plan_key: string | null;
+        members_count: number; products_count: number; sub_state: string | null; sub_provider: string | null; plan_key: string | null;
         seeded_at: string | null; last_sync_at: string | null; created_at: string; deleted_at: string | null;
       }>(sql`
         SELECT w.id, w.name, o.id AS owner_id, o.email AS owner_email, o.name AS owner_name,
                (SELECT count(*)::int FROM workspace_members wm WHERE wm.workspace_id = w.id AND wm.status = 'active') AS members_count,
                (SELECT count(*)::int FROM products p WHERE p.workspace_id = w.id AND p.deleted_at IS NULL) AS products_count,
-               s.state AS sub_state, s.plan_key,
+               s.state AS sub_state, s.provider AS sub_provider, s.plan_key,
                w.seeded_at,
                (SELECT max(c.updated_at) FROM sync_cursors c WHERE c.workspace_id = w.id) AS last_sync_at,
                w.created_at, w.deleted_at
@@ -126,6 +128,7 @@ export class AdminWorkspacesService {
         membersCount: row.members_count,
         productsCount: row.products_count,
         subscriptionState: row.sub_state,
+        subscriptionProvider: row.sub_provider,
         planKey: row.plan_key,
         seededAt: row.seeded_at ? new Date(row.seeded_at).toISOString() : null,
         lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at).toISOString() : null,
@@ -174,6 +177,11 @@ export class AdminWorkspacesService {
         .select({
           id: subscriptions.id,
           planKey: subscriptions.planKey,
+          provider: subscriptions.provider,
+          billingCycle: subscriptions.billingCycle,
+          billingType: subscriptions.billingType,
+          priceCents: subscriptions.priceCents,
+          nextDueDate: subscriptions.nextDueDate,
           state: subscriptions.state,
           autoRenewing: subscriptions.autoRenewing,
           acknowledged: subscriptions.acknowledged,
@@ -208,10 +216,10 @@ export class AdminWorkspacesService {
           (SELECT count(*)::int FROM products WHERE workspace_id = ${workspaceId} AND deleted_at IS NULL AND quantity_cache <= min_stock) AS low_stock
       `),
       this.db.execute<{
-        device_id: string; user_id: string | null; user_email: string | null; model: string | null;
+        device_id: string; user_id: string | null; user_email: string | null; model: string | null; platform: string | null;
         app_version_name: string | null; cursor: string; last_push_at: string | null; last_pull_at: string | null; updated_at: string;
       }>(sql`
-        SELECT c.device_id, c.user_id, u.email AS user_email, d.model, d.app_version_name,
+        SELECT c.device_id, c.user_id, u.email AS user_email, d.model, d.platform, d.app_version_name,
                c.cursor::text, c.last_push_at, c.last_pull_at, c.updated_at
         FROM sync_cursors c
         LEFT JOIN devices d ON d.id = c.device_id
@@ -262,6 +270,11 @@ export class AdminWorkspacesService {
       subscriptions: subs.map((row) => ({
         id: row.id,
         planKey: row.planKey,
+        provider: row.provider,
+        billingCycle: row.billingCycle,
+        billingType: row.billingType,
+        priceCents: row.priceCents,
+        nextDueDate: row.nextDueDate,
         state: row.state,
         autoRenewing: row.autoRenewing,
         acknowledged: row.acknowledged,
@@ -291,6 +304,7 @@ export class AdminWorkspacesService {
         userId: row.user_id,
         userEmail: row.user_email,
         model: row.model,
+        platform: row.platform,
         appVersionName: row.app_version_name,
         cursor: Number(row.cursor),
         lag: Math.max(0, Number(workspace.changeSeq) - Number(row.cursor)),

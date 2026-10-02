@@ -21,6 +21,9 @@ export interface ConflictView {
   keptValue: unknown;
   discardedValue: unknown;
   createdAt: string;
+  /** Decisão tomada (`meu`, `servidor`, `restaurar`); nula enquanto pendente ou automática. */
+  resolution: string | null;
+  resolvedAt: string | null;
 }
 
 /** Colunas que uma resolução pode reescrever, por nome de campo do contrato. */
@@ -74,6 +77,8 @@ export class ConflictsService {
         keptValue: conflictLog.keptValue,
         discardedValue: conflictLog.discardedValue,
         createdAt: conflictLog.createdAt,
+        resolution: conflictLog.resolution,
+        resolvedAt: conflictLog.resolvedAt,
       })
       .from(conflictLog)
       .leftJoin(products, eq(products.id, conflictLog.entityId))
@@ -87,6 +92,7 @@ export class ConflictsService {
         kind: linha.kind as ConflictView['kind'],
         status: linha.status as ConflictView['status'],
         createdAt: linha.createdAt.toISOString(),
+        resolvedAt: linha.resolvedAt ? linha.resolvedAt.toISOString() : null,
       })),
     };
   }

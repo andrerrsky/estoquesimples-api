@@ -21,6 +21,7 @@ export interface WorkspaceSummary {
   id: string;
   name: string;
   role: string;
+  status: 'active' | 'suspended';
   isOwner: boolean;
   memberCount: number;
   createdAt: string;
@@ -83,6 +84,7 @@ export class WorkspaceService {
         id: workspaces.id,
         name: workspaces.name,
         role: workspaceMembers.roleKey,
+        status: workspaceMembers.status,
         ownerUserId: workspaces.ownerUserId,
         createdAt: workspaces.createdAt,
         memberCount: sql<number>`(
@@ -105,6 +107,9 @@ export class WorkspaceService {
       id: row.id,
       name: row.name,
       role: row.role,
+      // Participação suspensa continua na lista (a pessoa precisa saber por
+      // que não entra), mas marcada: abrir a empresa devolve MEMBER_SUSPENDED.
+      status: row.status === 'suspended' ? ('suspended' as const) : ('active' as const),
       isOwner: row.ownerUserId === userId,
       memberCount: row.memberCount,
       createdAt: row.createdAt.toISOString(),

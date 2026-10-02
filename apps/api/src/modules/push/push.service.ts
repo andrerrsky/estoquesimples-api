@@ -219,12 +219,23 @@ export class PushService {
       SELECT coalesce(t.app_version_code::text, '?') AS version, count(*)::int AS count
       FROM push_tokens t WHERE ${where} GROUP BY 1 ORDER BY count DESC LIMIT 6
     `);
+    // Caixa de notificações: as mesmas contas que `deliverToInbox` alcança —
+    // quem recebe o push e quem o público atinge por conta (é como a campanha
+    // chega a quem usa só a web). Estimativa para o painel, não o envio.
+    const byAccount = this.audienceUsers(audience);
+    const inbox = await this.db.execute<{ total: number }>(sql`
+      SELECT count(*)::int AS total FROM (
+        SELECT DISTINCT t.user_id AS id FROM push_tokens t WHERE ${where} AND t.user_id IS NOT NULL
+        ${byAccount ? sql`UNION ${byAccount}` : sql``}
+      ) r
+    `);
     const row = rows.rows[0];
     return {
       total: row?.total ?? 0,
       signedIn: row?.signed_in ?? 0,
       installs: row?.installs ?? 0,
       users: row?.users ?? 0,
+      inboxUsers: inbox.rows[0]?.total ?? 0,
       versions: versions.rows,
       label: describeAudience(audience, activeWithinDays),
     };
@@ -246,6 +257,7 @@ export class PushService {
         (SELECT coalesce(sum(accepted), 0) FROM push_campaigns WHERE status = 'sent' AND NOT is_test) AS accepted,
         (SELECT coalesce(sum(delivered), 0) FROM push_campaigns WHERE status = 'sent' AND NOT is_test) AS delivered,
         (SELECT coalesce(sum(opened), 0) FROM push_campaigns WHERE status = 'sent' AND NOT is_test) AS opened,
+        (SELECT coalesce(sum(inbox_count), 0) FROM push_campaigns WHERE status = 'sent' AND NOT is_test) AS inbox,
         (SELECT count(*) FROM push_campaigns WHERE status IN ('queued','sending')) AS in_progress
     `);
     const r = rows.rows[0] ?? {};
@@ -260,6 +272,7 @@ export class PushService {
       accepted: n('accepted'),
       delivered: n('delivered'),
       opened: n('opened'),
+      inbox: n('inbox'),
       inProgress: n('in_progress'),
       fcmConfigured: this.services.fcm.configured,
       projectId: this.services.fcm.projectId,

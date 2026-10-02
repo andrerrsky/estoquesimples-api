@@ -26,10 +26,16 @@ export interface CloudAccess {
  * teto de produtos é aplicado adiante, na escrita, porque depende do que
  * está sendo gravado.
  */
-export async function assertCloudAccess(services: AppServices, request: FastifyRequest): Promise<CloudAccess> {
+export async function assertCloudAccess(
+  services: AppServices,
+  request: FastifyRequest,
+  options: { allowWhenPaused?: boolean } = {},
+): Promise<CloudAccess> {
   const { workspaceId, isOwner } = requireWorkspaceContext(request);
 
-  if (!services.env.FEATURE_SYNC_ENABLED) {
+  // `allowWhenPaused`: leitura que continua valendo com a sincronização
+  // pausada (exportar os próprios dados durante um incidente é desejável).
+  if (!services.env.FEATURE_SYNC_ENABLED && !options.allowWhenPaused) {
     throw new AppError(
       503,
       ErrorCode.SYNC_DISABLED,

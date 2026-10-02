@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
-import { Badge, Card, DataTable, Empty, PageHeader, Pagination, Time, type Column } from '../components/ui';
+import { Badge, Card, DataTable, Empty, PageHeader, Pagination, ProviderBadge, Time, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtNumber } from '../lib/format';
 import { PLAN_LABEL, SUBSCRIPTION_STATE } from '../lib/labels';
@@ -17,6 +17,7 @@ interface WorkspaceRow {
   membersCount: number;
   productsCount: number;
   subscriptionState: string | null;
+  subscriptionProvider: string | null;
   planKey: string | null;
   seededAt: string | null;
   lastSyncAt: string | null;
@@ -76,6 +77,7 @@ export function WorkspacesPage() {
           <span className="row" style={{ gap: 6 }}>
             <Badge tone={SUBSCRIPTION_STATE[row.subscriptionState]?.tone}>{SUBSCRIPTION_STATE[row.subscriptionState]?.label ?? row.subscriptionState}</Badge>
             <span className="muted small">{PLAN_LABEL[row.planKey ?? ''] ?? row.planKey}</span>
+            <ProviderBadge provider={row.subscriptionProvider} short />
           </span>
         ) : (
           <span className="muted">sem assinatura</span>

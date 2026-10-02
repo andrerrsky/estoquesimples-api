@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { nextChangeSeq } from '../../src/modules/sync/change-seq.js';
@@ -193,13 +194,36 @@ describe('exportação de dados', () => {
     expect(response.body).toMatch(/-3/);
   });
 
-  it('consulta consegue extrair; quem não é membro, não', async () => {
+  it('consulta extrai no plano Equipe; no gratuito, os dados da nuvem são só do proprietário', async () => {
     const owner = await registerUser(context);
     const viewer = await registerUser(context);
     const workspaceId = await createWorkspace(owner);
     await addMember(workspaceId, owner, viewer.userId, 'consulta');
     await seedInventory(workspaceId, owner.userId);
 
+    // Plano gratuito: a mesma guarda da sincronização vale para a exportação.
+    for (const path of ['export', 'export/produtos.csv', 'export/movimentacoes.csv']) {
+      const refused = await context.app.inject({
+        method: 'GET',
+        url: `/v1/workspaces/${workspaceId}/${path}`,
+        headers: viewer.authHeader,
+      });
+      expect(refused.statusCode, path).toBe(403);
+      expect(refused.json().error.code).toBe('SUBSCRIPTION_REQUIRED');
+    }
+    const ownerExport = await context.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/export`,
+      headers: owner.authHeader,
+    });
+    expect(ownerExport.statusCode).toBe(200);
+
+    // Com assinatura (plano Equipe), o papel de consulta volta a extrair.
+    const sealed = context.services.purchaseTokens;
+    await context.services.db.execute(sql`
+      INSERT INTO subscriptions (workspace_id, plan_key, purchase_token_hash, purchase_token_enc, google_product_id, state, last_verified_at, current_period_end)
+      VALUES (${workspaceId}::uuid, 'basico', ${sealed.hash('token-export')}, ${sealed.encrypt('token-export')}, 'assinatura', 'ativa', now(), now() + interval '20 days')
+    `);
     const allowed = await context.app.inject({
       method: 'GET',
       url: `/v1/workspaces/${workspaceId}/export`,

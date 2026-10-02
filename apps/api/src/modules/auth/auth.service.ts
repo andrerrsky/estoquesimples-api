@@ -219,6 +219,17 @@ export class AuthService {
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
 
+    // Só depois da senha conferida, para não revelar o estado da conta a quem
+    // não é o dono. Sem esta recusa o login "funcionava" e toda chamada
+    // seguinte voltava 401, sem explicação para a pessoa.
+    if (user.status === 'pending_deletion') {
+      throw new AppError(
+        403,
+        ErrorCode.AUTH_ACCOUNT_DELETION_PENDING,
+        'A exclusão desta conta foi solicitada. Para recuperá-la dentro do prazo, fale com o suporte.',
+      );
+    }
+
     const result = await this.db.transaction(async (tx) => {
       await tx
         .update(users)

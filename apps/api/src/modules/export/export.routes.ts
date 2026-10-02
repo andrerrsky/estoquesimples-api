@@ -10,6 +10,7 @@ import {
 } from '../../platform/http/authorize.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { errorSchema } from '../auth/auth.schemas.js';
+import { assertCloudAccess } from '../billing/cloud-access.js';
 import { backupFileSchema, exportQuerySchema } from './export.schemas.js';
 import { ExportService } from './export.service.js';
 
@@ -47,6 +48,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     async (request) => {
       const auth = requireAuth(request);
       const { workspaceId } = requireWorkspaceContext(request);
+      // Mesma guarda de plano da sincronização e do estoque da web: no plano
+      // gratuito os dados da nuvem são só do proprietário.
+      await assertCloudAccess(app.services, request, { allowWhenPaused: true });
       const podeVerMovimentos = request.workspace?.permissions.has('movimentacoes.ver') ?? false;
 
       const backup = await inWorkspace(request, (tx) =>
@@ -85,6 +89,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     async (request, reply) => {
       const auth = requireAuth(request);
       const { workspaceId } = requireWorkspaceContext(request);
+      // Mesma guarda de plano da sincronização e do estoque da web: no plano
+      // gratuito os dados da nuvem são só do proprietário.
+      await assertCloudAccess(app.services, request, { allowWhenPaused: true });
 
       // request.query já saiu validado e transformado (string 'true'/'false'
       // → boolean) pelo schema da rota; reanalisar aqui rejeitaria o próprio
@@ -121,6 +128,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     async (request, reply) => {
       const auth = requireAuth(request);
       const { workspaceId } = requireWorkspaceContext(request);
+      // Mesma guarda de plano da sincronização e do estoque da web: no plano
+      // gratuito os dados da nuvem são só do proprietário.
+      await assertCloudAccess(app.services, request, { allowWhenPaused: true });
 
       const csv = await inWorkspace(request, (tx) =>
         exporter.movementsCsv(tx, workspaceId, auth.userId, auth.deviceId),

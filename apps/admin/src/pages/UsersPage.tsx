@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
-import { Badge, Card, DataTable, Empty, PageHeader, Pagination, Time, type Column } from '../components/ui';
+import { Badge, Card, DataTable, Empty, PageHeader, Pagination, PlatformBadges, Time, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtNumber } from '../lib/format';
 import { USER_STATUS } from '../lib/labels';
@@ -19,6 +19,8 @@ interface UserRow {
   workspacesCount: number;
   hasActiveSubscription: boolean;
   lockedUntil: string | null;
+  /** Plataformas em que a conta tem aparelho (ou navegador) ativo. */
+  platforms: string[];
 }
 
 export function UsersPage() {
@@ -42,6 +44,7 @@ export function UsersPage() {
         q: values['q'],
         status: values['status'],
         emailVerified: values['emailVerified'],
+        platform: values['platform'],
         sort: sort.key,
         order: sort.order,
         page,
@@ -74,6 +77,11 @@ export function UsersPage() {
       ),
     },
     {
+      key: 'platforms',
+      header: 'Usa em',
+      render: (row) => <PlatformBadges platforms={row.platforms} empty="sem aparelho" />,
+    },
+    {
       key: 'workspaces',
       header: 'Empresas',
       numeric: true,
@@ -90,7 +98,7 @@ export function UsersPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Usuários" subtitle={query.data ? `${fmtNumber(query.data.total)} conta(s)` : 'Contas do aplicativo'} />
+      <PageHeader title="Usuários" subtitle={query.data ? `${fmtNumber(query.data.total)} conta(s) · app Android e web` : 'Contas do app Android e da web'} />
       <Card flush>
         <div className="filters" style={{ padding: '14px 18px' }}>
           <input
@@ -110,6 +118,11 @@ export function UsersPage() {
             <option value="">E-mail: todos</option>
             <option value="true">Confirmado</option>
             <option value="false">Não confirmado</option>
+          </select>
+          <select className="select select--sm" value={values['platform'] ?? ''} onChange={(event) => set({ platform: event.target.value })} aria-label="Plataforma" title="Contas com aparelho (ou navegador) ativo na plataforma. Quem usa as duas aparece nas duas.">
+            <option value="">Plataforma: todas</option>
+            <option value="android">Usa o app Android</option>
+            <option value="web">Usa a web</option>
           </select>
         </div>
         <DataTable

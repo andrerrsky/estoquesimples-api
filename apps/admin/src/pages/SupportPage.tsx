@@ -18,6 +18,7 @@ import {
   Notice,
   PageHeader,
   Pagination,
+  PlatformBadge,
   Skeleton,
   StatTile,
   Time,
@@ -56,6 +57,8 @@ interface Ticket {
   installId: string;
   workspaceId: string | null;
   deviceSummary: string | null;
+  /** De onde a solicitação foi aberta: `android` (padrão das versões antigas do app) ou `web`. */
+  platform: string;
   appVersionCode: number | null;
   assignedTo: string | null;
   assignedToEmail: string | null;
@@ -129,6 +132,7 @@ export function SupportPage() {
         category: values['category'],
         priority: values['priority'],
         assigned: values['assigned'],
+        platform: values['platform'],
         q: values['q'],
         page,
         pageSize,
@@ -141,10 +145,10 @@ export function SupportPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Atendimento" subtitle="Solicitações abertas pelo app, com resposta por push para o aparelho" />
+      <PageHeader title="Atendimento" subtitle="Solicitações abertas pelo app Android e pela web; a resposta cai na caixa de notificações e vira push no aparelho" />
 
       {s && !s.fcmConfigured && (
-        <Notice tone="warning" title="Firebase não configurado">As respostas serão gravadas, mas o usuário só será avisado por e-mail (quando houver).</Notice>
+        <Notice tone="warning" title="Firebase não configurado">As respostas são gravadas e aparecem na conversa (app e web), mas sem push: o aviso ativo fica só por e-mail, quando houver.</Notice>
       )}
 
       <div className="grid grid--tiles">
@@ -186,6 +190,11 @@ export function SupportPage() {
                 <option key={key} value={key}>{info.label}</option>
               ))}
             </select>
+            <select className="select select--sm" value={values['platform'] ?? ''} onChange={(event) => set({ platform: event.target.value })} aria-label="Plataforma">
+              <option value="">App e web</option>
+              <option value="android">Só app Android</option>
+              <option value="web">Só web</option>
+            </select>
             <input
               className="input input--sm input--search"
               placeholder="Assunto, e-mail, #número ou texto"
@@ -199,7 +208,7 @@ export function SupportPage() {
             <div style={{ padding: 18 }}><Skeleton lines={6} /></div>
           ) : (list.data?.items.length ?? 0) === 0 ? (
             <Empty icon="check" title={status === 'unresolved' ? 'Nenhuma solicitação em aberto' : 'Nenhuma solicitação com esses filtros'}>
-              {status === 'unresolved' && 'Quando alguém abrir uma solicitação pelo app, ela aparece aqui.'}
+              {status === 'unresolved' && 'Quando alguém abrir uma solicitação pelo app ou pela web, ela aparece aqui.'}
             </Empty>
           ) : (
             <div>
@@ -223,8 +232,8 @@ export function SupportPage() {
           </Card>
           <Card title="Como funciona">
             <div className="stack stack--tight" style={{ fontSize: 'var(--fs-supporting)' }}>
-              <div>O app envia junto o modelo do aparelho, a versão do Android e do app e um diagnóstico (sessão, empresa, assinatura, sincronização).</div>
-              <div>Ao responder, o aparelho recebe um push que abre a conversa. Sem aparelho registrado, o aviso vai por e-mail.</div>
+              <div>O app envia junto o modelo do aparelho, a versão do Android e do app e um diagnóstico (sessão, empresa, assinatura, sincronização). Pela web vêm o navegador, o sistema e a versão da aplicação.</div>
+              <div>Ao responder, o aparelho recebe um push que abre a conversa. Sem aparelho com push — caso de quem usa só a web — o aviso vai por e-mail, e a resposta fica na conversa e na caixa de notificações.</div>
               <div>Quem não tem conta é identificado pela instalação; se criar conta depois, as solicitações passam a ser dela.</div>
               <div>Notas internas ficam só aqui e não avisam ninguém.{s?.openAiConfigured ? ' O rascunho por IA usa a chave da OpenAI configurada em Avaliações.' : ' Configure a chave da OpenAI em Avaliações para gerar rascunhos.'}</div>
             </div>
@@ -246,6 +255,7 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
         <span className="ticket-row__subject">{ticket.subject}</span>
       </div>
       <div className="ticket-row__side">
+        <PlatformBadge platform={ticket.platform} />
         {priority && ticket.priority === 'high' && <Badge tone={priority.tone}>{priority.label}</Badge>}
         <Badge tone={status.tone}>{status.label}</Badge>
         <span className="caption"><Time value={ticket.lastMessageAt} /></span>
@@ -345,6 +355,8 @@ export function TicketDetailPage() {
   const status = SUPPORT_STATUS[ticket.status] ?? { label: ticket.status, tone: 'neutral' as const, hint: '' };
   const priority = SUPPORT_PRIORITY[ticket.priority];
   const device = ticket.device as { model?: string; manufacturer?: string; osVersion?: string; sdkInt?: number; appVersionName?: string; appVersionCode?: number; locale?: string; timezone?: string };
+  // Na web, `model` é o navegador e `osVersion` o sistema; no app, o aparelho e a versão do Android.
+  const fromWeb = ticket.platform === 'web';
   const order = Object.keys(DIAGNOSTIC_LABEL);
   const diagnostics = Object.entries(ticket.diagnostics)
     .filter(([key]) => key !== 'workspaceId')
@@ -359,6 +371,7 @@ export function TicketDetailPage() {
           <span className="row">
             <span className="muted" style={{ fontWeight: 500 }}>#{ticket.number}</span> {ticket.subject}
             <Badge tone={status.tone}>{status.label}</Badge>
+            <PlatformBadge platform={ticket.platform} />
             {priority && ticket.priority !== 'normal' && <Badge tone={priority.tone}>prioridade {priority.label.toLowerCase()}</Badge>}
           </span>
         }
@@ -390,7 +403,8 @@ export function TicketDetailPage() {
       )}
       {ticket.reachableDevices === 0 && ticket.status !== 'resolved' && (
         <Notice tone="warning" title="Nenhum aparelho para avisar por push">
-          {ticket.userEmail || ticket.contactEmail ? 'A resposta será avisada por e-mail.' : 'Esta pessoa não deixou e-mail: ela só verá a resposta ao abrir o app.'}
+          {fromWeb && 'Solicitação aberta pela web, que não recebe push. '}
+          {ticket.userEmail || ticket.contactEmail ? 'A resposta será avisada por e-mail.' : `Esta pessoa não deixou e-mail: ela só verá a resposta ao abrir ${fromWeb ? 'a web' : 'o app'}.`}
         </Notice>
       )}
 
@@ -404,7 +418,7 @@ export function TicketDetailPage() {
           </Card>
 
           {can('support') && (
-            <Card title={internal ? 'Nota interna' : 'Responder'} subtitle={internal ? 'Fica só no painel; o usuário não é avisado' : 'O aparelho recebe um push com o começo da resposta'}>
+            <Card title={internal ? 'Nota interna' : 'Responder'} subtitle={internal ? 'Fica só no painel; o usuário não é avisado' : ticket.reachableDevices > 0 ? 'O aparelho recebe um push com o começo da resposta' : 'Sem aparelho com push: a resposta fica na conversa e o aviso vai por e-mail, se houver'}>
               <form onSubmit={submit} className="stack stack--tight">
                 <textarea
                   className="textarea"
@@ -496,12 +510,13 @@ export function TicketDetailPage() {
             )}
           </Card>
 
-          <Card title="Aparelho">
+          <Card title={fromWeb ? 'Navegador' : 'Aparelho'}>
             <KeyValue
               items={[
-                { label: 'Modelo', value: [device.manufacturer, device.model].filter(Boolean).join(' ') || '—' },
-                { label: 'Android', value: device.osVersion ? `${device.osVersion}${device.sdkInt ? ` (API ${device.sdkInt})` : ''}` : '—' },
-                { label: 'Versão do app', value: device.appVersionName ? `${device.appVersionName}${device.appVersionCode ? ` (${device.appVersionCode})` : ''}` : '—' },
+                { label: 'Plataforma', value: <PlatformBadge platform={ticket.platform} /> },
+                { label: fromWeb ? 'Navegador' : 'Modelo', value: [device.manufacturer, device.model].filter(Boolean).join(' ') || '—' },
+                { label: fromWeb ? 'Sistema' : 'Android', value: device.osVersion ? `${device.osVersion}${device.sdkInt ? ` (API ${device.sdkInt})` : ''}` : '—' },
+                { label: fromWeb ? 'Versão da web' : 'Versão do app', value: device.appVersionName ? `${device.appVersionName}${device.appVersionCode ? ` (${device.appVersionCode})` : ''}` : '—' },
                 { label: 'Idioma / fuso', value: [device.locale, device.timezone].filter(Boolean).join(' · ') || '—' },
                 {
                   label: 'Push',
@@ -518,9 +533,9 @@ export function TicketDetailPage() {
             />
           </Card>
 
-          <Card title="Diagnóstico" subtitle="Estado do app no momento da abertura">
+          <Card title="Diagnóstico" subtitle={`Estado ${fromWeb ? 'da web' : 'do app'} no momento da abertura`}>
             {diagnostics.length === 0 ? (
-              <div className="muted">O app não enviou diagnóstico.</div>
+              <div className="muted">{fromWeb ? 'A web' : 'O app'} não enviou diagnóstico.</div>
             ) : (
               <KeyValue items={diagnostics.map(([key, value]) => ({ label: DIAGNOSTIC_LABEL[key] ?? key, value: formatDiagnostic(key, value) }))} />
             )}
@@ -593,6 +608,8 @@ export function TicketDetailPage() {
 }
 
 const DIAGNOSTIC_LABEL: Record<string, string> = {
+  path: 'Tela em que estava (web)',
+  workspaceId: 'Empresa (id)',
   signedIn: 'Com sessão',
   email: 'E-mail da sessão',
   workspaceName: 'Empresa',

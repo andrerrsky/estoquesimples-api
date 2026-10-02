@@ -65,7 +65,7 @@ export async function resolveAuth(
     throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
   }
 
-  // Trocar a senha ou o papel do usuário invalida os tokens já emitidos.
+  // Mudança de papel ou de participação invalida os tokens já emitidos.
   if (row.permissionVersion !== claims.ver) {
     throw unauthorized(
       ErrorCode.AUTH_PERMISSION_STALE,

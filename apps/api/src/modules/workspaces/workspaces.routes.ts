@@ -77,6 +77,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
                 id: z.string().uuid(),
                 name: z.string(),
                 role: z.string(),
+                status: z.enum(['active', 'suspended']),
                 isOwner: z.boolean(),
                 memberCount: z.number().int(),
                 createdAt: z.string(),

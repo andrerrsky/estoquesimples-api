@@ -55,6 +55,54 @@ export function fmtCurrency(value: number | null | undefined): string {
   return currency.format(value);
 }
 
+/** Valor guardado em centavos (preço de plano, cobrança) → "R$ 29,90". */
+export function fmtCents(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined || Number.isNaN(cents)) return '—';
+  return currency.format(cents / 100);
+}
+
+/** Centavos → texto de campo de formulário ("29,90"), sem símbolo. */
+export function centsToInput(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined) return '';
+  return `${Math.trunc(cents / 100)},${String(cents % 100).padStart(2, '0')}`;
+}
+
+/**
+ * Texto em reais → centavos inteiros. `null` para campo vazio; `undefined`
+ * quando o texto não é um valor em reais.
+ *
+ * A conta é feita com os dígitos, sem passar por float: `19.99 * 100` dá
+ * 1998.9999… e viraria um centavo a menos. Aceita o que se digita no Brasil
+ * ("29,90", "1.234,56", "R$ 29,9", "30") e também ponto decimal ("29.90").
+ * "2.990" é ambíguo (milhar ou três casas?) e é recusado em vez de adivinhado.
+ */
+export function parseReaisToCents(text: string): number | null | undefined {
+  const clean = text.replace(/\s|R\$/gi, '');
+  if (clean === '') return null;
+  let integer: string;
+  let fraction: string;
+  if (clean.includes(',')) {
+    const match = /^(\d{1,3}(?:\.\d{3})+|\d+),(\d{1,2})$/.exec(clean);
+    if (!match) return undefined;
+    integer = (match[1] as string).replace(/\./g, '');
+    fraction = match[2] as string;
+  } else {
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(clean);
+    if (!match) return undefined;
+    integer = match[1] as string;
+    fraction = match[2] ?? '';
+  }
+  if (integer.length > 9) return undefined;
+  return Number(integer) * 100 + Number(fraction.padEnd(2, '0'));
+}
+
+/** Data sem hora (`YYYY-MM-DD`, vencimento de cobrança) sem passar por fuso. */
+export function fmtDay(value: string | null | undefined): string {
+  if (!value) return '—';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
 export function fmtPercent(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   return percent.format(value);

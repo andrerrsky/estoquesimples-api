@@ -22,6 +22,8 @@ export interface UserListFilters extends PaginationQuery {
   q?: string;
   status?: 'active' | 'suspended' | 'pending_deletion';
   emailVerified?: boolean;
+  /** Só contas com aparelho (ou navegador) ativo nesta plataforma. */
+  platform?: 'android' | 'ios' | 'web';
   sort?: 'createdAt' | 'lastActivityAt' | 'name' | 'email';
   order?: 'asc' | 'desc';
 }
@@ -37,6 +39,8 @@ export interface UserListItem {
   workspacesCount: number;
   hasActiveSubscription: boolean;
   lockedUntil: string | null;
+  /** Plataformas em que a conta tem aparelho não revogado (`devices.platform`). */
+  platforms: string[];
 }
 
 export interface UserDetail {
@@ -53,6 +57,7 @@ export interface UserDetail {
   failedLoginAttempts: number;
   permissionVersion: number;
   lastActivityAt: string | null;
+  platforms: string[];
   workspaces: Array<{
     id: string;
     name: string;
@@ -61,6 +66,7 @@ export interface UserDetail {
     isOwner: boolean;
     joinedAt: string;
     subscriptionState: string | null;
+    subscriptionProvider: string | null;
     planKey: string | null;
     deletedAt: string | null;
   }>;
@@ -80,6 +86,8 @@ export interface UserDetail {
     id: string;
     deviceId: string | null;
     deviceModel: string | null;
+    /** Plataforma do aparelho da sessão; nulo quando o login veio sem aparelho. */
+    platform: string | null;
     ipAddress: string | null;
     userAgent: string | null;
     createdAt: string;
@@ -91,6 +99,7 @@ export interface UserDetail {
     workspaceId: string;
     workspaceName: string;
     planKey: string;
+    provider: string;
     state: string;
     startedAt: string | null;
     currentPeriodEnd: string | null;
@@ -135,6 +144,11 @@ export class AdminUsersService {
     if (filters.status) conditions.push(sql`u.status = ${filters.status}`);
     if (filters.emailVerified === true) conditions.push(sql`u.email_verified_at IS NOT NULL`);
     if (filters.emailVerified === false) conditions.push(sql`u.email_verified_at IS NULL`);
+    if (filters.platform) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM devices d WHERE d.user_id = u.id AND d.revoked_at IS NULL AND d.platform = ${filters.platform}
+      )`);
+    }
 
     const where = sql.join(conditions, sql` AND `);
     const sortColumn = SORT_COLUMNS[filters.sort ?? 'createdAt'];
@@ -152,6 +166,7 @@ export class AdminUsersService {
         workspaces_count: number;
         has_subscription: boolean;
         locked_until: string | null;
+        platforms: string[];
       }>(sql`
         SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until,
                (SELECT max(s.last_used_at) FROM sessions s WHERE s.user_id = u.id) AS last_activity_at,
@@ -162,7 +177,13 @@ export class AdminUsersService {
                  JOIN subscriptions sub ON sub.workspace_id = wm.workspace_id
                  WHERE wm.user_id = u.id AND wm.status = 'active'
                    AND sub.state IN ${sqlList(ENTITLED_STATES)}
-               ) AS has_subscription
+               ) AS has_subscription,
+               -- Uma conta pode usar o app e a web: a lista sai do que está
+               -- registrado em devices (o navegador também é um "aparelho").
+               ARRAY(
+                 SELECT DISTINCT d.platform FROM devices d
+                 WHERE d.user_id = u.id AND d.revoked_at IS NULL ORDER BY d.platform
+               ) AS platforms
         FROM users u
         WHERE ${where}
         ORDER BY ${sql.raw(sortColumn)} ${order}, u.id
@@ -183,6 +204,7 @@ export class AdminUsersService {
         workspacesCount: row.workspaces_count,
         hasActiveSubscription: row.has_subscription,
         lockedUntil: row.locked_until ? new Date(row.locked_until).toISOString() : null,
+        platforms: row.platforms ?? [],
       })),
       page: filters.page,
       pageSize: filters.pageSize,
@@ -198,11 +220,11 @@ export class AdminUsersService {
     const [memberships, deviceRows, sessionRows, purchased, counts, activity] = await Promise.all([
       this.db.execute<{
         id: string; name: string; role: string; member_status: string; owner_user_id: string;
-        joined_at: string; deleted_at: string | null; sub_state: string | null; plan_key: string | null;
+        joined_at: string; deleted_at: string | null; sub_state: string | null; sub_provider: string | null; plan_key: string | null;
       }>(sql`
         SELECT w.id, w.name, wm.role_key AS role, wm.status AS member_status, w.owner_user_id,
                wm.joined_at, w.deleted_at,
-               s.state AS sub_state, s.plan_key
+               s.state AS sub_state, s.provider AS sub_provider, s.plan_key
         FROM workspace_members wm
         JOIN workspaces w ON w.id = wm.workspace_id
         LEFT JOIN subscriptions s ON s.workspace_id = w.id
@@ -216,6 +238,7 @@ export class AdminUsersService {
           id: sessions.id,
           deviceId: sessions.deviceId,
           deviceModel: devices.model,
+          platform: devices.platform,
           ipAddress: sessions.ipAddress,
           userAgent: sessions.userAgent,
           createdAt: sessions.createdAt,
@@ -232,6 +255,7 @@ export class AdminUsersService {
           workspaceId: subscriptions.workspaceId,
           workspaceName: workspaces.name,
           planKey: subscriptions.planKey,
+          provider: subscriptions.provider,
           state: subscriptions.state,
           startedAt: subscriptions.startedAt,
           currentPeriodEnd: subscriptions.currentPeriodEnd,
@@ -270,6 +294,7 @@ export class AdminUsersService {
       failedLoginAttempts: user.failedLoginAttempts,
       permissionVersion: user.permissionVersion,
       lastActivityAt: activity.rows[0]?.last ? new Date(activity.rows[0].last).toISOString() : null,
+      platforms: [...new Set(deviceRows.filter((row) => row.revokedAt === null).map((row) => row.platform))].sort(),
       workspaces: memberships.rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -278,6 +303,7 @@ export class AdminUsersService {
         isOwner: row.owner_user_id === userId,
         joinedAt: new Date(row.joined_at).toISOString(),
         subscriptionState: row.sub_state,
+        subscriptionProvider: row.sub_provider,
         planKey: row.plan_key,
         deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
       })),
@@ -297,6 +323,7 @@ export class AdminUsersService {
         id: row.id,
         deviceId: row.deviceId,
         deviceModel: row.deviceModel,
+        platform: row.platform,
         ipAddress: row.ipAddress,
         userAgent: row.userAgent,
         createdAt: row.createdAt.toISOString(),
@@ -308,6 +335,7 @@ export class AdminUsersService {
         workspaceId: row.workspaceId,
         workspaceName: row.workspaceName,
         planKey: row.planKey,
+        provider: row.provider,
         state: row.state,
         startedAt: iso(row.startedAt),
         currentPeriodEnd: iso(row.currentPeriodEnd),
@@ -708,6 +736,46 @@ export class AdminUsersService {
       page: query.page,
       pageSize: query.pageSize,
       total: total.rows[0]?.total ?? 0,
+    };
+  }
+
+  /**
+   * Caixa de notificações da conta (a mesma que a web lista e que vira push
+   * no Android). Somente leitura: serve para o suporte responder "o cliente
+   * foi avisado?" sem depender do que o aparelho mostrou.
+   */
+  async notifications(userId: string, query: PaginationQuery) {
+    const [rows, totals] = await Promise.all([
+      this.db.execute<{
+        id: string; type: string; title: string; body: string; workspace_id: string | null; workspace_name: string | null;
+        read_at: string | null; created_at: string;
+      }>(sql`
+        SELECT n.id, n.type, n.title, n.body, n.workspace_id, w.name AS workspace_name, n.read_at, n.created_at
+        FROM notifications n LEFT JOIN workspaces w ON w.id = n.workspace_id
+        WHERE n.user_id = ${userId}
+        ORDER BY n.created_at DESC
+        LIMIT ${query.pageSize} OFFSET ${offsetOf(query)}
+      `),
+      this.db.execute<{ total: number; unread: number }>(sql`
+        SELECT count(*)::int AS total, count(*) FILTER (WHERE read_at IS NULL)::int AS unread
+        FROM notifications WHERE user_id = ${userId}
+      `),
+    ]);
+    return {
+      items: rows.rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        workspaceId: row.workspace_id,
+        workspaceName: row.workspace_name,
+        readAt: row.read_at ? new Date(row.read_at).toISOString() : null,
+        createdAt: new Date(row.created_at).toISOString(),
+      })),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: totals.rows[0]?.total ?? 0,
+      unread: totals.rows[0]?.unread ?? 0,
     };
   }
 

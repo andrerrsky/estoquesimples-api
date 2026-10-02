@@ -20,14 +20,16 @@ import {
   Notice,
   PageHeader,
   Pagination,
+  PlatformBadge,
+  ProviderBadge,
   Skeleton,
   StatTile,
   Tabs,
   Time,
   useToast,
 } from '../components/ui';
-import { fmtCurrency, fmtDecimal, fmtNumber } from '../lib/format';
-import { CONFLICT_STATUS, MEMBER_STATUS, MOVEMENT_TYPE, PLAN_LABEL, ROLE_LABEL, ROLE_OPTIONS, SUBSCRIPTION_STATE, USER_STATUS } from '../lib/labels';
+import { fmtCents, fmtCurrency, fmtDay, fmtDecimal, fmtNumber } from '../lib/format';
+import { BILLING_CYCLE, BILLING_TYPE, CONFLICT_STATUS, MEMBER_STATUS, MOVEMENT_TYPE, PLAN_LABEL, ROLE_LABEL, ROLE_OPTIONS, SUBSCRIPTION_STATE, subscriptionHint, USER_STATUS } from '../lib/labels';
 
 interface WorkspaceDetail {
   id: string;
@@ -42,9 +44,15 @@ interface WorkspaceDetail {
   owner: { id: string; email: string; name: string; status: string } | null;
   members: Array<{ id: string; userId: string; email: string; name: string; userStatus: string; role: string; status: string; joinedAt: string; removedAt: string | null }>;
   pendingInvites: Array<{ id: string; email: string; roleKey: string; expiresAt: string; createdAt: string; expired: boolean }>;
-  subscriptions: Array<{ id: string; planKey: string; state: string; autoRenewing: boolean; acknowledged: boolean; startedAt: string | null; currentPeriodEnd: string | null; graceUntil: string | null; canceledAt: string | null; lastVerifiedAt: string; purchaserUserId: string | null; purchaserEmail: string | null; productId: string; basePlanId: string | null; createdAt: string }>;
+  subscriptions: Array<{
+    id: string; planKey: string;
+    /** `google_play` (app Android) ou `asaas` (web). */
+    provider: string;
+    billingCycle: string | null; billingType: string | null; priceCents: number | null; nextDueDate: string | null;
+    state: string; autoRenewing: boolean; acknowledged: boolean; startedAt: string | null; currentPeriodEnd: string | null; graceUntil: string | null; canceledAt: string | null; lastVerifiedAt: string; purchaserUserId: string | null; purchaserEmail: string | null; productId: string | null; basePlanId: string | null; createdAt: string;
+  }>;
   counts: { products: number; productsDeleted: number; movements: number; movements30d: number; conflictsPending: number; conflictsTotal: number; syncOps7d: number; lowStock: number };
-  syncDevices: Array<{ deviceId: string; userId: string | null; userEmail: string | null; model: string | null; appVersionName: string | null; cursor: number; lag: number; lastPushAt: string | null; lastPullAt: string | null; updatedAt: string }>;
+  syncDevices: Array<{ deviceId: string; userId: string | null; userEmail: string | null; model: string | null; platform: string | null; appVersionName: string | null; cursor: number; lag: number; lastPushAt: string | null; lastPullAt: string | null; updatedAt: string }>;
   initialUploads: Array<{ id: string; status: string; declaredProducts: number; declaredMovements: number; receivedProducts: number; receivedMovements: number; createdAt: string; completedAt: string | null }>;
 }
 
@@ -104,6 +112,7 @@ export function WorkspaceDetailPage() {
             {ws.name}
             {ws.deletedAt && <Badge tone="error">excluída</Badge>}
             {live ? <Badge tone={SUBSCRIPTION_STATE[live.state]?.tone}>{SUBSCRIPTION_STATE[live.state]?.label}</Badge> : <Badge>sem assinatura</Badge>}
+            {live && <ProviderBadge provider={live.provider} />}
           </span>
         }
         subtitle={
@@ -188,18 +197,25 @@ export function WorkspaceDetailPage() {
             {live ? (
               <KeyValue
                 items={[
-                  { label: 'Estado', value: <><Badge tone={SUBSCRIPTION_STATE[live.state]?.tone}>{SUBSCRIPTION_STATE[live.state]?.label}</Badge> <span className="caption">{SUBSCRIPTION_STATE[live.state]?.hint}</span></> },
+                  { label: 'Estado', value: <><Badge tone={SUBSCRIPTION_STATE[live.state]?.tone}>{SUBSCRIPTION_STATE[live.state]?.label}</Badge> <span className="caption">{subscriptionHint(live.state, live.provider)}</span></> },
+                  { label: 'Origem', value: <ProviderBadge provider={live.provider} /> },
                   { label: 'Plano', value: PLAN_LABEL[live.planKey] ?? live.planKey },
+                  ...(live.provider === 'asaas'
+                    ? [
+                        { label: 'Cobrança', value: `${live.priceCents !== null ? fmtCents(live.priceCents) : '—'} · ${BILLING_CYCLE[live.billingCycle ?? ''] ?? live.billingCycle ?? '—'} · ${BILLING_TYPE[live.billingType ?? ''] ?? live.billingType ?? '—'}` },
+                        { label: 'Próximo vencimento', value: fmtDay(live.nextDueDate) },
+                      ]
+                    : []),
                   { label: 'Renovação automática', value: live.autoRenewing ? 'ligada' : 'desligada' },
                   { label: 'Fim do período', value: <Time value={live.currentPeriodEnd} relative={false} /> },
                   { label: 'Carência até', value: <Time value={live.graceUntil} relative={false} /> },
-                  { label: 'Comprada por', value: live.purchaserEmail ? <Link to={`/usuarios/${live.purchaserUserId}`}>{live.purchaserEmail}</Link> : '—' },
-                  { label: 'Verificada no Google', value: <Time value={live.lastVerifiedAt} /> },
+                  { label: live.provider === 'asaas' ? 'Contratada por' : 'Comprada por', value: live.purchaserEmail ? <Link to={`/usuarios/${live.purchaserUserId}`}>{live.purchaserEmail}</Link> : '—' },
+                  { label: live.provider === 'asaas' ? 'Verificada no Asaas' : 'Verificada no Google', value: <Time value={live.lastVerifiedAt} /> },
                   { label: 'Detalhes', value: <Link to={`/assinaturas/${live.id}`}>abrir assinatura</Link> },
                 ]}
               />
             ) : (
-              <Empty icon="card" title="Sem assinatura ativa">A empresa usa o aplicativo em modo local, sem sincronização.</Empty>
+              <Empty icon="card" title="Sem assinatura ativa">A empresa está no plano gratuito: sem equipe e com teto de produtos na nuvem.</Empty>
             )}
           </Card>
           <Card title="Membros" actions={<button type="button" className="btn btn--link small" onClick={() => setTab('membros')}>gerenciar</button>}>
@@ -254,6 +270,7 @@ export function WorkspaceDetailPage() {
                 <thead>
                   <tr>
                     <th>Estado</th>
+                    <th>Origem</th>
                     <th>Plano</th>
                     <th>Comprada por</th>
                     <th>Início</th>
@@ -266,7 +283,15 @@ export function WorkspaceDetailPage() {
                   {ws.subscriptions.map((sub) => (
                     <tr key={sub.id}>
                       <td><Badge tone={SUBSCRIPTION_STATE[sub.state]?.tone}>{SUBSCRIPTION_STATE[sub.state]?.label ?? sub.state}</Badge></td>
-                      <td>{PLAN_LABEL[sub.planKey] ?? sub.planKey} <span className="muted small">{sub.productId}{sub.basePlanId ? ` / ${sub.basePlanId}` : ''}</span></td>
+                      <td><ProviderBadge provider={sub.provider} /></td>
+                      <td>
+                        {PLAN_LABEL[sub.planKey] ?? sub.planKey}{' '}
+                        <span className="muted small">
+                          {sub.provider === 'asaas'
+                            ? `${sub.priceCents !== null ? fmtCents(sub.priceCents) : ''} ${BILLING_CYCLE[sub.billingCycle ?? '']?.toLowerCase() ?? ''}`.trim()
+                            : `${sub.productId ?? ''}${sub.basePlanId ? ` / ${sub.basePlanId}` : ''}`}
+                        </span>
+                      </td>
                       <td>{sub.purchaserEmail ?? <span className="muted">—</span>}</td>
                       <td><Time value={sub.startedAt} relative={false} /></td>
                       <td><Time value={sub.currentPeriodEnd} relative={false} /></td>
@@ -439,7 +464,7 @@ function SyncDevices({ ws }: { ws: WorkspaceDetail }) {
         <tbody>
           {ws.syncDevices.map((device) => (
             <tr key={device.deviceId}>
-              <td>{device.model ?? <span className="muted">—</span>}{device.appVersionName && <span className="muted small"> · v{device.appVersionName}</span>}</td>
+              <td>{device.model ?? <span className="muted">—</span>}{device.appVersionName && <span className="muted small"> · v{device.appVersionName}</span>} {device.platform && <PlatformBadge platform={device.platform} />}</td>
               <td>{device.userEmail ? <Link to={`/usuarios/${device.userId}`}>{device.userEmail}</Link> : '—'}</td>
               <td className="num">{fmtNumber(device.cursor)}</td>
               <td className="num">{device.lag > 0 ? <Badge tone={device.lag > 100 ? 'warning' : 'info'}>{fmtNumber(device.lag)} atrás</Badge> : <Badge tone="success">em dia</Badge>}</td>

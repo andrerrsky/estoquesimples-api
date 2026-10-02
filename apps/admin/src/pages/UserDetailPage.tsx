@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { api } from '../api/client';
+import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { NotesPanel } from '../components/Notes';
@@ -19,6 +19,10 @@ import {
   Modal,
   Notice,
   PageHeader,
+  Pagination,
+  PlatformBadge,
+  PlatformBadges,
+  ProviderBadge,
   Skeleton,
   StatTile,
   Tabs,
@@ -26,7 +30,7 @@ import {
   useToast,
 } from '../components/ui';
 import { fmtNumber } from '../lib/format';
-import { MEMBER_STATUS, PLAN_LABEL, ROLE_LABEL, SUBSCRIPTION_STATE, USER_STATUS } from '../lib/labels';
+import { MEMBER_STATUS, NOTIFICATION_TYPE, PLAN_LABEL, PLATFORM_LABEL, ROLE_LABEL, SUBSCRIPTION_STATE, USER_STATUS } from '../lib/labels';
 
 interface UserDetail {
   id: string;
@@ -42,14 +46,27 @@ interface UserDetail {
   failedLoginAttempts: number;
   permissionVersion: number;
   lastActivityAt: string | null;
-  workspaces: Array<{ id: string; name: string; role: string; memberStatus: string; isOwner: boolean; joinedAt: string; subscriptionState: string | null; planKey: string | null; deletedAt: string | null }>;
+  /** Plataformas com aparelho (ou navegador) não revogado. */
+  platforms: string[];
+  workspaces: Array<{ id: string; name: string; role: string; memberStatus: string; isOwner: boolean; joinedAt: string; subscriptionState: string | null; subscriptionProvider: string | null; planKey: string | null; deletedAt: string | null }>;
   devices: Array<{ id: string; installId: string; platform: string; model: string | null; osVersion: string | null; appVersionName: string | null; appVersionCode: number | null; lastSeenAt: string; createdAt: string; revokedAt: string | null }>;
-  sessions: Array<{ id: string; deviceId: string | null; deviceModel: string | null; ipAddress: string | null; userAgent: string | null; createdAt: string; lastUsedAt: string; expiresAt: string }>;
-  purchasedSubscriptions: Array<{ id: string; workspaceId: string; workspaceName: string; planKey: string; state: string; startedAt: string | null; currentPeriodEnd: string | null }>;
+  sessions: Array<{ id: string; deviceId: string | null; deviceModel: string | null; platform: string | null; ipAddress: string | null; userAgent: string | null; createdAt: string; lastUsedAt: string; expiresAt: string }>;
+  purchasedSubscriptions: Array<{ id: string; workspaceId: string; workspaceName: string; planKey: string; provider: string; state: string; startedAt: string | null; currentPeriodEnd: string | null }>;
   counts: { auditEvents30d: number; analyticsEvents30d: number; loginFailures7d: number };
 }
 
-type Tab = 'resumo' | 'empresas' | 'aparelhos' | 'assinaturas' | 'eventos' | 'historico' | 'notas';
+type Tab = 'resumo' | 'empresas' | 'aparelhos' | 'assinaturas' | 'avisos' | 'eventos' | 'historico' | 'notas';
+
+interface NotificationRow {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  workspaceId: string | null;
+  workspaceName: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
 type Dialog = null | 'suspend' | 'reactivate' | 'verify' | 'revoke' | 'cancelDeletion' | 'edit' | { device: string };
 
 export function UserDetailPage() {
@@ -116,7 +133,7 @@ export function UserDetailPage() {
         }
         subtitle={
           <span className="row">
-            {user.email} · <CopyId id={user.id} />
+            {user.email} · <CopyId id={user.id} /> · <PlatformBadges platforms={user.platforms} empty="sem aparelho registrado" />
           </span>
         }
         actions={
@@ -154,7 +171,12 @@ export function UserDetailPage() {
 
       <div className="grid grid--tiles">
         <StatTile label="Empresas" value={fmtNumber(user.workspaces.filter((w) => w.memberStatus !== 'removed' && !w.deletedAt).length)} foot={`${user.workspaces.filter((w) => w.isOwner).length} como proprietário`} />
-        <StatTile label="Aparelhos" value={fmtNumber(user.devices.filter((d) => !d.revokedAt).length)} foot={`${user.sessions.length} sessão(ões) ativa(s)`} />
+        <StatTile
+          label="Aparelhos"
+          value={fmtNumber(user.devices.filter((d) => !d.revokedAt).length)}
+          foot={`${user.platforms.length > 0 ? `${user.platforms.map((platform) => PLATFORM_LABEL[platform] ?? platform).join(' + ')} · ` : ''}${user.sessions.length} sessão(ões) ativa(s)`}
+          hint="O navegador da versão web também conta como aparelho."
+        />
         <StatTile label="Última atividade" value={<Time value={user.lastActivityAt} />} foot={<>conta criada <Time value={user.createdAt} /></>} />
         <StatTile label="Eventos (30d)" value={fmtNumber(user.counts.analyticsEvents30d)} foot={`${fmtNumber(user.counts.auditEvents30d)} ações auditadas`} />
       </div>
@@ -167,6 +189,7 @@ export function UserDetailPage() {
           { key: 'empresas', label: 'Empresas', count: user.workspaces.length },
           { key: 'aparelhos', label: 'Aparelhos e sessões', count: user.devices.length },
           { key: 'assinaturas', label: 'Compras', count: user.purchasedSubscriptions.length },
+          { key: 'avisos', label: 'Notificações' },
           { key: 'eventos', label: 'Eventos' },
           { key: 'historico', label: 'Histórico' },
           { key: 'notas', label: 'Notas' },
@@ -216,7 +239,7 @@ export function UserDetailPage() {
 
       {tab === 'aparelhos' && (
         <div className="stack">
-          <Card title="Aparelhos" subtitle="Instalações que já entraram com esta conta">
+          <Card title="Aparelhos" subtitle="Instalações do app e navegadores da web que já entraram com esta conta">
             <DevicesList user={user} onRevoke={can('support') ? (device) => setDialog({ device }) : undefined} />
           </Card>
           <Card title="Sessões ativas" subtitle="Cada login abre uma sessão; o token de acesso expira em minutos e é renovado por ela">
@@ -228,6 +251,7 @@ export function UserDetailPage() {
                   <thead>
                     <tr>
                       <th>Aparelho</th>
+                      <th>Plataforma</th>
                       <th>IP</th>
                       <th>Cliente</th>
                       <th>Início</th>
@@ -239,6 +263,7 @@ export function UserDetailPage() {
                     {user.sessions.map((session) => (
                       <tr key={session.id}>
                         <td>{session.deviceModel ?? <span className="muted">—</span>}</td>
+                        <td>{session.platform ? <PlatformBadge platform={session.platform} /> : <span className="muted" title="Login feito sem informar o aparelho.">não informada</span>}</td>
                         <td className="mono">{session.ipAddress ?? '—'}</td>
                         <td className="muted" title={session.userAgent ?? ''}>{session.userAgent ? session.userAgent.slice(0, 40) : '—'}</td>
                         <td><Time value={session.createdAt} /></td>
@@ -255,7 +280,7 @@ export function UserDetailPage() {
       )}
 
       {tab === 'assinaturas' && (
-        <Card title="Compras feitas por esta conta" subtitle="A assinatura pertence à empresa; aqui aparece o que esta pessoa comprou">
+        <Card title="Compras feitas por esta conta" subtitle="A assinatura pertence à empresa; aqui aparece o que esta pessoa comprou no app (Google Play) ou contratou na web (Asaas)">
           {user.purchasedSubscriptions.length === 0 ? (
             <Empty icon="card" title="Nenhuma compra" />
           ) : (
@@ -264,6 +289,7 @@ export function UserDetailPage() {
                 <thead>
                   <tr>
                     <th>Empresa</th>
+                    <th>Origem</th>
                     <th>Plano</th>
                     <th>Estado</th>
                     <th>Início</th>
@@ -274,6 +300,7 @@ export function UserDetailPage() {
                   {user.purchasedSubscriptions.map((sub) => (
                     <tr key={sub.id}>
                       <td><Link to={`/assinaturas/${sub.id}`}>{sub.workspaceName}</Link></td>
+                      <td><ProviderBadge provider={sub.provider} /></td>
                       <td>{PLAN_LABEL[sub.planKey] ?? sub.planKey}</td>
                       <td><Badge tone={SUBSCRIPTION_STATE[sub.state]?.tone}>{SUBSCRIPTION_STATE[sub.state]?.label ?? sub.state}</Badge></td>
                       <td><Time value={sub.startedAt} relative={false} /></td>
@@ -287,8 +314,14 @@ export function UserDetailPage() {
         </Card>
       )}
 
+      {tab === 'avisos' && (
+        <Card title="Caixa de notificações" subtitle="O que esta conta recebeu: a mesma caixa aparece na web e vira push no app Android">
+          <NotificationsPanel userId={userId} />
+        </Card>
+      )}
+
       {tab === 'eventos' && (
-        <Card title="Eventos de uso" subtitle="O que esta conta fez no aplicativo e o que a API registrou">
+        <Card title="Eventos de uso" subtitle="O que esta conta fez no app e na web, e o que a API registrou">
           <EventsPanel path={`/users/${userId}/events`} queryKey={queryKey} />
         </Card>
       )}
@@ -378,7 +411,10 @@ function WorkspacesList({ user, compact }: { user: UserDetail; compact?: boolean
           </div>
           {workspace.memberStatus !== 'active' && <Badge tone={MEMBER_STATUS[workspace.memberStatus]?.tone}>{MEMBER_STATUS[workspace.memberStatus]?.label}</Badge>}
           {workspace.subscriptionState ? (
-            <Badge tone={SUBSCRIPTION_STATE[workspace.subscriptionState]?.tone}>{SUBSCRIPTION_STATE[workspace.subscriptionState]?.label ?? workspace.subscriptionState}</Badge>
+            <>
+              <ProviderBadge provider={workspace.subscriptionProvider} short />
+              <Badge tone={SUBSCRIPTION_STATE[workspace.subscriptionState]?.tone}>{SUBSCRIPTION_STATE[workspace.subscriptionState]?.label ?? workspace.subscriptionState}</Badge>
+            </>
           ) : (
             <span className="list__meta">sem assinatura</span>
           )}
@@ -398,15 +434,16 @@ function DevicesList({ user, compact, onRevoke }: { user: UserDetail; compact?: 
           <div className="timeline__dot"><Icon name="phone" /></div>
           <div className="list__main">
             <div className="list__title">
-              {device.model ?? device.platform}
+              {device.model ?? (device.platform === 'web' ? 'Navegador' : PLATFORM_LABEL[device.platform] ?? device.platform)}
               {device.revokedAt && <Badge tone="error"> revogado</Badge>}
             </div>
             <div className="list__sub">
-              {device.osVersion ?? device.platform}
+              {device.osVersion ? (device.platform === 'android' ? `Android ${device.osVersion}` : device.osVersion) : PLATFORM_LABEL[device.platform] ?? device.platform}
               {device.appVersionName && ` · app ${device.appVersionName}`}
               {device.appVersionCode !== null && ` (${device.appVersionCode})`} · visto <Time value={device.lastSeenAt} />
             </div>
           </div>
+          <PlatformBadge platform={device.platform} />
           {onRevoke && !device.revokedAt && (
             <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRevoke(device.id)}>
               Revogar
@@ -414,6 +451,54 @@ function DevicesList({ user, compact, onRevoke }: { user: UserDetail; compact?: 
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Caixa de notificações da conta, somente leitura: responde "o cliente foi avisado?". */
+function NotificationsPanel({ userId }: { userId: string }) {
+  const [page, setPage] = useState(1);
+  const query = useQuery({
+    queryKey: ['user', userId, 'notifications', page],
+    queryFn: () => api.get<Paginated<NotificationRow> & { unread: number }>(`/users/${userId}/notifications`, { page, pageSize: 25 }),
+    placeholderData: (previous) => previous,
+  });
+  if (query.isLoading) return <Skeleton lines={5} />;
+  const items = query.data?.items ?? [];
+  if (items.length === 0) {
+    return (
+      <Empty icon="mail" title="Nenhuma notificação">
+        Avisos de pagamento, respostas do suporte e campanhas aparecem aqui quando a conta os recebe.
+      </Empty>
+    );
+  }
+  return (
+    <div>
+      <div className="caption" style={{ marginBottom: 8 }}>
+        {fmtNumber(query.data?.total ?? 0)} no total · {fmtNumber(query.data?.unread ?? 0)} não lida(s)
+      </div>
+      <div className="list">
+        {items.map((item) => {
+          const type = NOTIFICATION_TYPE[item.type];
+          return (
+            <div key={item.id} className="list__item" style={{ alignItems: 'flex-start' }}>
+              <div className="list__main">
+                <div className="list__title">{item.title}</div>
+                {item.body && <div className="list__sub">{item.body}</div>}
+                <div className="list__sub">
+                  <Time value={item.createdAt} relative={false} />
+                  {item.workspaceName && <> · <Link to={`/empresas/${item.workspaceId}`}>{item.workspaceName}</Link></>}
+                </div>
+              </div>
+              <Badge tone={type?.tone ?? 'neutral'} plain>{type?.label ?? item.type}</Badge>
+              {item.readAt ? <span className="list__meta" title={`Lida em ${new Date(item.readAt).toLocaleString('pt-BR')}`}>lida</span> : <Badge tone="warning">não lida</Badge>}
+            </div>
+          );
+        })}
+      </div>
+      {query.data && query.data.total > query.data.pageSize && (
+        <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPage={setPage} />
+      )}
     </div>
   );
 }

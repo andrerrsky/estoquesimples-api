@@ -25,6 +25,7 @@ const userListItemSchema = z.object({
   workspacesCount: z.number().int(),
   hasActiveSubscription: z.boolean(),
   lockedUntil: z.string().nullable(),
+  platforms: z.array(z.string()),
 });
 
 const noteSchema = z.object({
@@ -82,6 +83,7 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
             .enum(['true', 'false'])
             .optional()
             .transform((value) => (value === undefined ? undefined : value === 'true')),
+          platform: z.enum(['android', 'ios', 'web']).optional(),
           sort: z.enum(['createdAt', 'lastActivityAt', 'name', 'email']).optional(),
           order: z.enum(['asc', 'desc']).optional(),
         }),
@@ -136,6 +138,36 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
       },
     },
     async (request) => service.events(request.params.userId, request.query),
+  );
+
+  routes.get(
+    '/users/:userId/notifications',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Caixa de notificações da conta (app e web), somente leitura',
+        hide: true,
+        params: userParams,
+        querystring: paginationQuerySchema,
+        response: {
+          200: paginatedSchema(
+            z.object({
+              id: z.string(),
+              type: z.string(),
+              title: z.string(),
+              body: z.string(),
+              workspaceId: z.string().nullable(),
+              workspaceName: z.string().nullable(),
+              readAt: z.string().nullable(),
+              createdAt: z.string(),
+            }),
+          ).extend({ unread: z.number().int() }),
+          ...commonAdminErrors,
+        },
+      },
+    },
+    async (request) => service.notifications(request.params.userId, request.query),
   );
 
   routes.patch(

@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
-import { platformAdmins, pushTokens, supportMessages, supportTickets, users } from '../../platform/db/schema/index.js';
+import { notifications, platformAdmins, pushTokens, supportMessages, supportTickets, users } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
@@ -226,6 +226,21 @@ export class SupportService {
       .orderBy(supportMessages.createdAt)
       .limit(500);
     await this.db.update(supportTickets).set({ userSeenAt: new Date() }).where(eq(supportTickets.id, ticketId));
+    if (identity.userId) {
+      // Abrir a conversa é ler os avisos dela: o sino não fica aceso por
+      // algo que a pessoa acabou de ver, em qualquer cliente.
+      await this.db
+        .update(notifications)
+        .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(notifications.userId, identity.userId),
+            isNull(notifications.readAt),
+            sql`${notifications.type} LIKE 'support.%'`,
+            sql`${notifications.data}->>'ticketId' = ${ticketId}`,
+          ),
+        );
+    }
     return {
       ticket: this.toUserView({ ...ticket, userSeenAt: new Date() }),
       messages: messages.map((message) => this.toUserMessage(message)),

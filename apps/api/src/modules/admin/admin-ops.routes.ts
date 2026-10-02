@@ -68,6 +68,9 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
           uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
           jobsEnabled: env.JOBS_ENABLED,
           playConfigured: app.services.playClient.configured,
+          // Asaas (assinatura pela web): sem chave, o checkout fica desligado.
+          asaasConfigured: app.services.asaas.configured,
+          asaasEnvironment: app.services.asaas.environment,
           emailProvider: env.EMAIL_PROVIDER,
           syncProtocolVersion: env.SYNC_PROTOCOL_VERSION,
           syncMinSupportedProtocol: env.SYNC_PROTOCOL_MIN_SUPPORTED,

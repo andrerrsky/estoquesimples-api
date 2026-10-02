@@ -25,6 +25,7 @@ const entitlementSchema = z.object({
   active: z.boolean(),
   planKey: z.string(),
   state: z.string(),
+  provider: z.string().nullable(),
   currentPeriodEnd: z.string().nullable(),
   graceUntil: z.string().nullable(),
   autoRenewing: z.boolean(),
