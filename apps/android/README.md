@@ -16,7 +16,18 @@ Com ele você pode cadastrar ou importar produtos, edita-los, verificar relatór
 
 Você pode exportar relatórios em .pdf e texto.
 
-Não requer acesso a internet e nenhum cadastro, o banco de dados fica armazenado em seu próprio dispositivo.
+Não requer acesso a internet e nenhum cadastro: o banco de dados fica armazenado em seu próprio dispositivo. Com uma conta (opcional), o estoque sincroniza com a nuvem e pode ser usado também em https://estoquesimples.com.br.
+
+## Desenvolvimento
+
+Este projeto fica em `apps/android` do monorepo do Estoque Simples (a API, o painel e a aplicação web estão nas pastas ao lado). Abra esta pasta no Android Studio ou rode:
+
+```bash
+./gradlew :app:assembleDebug        # APK de depuração
+./gradlew :app:testDebugUnitTest    # testes unitários
+```
+
+Contexto para quem for alterar o código: [AGENTS.md](AGENTS.md). Chave de assinatura: [signing/README.md](signing/README.md).
 
 ## Acesso
 *Google Play: https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples*

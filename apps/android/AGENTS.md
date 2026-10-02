@@ -1,16 +1,24 @@
 # AGENTS.md — app Android do Estoque Simples
 
-Contexto para quem for mexer neste código. O contexto completo do sistema
-(backend, regras de negócio, painel administrativo, analytics) está em
-`estoquesimples-api/AGENTS.md`; este arquivo cobre o que é específico do
-aplicativo.
+Contexto para quem for mexer neste código. O app mora em `apps/android` do
+monorepo; o contexto completo do sistema (API, regras de negócio, aplicação
+web, painel administrativo, analytics) está no [AGENTS.md da raiz](../../AGENTS.md).
+Este arquivo cobre o que é específico do aplicativo.
+
+O app é um projeto Gradle independente: não participa dos workspaces npm e
+não entra no deploy do Railway. Para trabalhar nele, abra `apps/android` no
+Android Studio ou rode `./gradlew :app:assembleDebug` nesta pasta
+(`local.properties` com `sdk.dir` não é versionado).
 
 ## O que é
 
 App Android de controle de estoque, **offline-first**: tudo é gravado no
 SQLite do aparelho (`data/LocalDb.java`, banco `estoque`) e a nuvem é uma
-camada opcional para assinantes. O app precisa continuar funcionando por
-completo com a API fora do ar.
+camada opcional para quem cria conta. O app precisa continuar funcionando por
+completo com a API fora do ar. A mesma conta abre a aplicação web
+(estoquesimples.com.br), que trabalha direto sobre os dados da nuvem: o que
+é feito lá chega ao aparelho na sincronização seguinte, pelas mesmas regras
+de conflito.
 
 - Pacote `br.com.gameloop.estoquesimples`, `versionCode 24`, minSdk 24,
   targetSdk 36, Java 17 (sem Kotlin, sem Compose), UI em XML com ViewBinding,
@@ -39,7 +47,8 @@ Marca `#1C679D` (escura `#15537E`), fundo `#F4F7FA`, cartões brancos com
 borda `#E3E8EE` e raio 14dp, texto `#1A2330` / secundário `#5C6B7A`, sucesso
 `#1B7A3D`, aviso `#E65100`, erro `#C62828`. Sem elevação. Bottom nav azul com
 cinco abas (Início, Novo, Histórico, Relatórios, Imp/Exp). O painel
-administrativo e a futura versão web usam estes mesmos tokens.
+administrativo e a aplicação web usam estes mesmos tokens, copiados em
+`packages/design/tokens.css` — mudou aqui, mude lá.
 
 ## Modelo local
 
@@ -65,7 +74,23 @@ administrativo e a futura versão web usam estes mesmos tokens.
    texto da mensagem. `426` = atualizar o app; `SYNC_RESYNC_REQUIRED` =
    recarregar do servidor.
 
-## Pendências combinadas com a API
+## Documentos legais e assinatura do app
+
+- **Termos e Política**: a fonte é `packages/legal` (raiz do monorepo),
+  compartilhada com a aplicação web. Os arquivos em
+  `app/src/main/assets/legal/` são **cópia**: não edite aqui. Altere em
+  `packages/legal` e rode `npm run legal:sync` na raiz (o CI reprova cópia
+  defasada com `npm run legal:check`).
+- **Chave de assinatura**: `signing/key.jks` é a única chave versionada
+  (repositório privado). Senhas ficam fora do repositório; ver
+  [signing/README.md](signing/README.md). Não há `signingConfig` no Gradle: o
+  `.aab` é assinado pelo assistente do Android Studio.
+- **Assinatura do plano**: no app a compra é sempre pela Google Play. A
+  empresa também pode ter assinado pela web (Asaas); para o app não muda
+  nada — `GET /entitlement` devolve o mesmo retrato, qualquer que seja o
+  provedor. Não ofereça gerenciar pela Play uma assinatura que não veio dela.
+
+## Integrações com a API
 
 - **Analytics (implementado)**: pacote `analytics/` — `Analytics.track(context,
   nome, props)` grava na fila local (`analytics.db`, separado do banco do
@@ -77,7 +102,7 @@ administrativo e a futura versão web usam estes mesmos tokens.
   movimentação, estorno, edição em massa, busca, filtro, relatório, análise,
   importação/exportação, backup, paywall com `trigger`, compra, notificação)
   estão anotados com `Analytics.track(...)` junto da ação. Catálogo e regras
-  de privacidade: `estoquesimples-api/docs/analytics.md`. O Firebase
+  de privacidade: [docs/analytics.md](../../docs/analytics.md). O Firebase
   Analytics continua só com os eventos automáticos; o painel lê estes.
 - **Push (implementado)**: pacote `push/` — `PushRegistrar.register(context)`
   pede o token ao Firebase e envia a `PUT /v1/push/tokens` (chamado em
@@ -88,7 +113,7 @@ administrativo e a futura versão web usam estes mesmos tokens.
   `screen?`, `url?`); `EstoqueFirebaseMessagingService` monta a notificação e
   reporta a entrega; `MainActivity.handlePushIntent` reporta a abertura e
   abre a tela/link pedidos (`pushScreenTarget`). Contrato em
-  `estoquesimples-api/docs/push.md`.
+  [docs/push.md](../../docs/push.md).
 - **Suporte pelo app (implementado)**: `SupportActivity` (lista, menu ⋮
   "Ajuda e suporte" e botão "Falar com o suporte" na tela Sobre),
   `SupportNewActivity` (categoria em chips, assunto, mensagem; nome/e-mail
@@ -99,5 +124,5 @@ administrativo e a futura versão web usam estes mesmos tokens.
   A resposta do painel chega como push `type=support` com `ticketId`:
   `EstoqueFirebaseMessagingService` põe `EXTRA_TICKET_ID` no Intent e
   `MainActivity.handlePushIntent` abre a conversa. Contrato em
-  `estoquesimples-api/docs/support.md`. O e-mail de contato não é mais
+  [docs/support.md](../../docs/support.md). O e-mail de contato não é mais
   oferecido na tela Sobre.
