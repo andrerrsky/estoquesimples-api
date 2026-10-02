@@ -427,27 +427,6 @@ public final class MovementRepository {
         }
     }
 
-    /**
-     * Soma de todas as movimentações de um produto. Usada no diagnóstico para
-     * confirmar que o saldo armazenado é reproduzível a partir dos eventos.
-     */
-    public double sumMovements(String productUuid) {
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery(
-                    "SELECT COALESCE(SUM(" + SIGNED_QUANTITY_SQL + "), 0) FROM "
-                            + LocalDb.TABLE_MOVEMENTS
-                            + " WHERE product_uuid=? AND deleted_at IS NULL",
-                    new String[]{productUuid});
-            return cursor.moveToFirst() ? cursor.getDouble(0) : 0d;
-        } catch (Exception e) {
-            Log.e(TAG, "falha ao somar movimentações", e);
-            return 0d;
-        } finally {
-            LocalDb.closeQuietly(cursor);
-        }
-    }
-
     /** Saldo e nome do produto lidos numa consulta só, dentro da transação. */
     private static final class Snapshot {
         final double amount;

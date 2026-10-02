@@ -563,14 +563,6 @@ public class EditActivity extends BaseActivity {
         }
     }
 
-    public void cancelEdit(View v) {
-        if (discardGuard != null) {
-            discardGuard.confirmLeave();
-        } else {
-            finish();
-        }
-    }
-
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);

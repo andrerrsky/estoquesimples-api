@@ -30,13 +30,4 @@
     <color name="system_bar">@color/color_brand</color>
     <color name="bottom_nav_active">#FFFFFF</color>
     <color name="bottom_nav_inactive">#B3FFFFFF</color>
-    <color name="red">@color/color_error</color>
-
-    <!-- Aliases da paleta antiga da Assinatura -->
-    <color name="subscription_surface">@color/color_surface</color>
-    <color name="subscription_text">@color/color_text</color>
-    <color name="subscription_muted">@color/color_text_muted</color>
-    <color name="subscription_success">@color/color_success</color>
-    <color name="subscription_warning">@color/color_warning</color>
-    <color name="subscription_error">@color/color_error</color>
 </resources>

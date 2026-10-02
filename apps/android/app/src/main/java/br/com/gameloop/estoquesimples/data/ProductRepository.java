@@ -7,8 +7,6 @@ import android.util.Log;
 
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -171,25 +169,6 @@ public final class ProductRepository {
         } finally {
             LocalDb.closeQuietly(cursor);
         }
-    }
-
-    public List<String> allUuids() {
-        List<String> uuids = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery(
-                    "SELECT uuid FROM " + LocalDb.TABLE_PRODUCTS
-                            + " WHERE " + LocalDb.ACTIVE_PRODUCTS + " AND uuid IS NOT NULL",
-                    null);
-            while (cursor.moveToNext()) {
-                uuids.add(cursor.getString(0));
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "falha ao listar produtos", e);
-        } finally {
-            LocalDb.closeQuietly(cursor);
-        }
-        return uuids;
     }
 
     // -------------------------------------------------------------------------

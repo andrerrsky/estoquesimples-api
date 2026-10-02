@@ -24,7 +24,6 @@ public class ImageLoadHelper {
     // Limites de tamanho para diferentes contextos
     public static final int THUMBNAIL_SIZE = 800;  // Para listas e thumbnails
     public static final int DETAIL_SIZE = 1200;    // Para visualização detalhada
-    public static final int MAX_SIZE = 2048;       // Tamanho máximo absoluto
     
     /**
      * Carrega imagem de forma segura para uso em lista/thumbnail.
@@ -166,43 +165,6 @@ public class ImageLoadHelper {
             Log.i(TAG, "Picasso configurado com otimizações de memória");
         } catch (Exception e) {
             Log.e(TAG, "Erro ao configurar Picasso", e);
-        }
-    }
-    
-    /**
-     * Calcula o tamanho estimado de memória que uma imagem ocuparia.
-     * Útil para debug e monitoramento.
-     * 
-     * @param width Largura da imagem
-     * @param height Altura da imagem
-     * @param config Configuração do bitmap
-     * @return Tamanho estimado em bytes
-     */
-    public static long estimateMemorySize(int width, int height, Bitmap.Config config) {
-        int bytesPerPixel = 4; // ARGB_8888
-        
-        if (config == Bitmap.Config.RGB_565) {
-            bytesPerPixel = 2;
-        } else if (config == Bitmap.Config.ALPHA_8) {
-            bytesPerPixel = 1;
-        }
-        
-        return (long) width * height * bytesPerPixel;
-    }
-    
-    /**
-     * Formata tamanho de memória em formato legível.
-     * 
-     * @param bytes Tamanho em bytes
-     * @return String formatada (ex: "2.5 MB")
-     */
-    public static String formatMemorySize(long bytes) {
-        if (bytes < 1024) {
-            return bytes + " B";
-        } else if (bytes < 1024 * 1024) {
-            return String.format("%.1f KB", bytes / 1024.0);
-        } else {
-            return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
         }
     }
 }

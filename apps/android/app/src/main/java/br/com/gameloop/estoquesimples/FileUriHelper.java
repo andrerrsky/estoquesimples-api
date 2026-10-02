@@ -62,71 +62,6 @@ public class FileUriHelper {
     }
     
     /**
-     * Cria uma URI segura para um diretório.
-     * Nota: Diretórios são mais complexos e podem não funcionar em todos os casos.
-     * 
-     * @param context Contexto da aplicação
-     * @param directory Diretório para criar URI
-     * @return URI para o diretório, ou null se houver erro
-     */
-    public static Uri getUriForDirectory(Context context, File directory) {
-        if (context == null) {
-            Log.e(TAG, "Context is null, cannot create directory URI");
-            return null;
-        }
-        
-        if (directory == null || !directory.exists() || !directory.isDirectory()) {
-            Log.e(TAG, "Directory is null, does not exist, or is not a directory");
-            return null;
-        }
-        
-        try {
-            // Para diretórios, geralmente usamos Intent.ACTION_VIEW com DocumentsUI
-            // Mas a URI pode variar dependendo da versão do Android
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+ usa o MediaStore ou DocumentsProvider
-                // Para Downloads, usamos uma URI específica do DocumentsProvider
-                String relativePath = getRelativePathToPublicDirectory(directory);
-                if (relativePath != null) {
-                    return Uri.parse("content://com.android.externalstorage.documents/document/primary:" + relativePath);
-                }
-            }
-            
-            // Para versões antigas ou diretórios não públicos, usar file://
-            return Uri.fromFile(directory);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error creating URI for directory: " + directory.getAbsolutePath(), e);
-            return null;
-        }
-    }
-    
-    /**
-     * Obtém o caminho relativo de um diretório em relação aos diretórios públicos.
-     * 
-     * @param directory Diretório
-     * @return Caminho relativo ou null se não for um diretório público
-     */
-    private static String getRelativePathToPublicDirectory(File directory) {
-        if (directory == null) {
-            return null;
-        }
-        
-        String absPath = directory.getAbsolutePath();
-        
-        // Verificar se está no diretório Downloads
-        if (absPath.contains("/Download/") || absPath.contains("/Downloads/")) {
-            int index = absPath.lastIndexOf("/Download");
-            if (index != -1) {
-                String relativePath = absPath.substring(index + 1); // Remove a barra inicial
-                return relativePath.replace("/Download/", "Download/");
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
      * Verifica se uma URI é segura para ser usada em um Intent.
      * 
      * @param uri URI para verificar
@@ -144,35 +79,6 @@ public class FileUriHelper {
         
         // Em versões antigas, tanto file:// quanto content:// são aceitáveis
         return true;
-    }
-    
-    /**
-     * Valida se o FileProvider está configurado corretamente.
-     * 
-     * @param context Contexto da aplicação
-     * @return true se o FileProvider está configurado, false caso contrário
-     */
-    public static boolean validateFileProviderConfiguration(Context context) {
-        try {
-            // Tentar criar uma URI de teste para verificar a configuração
-            File testDir = context.getFilesDir();
-            if (testDir != null && testDir.exists()) {
-                File testFile = new File(testDir, ".test_fileprovider");
-                if (!testFile.exists()) {
-                    testFile.createNewFile();
-                }
-                
-                if (testFile.exists()) {
-                    Uri testUri = getUriForFile(context, testFile);
-                    testFile.delete();
-                    return testUri != null;
-                }
-            }
-            return false;
-        } catch (Exception e) {
-            Log.e(TAG, "FileProvider configuration validation failed", e);
-            return false;
-        }
     }
 }
 

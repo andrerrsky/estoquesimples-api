@@ -9,16 +9,6 @@
         <item name="postSplashScreenTheme">@style/CustomActionBarTheme</item>
     </style>
 
-    <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar.Bridge">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowBackground">@color/color_surface</item>
-        <item name="colorControlActivated">@color/color_brand</item>
-        <item name="colorControlNormal">@color/color_text_muted</item>
-        <item name="viewInflaterClass">androidx.appcompat.app.AppCompatViewInflater</item>
-    </style>
-
     <style name="CustomActionBarTheme" parent="Theme.MaterialComponents.Light.DarkActionBar.Bridge">
         <item name="android:actionBarStyle">@style/MyActionBar</item>
         <item name="actionBarStyle">@style/MyActionBar</item>

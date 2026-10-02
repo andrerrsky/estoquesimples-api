@@ -10,7 +10,6 @@ import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.provider.MediaStore;
@@ -637,14 +636,6 @@ public class AddActivity extends BaseActivity {
         }
         return allValid;
 
-    }
-
-    public void cancelAdd(View v) {
-        if (discardGuard != null) {
-            discardGuard.confirmLeave();
-        } else {
-            finish();
-        }
     }
 
     public void addTakeCameraPhoto(View v) {

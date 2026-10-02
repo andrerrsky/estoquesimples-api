@@ -1,11 +1,5 @@
 <resources>
     <string name="app_name">Estoque Simples</string>
-    <string name="my_own_title">Avalie o aplicativo!</string>
-    <string name="my_own_message">Se gostou do app e ele esta sendo útil, você poderia avalia-lo rapidinho? Não vai levar nem 1 minuto, obrigado pelo seu suporte! :) </string>
-    <string name="my_own_rate">Avaliar agora! :D</string>
-    <string name="my_own_thanks">Não obrigado :(</string>
-    <string name="my_own_cancel">Depois :|</string>
-    <string name="sim">Sim</string>
     <string name="history_title">Histórico</string>
 
     <!-- Settings Activity -->
@@ -36,7 +30,6 @@
     <string name="subscription_benefit_premium">Análise Avançada de Estoque: enxergue tendências antes de faltar produto</string>
     <string name="subscription_cta">Assinar</string>
     <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
-    <string name="subscription_price_month">%1$s / mês</string>
     <string name="subscription_price_suffix">/ mês</string>
     <string name="subscription_price_label">Por apenas</string>
     <string name="subscription_restore">Restaurar assinatura</string>
@@ -65,8 +58,6 @@
     
     <!-- Analytics Feature (Premium) -->
     <string name="analytics_title">Análise de Estoque</string>
-    <string name="analytics_description">Análises preditivas e insights sobre seu estoque</string>
-    <string name="analytics_locked">Recurso do plano Equipe</string>
     <string name="analytics_locked_message">A Análise Avançada de Estoque oferece previsões de esgotamento, taxa de rotatividade, recomendações de reabastecimento e muito mais.</string>
     <string name="analytics_unlock_cta">Conhecer o plano Equipe</string>
     <string name="analytics_no_data">Não há dados suficientes para gerar análises. Continue registrando entradas e saídas no histórico.</string>
@@ -86,14 +77,11 @@
     <string name="analytics_recommendation">Recomendação: reabastecer em breve.</string>
     
     <!-- Currency / Monetary Formatting -->
-    <string name="currency_selector_label">Moeda</string>
     <string name="currency_label_value">Valor unitário (%s)</string>
     <string name="report_total_value">Valor do estoque: %s</string>
-    <string name="report_avg_value">Valor Médio por Produto: %s</string>
     <string name="total_entry_value">Entradas (desde o início): %s</string>
     <string name="total_exit_value">Saídas (desde o início): %s</string>
     <string name="report_total_value_zero">Valor do estoque: %s 0,00</string>
-    <string name="report_avg_value_zero">Valor Médio: %s 0,00</string>
     <string name="total_entry_value_zero">Entradas (desde o início): %s 0,00</string>
     <string name="total_exit_value_zero">Saídas (desde o início): %s 0,00</string>
 
@@ -106,10 +94,4 @@
     <string name="report_btn_low_stock">Estoque baixo</string>
     <string name="report_btn_category">Por categoria</string>
     <string name="report_btn_financial">Financeiro / valor de inventário</string>
-
-    <!-- Premium Messages -->
-    <string name="premium_required_title">Recurso da assinatura</string>
-    <string name="premium_required_message">Este recurso está disponível para assinantes e para quem já adquiriu a antiga Versão PRO.</string>
-    <string name="premium_required_button_pro">Conhecer o plano</string>
-    <string name="premium_required_button_cancel">Agora não</string>
 </resources>

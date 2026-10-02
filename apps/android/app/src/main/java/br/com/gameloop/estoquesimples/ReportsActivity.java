@@ -22,7 +22,6 @@ import android.util.Log;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import android.text.Html;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -348,26 +347,6 @@ public class ReportsActivity extends BaseActivity {
         return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
     
-
-    /**
-     * Mantém as {@code maximo} maiores fatias e soma as demais em "Outros".
-     */
-    private static List<PieEntry> agruparFatias(List<PieEntry> entries, int maximo) {
-        if (entries.size() <= maximo + 1) {
-            return entries;
-        }
-        List<PieEntry> ordenadas = new ArrayList<>(entries);
-        java.util.Collections.sort(ordenadas, (a, b) -> Float.compare(b.getValue(), a.getValue()));
-        List<PieEntry> resultado = new ArrayList<>(ordenadas.subList(0, maximo));
-        float resto = 0f;
-        int quantos = 0;
-        for (PieEntry e : ordenadas.subList(maximo, ordenadas.size())) {
-            resto += e.getValue();
-            quantos++;
-        }
-        resultado.add(new PieEntry(resto, "Outros (" + quantos + " produtos)"));
-        return resultado;
-    }
 
     private static void somarPorUnidade(java.util.Map<String, Double> mapa, String unidade, double quantidade) {
         String chave = unidade == null || unidade.trim().isEmpty() || "null".equals(unidade) ? "un" : unidade.trim();
@@ -1912,79 +1891,6 @@ public class ReportsActivity extends BaseActivity {
             Log.e("ReportsActivity", "Error opening PDF file", e);
             Toast.makeText(this, 
                 "Erro ao abrir PDF: " + e.getMessage(), 
-                Toast.LENGTH_LONG).show();
-        }
-    }
-
-    // Abrir o gerenciador de arquivos na pasta do PDF
-    private void openFolder(File pdfFile) {
-        try {
-            Intent intent;
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+: abrir a pasta Downloads usando DocumentsProvider
-                intent = new Intent(Intent.ACTION_VIEW);
-                Uri uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download/EstoqueSimples");
-                intent.setDataAndType(uri, "vnd.android.document/directory");
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Android 7-9: Não podemos abrir diretório diretamente, mostrar mensagem com caminho
-                Toast.makeText(this, 
-                    "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
-                    "\n\nAbra seu gerenciador de arquivos e navegue até esta pasta.", 
-                    Toast.LENGTH_LONG).show();
-                return;
-            } else {
-                // Android 6 e inferior: pode usar URI de arquivo diretamente
-                Uri selectedUri = FileUriHelper.getUriForDirectory(this, pdfFile.getParentFile());
-                if (selectedUri == null) {
-                    // Fallback: mostrar o caminho
-                    Toast.makeText(this, 
-                        "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath(), 
-                        Toast.LENGTH_LONG).show();
-                    return;
-                }
-                
-                intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(selectedUri, "resource/folder");
-                
-                // Fallback: tentar com o DocumentsUI
-                if (intent.resolveActivity(getPackageManager()) == null) {
-                    intent = new Intent(Intent.ACTION_GET_CONTENT);
-                    intent.setDataAndType(selectedUri, "*/*");
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
-                }
-            }
-
-            // Tentar abrir; resolveActivity pode falhar no Android 11+ por package
-            // visibility, então tentamos abrir e caímos no fallback se não houver app.
-            boolean opened = false;
-            if (intent != null) {
-                try {
-                    startActivity(intent);
-                    opened = true;
-                } catch (android.content.ActivityNotFoundException e) {
-                    opened = false;
-                }
-            }
-            if (!opened) {
-                // Se não conseguir abrir a pasta, mostrar o caminho
-                Toast.makeText(this, 
-                    "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
-                    "\n\nAbra seu gerenciador de arquivos para localizar o arquivo.", 
-                    Toast.LENGTH_LONG).show();
-            }
-        } catch (android.os.FileUriExposedException e) {
-            Log.e("ReportsActivity", "FileUriExposedException when opening folder", e);
-            Toast.makeText(this, 
-                "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath() + 
-                "\n\nAbra seu gerenciador de arquivos para localizar o arquivo.", 
-                Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Log.e("ReportsActivity", "Error opening folder", e);
-            // Fallback: mostrar apenas o caminho
-            Toast.makeText(this, 
-                "Arquivo salvo em:\n" + pdfFile.getParentFile().getAbsolutePath(), 
                 Toast.LENGTH_LONG).show();
         }
     }

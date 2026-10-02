@@ -24,7 +24,6 @@ public final class PhotoPathHelper {
 
     private static final String TAG = "PhotoPathHelper";
     private static final String FOLDER_NAME = "EstoqueSimples";
-    private static final String LEGACY_SEGMENT = "/EstoqueSimples/Imagens/";
 
     private PhotoPathHelper() {}
 
@@ -223,14 +222,6 @@ public final class PhotoPathHelper {
             }
             return null;
         }
-    }
-
-    public static boolean isLegacyPublicPath(String storedPath) {
-        if (isEmptyPhotoReference(storedPath) || isContentUri(storedPath)) {
-            return false;
-        }
-        return storedPath.contains(LEGACY_SEGMENT)
-                || storedPath.contains("/EstoqueSimples/Imagens");
     }
 
     private static File newFileInFolder(File folder) {

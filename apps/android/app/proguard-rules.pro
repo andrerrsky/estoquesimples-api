@@ -27,6 +27,3 @@
 -dontwarn okio.**
 -dontwarn org.codehaus.mojo.animal_sniffer.*
 -dontwarn javax.annotation.**
-
-# ===== Google Play Billing =====
--keep class com.android.vending.billing.** { *; }
