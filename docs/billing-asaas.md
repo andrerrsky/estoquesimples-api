@@ -114,7 +114,7 @@ Projeto `estoquesimples-api` › serviço `estoquesimples-api` › **Variables**
 | `ASAAS_API_KEY` | `<chave $aact_prod_... do passo 2>` |
 | `ASAAS_ENVIRONMENT` | `production` |
 | `ASAAS_WEBHOOK_TOKEN` | `<segredo do passo 3>` |
-| `WEB_APP_URL` | `https://estoquesimples.com.br` (já definida no deploy da web) |
+| `WEB_APP_URL` | `https://estoquesimples.com.br` (definida quando o domínio da web entra no ar; ver DEPLOY.md) |
 
 Opcionais (têm padrão): `ASAAS_GRACE_DAYS=5`, `ASAAS_PENDING_EXPIRE_DAYS=7`,
 `ASAAS_SUSPENDED_CANCEL_DAYS=30`, `ASAAS_RECONCILE_INTERVAL_MINUTES=60`.

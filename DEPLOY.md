@@ -54,8 +54,15 @@ processo escolhe o que responder pelo cabeçalho `Host`:
 | `estoquesimples.com.br` | aplicação web (`apps/web/dist`) + `/v1` na mesma origem |
 
 Variáveis da web: `WEB_APP_HOSTS=estoquesimples.com.br,www.estoquesimples.com.br`
-e `WEB_APP_URL=https://estoquesimples.com.br`. Sem `WEB_APP_HOSTS` a web fica
-desligada e o domínio cairia na raiz da API. O app Android continua usando
+(já definida) e `WEB_APP_URL=https://estoquesimples.com.br`. Sem
+`WEB_APP_HOSTS` a web fica desligada e o domínio cairia na raiz da API.
+
+`WEB_APP_URL` **só deve ser definida depois que o domínio estiver no ar**
+(DNS verificado e certificado emitido, ver abaixo): é ela que põe os links
+da web nos e-mails de convite, confirmação e redefinição de senha e que
+informa ao Asaas para onde voltar depois do pagamento. Definida antes, os
+e-mails sairiam com links que não abrem.
+`railway variables --set "WEB_APP_URL=https://estoquesimples.com.br"`. O app Android continua usando
 `api.estoquesimples.com.br`; nada nele muda.
 
 Configuração de build e deploy versionada: `railway.json` (comandos,
@@ -82,7 +89,9 @@ existentes** (`api` CNAME → `5fm3slen.up.railway.app`; os registros de e-mail
 do Resend: `send` e `resend._domainkey`), acrescentar os dois acima com o
 proxy desligado ("DNS only") e trocar os servidores DNS no registro.br.
 `railway domain status estoquesimples.com.br` mostra quando o domínio foi
-verificado e o certificado emitido.
+verificado e o certificado emitido. Depois disso: definir `WEB_APP_URL`
+(acima) e conferir `https://estoquesimples.com.br` (página inicial, entrar,
+`/v1/config` respondendo JSON na mesma origem).
 
 O plano atual do Railway permite dois domínios próprios por serviço (`api.` e
 a raiz). O `www.` não coube: ou se faz o redirecionamento `www → raiz` no
