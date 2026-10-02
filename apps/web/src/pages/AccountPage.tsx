@@ -210,7 +210,7 @@ function PasswordCard() {
   const weak = apiError?.details.filter((detail) => detail.field === 'newPassword').map((detail) => detail.message).join(' ') || undefined;
 
   return (
-    <Card title="Senha" subtitle="A mesma senha vale para o aplicativo no celular e para o navegador.">
+    <Card title="Senha" subtitle="A mesma senha vale em todas as plataformas: aplicativo Android, navegador e web app.">
       <form className="stack" onSubmit={submit}>
         {error !== null && !wrongCurrent && !weak && <Notice tone="error">{errorMessage(error)}</Notice>}
         <div className="form-grid">

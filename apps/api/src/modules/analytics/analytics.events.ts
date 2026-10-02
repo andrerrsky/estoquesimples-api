@@ -76,6 +76,10 @@ export const AnalyticsEventName = {
   SUPPORT_TICKET_SUBMITTED: 'support.ticket_submitted',
   HELP_ARTICLE_OPENED: 'help.article_opened',
   HELP_SEARCHED: 'help.searched',
+  PLATFORM_PLAY_CLICKED: 'platform.play_clicked',
+  PLATFORM_DEVICE_SELECTED: 'platform.device_selected',
+  PLATFORM_INSTALL_CLICKED: 'platform.install_clicked',
+  PLATFORM_WEB_APP_INSTALLED: 'platform.web_app_installed',
 } as const;
 
 export type AnalyticsEventNameValue = (typeof AnalyticsEventName)[keyof typeof AnalyticsEventName];
@@ -130,6 +134,10 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'support.message_sent', source: 'server', description: 'Usuário escreveu numa solicitação já aberta.' },
   { name: 'support.ticket_resolved', source: 'server', description: 'Solicitação encerrada.', properties: { by: 'user | admin' } },
   { name: 'help.article_opened', source: 'app', description: 'Resposta aberta na central de ajuda (app ou web).', properties: { article: 'id do artigo em packages/help' } },
+  { name: 'platform.play_clicked', source: 'app', description: 'Clicou em baixar na Google Play, na página Plataformas da web.' },
+  { name: 'platform.device_selected', source: 'app', description: 'Escolheu o aparelho no passo a passo de instalar o web app.', properties: { device: 'ios | android | desktop | mac' } },
+  { name: 'platform.install_clicked', source: 'app', description: 'Clicou em "Instalar agora" (navegador com instalação em um clique).', properties: { device: 'ios | android | desktop | mac' } },
+  { name: 'platform.web_app_installed', source: 'app', description: 'O navegador confirmou a instalação do web app.' },
   { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda (só a contagem, nunca o texto).', properties: { results: 'quantidade' } },
   { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },
   { name: 'subscription.checkout_started', source: 'server', description: 'Contratação do plano iniciada pela web (Asaas).', properties: { provider: 'asaas', cycle: 'MONTHLY | YEARLY', billingType: 'forma de pagamento' } },

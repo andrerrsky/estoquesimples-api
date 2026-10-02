@@ -764,3 +764,55 @@
     padding-right: 4px;
   }
 }
+
+/* Plataformas (Android, web, web app) */
+.lp-platforms__head {
+  max-width: 640px;
+  margin-bottom: 28px;
+}
+.lp-platforms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.lp-platform {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px;
+}
+.lp-platform p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.lp-platform__cta {
+  margin-top: auto;
+  align-self: flex-start;
+}
+.lp-platform p + .lp-platform__cta {
+  margin-top: 14px;
+}
+.lp-platform--accent {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+}
+.lp-duo--pair {
+  margin-top: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lp-duo--pair .card {
+  padding: 24px;
+}
+.lp-duo--pair .feature p {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+@media (max-width: 980px) {
+  .lp-platforms {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-duo--pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

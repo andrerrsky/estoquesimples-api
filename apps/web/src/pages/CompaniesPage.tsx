@@ -105,7 +105,7 @@ export function CompaniesPage() {
       ))}
 
       <p className="caption">
-        Usa o aplicativo Android com outra empresa nesta mesma conta? Ela aparece aqui depois que o aplicativo sincronizar.
+        Usa o aplicativo Android com outra empresa nesta mesma conta? Ela aparece aqui depois que o aplicativo sincronizar. Quem usa a versão web em outro aparelho já a vê direto.
       </p>
 
       <CreateCompanyDialog open={creating} onClose={() => setCreating(false)} />

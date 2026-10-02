@@ -332,7 +332,7 @@ export function PlanPage() {
           {data && !data.checkoutAvailable && !sub && (
             <Notice tone="info" title="A assinatura pela web ainda não está disponível">
               Por enquanto, o plano Equipe é assinado no aplicativo Android, pelo Google Play. A assinatura é da empresa: depois de assinar
-              no celular, o plano vale também aqui no navegador.
+              no celular, o plano vale também aqui, no navegador e no web app.
             </Notice>
           )}
 

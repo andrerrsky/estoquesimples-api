@@ -125,6 +125,27 @@
       ]
     },
     {
+      "id": "adm-plataformas-ios",
+      "category": "atendimento",
+      "question": "O cliente usa iPhone ou iPad. O que respondo?",
+      "answer": [
+        "Não há aplicativo para iOS. A resposta é a **versão web instalada na tela inicial** (web app): Safari › Compartilhar › **Adicionar à Tela de Início**. A página pública **estoquesimples.com.br/plataformas** tem o passo a passo e pode ser enviada como link.",
+        "Peça que ele confirme que está no **Safari**, e não no navegador interno de outro aplicativo (WhatsApp, Instagram), que não mostra essa opção.",
+        "Avise o que muda: precisa de internet, não guarda fotos e não envia notificação no aparelho. O estoque, a conta e o plano são os mesmos.",
+        "Esses clientes aparecem no painel com o selo **Web**. Se a demanda por iOS crescer, vale registrar o número de solicitações com esse perfil."
+      ],
+      "keywords": [
+        "ios",
+        "iphone",
+        "ipad",
+        "apple",
+        "app store",
+        "safari",
+        "web app",
+        "instalar"
+      ]
+    },
+    {
       "id": "adm-avaliacoes",
       "category": "atendimento",
       "question": "Como respondo avaliações da Play Store?",

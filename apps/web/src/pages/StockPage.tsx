@@ -314,7 +314,7 @@ export function StockPage() {
                 )
               }
             >
-              Cadastre o primeiro produto ou importe uma planilha. Se você já usa o aplicativo no celular, os produtos aparecem aqui depois da sincronização.
+              Cadastre o primeiro produto ou importe uma planilha. Se você já usa o aplicativo Android, os produtos aparecem aqui depois da sincronização.
             </Empty>
           )
         ) : (

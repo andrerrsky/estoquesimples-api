@@ -1,0 +1,202 @@
+/* ==========================================================================
+   Plataformas: onde funciona e como instalar o web app
+   ========================================================================== */
+
+.plat {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.plat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.plat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+}
+.plat-card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+  font-size: var(--fs-supporting);
+}
+.plat-card__icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-panel);
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.plat-card__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 6px 0 0;
+  font-size: var(--fs-section);
+}
+.plat-card__action {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.plat-install {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hero);
+  background: var(--surface-content);
+}
+.plat-install__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.plat-install__head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.plat-install__head p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-supporting);
+}
+.plat-install__logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--brand-soft);
+}
+.plat-intro {
+  margin: 0;
+  color: var(--text);
+}
+
+.plat-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plat-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  line-height: 1.55;
+}
+.plat-steps__n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: var(--fs-label);
+  font-weight: 700;
+}
+.plat-inline {
+  display: inline-block;
+  vertical-align: -3px;
+  color: var(--brand);
+}
+.plat-note {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-panel);
+  background: var(--warning-soft);
+  color: #7a3300;
+  font-size: var(--fs-supporting);
+  line-height: 1.5;
+}
+.plat-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.plat-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-panel);
+  background: var(--success-soft);
+  color: var(--success);
+  font-weight: 600;
+}
+.plat-oneclick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+.plat-oneclick > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 240px;
+  font-size: var(--fs-supporting);
+}
+
+.plat-compare h2 {
+  margin: 0 0 10px;
+  font-size: var(--fs-section);
+}
+.plat-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+}
+.plat-table th[scope='row'] {
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  background: none;
+}
+.plat-foot {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-supporting);
+}
+
+@media (max-width: 900px) {
+  .plat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .plat-install {
+    padding: 18px 14px;
+  }
+  .plat-steps li {
+    padding: 12px;
+  }
+}

@@ -73,6 +73,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `purchase.started` / `purchase.failed` | app | fluxo do Play Billing | `reason` (código do Billing) |
 | `low_stock.notified` / `notification.opened` | app | notificação exibida/tocada | `count` |
 | `help.article_opened` | app e web | resposta aberta na central de ajuda | `article` (id do artigo em `packages/help`) |
+| `platform.play_clicked` / `platform.device_selected` / `platform.install_clicked` / `platform.web_app_installed` | web | página Plataformas: clique na Google Play, aparelho escolhido no passo a passo, instalação com um clique e instalação confirmada | `device` |
 | `help.searched` | app e web | busca na central de ajuda (após pausa na digitação) | `results` — só a contagem, nunca o texto buscado |
 | `user.registered` / `user.logged_in` / `user.email_verified` / `user.deletion_requested` | API | ciclo de vida da conta | `origin` |
 | `workspace.created` / `invite.sent` / `invite.accepted` | API | empresa e equipe | `roleKey`, `newAccount` |

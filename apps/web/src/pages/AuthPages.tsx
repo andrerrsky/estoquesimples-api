@@ -22,10 +22,10 @@ function AuthLayout({ title, subtitle, children, footer }: { title: string; subt
           <Logo size={36} /> Estoque Simples
         </Link>
         <div>
-          <p className="auth__headline">Seu estoque em dia, no celular e no computador.</p>
+          <p className="auth__headline">Seu estoque em dia, em qualquer aparelho.</p>
           <ul className="auth__points">
             <li><Icon name="check" /> Produtos, entradas e saídas com histórico de tudo</li>
-            <li><Icon name="check" /> Os mesmos dados do app Android, sincronizados</li>
+            <li><Icon name="check" /> Os mesmos dados no Android, na web e no iPhone (como web app)</li>
             <li><Icon name="check" /> Grátis para você; plano Equipe para trabalhar em grupo</li>
           </ul>
         </div>

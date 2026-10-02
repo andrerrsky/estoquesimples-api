@@ -31,6 +31,8 @@ const AccountPage = page(() => import('./pages/AccountPage'), 'AccountPage');
 const CompaniesPage = page(() => import('./pages/CompaniesPage'), 'CompaniesPage');
 const LegalPage = page(() => import('./pages/LegalPage'), 'LegalPage');
 const HelpPage = page(() => import('./pages/HelpPage'), 'HelpPage');
+const PlatformsPage = page(() => import('./pages/PlatformsPage'), 'PlatformsPage');
+const PublicPlatformsPage = page(() => import('./pages/PlatformsPage'), 'PublicPlatformsPage');
 const PublicHelpPage = page(() => import('./pages/HelpPage'), 'PublicHelpPage');
 
 const lazyPage = (Component: ComponentType, gated = false) => (
@@ -83,6 +85,7 @@ export const router = createBrowserRouter([
       { path: '/termos', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
       { path: '/privacidade', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
       { path: '/ajuda', element: <Suspense fallback={<FullScreenLoading />}><PublicHelpPage /></Suspense> },
+      { path: '/plataformas', element: <Suspense fallback={<FullScreenLoading />}><PublicPlatformsPage /></Suspense> },
       {
         path: '/app',
         element: <AppShell />,
@@ -102,6 +105,7 @@ export const router = createBrowserRouter([
               { path: 'plano', element: lazyPage(PlanPage) },
               { path: 'notificacoes', element: lazyPage(NotificationsPage) },
               { path: 'ajuda', element: lazyPage(HelpPage) },
+              { path: 'plataformas', element: lazyPage(PlatformsPage) },
               { path: 'suporte', element: lazyPage(SupportPage) },
               { path: 'suporte/novo', element: lazyPage(SupportNewPage) },
               { path: 'suporte/:ticketId', element: lazyPage(SupportTicketPage) },

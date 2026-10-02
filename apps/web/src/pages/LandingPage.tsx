@@ -240,7 +240,7 @@ export function LandingPage() {
   const authed = status === 'authed';
 
   useEffect(() => {
-    document.title = 'Estoque Simples · Controle de estoque no celular e no computador';
+    document.title = 'Estoque Simples · Controle de estoque no Android, na web e no computador';
     return () => {
       document.title = 'Estoque Simples';
     };
@@ -259,7 +259,7 @@ export function LandingPage() {
           </Link>
           <nav className="lp-nav__links" aria-label="Seções da página">
             <a className="lp-nav__link" href="#recursos">Recursos</a>
-            <a className="lp-nav__link" href="#app">App Android</a>
+            <a className="lp-nav__link" href="#plataformas">Plataformas</a>
             <a className="lp-nav__link" href="#planos">Planos</a>
           </nav>
           <div className="lp-nav__actions">
@@ -280,9 +280,9 @@ export function LandingPage() {
           <div className="landing__hero-inner">
             <div>
               <p className="lp-eyebrow">Controle de estoque para pequenos negócios</p>
-              <h1 className="landing__title" id="lp-titulo">O mesmo estoque no celular e no computador.</h1>
+              <h1 className="landing__title" id="lp-titulo">O mesmo estoque no celular, no tablet e no computador.</h1>
               <p className="landing__lead">
-                Cadastre produtos, registre entradas e saídas e veja o que está acabando. O que você lança no app Android aparece no navegador, e o que lança no navegador aparece no app.
+                Cadastre produtos, registre entradas e saídas e veja o que está acabando. Use no Android, no iPhone, no iPad ou no computador: o que você lança em um aparece em todos os outros.
               </p>
               <div className="landing__cta">
                 {authed ? (
@@ -290,7 +290,7 @@ export function LandingPage() {
                     <Link to="/app" className="btn btn--on-brand btn--lg">
                       Abrir meu estoque <Icon name="arrowRight" size={18} />
                     </Link>
-                    <PlayLink className="btn btn--outline-on-brand btn--lg">Baixar o app Android</PlayLink>
+                    <Link to="/plataformas" className="btn btn--outline-on-brand btn--lg">Onde usar</Link>
                   </>
                 ) : (
                   <>
@@ -355,46 +355,62 @@ export function LandingPage() {
           </section>
         </div>
 
-        <section className="landing__section" id="app" aria-labelledby="lp-app">
-          <div className="lp-duo">
-            <div className="lp-android">
-              <p className="lp-kicker">App Android</p>
-              <h2 className="landing__h2" id="lp-app">No celular, funciona até sem internet.</h2>
-              <p className="lp-lead">
-                O aplicativo guarda tudo no aparelho e continua funcionando sem conexão. Quando a internet volta, ele sincroniza com a sua conta e o estoque aparece igual aqui, no navegador.
-              </p>
-              <ul className="check-list">
-                <li><Icon name="check" /> A mesma conta no app e na web</li>
-                <li><Icon name="check" /> No app, lançamentos feitos sem internet sobem depois</li>
-                <li><Icon name="check" /> Na web, nada para instalar: é só entrar pelo navegador</li>
-              </ul>
-              <PlayLink className="btn btn--primary btn--lg lp-android__cta">
-                Baixar na Google Play <Icon name="external" size={17} />
+        <section className="landing__section" id="plataformas" aria-labelledby="lp-plataformas">
+          <div className="lp-platforms__head">
+            <p className="lp-kicker">Plataformas</p>
+            <h2 className="landing__h2" id="lp-plataformas">No Android, na web e instalado como aplicativo.</h2>
+            <p className="lp-lead">A mesma conta e o mesmo estoque em qualquer lugar. Escolha o que combina com o seu aparelho.</p>
+          </div>
+          <div className="lp-platforms">
+            <div className="card lp-platform">
+              <span className="feature__icon"><Icon name="phone" size={22} /></span>
+              <h3 className="feature__title lp-feature__title">Aplicativo Android</h3>
+              <p>Guarda tudo no aparelho e funciona até sem internet. Quando a conexão volta, sincroniza com a sua conta. Tem fotos, leitura de código de barras pela câmera e aviso de estoque baixo.</p>
+              <PlayLink className="btn btn--primary lp-platform__cta">
+                Baixar na Google Play <Icon name="external" size={16} />
               </PlayLink>
             </div>
+            <div className="card lp-platform">
+              <span className="feature__icon"><Icon name="monitor" size={22} /></span>
+              <h3 className="feature__title lp-feature__title">Versão web</h3>
+              <p>Abre em qualquer navegador, sem instalar nada: no computador, no tablet ou no celular. Telas grandes, relatórios, importação de planilha e assinatura do plano por Pix, boleto ou cartão.</p>
+              <Link to={authed ? '/app' : '/criar-conta'} className="btn btn--secondary lp-platform__cta">
+                {authed ? 'Abrir meu estoque' : 'Criar conta e entrar'}
+              </Link>
+            </div>
+            <div className="card lp-platform lp-platform--accent">
+              <span className="feature__icon"><Icon name="layers" size={22} /></span>
+              <h3 className="feature__title lp-feature__title">
+                Web app <span className="badge badge--brand">iPhone e iPad</span>
+              </h3>
+              <p>Ainda não temos aplicativo para iPhone e iPad, mas você instala a versão web na tela inicial e usa como um aplicativo. Vale também para o computador.</p>
+              <Link to="/plataformas" className="btn btn--secondary lp-platform__cta">
+                Ver como instalar <Icon name="arrowRight" size={16} />
+              </Link>
+            </div>
+          </div>
 
-            <div className="lp-duo__side">
-              <div className="card feature">
-                <span className="feature__icon">
-                  <Icon name="barcode" size={20} />
-                </span>
-                <h3 className="feature__title lp-feature__title">Leitura de código de barras</h3>
-                <p>Ache o produto pelo código: aponte a câmera, nos navegadores que oferecem esse recurso, ou use um leitor USB.</p>
-              </div>
-              <div className="card feature">
-                <span className="feature__icon">
-                  <Icon name="users" size={20} />
-                </span>
-                <h3 className="feature__title lp-feature__title">
-                  Equipe com papéis e permissões <span className="badge badge--brand">Plano Equipe</span>
-                </h3>
-                <p>Convide pessoas por e-mail e escolha o papel de cada uma, de quem só consulta a quem administra a empresa.</p>
-                <ul className="lp-roles" aria-label="Papéis disponíveis">
-                  {Object.values(ROLE_LABEL).map((role) => (
-                    <li key={role} className="badge">{role}</li>
-                  ))}
-                </ul>
-              </div>
+          <div className="lp-duo lp-duo--pair">
+            <div className="card feature">
+              <span className="feature__icon">
+                <Icon name="barcode" size={20} />
+              </span>
+              <h3 className="feature__title lp-feature__title">Leitura de código de barras</h3>
+              <p>Ache o produto pelo código: aponte a câmera, nos navegadores que oferecem esse recurso, ou use um leitor USB.</p>
+            </div>
+            <div className="card feature">
+              <span className="feature__icon">
+                <Icon name="users" size={20} />
+              </span>
+              <h3 className="feature__title lp-feature__title">
+                Equipe com papéis e permissões <span className="badge badge--brand">Plano Equipe</span>
+              </h3>
+              <p>Convide pessoas por e-mail e escolha o papel de cada uma, de quem só consulta a quem administra a empresa.</p>
+              <ul className="lp-roles" aria-label="Papéis disponíveis">
+                {Object.values(ROLE_LABEL).map((role) => (
+                  <li key={role} className="badge">{role}</li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
@@ -418,7 +434,7 @@ export function LandingPage() {
                     <li><Icon name="check" /> Estoque na nuvem para uma pessoa</li>
                     <li><Icon name="check" /> Produtos, entradas e saídas, histórico e relatórios</li>
                     <li><Icon name="check" /> Importação e exportação em CSV</li>
-                    <li><Icon name="check" /> Web e app Android com a mesma conta</li>
+                    <li><Icon name="check" /> Android e web (no iPhone, iPad e computador) com a mesma conta</li>
                     <li className="lp-limit"><Icon name="info" /> Com limite de produtos na nuvem</li>
                   </ul>
                   {authed ? (
@@ -485,7 +501,7 @@ export function LandingPage() {
             <li><Link to="/privacidade">Política de Privacidade</Link></li>
             <li><Link to="/entrar">Entrar</Link></li>
             <li><Link to="/ajuda">Central de ajuda</Link></li>
-            <li><PlayLink className="">App Android</PlayLink></li>
+            <li><Link to="/plataformas">Plataformas</Link></li>
           </ul>
         </div>
       </footer>

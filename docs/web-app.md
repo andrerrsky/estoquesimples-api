@@ -47,6 +47,19 @@ antigos, que não existem mais. Três camadas evitam que isso vire tela de erro:
 O `index.html` nunca é guardado em cache, então recarregar sempre traz a
 versão nova.
 
+## Web app instalável
+
+A web é um **PWA**: `apps/web/public/manifest.webmanifest` (nome, cores,
+`start_url: /app`, ícones 192/512 e maskable) + `apple-touch-icon.png` e as
+metatags do `index.html`. É o que permite instalar na tela inicial do iPhone
+e do iPad (Safari › Compartilhar › Adicionar à Tela de Início), do Android
+(Chrome) e do computador (Chrome, Edge, Safari/Dock). Não há service worker:
+a instalação funciona, mas o web app **não abre offline**. A página
+`/plataformas` (pública) e `/app/plataformas` explicam as plataformas e os
+passos, e oferecem "Instalar agora" nos navegadores que disparam
+`beforeinstallprompt`. Os ícones PNG são gerados a partir de
+`packages/design/icon.svg`; se a marca mudar, regere-os.
+
 ## Sessão
 
 | | Android | Web |

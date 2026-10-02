@@ -111,19 +111,75 @@
     {
       "id": "app-ou-web",
       "category": "comecar",
-      "question": "Qual a diferença entre o aplicativo e a versão web?",
+      "question": "Em quais plataformas o Estoque Simples funciona?",
       "answer": [
-        "Os dois mostram o mesmo estoque e seguem as mesmas regras. As diferenças são:",
-        "• **Aplicativo Android:** funciona sem internet, guarda fotos dos produtos, avisa por notificação quando algo está acabando e faz backup no próprio aparelho.",
-        "• **Versão web:** precisa de internet, tem tela grande para cadastrar e conferir com mais conforto, e é onde se assina o plano por Pix, boleto ou cartão.",
-        "Você pode usar só um deles ou os dois juntos, com a mesma conta."
+        "O Estoque Simples funciona no **Android** e na **web**, com a mesma conta e o mesmo estoque:",
+        "• **Aplicativo Android** (Google Play): funciona sem internet, guarda fotos dos produtos, lê código de barras pela câmera e avisa quando algo está acabando.",
+        "• **Versão web** (estoquesimples.com.br): abre em qualquer navegador, no computador, no tablet ou no celular, sem instalar nada. Precisa de internet. É também onde se assina o plano por Pix, boleto ou cartão.",
+        "• **Web app**: a versão web instalada na tela inicial, como se fosse um aplicativo. É o caminho para quem usa **iPhone ou iPad**, que ainda não têm aplicativo próprio, e também serve no computador.",
+        "Você pode usar só um ou vários ao mesmo tempo."
       ],
       "keywords": [
         "computador",
         "navegador",
         "site",
         "celular",
-        "android"
+        "android",
+        "iphone",
+        "ios",
+        "ipad",
+        "tablet",
+        "plataforma",
+        "onde funciona",
+        "windows",
+        "mac"
+      ]
+    },
+    {
+      "id": "funciona-no-iphone",
+      "category": "comecar",
+      "question": "Funciona no iPhone e no iPad?",
+      "answer": [
+        "Sim, pela versão web. Ainda não temos um aplicativo na App Store, mas você pode **instalar a versão web na tela inicial** e usar como um aplicativo, com ícone próprio e sem a barra do navegador.",
+        "No Safari: abra **estoquesimples.com.br**, toque em **Compartilhar** (o quadrado com uma seta para cima), depois em **Adicionar à Tela de Início** e confirme em **Adicionar**.",
+        "A página **Plataformas** (no menu, ou em estoquesimples.com.br/plataformas) mostra o passo a passo com os nomes dos botões, para iPhone, iPad, Android, Windows e Mac.",
+        "Tem as mesmas telas e a mesma conta do computador. A diferença para o aplicativo Android é que precisa de internet e não guarda fotos."
+      ],
+      "keywords": [
+        "ios",
+        "apple",
+        "tela de início",
+        "instalar",
+        "web app",
+        "pwa",
+        "safari",
+        "app store",
+        "iphone",
+        "ipad"
+      ]
+    },
+    {
+      "id": "instalar-web-app",
+      "category": "comecar",
+      "question": "Como instalo a versão web como aplicativo?",
+      "answer": [
+        "Instalar a versão web na tela inicial é gratuito e leva meio minuto:",
+        "• **iPhone e iPad (Safari):** Compartilhar › **Adicionar à Tela de Início**.",
+        "• **Android (Chrome):** menu ⋮ › **Instalar app**. No Android, o aplicativo da Google Play funciona até sem internet e costuma ser a melhor escolha.",
+        "• **Windows, Linux e Chrome no Mac:** ícone de instalar na barra de endereço, ou menu ⋮ › **Instalar Estoque Simples**. No Edge: **Aplicativos › Instalar este site como um aplicativo**.",
+        "• **Mac (Safari):** **Arquivo › Adicionar ao Dock**.",
+        "Os passos completos, com a opção de instalar com um clique nos navegadores que oferecem, estão na página **Plataformas**."
+      ],
+      "keywords": [
+        "instalar",
+        "pwa",
+        "tela inicial",
+        "atalho",
+        "ícone",
+        "adicionar à tela",
+        "dock",
+        "web app",
+        "app no computador"
       ]
     },
     {
@@ -805,7 +861,7 @@
         "Ele é um controle de estoque. Para você não contar com o que não existe:",
         "• **não emite nota fiscal** nem cupom;",
         "• **não é frente de caixa**: não recebe pagamento nem controla contas a pagar e a receber;",
-        "• **não tem aplicativo para iPhone** (no iPhone, use a versão web pelo navegador);",
+        "• **não tem aplicativo na App Store** (iPhone e iPad). Nesses aparelhos, instale a versão web na tela inicial: veja a página **Plataformas**;",
         "• **não se integra** sozinho a lojas virtuais ou marketplaces. A troca de dados com outros sistemas é por planilha (CSV)."
       ],
       "keywords": [
@@ -840,7 +896,7 @@
     {
       "id": "limites-web",
       "category": "limites",
-      "question": "O que a versão web não tem em relação ao aplicativo?",
+      "question": "O que a versão web e o web app não têm em relação ao aplicativo Android?",
       "answer": [
         "• Não funciona sem internet.",
         "• Não mostra nem guarda fotos dos produtos.",
