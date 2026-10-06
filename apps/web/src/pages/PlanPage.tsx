@@ -569,6 +569,7 @@ function PlanComparison({
           <li><Icon name="check" /> Aplicativo Android e navegador com os mesmos dados</li>
           <li className="off"><Icon name="minus" /> Sem equipe: não dá para convidar outras pessoas</li>
           {!freeAnalysis && <li className="off"><Icon name="minus" /> Sem análise avançada</li>}
+          <li className="off"><Icon name="minus" /> Sem identidade visual personalizada</li>
         </ul>
       </section>
 
@@ -598,6 +599,8 @@ function PlanComparison({
           <li><Icon name="check" /> Equipe com papéis: administrador, gerente, operador e somente consulta</li>
           <li><Icon name="check" /> Todas as pessoas no mesmo estoque, no celular e no computador</li>
           <li><Icon name="check" /> Análise avançada: giro, previsão de falta e o que repor primeiro</li>
+          <li><Icon name="check" /> Identidade visual da sua empresa: cores, logotipo e página de entrada própria</li>
+          <li><Icon name="check" /> Mais espaço para fotos dos produtos</li>
         </ul>
         <div className="plan-card__foot">
           {action}

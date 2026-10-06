@@ -4,6 +4,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import br.com.gameloop.estoquesimples.branding.Brand;
+import br.com.gameloop.estoquesimples.branding.BrandLogo;
+import br.com.gameloop.estoquesimples.branding.BrandStore;
+
 import org.json.JSONObject;
 
 import java.text.ParseException;
@@ -53,6 +57,7 @@ public final class EntitlementManager {
     /** Valor guardado quando o plano não limita. */
     public static final int SEM_LIMITE = -1;
 
+    private final Context appContext;
     private final SharedPreferences prefs;
     private final ApiClient api;
     private final SessionManager session;
@@ -61,6 +66,7 @@ public final class EntitlementManager {
         // Direitos não são segredo: são um retrato do que o servidor já sabe, e
         // adulterá-los localmente não concede nada, porque o servidor confere o
         // plano em toda sincronização e em todo convite.
+        this.appContext = context.getApplicationContext();
         this.prefs = context.getApplicationContext()
                 .getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE);
         this.api = new ApiClient();
@@ -211,6 +217,8 @@ public final class EntitlementManager {
         ApiClient.Response response = api.get(
                 "/v1/workspaces/" + workspaceId + "/entitlement", session.accessToken());
         store(response.body);
+        // Logotipo da marca (se houver): rede, por isso aqui e não no store().
+        BrandLogo.ensure(appContext, BrandStore.current(appContext));
         return canSync();
     }
 
@@ -228,6 +236,8 @@ public final class EntitlementManager {
     }
 
     private void store(JSONObject body) {
+        // Identidade visual: o servidor manda junto com os direitos (e some junto com eles).
+        BrandStore.save(appContext, body, parseIso(body.optString("offlineValidUntil", null)));
         JSONObject features = body.optJSONObject("features");
         JSONObject limits = body.optJSONObject("limits");
         JSONObject usage = body.optJSONObject("usage");
@@ -275,6 +285,7 @@ public final class EntitlementManager {
     /** Esquece o retrato ao sair da conta ou trocar de empresa. */
     public void clear() {
         prefs.edit().clear().apply();
+        BrandStore.clear(appContext);
     }
 
     private static String formatDate(long millis) {

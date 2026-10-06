@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -123,7 +124,7 @@ public class EstoqueFirebaseMessagingService extends FirebaseMessagingService {
         String channelId = getString(R.string.push_channel_id);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.drawable.ic_stat_notification)
-                .setColor(getColor(R.color.color_brand))
+                .setColor(BrandStore.color(this, R.color.color_brand))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))

@@ -9,6 +9,8 @@ Modelo em vigor desde a migration `0013_free_sync` (1º de outubro de 2026).
 | Pessoas na empresa (`equipe.membros`) | só o proprietário | sem teto (ajustável) |
 | Aparelhos | sem teto (do próprio dono) | sem teto |
 | Análise Avançada (`analise.avancada`) | não (a Versão PRO antiga libera no aparelho) | sim |
+| Espaço de fotos (`imagens.armazenamento_mb`) | 100 MB | 5.000 MB |
+| Identidade visual (`marca.personalizada`) | não | sim ([branding.md](branding.md)) |
 | Histórico, relatórios, importação, exportação, backup | tudo igual, no aparelho | |
 
 Os números são linhas de `plan_features` e podem ser alterados no painel

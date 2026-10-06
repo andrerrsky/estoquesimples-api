@@ -316,7 +316,7 @@ public class AnalyticsActivity extends BaseActivity {
         }
 
         if (!slowMovingProducts.isEmpty()) {
-            addHeaderCard(container, getString(R.string.analytics_slow_moving), R.color.color_brand);
+            addHeaderCard(container, getString(R.string.analytics_slow_moving), R.color.color_accent);
             for (ProductAnalytics analytics : slowMovingProducts) {
                 addProductCard(container, analytics);
             }

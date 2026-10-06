@@ -239,7 +239,7 @@
 
     <style name="Widget.Estoque.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
         <item name="boxStrokeColor">@color/input_stroke</item>
-        <item name="hintTextColor">@color/color_brand</item>
+        <item name="hintTextColor">@color/color_accent</item>
         <item name="android:textColorHint">@color/color_text_muted</item>
         <item name="boxCornerRadiusTopStart">@dimen/radius_button</item>
         <item name="boxCornerRadiusTopEnd">@dimen/radius_button</item>

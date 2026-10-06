@@ -20,7 +20,7 @@
     <string name="subscription_hero_title">Sua equipe inteira no mesmo estoque</string>
     <string name="subscription_hero_subtitle">A nuvem já é sua de graça. O plano Equipe abre a empresa para funcionários e sócios, tira o teto de produtos e liga a Análise Avançada.</string>
     <string name="subscription_hero_title_active">Plano Equipe ativo</string>
-    <string name="subscription_hero_subtitle_active">Sua equipe pode trabalhar no mesmo estoque, sem teto de produtos. A Análise Avançada de Estoque está liberada.</string>
+    <string name="subscription_hero_subtitle_active">Sua equipe pode trabalhar no mesmo estoque, sem teto de produtos. A Análise Avançada de Estoque e a identidade visual da empresa estão liberadas.</string>
     <string name="subscription_hero_title_legacy_pro">Falta pouco para trabalhar em equipe</string>
     <string name="subscription_hero_subtitle_legacy_pro">Você já tem os recursos premium e a nuvem é grátis com conta. O plano Equipe adiciona acesso para sua equipe e produtos sem limite.</string>
     <string name="subscription_benefits_title">O que o plano Equipe libera</string>
@@ -28,6 +28,7 @@
     <string name="subscription_benefit_devices">Papéis por pessoa: quem cadastra, quem movimenta, quem só consulta</string>
     <string name="subscription_benefit_backup">Produtos sem limite na nuvem — o plano gratuito tem teto</string>
     <string name="subscription_benefit_premium">Análise Avançada de Estoque: enxergue tendências antes de faltar produto</string>
+    <string name="subscription_benefit_brand">Sua marca no app e na web: cores, logotipo e página de entrada da empresa, com mais espaço para fotos</string>
     <string name="subscription_cta">Assinar</string>
     <string name="subscription_cta_with_price">Assinar — %1$s/mês</string>
     <string name="subscription_price_suffix">/ mês</string>

@@ -1,3 +1,4 @@
+import { brandingViewSchema } from '../branding/branding.routes.js';
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -33,6 +34,7 @@ const entitlementSchema = z.object({
   syncAllowed: z.boolean(),
   limits: z.object({ products: z.number().int().nullable(), members: z.number().int().nullable(), images: z.number().nullable() }),
   usage: z.object({ products: z.number().int(), members: z.number().int(), images: z.number() }),
+  branding: brandingViewSchema,
   offlineValidUntil: z.string(),
   checkedAt: z.string(),
 });

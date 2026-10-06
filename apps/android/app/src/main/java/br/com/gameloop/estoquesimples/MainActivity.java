@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import br.com.gameloop.estoquesimples.push.PushRegistrar;
 import br.com.gameloop.estoquesimples.push.PushEvents;
 import br.com.gameloop.estoquesimples.analytics.AnalyticsScheduler;
@@ -444,7 +445,7 @@ public class MainActivity extends BaseActivity {
         // Bottom Menu:
         bottomNavigationView = (BottomNavigationView) findViewById(R.id.bottomNavigation);
         if (bottomNavigationView != null) {
-            bottomNavigationView.setBackgroundColor(ContextCompat.getColor(getApplicationContext(), R.color.colorActionBar));
+            bottomNavigationView.setBackgroundColor(BrandStore.color(this, R.color.colorActionBar));
             
             bottomNavigationView.setOnItemSelectedListener(new BottomNavigationView.OnItemSelectedListener() {
                 @Override
@@ -579,6 +580,8 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Logotipo da empresa (se a marca estiver ativa e o arquivo já tiver sido baixado).
+        br.com.gameloop.estoquesimples.branding.BrandApplier.applyLogo(this);
         if (bottomNavigationView != null) {
             bottomNavigationView.setSelectedItemId(R.id.navigation_home);
         }
@@ -1410,7 +1413,7 @@ public class MainActivity extends BaseActivity {
                 FormValidation.addField(container, "Filtrar por nome ou categoria", android.text.InputType.TYPE_CLASS_TEXT);
         final TextView selectAll = new TextView(this);
         selectAll.setText("Marcar todos os visíveis");
-        selectAll.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        selectAll.setTextColor(BrandStore.color(this, R.color.color_accent));
         selectAll.setTypeface(null, android.graphics.Typeface.BOLD);
         selectAll.setPadding(0, pad / 2, 0, pad / 2);
         container.addView(selectAll);

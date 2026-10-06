@@ -90,6 +90,15 @@
                 android:text="@string/subscription_benefit_premium"
                 android:textAppearance="@style/TextAppearance.Estoque.Body"
                 android:drawableStart="@drawable/ic_check"
+                android:drawablePadding="@dimen/row_gap"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/subscription_benefit_brand"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:drawableStart="@drawable/ic_check"
                 android:drawablePadding="@dimen/row_gap" />
         </LinearLayout>
 

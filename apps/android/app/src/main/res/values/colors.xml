@@ -3,6 +3,8 @@
     <!-- Paleta única (referência: tela Assinatura) -->
     <color name="color_brand">#1C679D</color>
     <color name="color_brand_dark">#15537E</color>
+    <!-- Destaque (links, valores em evidência): igual à cor principal até a empresa escolher outra. -->
+    <color name="color_accent">#1C679D</color>
     <color name="color_brand_pressed">#155A87</color>
     <color name="color_surface">#F4F7FA</color>
     <color name="color_surface_content">#FFFFFF</color>

@@ -80,6 +80,14 @@ export const AnalyticsEventName = {
   PLATFORM_DEVICE_SELECTED: 'platform.device_selected',
   PLATFORM_INSTALL_CLICKED: 'platform.install_clicked',
   PLATFORM_WEB_APP_INSTALLED: 'platform.web_app_installed',
+
+  // Identidade visual por empresa
+  BRAND_UPDATED: 'brand.updated',
+  BRAND_LOGO_UPLOADED: 'brand.logo_uploaded',
+  BRAND_LOGO_REMOVED: 'brand.logo_removed',
+  BRAND_RESET: 'brand.reset',
+  BRAND_LOGIN_VIEWED: 'brand.login_viewed',
+  BRAND_APPLIED: 'brand.applied',
 } as const;
 
 export type AnalyticsEventNameValue = (typeof AnalyticsEventName)[keyof typeof AnalyticsEventName];
@@ -141,6 +149,12 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda (só a contagem, nunca o texto).', properties: { results: 'quantidade' } },
   { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },
   { name: 'subscription.checkout_started', source: 'server', description: 'Contratação do plano iniciada pela web (Asaas).', properties: { provider: 'asaas', cycle: 'MONTHLY | YEARLY', billingType: 'forma de pagamento' } },
+  { name: 'brand.updated', source: 'server', description: 'Empresa salvou a identidade visual.', properties: { colors: 'quantas cores personalizadas (0-3)', font: 'default | serif', hasLogo: 'boolean' } },
+  { name: 'brand.logo_uploaded', source: 'server', description: 'Empresa enviou o logotipo.', properties: { bytes: 'tamanho guardado' } },
+  { name: 'brand.logo_removed', source: 'server', description: 'Empresa removeu o logotipo.' },
+  { name: 'brand.reset', source: 'server', description: 'Empresa voltou ao visual padrão.' },
+  { name: 'brand.login_viewed', source: 'app', description: 'Abriu a tela de entrada personalizada de uma empresa (sem identificar a empresa no evento).' },
+  { name: 'brand.applied', source: 'app', description: 'Cliente aplicou a identidade visual da empresa.', properties: { platform: 'web | android' } },
   { name: 'subscription.cancel_requested', source: 'server', description: 'Proprietário cancelou a renovação pela web.', properties: { provider: 'asaas' } },
 ];
 

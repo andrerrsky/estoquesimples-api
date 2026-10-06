@@ -45,6 +45,13 @@ export const AuditAction = {
   SYNC_CONFLICT_RESOLVED: 'sync.conflict_resolved',
   SYNC_RESYNC_REQUIRED: 'sync.resync_required',
 
+  BRAND_UPDATED: 'brand.updated',
+  BRAND_LOGO_CHANGED: 'brand.logo_changed',
+  BRAND_LOGO_REMOVED: 'brand.logo_removed',
+  BRAND_RESET: 'brand.reset',
+  BRAND_BLOCKED: 'brand.blocked',
+  BRAND_UNBLOCKED: 'brand.unblocked',
+
   DATA_EXPORTED: 'data.exported',
 
   PRODUCT_DELETED: 'product.deleted',

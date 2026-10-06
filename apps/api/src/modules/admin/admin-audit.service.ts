@@ -32,6 +32,8 @@ export const AdminAction = {
   WORKSPACE_UPDATED: 'workspace.updated',
   WORKSPACE_DELETED: 'workspace.deleted',
   WORKSPACE_RESTORED: 'workspace.restored',
+  WORKSPACE_BRAND_BLOCKED: 'workspace.brand_blocked',
+  WORKSPACE_BRAND_UNBLOCKED: 'workspace.brand_unblocked',
   WORKSPACE_OWNERSHIP_TRANSFERRED: 'workspace.ownership_transferred',
   WORKSPACE_MEMBER_ROLE_CHANGED: 'workspace.member_role_changed',
   WORKSPACE_MEMBER_STATUS_CHANGED: 'workspace.member_status_changed',

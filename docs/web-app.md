@@ -122,6 +122,8 @@ contrato completo está em `/docs` (OpenAPI).
 | Análise Avançada | `/app/analise` | plano Equipe |
 | Importar e exportar | `/app/importar` | CSV lido no navegador; exportações da API |
 | Conflitos | `/app/conflitos` | decisões pendentes da sincronização |
+| Identidade visual | `/app/marca` | plano Equipe; proprietário e administradores ([branding.md](branding.md)) |
+| Entrada da empresa | `/<identificador>/entrar` | pública; a mesma tela de entrada com a marca da empresa |
 | Equipe | `/app/equipe` | membros, papéis, convites (plano Equipe) |
 | Plano | `/app/plano` | estado, contratação e pagamentos via Asaas ([billing-asaas.md](billing-asaas.md)) |
 | Notificações | `/app/notificacoes` | caixa compartilhada com o app ([notifications.md](notifications.md)) |

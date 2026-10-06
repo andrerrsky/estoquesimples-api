@@ -54,7 +54,7 @@ const MAX_STORED_BYTES = 1_048_576;
 
 const invalid = (message: string): AppError => new AppError(422, ErrorCode.IMAGE_INVALID, message);
 
-export async function normalizeImage(input: Buffer, declaredContentType: string, options: { maxEdge: number }): Promise<NormalizedImage> {
+export async function normalizeImage(input: Buffer, declaredContentType: string, options: { maxEdge: number; maxBytes?: number }): Promise<NormalizedImage> {
   const sniffed = sniffImage(input);
   if (!sniffed) {
     throw new AppError(415, ErrorCode.IMAGE_UNSUPPORTED_TYPE, 'Formato não aceito. Envie uma imagem WebP, JPEG ou PNG.');
@@ -83,7 +83,7 @@ export async function normalizeImage(input: Buffer, declaredContentType: string,
   // Já está no formato e no tamanho de guardar, sem metadados: só confere que
   // decodifica por inteiro (cabeçalho válido não basta) e guarda como veio —
   // evita recomprimir com perda uma imagem que o app já otimizou.
-  if (sniffed === 'webp' && longest <= options.maxEdge && !meta.exif && !meta.xmp && !meta.icc && input.length <= MAX_STORED_BYTES) {
+  if (sniffed === 'webp' && longest <= options.maxEdge && !meta.exif && !meta.xmp && !meta.icc && input.length <= (options.maxBytes ?? MAX_STORED_BYTES)) {
     try {
       await base().stats();
     } catch {
@@ -105,7 +105,7 @@ export async function normalizeImage(input: Buffer, declaredContentType: string,
     } catch {
       throw invalid('Não foi possível processar a imagem: o arquivo está corrompido.');
     }
-    if (result.data.length <= MAX_STORED_BYTES) {
+    if (result.data.length <= (options.maxBytes ?? MAX_STORED_BYTES)) {
       return { bytes: result.data, hash: sha256(result.data), contentType: 'image/webp', width: result.info.width, height: result.info.height };
     }
   }

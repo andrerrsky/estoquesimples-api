@@ -30,6 +30,8 @@ export interface WorkspaceSummary {
   status: 'active' | 'suspended';
   isOwner: boolean;
   memberCount: number;
+  /** Identificador da URL de entrada da empresa (`/<slug>/entrar`). */
+  brandSlug: string | null;
   createdAt: string;
 }
 
@@ -62,6 +64,52 @@ export interface Entitlement {
   limits: { products: number | null; members: number | null; images: number | null };
   /** `images`: espaço de fotos em uso, em MB. */
   usage: { products: number; members: number; images: number };
+  /** Identidade visual a aplicar; `active=false` = visual padrão. */
+  branding: BrandingView;
+}
+
+export interface BrandTheme {
+  primary: string;
+  primaryDark: string;
+  primaryPressed: string;
+  primarySoft: string;
+  primaryTint: string;
+  onPrimary: string;
+  accent: string;
+  text: string;
+  textMuted: string;
+  font: 'default' | 'serif';
+}
+
+export interface BrandLogo {
+  url: string;
+  hash: string;
+  width: number;
+  height: number;
+}
+
+export interface BrandingView {
+  eligible: boolean;
+  active: boolean;
+  slug: string | null;
+  version: number;
+  displayName: string | null;
+  loginPath: string | null;
+  theme: BrandTheme | null;
+  logo: BrandLogo | null;
+}
+
+export interface BrandConfig {
+  slug: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  textColor: string | null;
+  font: 'default' | 'serif';
+  logo: BrandLogo | null;
+  blocked: boolean;
+  blockedReason: string | null;
+  version: number;
+  updatedAt: string | null;
 }
 
 export type SubscriptionState =

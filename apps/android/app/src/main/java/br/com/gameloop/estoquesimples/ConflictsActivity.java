@@ -46,6 +46,7 @@ public final class ConflictsActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        br.com.gameloop.estoquesimples.branding.BrandApplier.apply(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_conflicts);
         setTitle("Conflitos");

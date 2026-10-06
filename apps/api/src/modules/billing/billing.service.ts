@@ -14,6 +14,7 @@ import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/err
 import { recordBillingEvent } from '../../platform/observability/metrics.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
+import { loadEffectiveBranding, type BrandingView } from '../branding/branding-view.js';
 import type { RequestMeta } from '../auth/auth.service.js';
 import { AsaasBillingService } from './asaas/asaas-billing.service.js';
 import type { SubscriptionPurchaseV2 } from './play-client.js';
@@ -99,6 +100,8 @@ export interface EntitlementSnapshot {
   limits: { products: number | null; members: number | null; images: number | null };
   /** O que a empresa já usa, para o app mostrar "12 de 50". */
   usage: { products: number; members: number; images: number };
+  /** Identidade visual a aplicar (`active=false` = visual padrão). Ver docs/branding.md. */
+  branding: BrandingView;
   /** Até quando o app pode confiar neste retrato sem falar com a API. */
   offlineValidUntil: string;
   checkedAt: string;
@@ -464,6 +467,7 @@ export class BillingService {
       syncAllowed: features['sync.nuvem']?.enabled ?? false,
       limits: { products: limitOf('produtos.sincronizados'), members: limitOf('equipe.membros'), images: limitOf('imagens.armazenamento_mb') },
       usage: { products: usage?.products ?? 0, members: usage?.members ?? 0, images: Number(usage?.images ?? 0) },
+      branding: await loadEffectiveBranding(this.db, workspaceId, features['marca.personalizada']?.enabled ?? false),
       offlineValidUntil: new Date(
         now.getTime() + this.services.env.ENTITLEMENT_OFFLINE_MAX_DAYS * 86_400_000,
       ).toISOString(),

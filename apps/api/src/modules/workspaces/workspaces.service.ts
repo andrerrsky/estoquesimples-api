@@ -24,6 +24,8 @@ export interface WorkspaceSummary {
   status: 'active' | 'suspended';
   isOwner: boolean;
   memberCount: number;
+  /** Identificador da URL de entrada personalizada (`/<slug>/entrar`), se a empresa definiu um. */
+  brandSlug: string | null;
   createdAt: string;
 }
 
@@ -87,6 +89,7 @@ export class WorkspaceService {
         status: workspaceMembers.status,
         ownerUserId: workspaces.ownerUserId,
         createdAt: workspaces.createdAt,
+        brandSlug: sql<string | null>`(SELECT b.slug FROM workspace_brandings b WHERE b.workspace_id = ${workspaces.id})`,
         memberCount: sql<number>`(
           SELECT count(*)::int FROM workspace_members wm
           WHERE wm.workspace_id = ${workspaces.id} AND wm.status = 'active'
@@ -112,6 +115,7 @@ export class WorkspaceService {
       status: row.status === 'suspended' ? ('suspended' as const) : ('active' as const),
       isOwner: row.ownerUserId === userId,
       memberCount: row.memberCount,
+      brandSlug: row.brandSlug ?? null,
       createdAt: row.createdAt.toISOString(),
     }));
   }

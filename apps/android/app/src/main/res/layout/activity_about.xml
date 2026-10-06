@@ -178,7 +178,7 @@
                 android:id="@+id/subscriptionCardSubtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Sua equipe no mesmo estoque, produtos sem limite e Análise Avançada"
+                android:text="Sua equipe no mesmo estoque, produtos sem limite, Análise Avançada e a sua marca no app"
                 android:textColor="@color/color_text_on_brand_muted"
                 android:textSize="15sp"
                 android:lineSpacingExtra="3dp"

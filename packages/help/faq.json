@@ -411,8 +411,9 @@
       "question": "As fotos dos produtos vão para a nuvem?",
       "answer": [
         "Sim. A foto que você tira no aplicativo ou escolhe na versão web é **reduzida e otimizada** (até 1280 pixels, em geral algumas centenas de KB) e guardada na nuvem junto com o produto. Ela aparece nos seus outros aparelhos e na web, depois da sincronização.",
+        "São aceitas imagens **JPEG, PNG ou WebP** (até 2 MB por envio; as do celular são reduzidas antes de enviar). Imagens animadas, arquivos corrompidos e outros formatos são recusados.",
         "Sem internet, o aplicativo guarda a foto no próprio celular e envia quando a conexão voltar. Trocar ou remover a foto vale em todos os lugares.",
-        "Cada plano tem um **limite de espaço para fotos** por empresa (o plano Equipe tem mais). Quando o espaço acaba, as novas fotos não são enviadas — o produto continua cadastrado e a foto fica só no aparelho até você liberar espaço ou assinar.",
+        "Cada plano tem um **limite de espaço para fotos** por empresa: hoje, **100 MB no plano gratuito e 5 GB no plano Equipe** (o uso aparece em **Plano**, na web). Quando o espaço acaba, as novas fotos não são enviadas — o produto continua cadastrado e a foto fica só no aparelho até você liberar espaço ou assinar.",
         "Fotos que você troca ou remove, e as de produtos excluídos, são apagadas da nuvem depois de alguns dias.",
         "Quem ainda está numa versão antiga do aplicativo não envia nem recebe fotos."
       ],
@@ -427,6 +428,49 @@
         "enviar foto",
         "trocar foto",
         "remover foto"
+      ]
+    },
+    {
+      "id": "identidade-visual",
+      "category": "equipe",
+      "question": "Posso usar as cores e o logotipo da minha empresa?",
+      "answer": [
+        "Sim, no **plano Equipe**. Em **Identidade visual** (na web, menu Empresa) o proprietário ou um administrador escolhe a **cor principal**, a **cor de destaque**, a **cor do texto**, a **fonte** e envia o **logotipo**. Tudo isso é aplicado por cima do mesmo Estoque Simples: as telas, o menu e o jeito de usar continuam iguais.",
+        "A mesma identidade aparece no **aplicativo Android** e na **web**, para todas as pessoas da empresa, assim que entram (no Android, na próxima sincronização).",
+        "Para o texto continuar legível, o Estoque Simples **recusa cores com pouco contraste** e sugere uma parecida que funciona. Fontes: usamos as já instaladas no aparelho, sem baixar nada de terceiros.",
+        "Se a assinatura acabar, a empresa volta sozinha ao visual padrão — o que você configurou fica guardado e volta quando assinar de novo. Em **Voltar ao visual padrão** você pode desfazer tudo quando quiser.",
+        "No Android, as cores valem em todo o app a partir do Android 11; em versões mais antigas aparecem a barra, o logotipo e os destaques."
+      ],
+      "keywords": [
+        "identidade visual",
+        "cores",
+        "logotipo",
+        "logo",
+        "marca",
+        "personalizar",
+        "tema",
+        "fonte",
+        "white label",
+        "branding"
+      ]
+    },
+    {
+      "id": "pagina-entrada-empresa",
+      "category": "equipe",
+      "question": "O que é a página de entrada com o nome da minha empresa?",
+      "answer": [
+        "É um endereço só da sua empresa, no formato **estoquesimples.com.br/identificador/entrar**, com o logotipo e as cores dela. A entrada é a mesma do Estoque Simples: a mesma conta e a mesma senha — só muda a aparência.",
+        "Você escolhe o **identificador** (3 a 32 letras minúsculas, números e hífen). Ele precisa ser único e não pode ser um nome reservado do sistema. Se trocar, o endereço antigo fica reservado para você por 90 dias e redireciona para o novo.",
+        "Atenção: o **logotipo, o nome da empresa e as cores são públicos** — qualquer pessoa que abrir esse endereço os vê. Não coloque nada confidencial neles.",
+        "Sem assinatura ativa, o endereço mostra a tela de entrada padrão."
+      ],
+      "keywords": [
+        "página de login",
+        "url da empresa",
+        "endereço próprio",
+        "identificador",
+        "entrar",
+        "link da empresa"
       ]
     },
     {
@@ -592,7 +636,7 @@
       "answer": [
         "**Sempre grátis:** o aplicativo no celular, com produtos, movimentações, histórico, relatórios, importação e exportação.",
         "**Grátis com conta:** o estoque na nuvem e na versão web, para **uma pessoa** (quem criou a empresa) e até um limite de produtos. O número aparece em **Plano**, na web, e em **Conta e nuvem**, no aplicativo.",
-        "**Plano Equipe (pago):** produtos sem limite na nuvem, equipe com papéis e permissões e a Análise Avançada (ritmo de consumo, previsão de quando cada produto acaba e o que repor primeiro).",
+        "**Plano Equipe (pago):** produtos sem limite na nuvem, equipe com papéis e permissões, mais espaço para fotos (5 GB), a **identidade visual da sua empresa** (cores, logotipo e página de entrada própria) e a Análise Avançada (ritmo de consumo, previsão de quando cada produto acaba e o que repor primeiro).",
         "O preço aparece antes de qualquer confirmação: na tela **Plano** da web ou em **Plano Equipe**, no menu do aplicativo."
       ],
       "keywords": [
@@ -719,7 +763,9 @@
         "**Nada é apagado**, nem na nuvem nem nos celulares. A empresa volta ao plano gratuito, o que significa:",
         "• só o proprietário continua usando a nuvem e a web; as outras pessoas ficam na equipe, mas sem acesso até a assinatura voltar;",
         "• se o estoque estiver acima do limite de produtos do plano gratuito, não dá para cadastrar novos produtos na nuvem até reduzir ou assinar de novo;",
-        "• a Análise Avançada deixa de ficar disponível.",
+        "• a Análise Avançada deixa de ficar disponível;",
+        "• a identidade visual volta ao padrão do Estoque Simples (o que você configurou fica guardado);",
+        "• o espaço de fotos volta ao do plano gratuito: as fotos já enviadas continuam, mas novas só entram quando houver espaço.",
         "Assinando novamente, tudo volta como estava."
       ],
       "keywords": [
@@ -892,6 +938,8 @@
       "answer": [
         "• **Uma pessoa na nuvem:** só quem criou a empresa usa a web e a sincronização.",
         "• **Limite de produtos na nuvem:** o número aparece em **Plano** (web) ou em **Conta e nuvem** (aplicativo), junto com quantos você já usa.",
+        "• **Espaço de fotos:** 100 MB por empresa (no plano Equipe, 5 GB).",
+        "• **Sem identidade visual personalizada** (cores, fonte, logotipo e página de entrada da empresa).",
         "• **Sem Análise Avançada.**",
         "No celular, sem usar a nuvem, o aplicativo não tem limite de produtos."
       ],

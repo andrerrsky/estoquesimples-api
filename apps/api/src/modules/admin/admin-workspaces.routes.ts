@@ -211,6 +211,30 @@ export async function registerAdminWorkspacesRoutes(app: FastifyInstance): Promi
     },
   );
 
+  for (const [action, blocked, message] of [
+    ['block-brand', true, 'Identidade visual bloqueada: a empresa volta ao visual padrão.'],
+    ['unblock-brand', false, 'Identidade visual liberada.'],
+  ] as const) {
+    routes.post(
+      `/workspaces/:workspaceId/${action}`,
+      {
+        preHandler: requireAdmin('support'),
+        schema: {
+          tags: ['admin'],
+          summary: blocked ? 'Bloqueia a identidade visual da empresa' : 'Libera a identidade visual da empresa',
+          hide: true,
+          params: workspaceParams,
+          body: reasonBodySchema,
+          response: { 200: messageSchema, ...commonAdminErrors },
+        },
+      },
+      async (request) => {
+        await service.setBrandBlocked(adminActor(request), request.params.workspaceId, request.body.reason, blocked);
+        return { message };
+      },
+    );
+  }
+
   routes.post(
     '/workspaces/:workspaceId/transfer-ownership',
     {

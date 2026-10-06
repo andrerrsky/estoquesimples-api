@@ -3,23 +3,26 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { api, ApiError, errorMessage, sessionApi } from '../api/client';
-import type { InvitePreview } from '../api/types';
+import type { BrandLogo, BrandTheme, InvitePreview } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { FullScreenLoading } from '../components/AppShell';
-import { Icon, Logo } from '../components/Icon';
+import { BrandMark } from '../components/BrandMark';
+import { Icon } from '../components/Icon';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
+import { clearPublicBrand, setBrand, useBrand } from '../lib/brand';
 import { fmtDate } from '../lib/format';
 import { ROLE_LABEL } from '../lib/labels';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 
 /** Moldura das telas de entrada: a marca à esquerda, o formulário à direita. */
 function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
+  const brand = useBrand();
   return (
     <div className="auth">
       <aside className="auth__aside">
         <Link to="/" className="auth__brand">
-          <Logo size={36} /> Estoque Simples
+          <BrandMark size={36} />
         </Link>
         <div>
           <p className="auth__headline">Seu estoque em dia, em qualquer aparelho.</p>
@@ -30,13 +33,14 @@ function AuthLayout({ title, subtitle, children, footer }: { title: string; subt
           </ul>
         </div>
         <p className="auth__foot">
+          {brand && <><span className="auth__brand--partner">Estoque Simples</span> · </>}
           <Link to="/termos">Termos de Uso</Link> · <Link to="/privacidade">Política de Privacidade</Link>
         </p>
       </aside>
       <main className="auth__main">
         <div className="auth__form">
           <Link to="/" className="auth__mobile-brand">
-            <Logo size={30} /> Estoque Simples
+            <BrandMark size={30} />
           </Link>
           <div>
             <h1 className="auth__title">{title}</h1>
@@ -93,8 +97,12 @@ function useRedirectIfAuthed(): ReactNode | null {
   return null;
 }
 
-export function LoginPage() {
+/** Entrada pela URL da empresa: depois de entrar, abre a empresa de onde a pessoa veio (se participa dela). */
+export const BRAND_HINT_KEY = 'es_web_brand_hint';
+
+export function LoginPage({ brandSlug }: { brandSlug?: string }) {
   const { login } = useAuth();
+  const brand = useBrand();
   const redirect = useRedirectIfAuthed();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -109,6 +117,13 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email.trim(), password);
+      if (brandSlug) {
+        try {
+          sessionStorage.setItem(BRAND_HINT_KEY, brandSlug);
+        } catch {
+          // sem sessionStorage: abre a última empresa usada
+        }
+      }
     } catch (caught) {
       setError(caught instanceof ApiError && caught.code === 'AUTH_ACCOUNT_LOCKED' ? 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.' : errorMessage(caught));
     } finally {
@@ -117,7 +132,7 @@ export function LoginPage() {
   };
 
   return (
-    <AuthLayout title="Entrar" subtitle="Use a mesma conta do aplicativo." footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
+    <AuthLayout title="Entrar" subtitle={brand?.displayName ? `Acesse o estoque de ${brand.displayName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
       <form className="stack" onSubmit={submit}>
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="E-mail">
@@ -131,6 +146,65 @@ export function LoginPage() {
       </form>
     </AuthLayout>
   );
+}
+
+interface PublicBrand {
+  active: boolean;
+  slug: string | null;
+  displayName: string | null;
+  version: number;
+  theme: BrandTheme | null;
+  logo: BrandLogo | null;
+}
+
+/**
+ * `/<identificador>/entrar`: a MESMA tela de entrada, com o tema e o
+ * logotipo da empresa por cima. A autenticação é a central do produto. Se o
+ * identificador não existe, a empresa não tem direito ao recurso ou algo
+ * falha, a pessoa vê a tela padrão (sem aviso: de fora, tudo isso é igual).
+ */
+export function BrandedLoginPage() {
+  const { slug = '' } = useParams();
+  const navigate = useNavigate();
+  const { status } = useAuth();
+  const query = useQuery({
+    queryKey: ['public-brand', slug],
+    // Sem sessão e sem renovar token: é uma rota pública. Qualquer falha = tela padrão.
+    queryFn: async (): Promise<PublicBrand | null> => {
+      try {
+        const response = await fetch(`/v1/public/brand/${encodeURIComponent(slug)}`, { headers: { accept: 'application/json' } });
+        return response.ok ? ((await response.json()) as PublicBrand) : null;
+      } catch {
+        return null;
+      }
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+  const data = query.data;
+  const active = !!data?.active && !!data.slug;
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  useEffect(() => {
+    if (!data) return;
+    if (!active) {
+      clearPublicBrand();
+      return;
+    }
+    // Identificador antigo: segue para o atual.
+    if (data.slug && data.slug !== slug) navigate(`/${data.slug}/entrar`, { replace: true });
+    setBrand({ eligible: true, active: true, slug: data.slug, version: data.version, displayName: data.displayName, loginPath: `/${data.slug}/entrar`, theme: data.theme, logo: data.logo }, 'public');
+    track('brand.login_viewed');
+  }, [data, active, slug, navigate]);
+
+  // Ao sair da tela sem ter entrado, a marca pública não vaza para as outras telas.
+  useEffect(() => () => {
+    if (statusRef.current !== 'authed') clearPublicBrand();
+  }, []);
+
+  if (query.isLoading) return <FullScreenLoading />;
+  return <LoginPage brandSlug={active ? (data?.slug ?? slug) : undefined} />;
 }
 
 export function RegisterPage() {

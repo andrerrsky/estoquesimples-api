@@ -145,3 +145,43 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type Role = typeof roles.$inferSelect;
+
+/**
+ * Identidade visual da empresa (migration 0017, `modules/branding`). A linha
+ * guarda a configuração; se ela é aplicada depende do plano em vigor.
+ */
+export const workspaceBrandings = pgTable(
+  'workspace_brandings',
+  {
+    workspaceId: uuid('workspace_id')
+      .primaryKey()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    slug: text('slug'),
+    primaryColor: text('primary_color'),
+    accentColor: text('accent_color'),
+    textColor: text('text_color'),
+    font: text('font').notNull().default('default'),
+    logoHash: text('logo_hash'),
+    logoContentType: text('logo_content_type'),
+    logoBytes: integer('logo_bytes'),
+    logoWidth: integer('logo_width'),
+    logoHeight: integer('logo_height'),
+    blockedAt: timestamp('blocked_at', tz),
+    blockedReason: text('blocked_reason'),
+    version: integer('version').notNull().default(1),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('workspace_brandings_slug_unique').on(table.slug).where(sql`${table.slug} IS NOT NULL`)],
+);
+
+export type WorkspaceBranding = typeof workspaceBrandings.$inferSelect;
+
+export const brandSlugReservations = pgTable('brand_slug_reservations', {
+  slug: text('slug').primaryKey(),
+  workspaceId: uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  releasedAt: timestamp('released_at', tz).notNull().defaultNow(),
+});

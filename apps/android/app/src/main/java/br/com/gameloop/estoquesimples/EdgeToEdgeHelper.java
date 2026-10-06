@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
@@ -48,7 +49,7 @@ public final class EdgeToEdgeHelper {
 
         // A raiz recebe a cor das barras (#1c679d). Ela só fica visível nas
         // áreas de padding (status bar / nav bar).
-        root.setBackgroundColor(ContextCompat.getColor(activity, R.color.system_bar));
+        root.setBackgroundColor(BrandStore.color(activity, R.color.system_bar));
 
         // A área de conteúdo recebe o fundo padrão do tema (opaco). Sem isso,
         // telas cujo layout raiz não define android:background deixariam o azul

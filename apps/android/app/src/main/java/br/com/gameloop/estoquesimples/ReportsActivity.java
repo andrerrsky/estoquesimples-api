@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import br.com.gameloop.estoquesimples.analytics.Analytics;
 
 import br.com.gameloop.estoquesimples.data.LocalDb;
@@ -513,7 +514,7 @@ public class ReportsActivity extends BaseActivity {
             }
             com.github.mikephil.charting.data.BarDataSet dataSet =
                     new com.github.mikephil.charting.data.BarDataSet(barras, "");
-            dataSet.setColor(ContextCompat.getColor(this, R.color.color_brand));
+            dataSet.setColor(BrandStore.color(this, R.color.color_accent));
             dataSet.setValueTextColor(ContextCompat.getColor(this, R.color.color_text));
             dataSet.setValueTextSize(11f);
             dataSet.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {

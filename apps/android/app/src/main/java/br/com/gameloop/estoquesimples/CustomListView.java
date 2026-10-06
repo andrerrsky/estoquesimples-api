@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import br.com.gameloop.estoquesimples.analytics.Analytics;
 
 import br.com.gameloop.estoquesimples.data.MovementRepository;
@@ -481,7 +482,7 @@ public class CustomListView extends ArrayAdapter<String> {
         final long[] quando = {0L};
         final android.widget.TextView dataView = new android.widget.TextView(context);
         dataView.setText("Data: agora · alterar");
-        dataView.setTextColor(ContextCompat.getColor(context, R.color.color_brand));
+        dataView.setTextColor(BrandStore.color(context, R.color.color_accent));
         dataView.setTypeface(null, android.graphics.Typeface.BOLD);
         dataView.setPadding(0, (int) (context.getResources().getDisplayMetrics().density * 12), 0, 0);
         dataView.setOnClickListener(v -> {

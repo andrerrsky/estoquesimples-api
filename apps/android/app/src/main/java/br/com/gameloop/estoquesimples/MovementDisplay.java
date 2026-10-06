@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.content.Context;
 
 import androidx.core.content.ContextCompat;
@@ -75,6 +76,6 @@ final class MovementDisplay {
         }
         return effect < 0
                 ? ContextCompat.getColor(context, R.color.color_error)
-                : ContextCompat.getColor(context, R.color.color_brand);
+                : BrandStore.color(context, R.color.color_accent);
     }
 }

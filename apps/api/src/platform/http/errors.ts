@@ -69,6 +69,12 @@ export const ErrorCode = {
   IMAGE_UNSUPPORTED_TYPE: 'IMAGE_UNSUPPORTED_TYPE',
   /** Sem armazenamento configurado neste ambiente. */
   IMAGES_UNAVAILABLE: 'IMAGES_UNAVAILABLE',
+
+  /** Cores, fonte ou identificador da marca fora das regras (inclui contraste). */
+  BRAND_INVALID: 'BRAND_INVALID',
+  BRAND_SLUG_TAKEN: 'BRAND_SLUG_TAKEN',
+  /** O plano em vigor não inclui a identidade visual personalizada. */
+  BRAND_NOT_IN_PLAN: 'BRAND_NOT_IN_PLAN',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];

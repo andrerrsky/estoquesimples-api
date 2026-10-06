@@ -80,6 +80,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
                 status: z.enum(['active', 'suspended']),
                 isOwner: z.boolean(),
                 memberCount: z.number().int(),
+                brandSlug: z.string().nullable(),
                 createdAt: z.string(),
               }),
             ),

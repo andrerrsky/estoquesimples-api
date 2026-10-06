@@ -53,6 +53,8 @@ interface WorkspaceDetail {
   }>;
   counts: { products: number; productsDeleted: number; movements: number; movements30d: number; conflictsPending: number; conflictsTotal: number; syncOps7d: number; lowStock: number };
   syncDevices: Array<{ deviceId: string; userId: string | null; userEmail: string | null; model: string | null; platform: string | null; appVersionName: string | null; cursor: number; lag: number; lastPushAt: string | null; lastPullAt: string | null; updatedAt: string }>;
+  /** Identidade visual configurada pela empresa (o painel só pode bloquear). */
+  branding: { slug: string | null; primaryColor: string | null; accentColor: string | null; textColor: string | null; font: string; logo: { url: string } | null; blocked: boolean; blockedReason: string | null; eligible: boolean; active: boolean; version: number; updatedAt: string | null } | null;
   initialUploads: Array<{ id: string; status: string; declaredProducts: number; declaredMovements: number; receivedProducts: number; receivedMovements: number; createdAt: string; completedAt: string | null }>;
 }
 
@@ -63,6 +65,8 @@ type Dialog =
   | 'delete'
   | 'restore'
   | 'transfer'
+  | 'brand-block'
+  | 'brand-unblock'
   | { kind: 'role'; userId: string; current: string }
   | { kind: 'status'; userId: string; status: 'active' | 'suspended' }
   | { kind: 'remove'; userId: string }
@@ -126,6 +130,7 @@ export function WorkspaceDetailPage() {
               items={[
                 { label: 'Renomear empresa', icon: 'edit', onClick: () => setDialog('rename') },
                 { label: 'Transferir propriedade', icon: 'users', disabled: activeMembers.length < 2, onClick: () => setDialog('transfer') },
+                ...(ws.branding ? [ws.branding.blocked ? { label: 'Liberar identidade visual', icon: 'refresh', onClick: () => setDialog('brand-unblock') } : { label: 'Bloquear identidade visual', icon: 'trash', danger: true, onClick: () => setDialog('brand-block') }] : []),
                 'sep',
                 ws.deletedAt
                   ? { label: 'Restaurar empresa', icon: 'refresh', onClick: () => setDialog('restore') }
@@ -193,6 +198,20 @@ export function WorkspaceDetailPage() {
               </div>
             )}
           </Card>
+          {ws.branding && (
+            <Card title="Identidade visual" subtitle="Configurada pela própria empresa; só vale enquanto o plano incluir o recurso">
+              <KeyValue
+                items={[
+                  { label: 'Situação', value: ws.branding.blocked ? <Badge tone="error">bloqueada pelo suporte</Badge> : ws.branding.active ? <Badge tone="success">aplicada</Badge> : ws.branding.eligible ? <Badge>sem personalização</Badge> : <Badge tone="warning">guardada, sem plano</Badge> },
+                  { label: 'Endereço de entrada', value: ws.branding.slug ? <code>/{ws.branding.slug}/entrar</code> : '—' },
+                  { label: 'Cores', value: [ws.branding.primaryColor, ws.branding.accentColor, ws.branding.textColor].filter(Boolean).map((color) => <span key={color} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 8 }}><span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: color ?? undefined, border: '1px solid var(--border)' }} />{color}</span>) },
+                  { label: 'Fonte', value: ws.branding.font === 'serif' ? 'com serifa' : 'padrão' },
+                  { label: 'Logotipo', value: ws.branding.logo ? 'enviado' : '—' },
+                  ...(ws.branding.blockedReason ? [{ label: 'Motivo do bloqueio', value: ws.branding.blockedReason }] : []),
+                ]}
+              />
+            </Card>
+          )}
           <Card title="Assinatura atual">
             {live ? (
               <KeyValue
@@ -365,6 +384,8 @@ export function WorkspaceDetailPage() {
         onConfirm={post('delete')}
       />
       <ConfirmDialog open={dialog === 'restore'} onClose={() => setDialog(null)} title="Restaurar empresa" description="Os membros voltam a ter acesso." confirmLabel="Restaurar" onConfirm={post('restore')} />
+      <ConfirmDialog open={dialog === 'brand-block'} onClose={() => setDialog(null)} title="Bloquear identidade visual" description="A empresa volta ao visual padrão do Estoque Simples em todos os aparelhos e na tela de entrada. A configuração fica guardada e pode ser liberada depois." confirmLabel="Bloquear" danger onConfirm={post('block-brand')} />
+      <ConfirmDialog open={dialog === 'brand-unblock'} onClose={() => setDialog(null)} title="Liberar identidade visual" description="A configuração da empresa volta a ser aplicada (se o plano incluir o recurso)." confirmLabel="Liberar" onConfirm={post('unblock-brand')} />
       <TransferDialog open={dialog === 'transfer'} onClose={() => setDialog(null)} ws={ws} onConfirm={(newOwnerUserId, reason) => post('transfer-ownership', { newOwnerUserId })(reason)} />
       <RoleDialog
         open={typeof dialog === 'object' && dialog?.kind === 'role'}

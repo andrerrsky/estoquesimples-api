@@ -435,7 +435,7 @@ export function LandingPage() {
                     <li><Icon name="check" /> Produtos, entradas e saídas, histórico e relatórios</li>
                     <li><Icon name="check" /> Importação e exportação em CSV</li>
                     <li><Icon name="check" /> Android e web (no iPhone, iPad e computador) com a mesma conta</li>
-                    <li className="lp-limit"><Icon name="info" /> Com limite de produtos na nuvem</li>
+                    <li className="lp-limit"><Icon name="info" /> Com limite de produtos e de espaço para fotos na nuvem</li>
                   </ul>
                   {authed ? (
                     <Link to="/app" className="btn btn--secondary btn--block">Abrir meu estoque</Link>
@@ -456,6 +456,8 @@ export function LandingPage() {
                     <li><Icon name="check" /> Produtos sem limite</li>
                     <li><Icon name="check" /> Equipe com papéis e permissões</li>
                     <li><Icon name="check" /> Análise avançada: giro dos produtos e previsão de quando cada um acaba</li>
+                    <li><Icon name="check" /> Sua marca: cores, logotipo e página de entrada própria da empresa</li>
+                    <li><Icon name="check" /> Mais espaço para fotos dos produtos</li>
                   </ul>
                   <p className="lp-plan__note">A assinatura é da empresa: uma pessoa assina e toda a equipe usa. O valor aparece dentro do aplicativo, em Plano.</p>
                   {authed ? (

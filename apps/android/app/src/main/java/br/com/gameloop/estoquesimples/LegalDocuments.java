@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -49,7 +50,7 @@ final class LegalDocuments {
 
     private static void bind(TextView view, String texto) {
         SpannableString span = new SpannableString(texto);
-        int brand = ContextCompat.getColor(view.getContext(), R.color.color_brand);
+        int brand = BrandStore.color(view.getContext(), R.color.color_accent);
         marcar(span, texto, "Termos de Uso", PAGE_TERMOS, brand);
         marcar(span, texto, "Política de Privacidade", PAGE_PRIVACIDADE, brand);
         view.setText(span);

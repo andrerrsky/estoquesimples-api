@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import br.com.gameloop.estoquesimples.analytics.Analytics;
 
 import android.content.Context;
@@ -437,7 +438,7 @@ public class SubscriptionActivity extends BaseActivity {
         int suffixEnd = text.length();
 
         int prefixColor = ContextCompat.getColor(this, R.color.color_text_muted);
-        int amountColor = ContextCompat.getColor(this, R.color.color_brand);
+        int amountColor = BrandStore.color(this, R.color.color_accent);
 
         applySpan(text, prefixStart, prefixEnd, 18, prefixColor, false);
         applySpan(text, amountStart, amountEnd, 42, amountColor, true);

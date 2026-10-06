@@ -1,6 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
 import br.com.gameloop.estoquesimples.analytics.Analytics;
+import br.com.gameloop.estoquesimples.branding.BrandApplier;
 
 import android.os.Bundle;
 import android.view.View;
@@ -16,6 +17,8 @@ public abstract class BaseActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // Identidade visual da empresa: antes de qualquer layout ser inflado.
+        BrandApplier.apply(this);
         EdgeToEdgeHelper.enable(this);
         super.onCreate(savedInstanceState);
         EstoqueFirebaseMessagingService.ensureChannel(this);
@@ -32,6 +35,7 @@ public abstract class BaseActivity extends AppCompatActivity {
     public void setContentView(int layoutResID) {
         super.setContentView(layoutResID);
         EdgeToEdgeHelper.applyInsets(this);
+        BrandApplier.applyChrome(this);
     }
 
     @Override

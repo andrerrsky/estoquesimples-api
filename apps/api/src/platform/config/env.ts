@@ -245,6 +245,8 @@ const envSchema = z
     IMAGE_MAX_EDGE: z.coerce.number().int().min(256).max(4096).default(1280),
     /** Dias que uma imagem sem produto fica guardada antes de ser apagada. */
     IMAGE_GC_GRACE_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+    // Quanto tempo a API guarda em memória a marca pública de um identificador (ms). 0 desliga.
+    BRAND_PUBLIC_CACHE_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
   })
   .superRefine((value, ctx) => {
     const isProdLike = value.NODE_ENV === 'production' || value.NODE_ENV === 'staging';

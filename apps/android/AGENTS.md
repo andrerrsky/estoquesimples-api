@@ -192,3 +192,10 @@ servidor**, sempre WebP).
 - **Backup/importação**: o `.db` leva `photo_hash` junto; JSON portátil e CSV
   não levam foto. Foto restaurada sem hash conhecido = "precisa subir".
 - Limites: 2 MiB por upload (a API recusa mais), 1280 px, 250 KB alvo.
+
+## Identidade visual da empresa
+
+Camada de tema, nunca layout (docs/branding.md). A API manda `entitlement.branding`; `EntitlementManager` o guarda em `branding/BrandStore` (mesma validade offline do plano) e baixa o logotipo (`BrandLogo`). `BaseActivity.onCreate` chama `BrandApplier.apply` **antes** de inflar: no Android 11+ troca os `@color/…` por sobreposição de recursos (`ColorResourcesOverride`); abaixo disso só barras, destaques e logotipo. Regras para quem mexer em telas:
+- cor de marca em layout/drawable: use `@color/color_brand` (fundos/ícones) ou `@color/color_accent` (texto em destaque) — nunca um hex literal;
+- cor lida em código fora de Activity (notificação, serviço) ou via `getApplicationContext()`: `BrandStore.color(context, R.color.x)`, porque o contexto da aplicação não recebe a sobreposição;
+- não crie variações de tela por empresa; a edição da marca é na web.

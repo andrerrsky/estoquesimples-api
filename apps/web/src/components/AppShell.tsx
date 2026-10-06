@@ -8,7 +8,8 @@ import { trackScreen } from '../lib/analytics';
 import { initials } from '../lib/format';
 import { ROLE_LABEL } from '../lib/labels';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
-import { Icon, Logo, type IconName } from './Icon';
+import { BrandMark } from './BrandMark';
+import { Icon, type IconName } from './Icon';
 import { Empty, Menu, Meter, Modal, Notice, Skeleton, Spinner } from './ui';
 
 interface NavItem {
@@ -30,6 +31,9 @@ const COMPANY_NAV: NavItem[] = [
   { to: '/app/plano', label: 'Plano', icon: 'card' },
 ];
 
+/** Só quem pode configurar a marca vê o item (a API confere de novo). */
+const BRAND_NAV: NavItem = { to: '/app/marca', label: 'Identidade visual', icon: 'palette' };
+
 const HELP_NAV: NavItem[] = [
   { to: '/app/ajuda', label: 'Central de ajuda', icon: 'book' },
   { to: '/app/plataformas', label: 'Plataformas', icon: 'phone' },
@@ -49,7 +53,7 @@ function useUnreadNotifications(): number {
 /** Estrutura das telas internas: barra lateral no desktop, barra inferior no celular. */
 export function AppShell() {
   const { status, user, logout } = useAuth();
-  const { workspaces, workspace, workspaceId, entitlement, loading, error, select, isPaid, refresh } = useWorkspace();
+  const { workspaces, workspace, workspaceId, entitlement, loading, error, select, isPaid, refresh, can } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
   const unread = useUnreadNotifications();
@@ -94,6 +98,8 @@ export function AppShell() {
     { label: 'Sair', icon: 'logout' as const, onClick: () => void logout().then(() => navigate('/entrar')) },
   ];
 
+  const companyNav = can('marca.gerenciar') ? [...COMPANY_NAV, BRAND_NAV] : COMPANY_NAV;
+
   const renderNav = (items: NavItem[]) =>
     items.map((item) => (
       <NavLink key={item.to} to={item.to} className={({ isActive }) => `navlink ${isActive ? 'active' : ''}`}>
@@ -107,7 +113,7 @@ export function AppShell() {
     <div className="shell">
       <aside className="sidebar no-print">
         <Link to="/app/estoque" className="sidebar__brand">
-          <Logo size={30} /> Estoque Simples
+          <BrandMark size={30} />
         </Link>
 
         {workspace && (
@@ -141,7 +147,7 @@ export function AppShell() {
 
         <nav className="nav" aria-label="Estoque">{renderNav(STOCK_NAV)}</nav>
         <div className="sidebar__section">Empresa</div>
-        <nav className="nav" aria-label="Empresa">{renderNav(COMPANY_NAV)}</nav>
+        <nav className="nav" aria-label="Empresa">{renderNav(companyNav)}</nav>
         <div className="sidebar__section">Ajuda</div>
         <nav className="nav" aria-label="Ajuda">{renderNav(HELP_NAV)}</nav>
 
@@ -170,7 +176,7 @@ export function AppShell() {
       <div className="main">
         <header className={`topbar no-print ${scrolled ? 'topbar--scrolled' : ''}`}>
           <Link to="/app/estoque" className="topbar__brand">
-            <Logo size={28} />
+            <BrandMark size={28} name={false} />
             <span className="truncate">{workspace?.name ?? 'Estoque Simples'}</span>
           </Link>
           <span className="spacer" />
@@ -221,7 +227,7 @@ export function AppShell() {
 
       <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title={workspace?.name ?? 'Mais'} description={workspace ? ROLE_LABEL[workspace.role] : undefined}>
         <nav className="nav">
-          {renderNav([...STOCK_NAV.slice(3), ...COMPANY_NAV, ...HELP_NAV, { to: '/app/conta', label: 'Minha conta', icon: 'user' }, { to: '/app/empresas', label: 'Empresas', icon: 'building' }])}
+          {renderNav([...STOCK_NAV.slice(3), ...companyNav, ...HELP_NAV, { to: '/app/conta', label: 'Minha conta', icon: 'user' }, { to: '/app/empresas', label: 'Empresas', icon: 'building' }])}
           <button type="button" className="navlink" style={{ border: 'none', background: 'none', textAlign: 'left' }} onClick={() => void logout().then(() => navigate('/entrar'))}>
             <Icon name="logout" /> Sair
           </button>

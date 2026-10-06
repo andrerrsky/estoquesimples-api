@@ -11,7 +11,8 @@ import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
-import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
+import { BrandingService } from '../branding/branding.service.js';
+import { BillingService, ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
 import { OWNER_ROLE } from '../workspaces/workspaces.service.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
@@ -236,9 +237,12 @@ export class AdminWorkspacesService {
       `),
     ]);
 
+    const brandConfig = await new BrandingService(this.services).adminGet(workspaceId);
+    const brandEffective = (await new BillingService(this.services).getEntitlement(workspaceId)).branding;
     const c = counts.rows[0];
     return {
       id: workspace.id,
+      branding: brandConfig ? { ...brandConfig, eligible: brandEffective.eligible, active: brandEffective.active } : null,
       name: workspace.name,
       settings: workspace.settings as Record<string, unknown>,
       changeSeq: Number(workspace.changeSeq),
@@ -609,6 +613,18 @@ export class AdminWorkspacesService {
         targetId: workspaceId,
         metadata: { reason, deletedAt: iso(workspace.deletedAt) },
       });
+    });
+  }
+
+  /** Bloqueia (com motivo) ou libera a identidade visual da empresa. O painel não edita a marca: só pode desligá-la. */
+  async setBrandBlocked(actor: AdminActor, workspaceId: string, reason: string, blocked: boolean): Promise<void> {
+    await new BrandingService(this.services).adminSetBlocked(workspaceId, actor.email, blocked ? reason : null);
+    await recordAdminAudit(this.db, {
+      actor,
+      action: blocked ? AdminAction.WORKSPACE_BRAND_BLOCKED : AdminAction.WORKSPACE_BRAND_UNBLOCKED,
+      targetType: 'workspace',
+      targetId: workspaceId,
+      metadata: { reason },
     });
   }
 

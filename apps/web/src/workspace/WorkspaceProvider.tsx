@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api } from '../api/client';
 import type { Entitlement, WorkspaceDetail, WorkspaceSummary } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
-import { setAnalyticsWorkspace } from '../lib/analytics';
+import { setAnalyticsWorkspace, track } from '../lib/analytics';
+import { dropWorkspaceBrand, setBrand } from '../lib/brand';
 
 const STORAGE_KEY = 'es_web_workspace';
 
@@ -95,6 +96,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     setSelected(id);
   }, []);
+
+  // Identidade visual: a API decide (plano em vigor); aqui só se aplica. Sem
+  // sessão, nada da empresa fica no navegador; com erro ao carregar, vale o visual padrão.
+  useEffect(() => {
+    if (status === 'guest') dropWorkspaceBrand();
+  }, [status]);
+  useEffect(() => {
+    if (!enabled) return;
+    if (entitlement.data) {
+      setBrand(entitlement.data.branding, 'workspace');
+      if (entitlement.data.branding?.active) track('brand.applied', { platform: 'web' });
+    } else if (entitlement.isError || (workspaceId === null && list.isSuccess)) {
+      setBrand(null, 'workspace');
+    }
+  }, [enabled, entitlement.data, entitlement.isError, workspaceId, list.isSuccess]);
+
+  // Veio pela URL da empresa (`/<slug>/entrar`): abre essa empresa, se a pessoa participa dela.
+  useEffect(() => {
+    if (!list.isSuccess) return;
+    let hint: string | null = null;
+    try {
+      hint = sessionStorage.getItem('es_web_brand_hint');
+      if (hint) sessionStorage.removeItem('es_web_brand_hint');
+    } catch {
+      hint = null;
+    }
+    const match = hint ? list.data?.find((item) => item.brandSlug === hint && item.status !== 'suspended') : undefined;
+    if (match) select(match.id);
+  }, [list.isSuccess, list.data, select]);
 
   const refresh = useCallback(async () => {
     await Promise.all([

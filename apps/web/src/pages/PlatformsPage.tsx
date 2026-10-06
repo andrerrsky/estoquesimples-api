@@ -197,6 +197,7 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
               <tr><th scope="row">Mesma conta e mesmo estoque</th><td>Sim</td><td>Sim</td></tr>
               <tr><th scope="row">Funciona sem internet</th><td>Sim</td><td>Não</td></tr>
               <tr><th scope="row">Fotos dos produtos</th><td>Sim, pela câmera ou galeria</td><td>Sim, escolhendo um arquivo</td></tr>
+              <tr><th scope="row">Identidade visual da empresa (plano Equipe)</th><td>Aplica as cores e o logotipo</td><td>Aplica e é onde se configura</td></tr>
               <tr><th scope="row">Leitor de código de barras</th><td>Câmera</td><td>Leitor USB (e câmera, em alguns navegadores)</td></tr>
               <tr><th scope="row">Aviso de estoque baixo no aparelho</th><td>Sim</td><td>Não (aparece destacado na lista e nos relatórios)</td></tr>
               <tr><th scope="row">Assinar o plano Equipe</th><td>Google Play</td><td>Pix, boleto ou cartão</td></tr>

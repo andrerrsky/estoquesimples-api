@@ -5,7 +5,7 @@ import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './component
 import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
-import { ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
+import { BrandedLoginPage, ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
 import { LandingPage } from './pages/LandingPage';
 
 /**
@@ -22,6 +22,7 @@ const AnalysisPage = page(() => import('./pages/AnalysisPage'), 'AnalysisPage');
 const ImportExportPage = page(() => import('./pages/ImportExportPage'), 'ImportExportPage');
 const ConflictsPage = page(() => import('./pages/ConflictsPage'), 'ConflictsPage');
 const TeamPage = page(() => import('./pages/TeamPage'), 'TeamPage');
+const BrandPage = page(() => import('./pages/BrandPage'), 'BrandPage');
 const PlanPage = page(() => import('./pages/PlanPage'), 'PlanPage');
 const NotificationsPage = page(() => import('./pages/NotificationsPage'), 'NotificationsPage');
 const SupportPage = page(() => import('./pages/SupportPage'), 'SupportPage');
@@ -81,6 +82,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <LandingPage /> },
       { path: '/entrar', element: <LoginPage /> },
+      // Entrada personalizada da empresa (identificadores reservados nunca chegam aqui: ver brand-rules.ts).
+      { path: '/:slug/entrar', element: <BrandedLoginPage /> },
       { path: '/criar-conta', element: <RegisterPage /> },
       { path: '/esqueci-a-senha', element: <ForgotPasswordPage /> },
       { path: '/redefinir-senha', element: <ResetPasswordPage /> },
@@ -107,6 +110,7 @@ export const router = createBrowserRouter([
               { path: 'conflitos', element: lazyPage(ConflictsPage, true) },
               { path: 'equipe', element: lazyPage(TeamPage) },
               { path: 'plano', element: lazyPage(PlanPage) },
+              { path: 'marca', element: lazyPage(BrandPage) },
               { path: 'notificacoes', element: lazyPage(NotificationsPage) },
               { path: 'ajuda', element: lazyPage(HelpPage) },
               { path: 'plataformas', element: lazyPage(PlatformsPage) },

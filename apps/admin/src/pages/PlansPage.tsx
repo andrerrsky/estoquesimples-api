@@ -38,6 +38,7 @@ const FEATURE_LABEL: Record<string, string> = {
   'sync.dispositivos': 'Aparelhos sincronizando (não aplicado)',
   'analise.avancada': 'Análise Avançada de Estoque',
   'imagens.armazenamento_mb': 'Fotos de produtos: armazenamento por empresa (MB; vazio = sem limite)',
+  'marca.personalizada': 'Identidade visual personalizada (cores, fonte, logotipo e URL de entrada)',
 };
 
 type Dialog = null | { kind: 'plan'; plan: Plan } | { kind: 'feature'; plan: Plan; feature: { key: string; enabled: boolean; limit: number | null } };

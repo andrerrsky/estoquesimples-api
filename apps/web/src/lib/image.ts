@@ -40,7 +40,16 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
-export async function prepareImage(file: File): Promise<PreparedImage> {
+export interface PrepareOptions {
+  maxEdge?: number;
+  targetBytes?: number;
+  /** Logotipo: preserva a transparência (cai para PNG, nunca para JPEG). */
+  keepAlpha?: boolean;
+}
+
+export async function prepareImage(file: File, options: PrepareOptions = {}): Promise<PreparedImage> {
+  const maxEdge = options.maxEdge ?? IMAGE_MAX_EDGE;
+  const targetBytes = options.targetBytes ?? TARGET_BYTES;
   checkPickedFile(file);
 
   let bitmap: ImageBitmap;
@@ -52,7 +61,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
   }
 
   try {
-    let scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    let scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     for (let round = 0; round < 6; round += 1) {
       const width = Math.max(16, Math.round(bitmap.width * scale));
       const height = Math.max(16, Math.round(bitmap.height * scale));
@@ -67,9 +76,9 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
       for (const quality of [0.82, 0.7, 0.58]) {
         // WebP onde o navegador sabe gerar; senão (Safari antigo devolve PNG) JPEG.
         let blob = await toBlob(canvas, 'image/webp', quality);
-        if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, 'image/jpeg', quality);
+        if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, options.keepAlpha ? 'image/png' : 'image/jpeg', quality);
         if (!blob) throw new ImageError('Não foi possível otimizar a imagem.');
-        if (blob.size <= TARGET_BYTES || (round === 5 && quality === 0.58)) {
+        if (blob.size <= targetBytes || (round === 5 && quality === 0.58)) {
           return { blob, width, height, previewUrl: URL.createObjectURL(blob) };
         }
       }

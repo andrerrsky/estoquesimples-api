@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -170,7 +171,7 @@ public final class LegalActivity extends BaseActivity {
             getSupportActionBar().setTitle(termos ? "Termos de uso" : "Política de privacidade");
         }
 
-        int brand = ContextCompat.getColor(this, R.color.color_brand);
+        int brand = BrandStore.color(this, R.color.color_accent);
         int muted = ContextCompat.getColor(this, R.color.color_text_muted);
         tabTermosLabel.setTextColor(termos ? brand : muted);
         tabPrivacidadeLabel.setTextColor(termos ? muted : brand);

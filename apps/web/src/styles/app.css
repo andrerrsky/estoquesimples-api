@@ -54,7 +54,7 @@ p {
 }
 
 a {
-  color: var(--brand);
+  color: var(--accent, var(--brand));
   text-decoration: none;
 }
 a:hover {
@@ -530,7 +530,7 @@ button {
   min-height: 0;
   padding: 0;
   border: none;
-  color: var(--brand);
+  color: var(--accent, var(--brand));
   font-weight: 600;
 }
 .btn--link:hover {
@@ -2072,4 +2072,28 @@ button {
   .tile {
     break-inside: avoid;
   }
+}
+
+/* Identidade visual da empresa: só o logotipo entra como imagem; as cores e a
+   fonte chegam pelos tokens (lib/brand.ts). */
+.brandlogo {
+  display: block;
+  width: auto;
+  max-width: 168px;
+  object-fit: contain;
+}
+.auth__aside .brandlogo {
+  max-width: 220px;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: var(--radius-control);
+}
+.auth__aside .brandlogo[style] {
+  height: auto !important;
+  max-height: 64px;
+}
+.auth__brand--partner {
+  color: var(--on-brand-muted);
+  font-size: var(--fs-caption);
+  font-weight: 500;
 }

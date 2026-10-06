@@ -31,7 +31,12 @@ export function imageKey(workspaceId: string, hash: string): string {
   return `workspaces/${workspaceId}/images/${hash}.webp`;
 }
 
-const KEY_PATTERN = /^workspaces\/[0-9a-f-]{36}\/images\/[0-9a-f]{64}\.webp$/;
+/** Logotipo da marca: fora da cota de fotos, em prefixo próprio. */
+export function brandLogoKey(workspaceId: string, hash: string): string {
+  return `workspaces/${workspaceId}/brand/${hash}.webp`;
+}
+
+const KEY_PATTERN = /^workspaces\/[0-9a-f-]{36}\/(images|brand)\/[0-9a-f]{64}\.webp$/;
 
 function assertKey(key: string): void {
   if (!KEY_PATTERN.test(key)) throw new Error('Chave de objeto inválida.');

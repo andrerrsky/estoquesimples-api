@@ -9,6 +9,7 @@ import './styles/app.css';
 import { ApiError } from './api/client';
 import { router } from './App';
 import { AuthProvider } from './auth/AuthProvider';
+import { bootBrand } from './lib/brand';
 import { reloadForNewVersion } from './lib/chunks';
 import { ToastProvider } from './components/ui';
 import { WorkspaceProvider } from './workspace/WorkspaceProvider';
@@ -33,6 +34,9 @@ const queryClient = new QueryClient({
 window.addEventListener('vite:preloadError', (event) => {
   if (reloadForNewVersion()) event.preventDefault();
 });
+
+// Abre já com a última marca da empresa (a API confirma ou desfaz depois).
+bootBrand();
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

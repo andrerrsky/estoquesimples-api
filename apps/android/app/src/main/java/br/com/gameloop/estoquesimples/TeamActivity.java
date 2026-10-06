@@ -1,5 +1,6 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.branding.BrandStore;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -237,7 +238,7 @@ public final class TeamActivity extends BaseActivity {
         Button papel = new Button(this);
         papel.setText("Papel: " + rotulos[escolhido[0]]);
         papel.setBackgroundResource(R.drawable.bg_button_secondary);
-        papel.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        papel.setTextColor(BrandStore.color(this, R.color.color_accent));
         papel.setAllCaps(false);
         papel.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle("Papel na empresa")
@@ -250,7 +251,7 @@ public final class TeamActivity extends BaseActivity {
 
         TextView ajuda = new TextView(this);
         ajuda.setText("O que cada papel pode fazer?");
-        ajuda.setTextColor(ContextCompat.getColor(this, R.color.color_brand));
+        ajuda.setTextColor(BrandStore.color(this, R.color.color_accent));
         ajuda.setTextSize(14);
         ajuda.setPadding(0, (int) (8 * getResources().getDisplayMetrics().density), 0, 0);
         ajuda.setPaintFlags(ajuda.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
