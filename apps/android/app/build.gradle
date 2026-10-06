@@ -115,4 +115,6 @@ dependencies {
     
     // Testing
     testImplementation 'junit:junit:4.13.2'
+    // org.json real: o do android.jar é só stub e quebra nos testes de JVM.
+    testImplementation 'org.json:json:20240303'
 }

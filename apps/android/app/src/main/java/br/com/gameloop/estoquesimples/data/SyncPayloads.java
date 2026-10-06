@@ -137,8 +137,13 @@ final class SyncPayloads {
             if (previous != null && previous.length() > 0) {
                 json.put("previous", previous);
             }
-            // A foto é um caminho local e não significa nada em outro aparelho.
-            // Sincronizar imagens é assunto de outra etapa, com upload próprio.
+            // O caminho da foto é local e não viaja. O que viaja é o hash da
+            // imagem na nuvem, e só quando esta operação mexe na foto (o
+            // "previous" traz photoHash): ausente = "não toquei na foto", e um
+            // aparelho que não enviou a imagem nunca pode apagá-la por omissão.
+            if (PhotoPayloads.touchesPhoto(previous)) {
+                PhotoPayloads.attach(json, product.photoHash);
+            }
             return json;
 
         } catch (JSONException e) {

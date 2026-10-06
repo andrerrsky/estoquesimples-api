@@ -37,6 +37,11 @@ public final class SyncMeta {
     public static final String CONFLITOS_PENDENTES = "conflitos_pendentes";
     /** Mensagem do servidor quando o plano travou a sincronização (teto ou equipe). */
     public static final String BLOQUEIO_PLANO = "bloqueio_plano";
+    /**
+     * Aviso discreto sobre fotos que não puderam subir (cota de armazenamento,
+     * permissão). Não pausa o estoque; aparece só no status da tela de conta.
+     */
+    public static final String FOTOS_AVISO = "fotos_aviso";
 
     private final SQLiteDatabase db;
 

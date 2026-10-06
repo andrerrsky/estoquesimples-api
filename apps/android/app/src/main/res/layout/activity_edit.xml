@@ -285,6 +285,15 @@
                     android:text="Câmera"
                     android:onClick="editTakeCameraPhoto" />
 
+                <Button
+                    android:id="@+id/editRemovePhoto"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Remover foto"
+                    android:visibility="gone" />
+
             </LinearLayout>
         </LinearLayout>
 

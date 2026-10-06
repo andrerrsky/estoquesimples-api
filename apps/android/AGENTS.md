@@ -144,3 +144,51 @@ administrativo e a aplicação web usam estes mesmos tokens, copiados em
   direto. Eventos: `help.article_opened` (`article` = id do artigo) e
   `help.searched` (`results`; uma vez por busca, 1 s depois da última tecla,
   nunca com o texto digitado).
+
+## Fotos dos produtos
+
+Pacote `photos/`; contrato da nuvem em `apps/api/src/modules/images`. A foto
+de um produto é identificada por `photoHash` (SHA-256 da imagem **guardada no
+servidor**, sempre WebP).
+
+- **Estado local** (`Estoque`, schema v7): `photo` (caminho local, como
+  sempre), `photo_hash` (nulo com `photo` preenchida = **ainda precisa subir**;
+  preenchido = o arquivo corresponde a essa imagem da nuvem) e
+  `photo_base_hash` (hash que a nuvem tinha quando a foto local foi trocada;
+  vira o `previous.photoHash` do envio). Decisões puras em `PhotoRules`
+  (testadas); fotos antigas ficam com hash nulo e sobem no próximo ciclo.
+- **Captura** (`ImageOptimizer`, fora da thread principal): `inSampleSize` +
+  escala exata, EXIF aplicado e descartado, lado maior 1280 px, nunca amplia,
+  WebP (`WEBP_LOSSY` na API 30+) qualidade 80→70→60 e depois dimensões ×0.85
+  até 250 KB. `AddActivity`/`EditActivity` guardam o arquivo otimizado
+  (`es_<ts>_<rand>.webp`); se falhar, cai na cópia simples. Fotos antigas (JPEG
+  grande, `content://`) são otimizadas em memória só no envio.
+- **Ciclo** (`SyncWorker`): depois da carga inicial e **antes** do envio da
+  fila, `PhotoSync.uploadPending()` faz `PUT /images` (até 20 por rodada) e,
+  com o hash, `ProductRepository.markPhotoUploaded` grava `photo_hash`, sobe o
+  `rev` e enfileira um upsert normal com `photoHash` + `previous`. Depois da
+  leitura, `PhotoSync.downloadMissing()` baixa (até 20) tudo com `photo_hash`
+  e arquivo ausente. Foto nunca derruba o sync do estoque: erro de foto só
+  encerra a etapa de fotos.
+- **Payload** (`PhotoPayloads`): `photoHash` **ausente** = não mexi na foto
+  (toda edição comum); `null` = remover; hash = definir. Só vai quando o
+  `previous` traz `photoHash`; a compactação da fila preserva isso
+  (`carryOver`). Remover foto na `EditActivity` (botão "Remover foto") envia
+  `null` direto, sem upload.
+- **Pull** (`RemoteChanges.applyPhoto`): mesmo hash = nada; foto local ainda
+  não enviada = mantém (resolve pelo envio; conflito de `photoHash` é
+  server-wins); hash novo = grava `photo_hash` e `photo = <pasta>/<hash>.webp`
+  (baixa depois, fora da transação, confere o SHA-256, grava em `.tmp` e
+  renomeia); servidor sem foto + foto local sincronizada = remove a
+  referência. Arquivo substituído só é apagado se nenhum produto o usa e se
+  está na pasta do app. `photo_hash` com arquivo ausente é o marcador de
+  "baixar de novo".
+- **Erros**: 413/415/422 = permanente para aquele arquivo (marcador
+  `foto_ignorar:<uuid>` até o arquivo mudar); 403 de cota
+  (`PLAN_LIMIT_REACHED`), permissão, rede, 429/5xx = a foto fica no aparelho e
+  tenta de novo na próxima rodada. Cota/permissão geram o aviso discreto
+  `SyncMeta.FOTOS_AVISO` no status da tela de conta (não pausa o estoque). 404
+  no download adia a imagem por 1 h.
+- **Backup/importação**: o `.db` leva `photo_hash` junto; JSON portátil e CSV
+  não levam foto. Foto restaurada sem hash conhecido = "precisa subir".
+- Limites: 2 MiB por upload (a API recusa mais), 1280 px, 250 KB alvo.

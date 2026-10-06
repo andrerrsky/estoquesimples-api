@@ -1,6 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
 import br.com.gameloop.estoquesimples.analytics.Analytics;
+import br.com.gameloop.estoquesimples.photos.ImageOptimizer;
 
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
@@ -67,6 +68,8 @@ public class AddActivity extends BaseActivity {
     private File imagesFolder;
     private String lastPhotoName;
     private String newPhotoPath;
+    /** Otimização de foto em andamento (fora da thread principal). */
+    private boolean photoBusy;
 
     // Constantes
     private static final String TAG = "AddActivity";
@@ -392,6 +395,11 @@ public class AddActivity extends BaseActivity {
         }
 
         if (!isValid()) {
+            return;
+        }
+
+        if (photoBusy) {
+            Toast.makeText(this, "Preparando a foto… tente salvar em instantes.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -741,10 +749,19 @@ public class AddActivity extends BaseActivity {
             Log.d(TAG, "Checking for photo at: " + imgFile.getAbsolutePath());
 
             if (imgFile.exists()) {
-                newPhotoPath = imgFile.getAbsolutePath();
-                if (discardGuard != null) discardGuard.markDirty();
-                displayPhoto(newPhotoPath);
-                Log.d(TAG, "Photo saved successfully at: " + newPhotoPath);
+                // Reduz e recodifica (WebP, até 1280 px / 250 KB) fora da thread
+                // principal; sem isso a foto de 12 MP ficaria como está.
+                photoBusy = true;
+                ImageOptimizer.importCameraFileAsync(this, imgFile, path -> {
+                    photoBusy = false;
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    newPhotoPath = path;
+                    if (discardGuard != null) discardGuard.markDirty();
+                    displayPhoto(newPhotoPath);
+                    Log.d(TAG, "Photo saved successfully at: " + newPhotoPath);
+                });
             } else {
                 Log.e(TAG, "Photo file does not exist at: " + imgFile.getAbsolutePath());
                 Toast.makeText(this, "Erro: Foto não foi salva pela câmera", Toast.LENGTH_SHORT).show();
@@ -766,14 +783,21 @@ public class AddActivity extends BaseActivity {
 
         // O Photo Picker concede acesso temporário à URI; copiamos para a pasta
         // do app para que a imagem permaneça disponível nas próximas sessões.
-        String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
-        if (copiedPath != null) {
-            newPhotoPath = copiedPath;
-            if (discardGuard != null) discardGuard.markDirty();
-            displayPhoto(copiedPath);
-        } else {
-            Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
-        }
+        // A cópia passa pelo otimizador (fora da thread principal).
+        photoBusy = true;
+        ImageOptimizer.importUriAsync(this, selectedImage, copiedPath -> {
+            photoBusy = false;
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
+            if (copiedPath != null) {
+                newPhotoPath = copiedPath;
+                if (discardGuard != null) discardGuard.markDirty();
+                displayPhoto(copiedPath);
+            } else {
+                Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /**

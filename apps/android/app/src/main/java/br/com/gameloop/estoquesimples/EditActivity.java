@@ -1,6 +1,8 @@
 package br.com.gameloop.estoquesimples;
 
 import br.com.gameloop.estoquesimples.analytics.Analytics;
+import br.com.gameloop.estoquesimples.photos.ImageOptimizer;
+import br.com.gameloop.estoquesimples.photos.PhotoFiles;
 
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
@@ -27,6 +29,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -85,6 +88,13 @@ public class EditActivity extends BaseActivity {
     private File imagesFolder;
     private String lastPhotoName;
     private String newPhotoPath;
+    /** Foto que o produto tinha ao abrir a tela (para limpar o arquivo ao trocar/remover). */
+    private String originalPhotoPath;
+    /** O usuário pediu para remover a foto do produto. */
+    private boolean removePhoto;
+    /** Otimização de foto em andamento (fora da thread principal). */
+    private boolean photoBusy;
+    private Button removePhotoButton;
 
     // Constantes
     private static final String TAG = "EditActivity";
@@ -93,6 +103,7 @@ public class EditActivity extends BaseActivity {
     
     // Keys para salvar estado
     private static final String STATE_PHOTO_PATH = "photoPath";
+    private static final String STATE_REMOVE_PHOTO = "removePhoto";
     private static final String STATE_LAST_PHOTO_NAME = "lastPhotoName";
 
     // ActivityResultLaunchers para capturar resultados
@@ -133,6 +144,10 @@ public class EditActivity extends BaseActivity {
 
         // Inicializar campos com verificação de erro
         photo = (ImageView) findViewById(R.id.editPhoto);
+        removePhotoButton = findViewById(R.id.editRemovePhoto);
+        if (removePhotoButton != null) {
+            removePhotoButton.setOnClickListener(v -> removeCurrentPhoto());
+        }
         name = (TextView) findViewById(R.id.editName);
         amount = (TextView) findViewById(R.id.editAmount);
         value = (TextView) findViewById(R.id.editValue);
@@ -210,6 +225,9 @@ public class EditActivity extends BaseActivity {
             if (savedPhotoName != null) {
                 lastPhotoName = savedPhotoName;
             }
+            if (savedInstanceState.getBoolean(STATE_REMOVE_PHOTO, false)) {
+                removeCurrentPhoto();
+            }
             
             // Se havia uma foto nova não salva, exibi-la
             if (newPhotoPath != null && !newPhotoPath.isEmpty()) {
@@ -250,6 +268,27 @@ public class EditActivity extends BaseActivity {
         }
         if (lastPhotoName != null) {
             outState.putString(STATE_LAST_PHOTO_NAME, lastPhotoName);
+        }
+        outState.putBoolean(STATE_REMOVE_PHOTO, removePhoto);
+    }
+
+    /** Tira a foto do produto (efeito só ao salvar) e mostra o ícone padrão. */
+    private void removeCurrentPhoto() {
+        removePhoto = true;
+        newPhotoPath = null;
+        if (photo != null) {
+            photo.setImageResource(R.drawable.ic_camera);
+            photo.setOnClickListener(null);
+        }
+        if (removePhotoButton != null) {
+            removePhotoButton.setVisibility(View.GONE);
+        }
+        if (discardGuard != null) discardGuard.markDirty();
+    }
+
+    private void showRemovePhotoButton(boolean show) {
+        if (removePhotoButton != null) {
+            removePhotoButton.setVisibility(show ? View.VISIBLE : View.GONE);
         }
     }
     
@@ -518,7 +557,9 @@ public class EditActivity extends BaseActivity {
                 unit.setText(columnUnit != null ? columnUnit : "");
 
                 // Carregar foto se disponível (com migração de caminhos legados)
+                originalPhotoPath = PhotoPathHelper.isEmptyPhotoReference(columnPhoto) ? null : columnPhoto;
                 if (!PhotoPathHelper.isEmptyPhotoReference(columnPhoto)) {
+                    showRemovePhotoButton(true);
                     try {
                         if (photo == null) {
                             Log.e(TAG, "photo field is null, cannot display photo");
@@ -651,6 +692,10 @@ public class EditActivity extends BaseActivity {
     }
 
     private void saveProduct(double targetAmount, String adjustmentNote) {
+        if (photoBusy) {
+            Toast.makeText(this, "Preparando a foto… tente salvar em instantes.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             ContentValues updateValues = new ContentValues();
             updateValues.put("name", name.getText().toString().trim());
@@ -670,6 +715,8 @@ public class EditActivity extends BaseActivity {
 
             if (newPhotoPath != null) {
                 updateValues.put("photo", newPhotoPath);
+            } else if (removePhoto) {
+                updateValues.putNull("photo");
             }
 
             // Atualização endereçada pelo identificador estável: renomear o
@@ -705,6 +752,14 @@ public class EditActivity extends BaseActivity {
             }
 
             if (saved) {
+                // A foto antiga só some do aparelho se nenhum produto a usa mais.
+                if (originalPhotoPath != null
+                        && (removePhoto || (newPhotoPath != null && !newPhotoPath.equals(originalPhotoPath)))) {
+                    synchronized (MainActivity.DB_LOCK) {
+                        PhotoFiles.deleteIfUnreferenced(MainActivity.stock,
+                                PhotoPathHelper.getImagesFolder(this), originalPhotoPath);
+                    }
+                }
                 Analytics.track(this, "product.updated");
                 setResult(RESULT_OK);
                 if (MainActivity.instance != null) {
@@ -1027,11 +1082,21 @@ public class EditActivity extends BaseActivity {
 
             // Verificar se a foto foi salva
             if (imgFile.exists() && imgFile.length() > 0) {
-                newPhotoPath = imgFile.getAbsolutePath();
-                if (discardGuard != null) discardGuard.markDirty();
-                displayPhoto(newPhotoPath);
-                Log.d(TAG, "Photo saved successfully at: " + newPhotoPath + ", size: " + imgFile.length() + " bytes");
-                Toast.makeText(this, "Foto capturada com sucesso", Toast.LENGTH_SHORT).show();
+                // Reduz e recodifica (WebP, até 1280 px / 250 KB) fora da thread
+                // principal; sem isso a foto de 12 MP ficaria como está.
+                photoBusy = true;
+                ImageOptimizer.importCameraFileAsync(this, imgFile, path -> {
+                    photoBusy = false;
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    removePhoto = false;
+                    newPhotoPath = path;
+                    if (discardGuard != null) discardGuard.markDirty();
+                    displayPhoto(newPhotoPath);
+                    Log.d(TAG, "Photo saved successfully at: " + newPhotoPath);
+                    Toast.makeText(this, "Foto capturada com sucesso", Toast.LENGTH_SHORT).show();
+                });
             } else {
                 Log.e(TAG, "Photo file does not exist or is empty at: " + imgFile.getAbsolutePath() 
                         + ", exists: " + imgFile.exists() 
@@ -1062,14 +1127,22 @@ public class EditActivity extends BaseActivity {
 
         // O Photo Picker concede acesso temporário à URI; copiamos para a pasta
         // do app para que a imagem permaneça disponível nas próximas sessões.
-        String copiedPath = PhotoPathHelper.copyUriToAppFolder(this, selectedImage);
-        if (copiedPath != null) {
-            newPhotoPath = copiedPath;
-            if (discardGuard != null) discardGuard.markDirty();
-            displayPhoto(copiedPath);
-        } else {
-            Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
-        }
+        // A cópia passa pelo otimizador (fora da thread principal).
+        photoBusy = true;
+        ImageOptimizer.importUriAsync(this, selectedImage, copiedPath -> {
+            photoBusy = false;
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
+            if (copiedPath != null) {
+                removePhoto = false;
+                newPhotoPath = copiedPath;
+                if (discardGuard != null) discardGuard.markDirty();
+                displayPhoto(copiedPath);
+            } else {
+                Toast.makeText(this, "Erro ao carregar imagem", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /**
@@ -1084,6 +1157,7 @@ public class EditActivity extends BaseActivity {
             }
 
             ImageLoadHelper.loadDetailImage(this, photoPath, photo);
+            showRemovePhotoButton(true);
             
             setupPhotoClickListener(photoPath);
         } catch (Exception e) {

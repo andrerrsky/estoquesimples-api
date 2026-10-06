@@ -58,10 +58,36 @@ public final class ApiClient {
     public static final class Response {
         public final int statusCode;
         public final JSONObject body;
+        /** Corpo binário (só nas chamadas de arquivo); nulo nas demais. */
+        public final byte[] bytes;
 
         Response(int statusCode, JSONObject body) {
+            this(statusCode, body, null);
+        }
+
+        Response(int statusCode, JSONObject body, byte[] bytes) {
             this.statusCode = statusCode;
             this.body = body;
+            this.bytes = bytes;
+        }
+    }
+
+    /**
+     * Transferência de arquivo: corpo bruto no envio e/ou resposta binária.
+     * Existe à parte para o caminho JSON, que é o de todas as outras chamadas,
+     * continuar exatamente como era.
+     */
+    private static final class Binary {
+        final byte[] upload;
+        final String uploadContentType;
+        final boolean download;
+        final int maxDownloadBytes;
+
+        Binary(byte[] upload, String uploadContentType, boolean download, int maxDownloadBytes) {
+            this.upload = upload;
+            this.uploadContentType = uploadContentType;
+            this.download = download;
+            this.maxDownloadBytes = maxDownloadBytes;
         }
     }
 
@@ -95,6 +121,22 @@ public final class ApiClient {
     }
 
     /**
+     * PUT de um arquivo (imagem de produto). A resposta é JSON. Repetir o mesmo
+     * arquivo é seguro: a API devolve a mesma imagem.
+     */
+    public Response putFile(String path, String contentType, byte[] bytes, String accessToken)
+            throws ApiException {
+        return execute("PUT", path, null, accessToken, null, 60_000,
+                new Binary(bytes, contentType, false, 0));
+    }
+
+    /** GET de um arquivo; {@link Response#bytes} traz o conteúdo (limitado a {@code maxBytes}). */
+    public Response getFile(String path, String accessToken, int maxBytes) throws ApiException {
+        return execute("GET", path, null, accessToken, null, 60_000,
+                new Binary(null, null, true, maxBytes));
+    }
+
+    /**
      * POST com chave de idempotência.
      *
      * Sem ela, uma resposta perdida no caminho de volta é indistinguível de uma
@@ -119,10 +161,18 @@ public final class ApiClient {
     private Response execute(String method, String path, JSONObject body,
                              String accessToken, String idempotencyKey, int readTimeoutMs)
             throws ApiException {
+        return execute(method, path, body, accessToken, idempotencyKey, readTimeoutMs, null);
+    }
+
+    private Response execute(String method, String path, JSONObject body,
+                             String accessToken, String idempotencyKey, int readTimeoutMs,
+                             Binary binary)
+            throws ApiException {
         ApiException ultima = null;
         for (int tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
             try {
-                return executeOnce(method, path, body, accessToken, idempotencyKey, readTimeoutMs);
+                return executeOnce(method, path, body, accessToken, idempotencyKey, readTimeoutMs,
+                        binary);
             } catch (ApiException e) {
                 ultima = e;
                 boolean rede = ApiException.SEM_REDE.equals(e.getCode());
@@ -142,7 +192,8 @@ public final class ApiClient {
     }
 
     private Response executeOnce(String method, String path, JSONObject body,
-                                 String accessToken, String idempotencyKey, int readTimeoutMs)
+                                 String accessToken, String idempotencyKey, int readTimeoutMs,
+                                 Binary binary)
             throws ApiException {
         HttpURLConnection connection = null;
         Thread watchdog = null;
@@ -190,7 +241,14 @@ public final class ApiClient {
             watchdog.setDaemon(true);
             watchdog.start();
 
-            if (body != null) {
+            if (binary != null && binary.upload != null) {
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", binary.uploadContentType);
+                connection.setFixedLengthStreamingMode(binary.upload.length);
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(binary.upload);
+                }
+            } else if (body != null) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
@@ -202,6 +260,11 @@ public final class ApiClient {
 
             int status = connection.getResponseCode();
             recordClockSkew(connection.getHeaderFieldDate("Date", 0L));
+
+            if (binary != null && binary.download && status >= 200 && status < 300) {
+                return new Response(status, new JSONObject(),
+                        readBytes(connection, binary.maxDownloadBytes));
+            }
 
             String responseBody = readBody(connection, status);
             JSONObject json = parse(responseBody);
@@ -254,6 +317,22 @@ public final class ApiClient {
                     // Fechar o fluxo não pode mascarar o resultado da chamada.
                 }
             }
+        }
+    }
+
+    /** Lê o corpo binário inteiro, recusando o que passar do limite. */
+    private byte[] readBytes(HttpURLConnection connection, int maxBytes) throws IOException {
+        try (InputStream stream = connection.getInputStream()) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = stream.read(chunk)) != -1) {
+                if (buffer.size() + read > maxBytes) {
+                    throw new IOException("resposta maior que o limite de " + maxBytes + " bytes");
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toByteArray();
         }
     }
 

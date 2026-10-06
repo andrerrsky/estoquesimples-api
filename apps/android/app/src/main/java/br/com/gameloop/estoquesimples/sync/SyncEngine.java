@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import br.com.gameloop.estoquesimples.PhotoPathHelper;
 import br.com.gameloop.estoquesimples.data.LocalBackup;
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.OutboxRepository;
@@ -52,6 +53,10 @@ public final class SyncEngine {
         this.meta = new SyncMeta(db);
         this.tamanhoLote = tamanhoLote;
         this.interrupcao = interrupcao;
+    }
+
+    private RemoteChanges remoteChanges() {
+        return new RemoteChanges(db).withImagesFolder(PhotoPathHelper.getImagesFolder(context));
     }
 
     private void conferirParada() throws ApiException {
@@ -383,7 +388,7 @@ public final class SyncEngine {
             // O cursor não avança aqui: esta versão veio pela resposta do
             // envio, não pela leitura ordenada, e tratá-la como leitura faria
             // o aparelho pular alterações de outras pessoas.
-            if (new RemoteChanges(db).apply(changes, meta.get(SyncMeta.CURSOR, "0"))
+            if (remoteChanges().apply(changes, meta.get(SyncMeta.CURSOR, "0"))
                     == RemoteChanges.FALHOU) {
                 Log.w(TAG, "não foi possível gravar a versão do servidor");
             }
@@ -433,7 +438,7 @@ public final class SyncEngine {
                 JSONArray changes = resposta.optJSONArray("changes");
                 String proximoCursor = resposta.optString("nextCursor", String.valueOf(cursor));
 
-                RemoteChanges aplicador = acumulador != null ? acumulador : new RemoteChanges(db);
+                RemoteChanges aplicador = acumulador != null ? acumulador : remoteChanges();
                 if (changes != null && changes.length() > 0) {
                     int aplicadas = aplicador.apply(changes, proximoCursor);
                     if (aplicadas == RemoteChanges.FALHOU) {
@@ -477,7 +482,7 @@ public final class SyncEngine {
      * e é a que mais precisa de um ponto de retorno.
      */
     private int fullResync(String workspaceId) throws ApiException {
-        RemoteChanges acumulador = new RemoteChanges(db);
+        RemoteChanges acumulador = remoteChanges();
         int recebidas = pullDesde(workspaceId, 0L, acumulador);
 
         LocalBackup.create(context, db, "recarga-completa");

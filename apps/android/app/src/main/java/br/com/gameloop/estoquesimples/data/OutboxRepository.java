@@ -291,9 +291,15 @@ public final class OutboxRepository {
 
             JSONObject anteriorAcumulado = new JSONObject();
             JSONObject ultimo = null;
+            boolean viuFoto = false;
+            Object ultimaFoto = null;
 
             while (cursor.moveToNext()) {
                 JSONObject payload = new JSONObject(cursor.getString(1));
+                if (payload.has(PhotoPayloads.FIELD)) {
+                    viuFoto = true;
+                    ultimaFoto = payload.get(PhotoPayloads.FIELD);
+                }
                 JSONObject anterior = payload.optJSONObject("previous");
                 if (anterior != null) {
                     Iterator<String> campos = anterior.keys();
@@ -318,6 +324,9 @@ public final class OutboxRepository {
             if (anteriorAcumulado.length() > 0) {
                 ultimo.put("previous", anteriorAcumulado);
             }
+            // Edição posterior sem foto não pode transformar "troquei a foto"
+            // em "remova a foto" quando as duas viram uma só.
+            PhotoPayloads.carryOver(ultimo, anteriorAcumulado, viuFoto, ultimaFoto);
             return ultimo;
 
         } catch (Exception e) {

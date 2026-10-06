@@ -9,6 +9,8 @@ import org.json.JSONObject;
 
 import java.util.UUID;
 
+import br.com.gameloop.estoquesimples.photos.PhotoRules;
+
 /**
  * Acesso a produtos identificados por {@code uuid}.
  *
@@ -277,6 +279,17 @@ public final class ProductRepository {
             // escolher um vencedor e descartar o trabalho do outro.
             JSONObject anterior = SyncPayloads.previousValues(db, uuid, values.keySet());
 
+            // Troca ou remoção de foto: ajusta photo_hash/photo_base_hash e, se
+            // a nuvem precisa saber (remoção de foto já sincronizada), acrescenta
+            // o ponto de partida da foto ao "previous".
+            JSONObject fotoAnterior = preparePhotoChange(uuid, values);
+            if (fotoAnterior != null) {
+                if (anterior == null) {
+                    anterior = new JSONObject();
+                }
+                anterior.put(PhotoPayloads.FIELD, fotoAnterior.get(PhotoPayloads.FIELD));
+            }
+
             int rows = db.update(LocalDb.TABLE_PRODUCTS, values, "uuid=?", new String[]{uuid});
             if (rows == 0) {
                 return false;
@@ -290,6 +303,98 @@ public final class ProductRepository {
             return true;
         } catch (Exception e) {
             Log.e(TAG, "falha ao atualizar produto", e);
+            return false;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
+     * Traduz uma mudança da coluna {@code photo} em estado de sincronização.
+     *
+     * <ul>
+     *   <li>foto nova ou trocada: {@code photo_hash} volta a nulo ("precisa
+     *       subir") e o hash que a nuvem tinha vira {@code photo_base_hash};
+     *       nada é enviado agora — o hash só existe depois do upload;</li>
+     *   <li>foto removida: {@code photo_hash} e a base são limpos e, se a nuvem
+     *       chegou a conhecer a foto, o payload leva {@code photoHash: null}
+     *       com o hash antigo em {@code previous};</li>
+     *   <li>mesmo valor de antes: a chave é ignorada.</li>
+     * </ul>
+     *
+     * @return {@code previous} com {@code photoHash}, só no caso de remoção de
+     *         foto que a nuvem conhece; senão {@code null}.
+     */
+    private JSONObject preparePhotoChange(String uuid, ContentValues values) {
+        if (!values.containsKey("photo")) {
+            return null;
+        }
+        Product atual = findByUuid(uuid);
+        if (atual == null) {
+            return null;
+        }
+        String nova = values.getAsString("photo");
+        boolean novaVazia = PhotoRules.isEmptyPath(nova);
+        boolean atualVazia = PhotoRules.isEmptyPath(atual.photo);
+        if ((novaVazia && atualVazia) || (!novaVazia && nova.equals(atual.photo))) {
+            values.remove("photo");
+            return null;
+        }
+
+        String hashNaNuvem = atual.photoHash != null ? atual.photoHash : atual.photoBaseHash;
+        values.putNull("photo_hash");
+        if (novaVazia) {
+            values.putNull("photo_base_hash");
+            return hashNaNuvem != null ? PhotoPayloads.previousFor(hashNaNuvem) : null;
+        }
+        if (hashNaNuvem != null) {
+            values.put("photo_base_hash", hashNaNuvem);
+        } else {
+            values.putNull("photo_base_hash");
+        }
+        return null;
+    }
+
+    /**
+     * Registra que a foto local foi enviada e enfileira a edição que a liga ao
+     * produto na nuvem.
+     *
+     * É uma edição como qualquer outra (versão de origem, {@code rev}
+     * incrementado, fila): o servidor a mescla ou a recusa pelas mesmas regras.
+     * Se a foto mudou enquanto o upload corria, nada é gravado — o hash recebido
+     * descreve outro arquivo — e o ciclo seguinte envia a foto atual.
+     *
+     * @return {@code true} se o hash foi gravado e a operação enfileirada.
+     */
+    public boolean markPhotoUploaded(String uuid, String uploadedPhotoPath, String hash) {
+        if (uuid == null || uploadedPhotoPath == null || !PhotoRules.isValidHash(hash)) {
+            return false;
+        }
+        db.beginTransaction();
+        try {
+            Product atual = findByUuid(uuid);
+            if (atual == null || atual.isDeleted() || atual.photoHash != null
+                    || !uploadedPhotoPath.equals(atual.photo)) {
+                return false;
+            }
+            long baseRev = revOf(uuid);
+
+            ContentValues values = new ContentValues();
+            values.put("photo_hash", hash);
+            values.putNull("photo_base_hash");
+            values.put("updated_at", System.currentTimeMillis());
+            if (db.update(LocalDb.TABLE_PRODUCTS, values, "uuid=?", new String[]{uuid}) == 0) {
+                return false;
+            }
+            db.execSQL("UPDATE " + LocalDb.TABLE_PRODUCTS + " SET rev = rev + 1 WHERE uuid=?",
+                    new String[]{uuid});
+            if (!enqueueUpsert(uuid, baseRev, PhotoPayloads.previousFor(atual.photoBaseHash))) {
+                return false;
+            }
+            db.setTransactionSuccessful();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao registrar o envio da foto", e);
             return false;
         } finally {
             db.endTransaction();

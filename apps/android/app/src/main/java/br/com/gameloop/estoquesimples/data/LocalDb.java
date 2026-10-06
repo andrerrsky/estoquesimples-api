@@ -46,8 +46,10 @@ public final class LocalDb extends SQLiteOpenHelper {
      *     tentativa de ligar o histórico legado ao produto pelo uuid.
      * 6 — reverses_uuid: vínculo estruturado entre um cancelamento e a
      *     movimentação original, para sincronizar e exibir esse elo.
+     * 7 — photo_hash / photo_base_hash: identificação da foto na nuvem (ver
+     *     AGENTS.md, "Fotos dos produtos").
      */
-    public static final int VERSION = 6;
+    public static final int VERSION = 7;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
@@ -135,6 +137,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV4(db);
         upgradeToV5(db);
         upgradeToV6(db);
+        upgradeToV7(db);
     }
 
     @Override
@@ -155,6 +158,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 6) {
             upgradeToV6(db);
+        }
+        if (oldVersion < 7) {
+            upgradeToV7(db);
         }
     }
 
@@ -368,6 +374,20 @@ public final class LocalDb extends SQLiteOpenHelper {
      */
     private void upgradeToV6(SQLiteDatabase db) {
         addColumnIfMissing(db, TABLE_MOVEMENTS, "reverses_uuid", "TEXT");
+    }
+
+    /**
+     * Fotos na nuvem.
+     *
+     * {@code photo_hash}: SHA-256 da imagem no servidor que o arquivo local
+     * representa; nulo com {@code photo} preenchida significa "ainda precisa
+     * subir". {@code photo_base_hash}: o que a nuvem tinha quando a foto local
+     * foi trocada, ponto de partida (previous) do envio. Aparelhos que já têm
+     * foto ficam com os dois nulos e a foto sobe na próxima sincronização.
+     */
+    private void upgradeToV7(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_PRODUCTS, "photo_hash", "TEXT");
+        addColumnIfMissing(db, TABLE_PRODUCTS, "photo_base_hash", "TEXT");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {

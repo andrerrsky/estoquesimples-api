@@ -384,6 +384,10 @@ public class AccountActivity extends BaseActivity {
             if (erro != null) {
                 appendNote(notas, erro);
             }
+            String avisoFotos = meta.get(SyncMeta.FOTOS_AVISO);
+            if (avisoFotos != null) {
+                appendNote(notas, avisoFotos);
+            }
 
             long desvio = meta.getLong(SyncMeta.DESVIO_RELOGIO, 0L);
             if (Math.abs(desvio) > 5 * 60 * 1000L) {

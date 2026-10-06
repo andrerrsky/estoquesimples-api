@@ -8,8 +8,14 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+
+import br.com.gameloop.estoquesimples.photos.PhotoFiles;
+import br.com.gameloop.estoquesimples.photos.PhotoRules;
 
 /**
  * Aplica no banco local as alterações vindas da nuvem.
@@ -48,9 +54,23 @@ public final class RemoteChanges {
      */
     private boolean adiadoPorPendencia;
 
+    /**
+     * Pasta das fotos. Sem ela a foto vinda da nuvem não é tocada (o resto do
+     * produto é aplicado normalmente).
+     */
+    private File imagesFolder;
+
+    /** Arquivos de fotos substituídas/removidas; apagados após o commit se órfãos. */
+    private final List<String> arquivosSubstituidos = new ArrayList<>();
+
     public RemoteChanges(SQLiteDatabase db) {
         this.db = db;
         this.outbox = new OutboxRepository(db);
+    }
+
+    public RemoteChanges withImagesFolder(File folder) {
+        this.imagesFolder = folder;
+        return this;
     }
 
     public Set<String> produtosVistos() {
@@ -105,6 +125,7 @@ public final class RemoteChanges {
     public int apply(JSONArray changes, String cursor) {
         int aplicadas = 0;
         boolean adiou = false;
+        arquivosSubstituidos.clear();
 
         db.beginTransaction();
         try {
@@ -135,6 +156,13 @@ public final class RemoteChanges {
         } finally {
             db.endTransaction();
         }
+
+        // Só depois do commit: se a página voltasse atrás, o arquivo antigo
+        // ainda seria o da foto de cada produto.
+        for (String caminho : arquivosSubstituidos) {
+            PhotoFiles.deleteIfUnreferenced(db, imagesFolder, caminho);
+        }
+        arquivosSubstituidos.clear();
 
         adiadoPorPendencia = adiou;
         recebidasNoTotal += changes.length();
@@ -187,6 +215,7 @@ public final class RemoteChanges {
             values.put("deleted_at", data.optLong("deletedAt", System.currentTimeMillis()));
         } else {
             values.putNull("deleted_at");
+            applyPhoto(uuid, data, values);
         }
 
         if (exists(LocalDb.TABLE_PRODUCTS, uuid)) {
@@ -200,6 +229,64 @@ public final class RemoteChanges {
             db.insert(LocalDb.TABLE_PRODUCTS, null, values);
         }
         return Efeito.APLICADA;
+    }
+
+    /**
+     * Reflete a foto do servidor no produto (ver {@link PhotoRules#decidePull}).
+     *
+     * Só grava referência e hash; o download acontece depois, fora da
+     * transação, e quem não conseguir baixar fica com {@code photo_hash} e sem
+     * arquivo — o marcador que a rodada seguinte usa para tentar de novo.
+     * Nada aqui apaga o arquivo que ainda é a foto de outro produto.
+     */
+    private void applyPhoto(String uuid, JSONObject data, ContentValues values) {
+        if (imagesFolder == null) {
+            return;
+        }
+        boolean informa = data.has("photoHash");
+        String hash = informa && !data.isNull("photoHash") ? data.optString("photoHash", null) : null;
+
+        String fotoLocal = null;
+        String hashLocal = null;
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery("SELECT photo, photo_hash FROM " + LocalDb.TABLE_PRODUCTS
+                    + " WHERE uuid=?", new String[]{uuid});
+            if (cursor.moveToFirst()) {
+                fotoLocal = cursor.isNull(0) ? null : cursor.getString(0);
+                hashLocal = cursor.isNull(1) ? null : cursor.getString(1);
+            }
+        } finally {
+            LocalDb.closeQuietly(cursor);
+        }
+
+        switch (PhotoRules.decidePull(informa, hash, fotoLocal, hashLocal)) {
+            case ADOPT_SERVER: {
+                File alvo = new File(imagesFolder, PhotoRules.canonicalName(hash));
+                if (alvo.exists() && !PhotoFiles.fileMatches(alvo, hash)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    alvo.delete();
+                }
+                values.put("photo", alvo.getAbsolutePath());
+                values.put("photo_hash", hash);
+                values.putNull("photo_base_hash");
+                if (!PhotoRules.isEmptyPath(fotoLocal)
+                        && !fotoLocal.equals(alvo.getAbsolutePath())) {
+                    arquivosSubstituidos.add(fotoLocal);
+                }
+                break;
+            }
+            case REMOVE_LOCAL:
+                values.putNull("photo");
+                values.putNull("photo_hash");
+                values.putNull("photo_base_hash");
+                if (!PhotoRules.isEmptyPath(fotoLocal)) {
+                    arquivosSubstituidos.add(fotoLocal);
+                }
+                break;
+            default:
+                break;
+        }
     }
 
     private Efeito applyMovement(JSONObject data) {

@@ -12,6 +12,10 @@ public final class Product {
     public String amount;
     public String value;
     public String photo;
+    /** SHA-256 da imagem na nuvem que {@link #photo} representa; nulo = ainda não enviada. */
+    public String photoHash;
+    /** Hash que a nuvem tinha quando a foto local foi trocada (ponto de partida do envio). */
+    public String photoBaseHash;
     public String category;
     public String sku;
     public String barcode;
@@ -32,6 +36,8 @@ public final class Product {
         product.amount = getString(cursor, "amount");
         product.value = getString(cursor, "value");
         product.photo = getString(cursor, "photo");
+        product.photoHash = getString(cursor, "photo_hash");
+        product.photoBaseHash = getString(cursor, "photo_base_hash");
         product.category = getString(cursor, "category");
         product.sku = getString(cursor, "sku");
         product.barcode = getString(cursor, "barcode");

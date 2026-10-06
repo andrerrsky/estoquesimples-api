@@ -13,6 +13,7 @@ import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.OutboxRepository;
 import br.com.gameloop.estoquesimples.data.SyncGate;
 import br.com.gameloop.estoquesimples.data.SyncMeta;
+import br.com.gameloop.estoquesimples.photos.PhotoSync;
 
 /**
  * Sincronização em segundo plano.
@@ -128,7 +129,23 @@ public final class SyncWorker extends Worker {
             }
         }
 
+        // Fotos: as imagens sobem antes do envio da fila (a nuvem ignora um
+        // photoHash cujo arquivo ainda não existe lá) e as novas descem depois
+        // da leitura. Erro de foto nunca derruba a sincronização do estoque.
+        PhotoSync photos = new PhotoSync(context, db, api, session, interrupcao);
+        try {
+            photos.uploadPending();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "falha inesperada ao enviar fotos", e);
+        }
+
         SyncEngine.Resultado resultado = engine.run();
+
+        try {
+            photos.downloadMissing();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "falha inesperada ao baixar fotos", e);
+        }
 
         int pendentes = new OutboxRepository(db).pendingCount();
         meta.put(SyncMeta.ULTIMA_SINCRONIZACAO, System.currentTimeMillis());
