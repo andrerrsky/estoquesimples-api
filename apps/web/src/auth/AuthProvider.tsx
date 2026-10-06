@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, onSessionChange, refreshSession, sessionApi } from '../api/client';
 import type { User } from '../api/types';
 import { track } from '../lib/analytics';
+import { clearProductImages } from '../lib/product-image';
 
 type Status = 'loading' | 'guest' | 'authed';
 
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setStatus('guest');
           queryClient.clear();
+          clearProductImages();
         }
       }),
     [queryClient],
@@ -77,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setStatus('guest');
     queryClient.clear();
+    clearProductImages();
   }, [queryClient]);
 
   const reloadUser = useCallback(async () => {

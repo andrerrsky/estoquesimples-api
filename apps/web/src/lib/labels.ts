@@ -101,6 +101,7 @@ export const FIELD_LABEL: Record<string, string> = {
   unit: 'unidade',
   sku: 'SKU',
   barcode: 'código de barras',
+  photoHash: 'foto',
 };
 
 export const CURRENCIES = ['R$', '$', '€', '£', '¥'];

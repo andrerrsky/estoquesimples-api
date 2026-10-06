@@ -17,9 +17,12 @@ Os números são linhas de `plan_features` e podem ser alterados no painel
 
 ## O que custa de verdade
 
-As fotos de produtos **nunca saem do aparelho**: a sincronização só leva
-texto e números (`photo_hash` existe na tabela, mas nem é aceito no payload).
-Logo o custo marginal de um usuário gratuito é só Postgres e tráfego JSON:
+Dados de texto e números pesam quase nada. O que custa são as **fotos**, e por
+isso elas têm cota (`imagens.armazenamento_mb`: 100 MB no gratuito, 5.000 MB
+na Equipe, editável em Planos). Cada foto é reduzida a no máximo 1280 px e em
+geral fica em 100–250 KB, então 100 MB são algumas centenas de fotos por
+empresa. Detalhes em [images.md](images.md). O custo marginal de um usuário
+gratuito é Postgres, tráfego JSON e esse espaço de imagens:
 
 - um produto ≈ 1 KB com índices; 50 produtos × 10.000 empresas gratuitas ≈ 0,5 GB;
 - movimentações ≈ 0,3 KB; 20/dia × 365 ≈ 2 MB/ano por empresa ativa;

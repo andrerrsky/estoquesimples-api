@@ -124,6 +124,7 @@ workspace na transação). Consequências:
 | `subscriptions` | assinatura **da empresa** | `provider` ∈ google_play/asaas; estados (iguais para os dois): pendente, ativa, carencia, suspensa, cancelada_mas_ativa, expirada, reembolsada, substituida; uma viva por empresa (índice parcial); purchase token do Google só cifrado (AES-GCM) + hash; colunas do Google são nulas nas do Asaas e vice-versa |
 | `subscription_events` | avisos dos provedores (RTDN do Google, webhooks do Asaas) | idempotentes por `notification_id` (`asaas:<id do evento>` no Asaas); nunca fonte de verdade — disparam consulta ao provedor |
 | `billing_customers` / `billing_payments` | pagador e cobranças da assinatura da web | espelho do Asaas para a área Plano e o painel; do documento só o tipo e os dígitos finais; tabelas de sistema (sem GRANT para `app_user`) |
+| `workspace_images` | metadados das fotos dos produtos (o binário está no bucket S3) | identificada por `hash` (SHA-256 do conteúdo guardado) por empresa; `products.photo_hash` aponta para ela; coleta de lixo por `orphaned_at` ([docs/images.md](docs/images.md)) |
 | `notifications` | caixa de entrada da conta (app e web) | uma linha por aviso; tabela de sistema, filtrada por `user_id` no serviço ([docs/notifications.md](docs/notifications.md)) |
 | `products` / `stock_movements` | estoque na nuvem | ids UUID gerados no aparelho; movimentações são fatos imutáveis com quantidade **com sinal**; cancelamento = movimento compensatório (`reverses_movement_id`); `quantity_cache` mantido por trigger (desligado na carga inicial); exclusão de produto é lógica (lápide) |
 | `sync_operations` / `sync_cursors` / `initial_uploads(_batches)` / `conflict_log` | infraestrutura de sync | idempotência de operação, posição de cada aparelho, sessão de carga inicial retomável, três lados de cada conflito |
@@ -418,6 +419,12 @@ Detalhes em [docs/web-app.md](docs/web-app.md) e
   (`asaas-state.ts`) do que o Asaas informa agora; webhook autenticado por
   token, idempotente e sempre 200; reconciliação por job
   (`billing.asaas_reconcile`). Chave e token só em variável de ambiente.
+- **Imagens** (`modules/images`, `platform/storage`): foto de produto no bucket
+  S3 privado; só a API lê e grava (valida tipo pelos bytes, decodifica,
+  reencoda em WebP ≤ 1280 px, cota por plano). Identificada pelo hash do
+  conteúdo e vinculada por `products.photo_hash`, que sincroniza como campo
+  normal do produto (ausente no `push` = não mexi; `null` = remover). Coleta de
+  lixo diária em duas etapas. Detalhes e limites em [docs/images.md](docs/images.md).
 - **Notificações** (`modules/notifications`): caixa de entrada única para app
   e web + push opcional; novos tipos entram em `NotificationType`.
 - **Front** (`apps/web`): Vite + React 19 + React Router 7 + TanStack Query,
@@ -434,6 +441,7 @@ Como estender a web: rota nova na API (seção 10) → contrato em
 
 Deploy, alertas, backups, lançamento gradual e rollback: [DEPLOY.md](DEPLOY.md).
 Suporte: `SUPPORT_NOTIFY_EMAILS`, `ADMIN_PANEL_URL`.
+Imagens: `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `IMAGE_FS_DIR`, `IMAGE_MAX_UPLOAD_BYTES`, `IMAGE_MAX_EDGE`, `IMAGE_GC_GRACE_DAYS`.
 Web e pagamento: `WEB_APP_HOSTS`, `WEB_APP_URL`, `WEB_SESSION_COOKIE_NAME`,
 `ASAAS_API_KEY`, `ASAAS_ENVIRONMENT`, `ASAAS_WEBHOOK_TOKEN`,
 `ASAAS_GRACE_DAYS`, `ASAAS_PENDING_EXPIRE_DAYS`,

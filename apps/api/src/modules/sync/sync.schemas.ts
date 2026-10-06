@@ -25,6 +25,13 @@ export const productInputSchema = z
     location: z.string().max(120).nullish(),
     sku: z.string().max(80).nullish(),
     barcode: z.string().max(80).nullish(),
+    /**
+     * Imagem do produto: SHA-256 (hex) devolvido por `PUT /images`.
+     *
+     * Ausente = "não mexi na foto" (aparelhos de versões antigas nunca a
+     * enviam e não podem apagá-la sem querer); `null` = "remover a foto".
+     */
+    photoHash: z.string().regex(/^[0-9a-f]{64}$/).nullish(),
     // Milissegundos do relógio do aparelho. Informativo apenas.
     updatedAt: z.number().int().nonnegative().optional(),
     deletedAt: z.number().int().nonnegative().nullish(),

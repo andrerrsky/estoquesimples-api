@@ -218,6 +218,33 @@ const envSchema = z
     /** Assinatura suspensa por falta de pagamento é cancelada depois deste prazo. */
     ASAAS_SUSPENDED_CANCEL_DAYS: z.coerce.number().int().min(1).max(180).default(30),
     ASAAS_RECONCILE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
+
+    // -----------------------------------------------------------------------
+    // Imagens de produto (docs/images.md)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Bucket S3 (no Railway: o bucket do projeto, com as credenciais que ele
+     * gera). Sem `S3_BUCKET` as imagens ficam desligadas em produção; em
+     * desenvolvimento e teste grava em disco (`IMAGE_FS_DIR`).
+     */
+    S3_BUCKET: z.string().min(1).optional(),
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_REGION: z.string().min(1).default('auto'),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    /** MinIO e similares exigem `bucket` no caminho; o Railway usa o padrão. */
+    S3_FORCE_PATH_STYLE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    IMAGE_FS_DIR: z.string().min(1).default('.data/images'),
+    /** Maior arquivo aceito no envio (a imagem já otimizada pelo cliente fica muito abaixo). */
+    IMAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().max(10_485_760).default(2_097_152),
+    /** Maior lado, em pixels, da imagem guardada. Acima disso a API reduz. */
+    IMAGE_MAX_EDGE: z.coerce.number().int().min(256).max(4096).default(1280),
+    /** Dias que uma imagem sem produto fica guardada antes de ser apagada. */
+    IMAGE_GC_GRACE_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   })
   .superRefine((value, ctx) => {
     const isProdLike = value.NODE_ENV === 'production' || value.NODE_ENV === 'staging';

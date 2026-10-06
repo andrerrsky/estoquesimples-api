@@ -37,6 +37,7 @@ const FEATURE_LABEL: Record<string, string> = {
   'equipe.membros': 'Pessoas na empresa (teto, inclui o proprietário)',
   'sync.dispositivos': 'Aparelhos sincronizando (não aplicado)',
   'analise.avancada': 'Análise Avançada de Estoque',
+  'imagens.armazenamento_mb': 'Fotos de produtos: armazenamento por empresa (MB; vazio = sem limite)',
 };
 
 type Dialog = null | { kind: 'plan'; plan: Plan } | { kind: 'feature'; plan: Plan; feature: { key: string; enabled: boolean; limit: number | null } };

@@ -15,6 +15,8 @@ export const Feature = {
   MEMBERS: 'equipe.membros',
   DEVICES: 'sync.dispositivos',
   ANALYSIS: 'analise.avancada',
+  /** Cota de imagens da empresa, em MB (limit_value; NULL = sem limite). */
+  IMAGES_MB: 'imagens.armazenamento_mb',
 } as const;
 
 /** Teto de um recurso: `null` quando o plano não limita. */

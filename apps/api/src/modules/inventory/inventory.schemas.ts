@@ -31,6 +31,8 @@ export const productFieldsSchema = z.object({
   location: optionalText(120),
   sku: optionalText(80),
   barcode: optionalText(80),
+  /** SHA-256 devolvido por `PUT /images`; `null` remove a foto. */
+  photoHash: z.string().regex(/^[0-9a-f]{64}$/, 'Identificador de imagem inválido.').nullish(),
 });
 
 export const createProductBodySchema = productFieldsSchema

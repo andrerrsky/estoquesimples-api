@@ -334,3 +334,128 @@
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* Fotos dos produtos */
+.pimg {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-faint);
+  vertical-align: middle;
+}
+.pimg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pimg__loading {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--chip) 25%, var(--surface) 50%, var(--chip) 75%);
+  background-size: 200% 100%;
+  animation: pimg-shimmer 1.2s infinite linear;
+}
+@keyframes pimg-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.pimg--hero {
+  width: 100% !important;
+  max-width: 100%;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  max-height: 320px;
+  border-radius: var(--radius-panel);
+}
+.pimg--hero img {
+  object-fit: contain;
+  background: var(--surface-content);
+}
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Campo de foto do formulário */
+.photo-field {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  transition: border-color var(--transition), background var(--transition);
+}
+.photo-field--drag {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.photo-field__preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 112px;
+  height: 112px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--surface-content);
+  border: 1px solid var(--border);
+}
+.photo-field__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-field__empty {
+  color: var(--text-faint);
+}
+.photo-field__busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.7);
+}
+.photo-field__side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.photo-field__side .field__hint,
+.photo-field__side .field__error {
+  margin: 0;
+}
+.photo-field__pick:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.photo-field__progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--chip);
+  overflow: hidden;
+}
+.photo-field__progress span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  transition: width 120ms linear;
+}
+@media (max-width: 480px) {
+  .photo-field {
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pimg__loading { animation: none; }
+}

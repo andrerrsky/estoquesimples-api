@@ -18,6 +18,7 @@ import { registerAnalyticsRoutes } from '../../modules/analytics/analytics.route
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerWebSessionRoutes } from '../../modules/auth/web-session.routes.js';
 import { registerAsaasRoutes } from '../../modules/billing/asaas/asaas.routes.js';
+import { registerImageRoutes } from '../../modules/images/images.routes.js';
 import { registerInventoryRoutes } from '../../modules/inventory/inventory.routes.js';
 import { registerNotificationRoutes } from '../../modules/notifications/notifications.routes.js';
 import { registerPushRoutes } from '../../modules/push/push.routes.js';
@@ -183,6 +184,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerInventoryRoutes, { prefix: '/v1' });
   await app.register(registerNotificationRoutes, { prefix: '/v1' });
   await app.register(registerAsaasRoutes, { prefix: '/v1' });
+  await app.register(registerImageRoutes, { prefix: '/v1' });
 
   // Painel administrativo: API em /admin/api e a interface estática em /admin.
   if (env.ADMIN_PANEL_ENABLED) {

@@ -114,7 +114,7 @@
       "question": "Em quais plataformas o Estoque Simples funciona?",
       "answer": [
         "O Estoque Simples funciona no **Android** e na **web**, com a mesma conta e o mesmo estoque:",
-        "• **Aplicativo Android** (Google Play): funciona sem internet, guarda fotos dos produtos, lê código de barras pela câmera e avisa quando algo está acabando.",
+        "• **Aplicativo Android** (Google Play): funciona sem internet, guarda as fotos também no aparelho, lê código de barras pela câmera e avisa quando algo está acabando.",
         "• **Versão web** (estoquesimples.com.br): abre em qualquer navegador, no computador, no tablet ou no celular, sem instalar nada. Precisa de internet. É também onde se assina o plano por Pix, boleto ou cartão.",
         "• **Web app**: a versão web instalada na tela inicial, como se fosse um aplicativo. É o caminho para quem usa **iPhone ou iPad**, que ainda não têm aplicativo próprio, e também serve no computador.",
         "Você pode usar só um ou vários ao mesmo tempo."
@@ -143,7 +143,7 @@
         "Sim, pela versão web. Ainda não temos um aplicativo na App Store, mas você pode **instalar a versão web na tela inicial** e usar como um aplicativo, com ícone próprio e sem a barra do navegador.",
         "No Safari: abra **estoquesimples.com.br**, toque em **Compartilhar** (o quadrado com uma seta para cima), depois em **Adicionar à Tela de Início** e confirme em **Adicionar**.",
         "A página **Plataformas** (no menu, ou em estoquesimples.com.br/plataformas) mostra o passo a passo com os nomes dos botões, para iPhone, iPad, Android, Windows e Mac.",
-        "Tem as mesmas telas e a mesma conta do computador. A diferença para o aplicativo Android é que precisa de internet e não guarda fotos."
+        "Tem as mesmas telas e a mesma conta do computador. A diferença para o aplicativo Android é que precisa de internet."
       ],
       "keywords": [
         "ios",
@@ -410,14 +410,23 @@
       "category": "nuvem",
       "question": "As fotos dos produtos vão para a nuvem?",
       "answer": [
-        "Não. As fotos ficam só no celular em que foram tiradas. Elas não aparecem na versão web nem em outros aparelhos.",
-        "Todo o resto do cadastro (nome, quantidade, preço, categoria, códigos, histórico) sincroniza normalmente."
+        "Sim. A foto que você tira no aplicativo ou escolhe na versão web é **reduzida e otimizada** (até 1280 pixels, em geral algumas centenas de KB) e guardada na nuvem junto com o produto. Ela aparece nos seus outros aparelhos e na web, depois da sincronização.",
+        "Sem internet, o aplicativo guarda a foto no próprio celular e envia quando a conexão voltar. Trocar ou remover a foto vale em todos os lugares.",
+        "Cada plano tem um **limite de espaço para fotos** por empresa (o plano Equipe tem mais). Quando o espaço acaba, as novas fotos não são enviadas — o produto continua cadastrado e a foto fica só no aparelho até você liberar espaço ou assinar.",
+        "Fotos que você troca ou remove, e as de produtos excluídos, são apagadas da nuvem depois de alguns dias.",
+        "Quem ainda está numa versão antiga do aplicativo não envia nem recebe fotos."
       ],
       "keywords": [
         "imagem",
         "foto",
         "câmera",
-        "galeria"
+        "galeria",
+        "espaço",
+        "armazenamento",
+        "limite de fotos",
+        "enviar foto",
+        "trocar foto",
+        "remover foto"
       ]
     },
     {
@@ -426,7 +435,7 @@
       "question": "Troquei de celular. Como levo meu estoque?",
       "answer": [
         "Se você usa conta, é só instalar o aplicativo no celular novo e entrar com o mesmo e-mail e senha: o estoque que está na nuvem é baixado.",
-        "Antes de se desfazer do celular antigo, abra **Conta e nuvem** e confira se não há nada pendente de envio. As fotos não vêm junto, porque ficam só no aparelho.",
+        "Antes de se desfazer do celular antigo, abra **Conta e nuvem** e confira se não há nada pendente de envio. As fotos também vêm da nuvem; se alguma ainda não tiver sido enviada, ela fica pendente no aparelho antigo.",
         "Se você não usa conta, faça um backup pelo aplicativo (em **Imp/Exp**) no celular antigo e restaure no novo."
       ],
       "keywords": [
@@ -899,7 +908,7 @@
       "question": "O que a versão web e o web app não têm em relação ao aplicativo Android?",
       "answer": [
         "• Não funciona sem internet.",
-        "• Não mostra nem guarda fotos dos produtos.",
+        "• A foto do produto pode ser escolhida do computador ou do celular; a câmera do aparelho só no aplicativo (ou pelo navegador do celular).",
         "• Não envia notificação de estoque baixo (o destaque aparece na lista e nos relatórios).",
         "• O backup em arquivo é um recurso do aplicativo; na web, use as exportações."
       ],

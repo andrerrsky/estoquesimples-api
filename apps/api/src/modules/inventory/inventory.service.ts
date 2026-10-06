@@ -42,7 +42,7 @@ interface Operation {
   payload: Record<string, unknown>;
 }
 
-const EDITABLE_FIELDS = ['name', 'description', 'unitValue', 'minStock', 'unit', 'category', 'supplier', 'location', 'sku', 'barcode'] as const;
+const EDITABLE_FIELDS = ['name', 'description', 'unitValue', 'minStock', 'unit', 'category', 'supplier', 'location', 'sku', 'barcode', 'photoHash'] as const;
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
 const MOVEMENT_LABEL: Record<string, string> = {
@@ -96,6 +96,7 @@ function productView(row: Row) {
     location: text(row['location']),
     sku: text(row['sku']),
     barcode: text(row['barcode']),
+    photoHash: text(row['photo_hash']),
     rev: Number(row['rev']),
     lowStock: quantity <= 0 || (minStock > 0 && quantity <= minStock),
     outOfStock: quantity <= 0,
@@ -557,6 +558,7 @@ export class InventoryService {
       location: 'location' in overrides ? overrides.location : row['location'],
       sku: 'sku' in overrides ? overrides.sku : row['sku'],
       barcode: 'barcode' in overrides ? overrides.barcode : row['barcode'],
+      photoHash: 'photoHash' in overrides ? overrides.photoHash : row['photo_hash'],
       rev: Number(row['rev']),
       updatedAt: Date.now(),
     };
@@ -568,12 +570,28 @@ export class InventoryService {
         return num(row['unit_value']);
       case 'minStock':
         return num(row['min_stock']);
+      case 'photoHash':
+        return (row['photo_hash'] as string | null) ?? null;
       default:
         return (row[field] as string | null) ?? null;
     }
   }
 
+  /**
+   * A foto só pode apontar para uma imagem já enviada para esta empresa. O
+   * motor de sincronização ignora ponteiro desconhecido sem avisar (para não
+   * travar o estoque); a web, que espera a resposta, recebe o erro claro.
+   */
+  private async assertImageExists(tx: Transaction, workspaceId: string, hash: string | null | undefined): Promise<void> {
+    if (!hash) return;
+    const found = await tx.execute(sql`SELECT 1 FROM workspace_images WHERE workspace_id = ${workspaceId} AND hash = ${hash} LIMIT 1`);
+    if (found.rows.length === 0) {
+      throw new AppError(422, ErrorCode.IMAGE_INVALID, 'A imagem do produto não foi encontrada. Envie a foto de novo.');
+    }
+  }
+
   async createProduct(tx: Transaction, ctx: InventoryContext, body: CreateProductBody): Promise<ProductView> {
+    await this.assertImageExists(tx, ctx.workspaceId, body.photoHash);
     this.validateUnit(body.unit, body.quantity);
     const id = body.id ?? randomUUID();
     const unit = body.unit && body.unit !== '' ? body.unit : 'un';
@@ -596,6 +614,7 @@ export class InventoryService {
         location: body.location || null,
         sku: body.sku || null,
         barcode: body.barcode || null,
+        ...(body.photoHash ? { photoHash: body.photoHash } : {}),
         rev: 0,
         updatedAt: Date.now(),
       },
@@ -618,6 +637,7 @@ export class InventoryService {
   }
 
   async updateProduct(tx: Transaction, ctx: InventoryContext, productId: string, body: UpdateProductBody): Promise<ProductView> {
+    await this.assertImageExists(tx, ctx.workspaceId, body.changes.photoHash);
     const current = await this.lockProduct(tx, ctx.workspaceId, productId);
 
     const changes: Partial<Record<EditableField, unknown>> = {};

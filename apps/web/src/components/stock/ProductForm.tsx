@@ -1,12 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
 
-import { api, ApiError, errorMessage } from '../../api/client';
-import type { Facets, Product, ProductList } from '../../api/types';
+import { api, ApiError, errorMessage, uploadBinary } from '../../api/client';
+import type { Facets, Product, ProductList, UploadedImage } from '../../api/types';
 import { track } from '../../lib/analytics';
 import { newId } from '../../lib/device';
 import { fmtQuantity, fold, numberInput, parseNumber } from '../../lib/format';
+import { IMAGE_ACCEPT, ImageError, prepareImage, type PreparedImage } from '../../lib/image';
 import { inventoryKeys, useDebounced, useInvalidateInventory } from '../../lib/inventory';
+import { ProductImage } from '../../lib/product-image';
 import { fractionMessage, hasFraction, isValidUnit, isWholeUnit, UNIT_ERROR } from '../../lib/units';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { BarcodeScanner, barcodeScanningSupported } from '../BarcodeScanner';
@@ -47,6 +49,9 @@ function fromProduct(product: Product): FormState {
 
 type Errors = Partial<Record<keyof FormState, string>>;
 
+/** O que a pessoa fez com a foto neste formulário. */
+type PhotoChange = { kind: 'keep' } | { kind: 'new'; prepared: PreparedImage } | { kind: 'remove' };
+
 /**
  * Cadastro e edição de produto, num painel lateral. As regras são as do app:
  * nome obrigatório e único, quantidade não negativa, unidade da lista e sem
@@ -67,9 +72,27 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
   const [confirmQuantity, setConfirmQuantity] = useState(false);
   const [adjustNote, setAdjustNote] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [photo, setPhoto] = useState<PhotoChange>({ kind: 'keep' });
+  const [preparing, setPreparing] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  /** Imagem já enviada nesta sessão: se salvar o produto falhar, o reenvio não repete o upload. */
+  const uploaded = useRef<{ blob: Blob; hash: string } | null>(null);
+
+  const dropPhoto = (next: PhotoChange) => {
+    setPhoto((current) => {
+      if (current.kind === 'new') URL.revokeObjectURL(current.prepared.previewUrl);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
+    dropPhoto({ kind: 'keep' });
+    setPhotoError(null);
+    setProgress(null);
+    uploaded.current = null;
     setForm(product ? fromProduct(product) : EMPTY);
     setErrors({});
     setServerError(null);
@@ -119,8 +142,42 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     return { ok: Object.keys(next).length === 0, quantity: quantity ?? 0, unitValue, minStock };
   };
 
+  const choosePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setPhotoError(null);
+    setPreparing(true);
+    try {
+      const prepared = await prepareImage(file);
+      uploaded.current = null;
+      dropPhoto({ kind: 'new', prepared });
+    } catch (caught) {
+      setPhotoError(caught instanceof ImageError ? caught.message : 'Não foi possível preparar a imagem.');
+    } finally {
+      setPreparing(false);
+    }
+  };
+
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setDragging(false);
+    void choosePhoto(event.dataTransfer.files[0]);
+  };
+
   const save = useMutation({
     mutationFn: async (values: { quantity: number; unitValue: number; minStock: number }) => {
+      // A foto sobe primeiro; só então o produto aponta para ela. Se o envio
+      // falhar, nada do produto é gravado e o formulário continua como estava.
+      let photoHash: string | null | undefined;
+      if (photo.kind === 'new') {
+        if (uploaded.current?.blob !== photo.prepared.blob) {
+          setProgress(0);
+          const sent = await uploadBinary<UploadedImage>(`${base}/images`, photo.prepared.blob, setProgress);
+          uploaded.current = { blob: photo.prepared.blob, hash: sent.hash };
+        }
+        photoHash = uploaded.current.hash;
+      } else if (photo.kind === 'remove') {
+        photoHash = null;
+      }
       const fields = {
         name: form.name.trim(),
         description: form.description.trim() || null,
@@ -135,7 +192,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
       };
       if (!product) {
         // `id` gerado aqui: se a resposta se perder, repetir não duplica.
-        return api.post<Product>(`${base}/products`, { id: draftId, ...fields, quantity: values.quantity });
+        return api.post<Product>(`${base}/products`, { id: draftId, ...fields, ...(photoHash ? { photoHash } : {}), quantity: values.quantity });
       }
       const changes: Record<string, unknown> = {};
       const original: Record<string, string | number | null> = {};
@@ -145,6 +202,10 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
           changes[key] = value;
           original[key] = before ?? null;
         }
+      }
+      if (photoHash !== undefined && photoHash !== product.photoHash) {
+        changes['photoHash'] = photoHash;
+        original['photoHash'] = product.photoHash ?? null;
       }
       const quantityChanged = values.quantity !== product.quantity;
       return api.patch<Product>(`${base}/products/${product.id}`, {
@@ -161,7 +222,13 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
       onSaved?.(saved);
       onClose();
     },
+    onSettled: () => setProgress(null),
     onError: (error) => {
+      // Falha do envio da foto: o aviso fica junto da foto, onde a pessoa vai olhar.
+      if (error instanceof ApiError && /^(IMAGE_|PLAN_LIMIT|PAYLOAD_TOO_LARGE)/.test(error.code)) {
+        setPhotoError(errorMessage(error));
+        return;
+      }
       if (error instanceof ApiError && error.code === 'DUPLICATE_NAME') {
         setErrors((current) => ({ ...current, name: 'Já existe um produto com este nome.' }));
         return;
@@ -199,14 +266,69 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
         footer={
           <>
             <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" form={`${listId}-form`} className="btn btn--primary" disabled={save.isPending}>
-              {save.isPending ? 'Salvando…' : 'Salvar'}
+            <button type="submit" form={`${listId}-form`} className="btn btn--primary" disabled={save.isPending || preparing}>
+              {save.isPending ? (progress !== null ? 'Enviando foto…' : 'Salvando…') : 'Salvar'}
             </button>
           </>
         }
       >
         <form id={`${listId}-form`} className="stack" onSubmit={submit} noValidate>
           {serverError && <Notice tone="error">{serverError}</Notice>}
+
+          <div className="form-section">Foto</div>
+          <div
+            className={`photo-field ${dragging ? 'photo-field--drag' : ''}`}
+            onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+          >
+            <div className="photo-field__preview">
+              {photo.kind === 'new' ? (
+                <img src={photo.prepared.previewUrl} alt="Prévia da nova foto" />
+              ) : photo.kind === 'keep' && product?.photoHash ? (
+                <ProductImage workspaceId={workspaceId} hash={product.photoHash} name={product.name} size={112} />
+              ) : (
+                <span className="photo-field__empty"><Icon name="box" size={30} /></span>
+              )}
+              {preparing && <span className="photo-field__busy"><span className="spinner" /></span>}
+            </div>
+            <div className="photo-field__side">
+              <div className="row row--wrap" style={{ gap: 8 }}>
+                <label className="btn btn--secondary btn--sm photo-field__pick">
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept={IMAGE_ACCEPT}
+                    disabled={preparing || save.isPending}
+                    onChange={(event) => { void choosePhoto(event.target.files?.[0]); event.target.value = ''; }}
+                  />
+                  <Icon name="upload" size={15} />
+                  {photo.kind === 'new' || (photo.kind === 'keep' && product?.photoHash) ? 'Trocar foto' : 'Escolher foto'}
+                </label>
+                {(photo.kind === 'new' || (photo.kind === 'keep' && product?.photoHash)) && (
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={save.isPending} onClick={() => dropPhoto(product?.photoHash && photo.kind === 'new' ? { kind: 'keep' } : product?.photoHash ? { kind: 'remove' } : { kind: 'keep' })}>
+                    {photo.kind === 'new' && product?.photoHash ? 'Desfazer troca' : 'Remover'}
+                  </button>
+                )}
+                {photo.kind === 'remove' && (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => dropPhoto({ kind: 'keep' })}>Manter a foto atual</button>
+                )}
+              </div>
+              {photo.kind === 'remove' ? (
+                <p className="field__hint">A foto será removida ao salvar.</p>
+              ) : photo.kind === 'new' ? (
+                <p className="field__hint">Pronta para enviar: {Math.round(photo.prepared.blob.size / 1024)} KB, {photo.prepared.width}×{photo.prepared.height}.</p>
+              ) : (
+                <p className="field__hint">JPEG, PNG ou WebP. Também dá para arrastar a imagem para cá. Ela é reduzida antes do envio.</p>
+              )}
+              {progress !== null && (
+                <div className="photo-field__progress" role="progressbar" aria-label="Enviando a foto" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+                  <span style={{ width: `${Math.round(progress * 100)}%` }} />
+                </div>
+              )}
+              {photoError && <p className="field__error" role="alert">{photoError}</p>}
+            </div>
+          </div>
 
           <div className="form-section">Informações básicas</div>
           <Field label="Nome do produto *" error={errors.name} hint={similarName ? `Parecido com “${similarName}”, já cadastrado. Se for o mesmo, registre uma entrada nele.` : undefined}>

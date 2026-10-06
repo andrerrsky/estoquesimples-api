@@ -274,3 +274,33 @@ export const initialUploadBatches = pgTable(
     }).onDelete('cascade'),
   }),
 );
+
+/**
+ * Metadados das imagens de produto (o binário está no bucket). Identificada
+ * pelo SHA-256 do conteúdo guardado, por empresa; `products.photoHash` aponta
+ * para `hash`. Ver migration 0016 e `modules/images`.
+ */
+export const workspaceImages = pgTable(
+  'workspace_images',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    hash: text('hash').notNull(),
+    sourceHash: text('source_hash').notNull(),
+    contentType: text('content_type').notNull(),
+    bytes: integer('bytes').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    orphanedAt: timestamp('orphaned_at', tz),
+  },
+  (table) => ({
+    hashUnique: uniqueIndex('workspace_images_hash_unique').on(table.workspaceId, table.hash),
+    sourceIdx: index('workspace_images_source_idx').on(table.workspaceId, table.sourceHash),
+  }),
+);
+
+export type WorkspaceImage = typeof workspaceImages.$inferSelect;

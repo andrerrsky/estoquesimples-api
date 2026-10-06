@@ -228,6 +228,65 @@ export const api = {
   delete: <T>(path: string, body?: unknown, options: Omit<RequestOptions, 'body'> = {}) => request<T>('DELETE', path, { ...options, ...(body === undefined ? {} : { body }) }),
 };
 
+/** Baixa um conteúdo autenticado como `Blob` (imagens). Erros viram `ApiError`. */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const send = async (token: string) => {
+    try {
+      return await fetch(path, { headers: { authorization: `Bearer ${token}` }, credentials: 'same-origin' });
+    } catch {
+      throw new ApiError(0, null, 'Sem conexão com o servidor.');
+    }
+  };
+  let response = await send(await ensureToken());
+  if (response.status === 401) {
+    accessToken = null;
+    const auth = await refreshSession();
+    if (auth) response = await send(auth.accessToken);
+  }
+  if (!response.ok) await parse(response);
+  return response.blob();
+}
+
+/**
+ * Envia um arquivo como corpo bruto, com progresso. Usa XMLHttpRequest porque
+ * `fetch` ainda não informa o andamento do envio. Uma sessão vencida é
+ * renovada e o envio repetido uma vez.
+ */
+export function uploadBinary<T>(path: string, body: Blob, onProgress?: (ratio: number) => void): Promise<T> {
+  const attempt = (token: string) =>
+    new Promise<{ status: number; text: string }>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('PUT', path);
+      request.setRequestHeader('authorization', `Bearer ${token}`);
+      request.setRequestHeader('content-type', body.type);
+      request.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+      };
+      request.onload = () => resolve({ status: request.status, text: request.responseText });
+      request.onerror = () => reject(new ApiError(0, null, 'Sem conexão com o servidor.'));
+      request.ontimeout = () => reject(new ApiError(0, null, 'O envio demorou demais.'));
+      request.timeout = 60_000;
+      request.send(body);
+    });
+
+  return (async () => {
+    let result = await attempt(await ensureToken());
+    if (result.status === 401) {
+      accessToken = null;
+      const auth = await refreshSession();
+      if (auth) result = await attempt(auth.accessToken);
+    }
+    let json: unknown = null;
+    try {
+      json = result.text ? JSON.parse(result.text) : null;
+    } catch {
+      json = null;
+    }
+    if (result.status < 200 || result.status >= 300) throw new ApiError(result.status, json as Record<string, unknown> | null, `Erro ${result.status}`);
+    return json as T;
+  })();
+}
+
 /** Baixa um arquivo autenticado (CSV, JSON) e entrega ao navegador. */
 export async function download(path: string, filename: string, query?: QueryParams): Promise<void> {
   const token = await ensureToken();

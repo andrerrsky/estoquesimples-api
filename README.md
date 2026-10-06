@@ -105,6 +105,7 @@ docs/         contratos e decisões (web, Asaas, notificações, analytics,
 | [docs/billing-asaas.md](docs/billing-asaas.md) | assinatura pela web e passo a passo de produção do Asaas |
 | [docs/plans.md](docs/plans.md) | planos e limites |
 | [docs/notifications.md](docs/notifications.md) | caixa de notificações e push |
+| [docs/images.md](docs/images.md) | fotos dos produtos: armazenamento, envio, sincronização, segurança e limites |
 | [docs/help.md](docs/help.md) | central de ajuda: onde fica o conteúdo e como alterar |
 | [docs/support.md](docs/support.md) · [docs/push.md](docs/push.md) · [docs/analytics.md](docs/analytics.md) | contratos para os clientes |
 

@@ -105,6 +105,17 @@ export function registerErrorHandler(app: FastifyInstance): void {
       return reply.code(413).send(body);
     }
 
+    if (fastifyError.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') {
+      const body: ErrorBody = {
+        error: {
+          code: ErrorCode.IMAGE_UNSUPPORTED_TYPE,
+          message: 'Tipo de conteúdo não aceito.',
+          correlationId,
+        },
+      };
+      return reply.code(415).send(body);
+    }
+
     if (
       fastifyError.code === 'FST_ERR_CTP_EMPTY_JSON_BODY' ||
       fastifyError.code === 'FST_ERR_CTP_INVALID_JSON_BODY'

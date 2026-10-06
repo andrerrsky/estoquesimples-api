@@ -5,6 +5,7 @@ import { api } from '../../api/client';
 import type { Movement, Page, Product } from '../../api/types';
 import { fmtDateTime, fmtMoney, fmtQuantity, fmtStock } from '../../lib/format';
 import { inventoryKeys } from '../../lib/inventory';
+import { ProductImage } from '../../lib/product-image';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { Icon } from '../Icon';
 import { Badge, Drawer, KeyValue, QueryState, Time } from '../ui';
@@ -71,6 +72,7 @@ export function ProductDrawer({
         <QueryState loading={product.isLoading} error={product.error} onRetry={() => void product.refetch()} />
       ) : (
         <div className="stack stack--loose">
+          {item.photoHash && <ProductImage workspaceId={workspaceId} hash={item.photoHash} name={item.name} size={260} className="pimg--hero" />}
           <div className="row row--between" style={{ alignItems: 'flex-end' }}>
             <div>
               <div className="caption">Em estoque</div>

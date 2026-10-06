@@ -21,8 +21,10 @@ import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
 import { registerSupportJobs } from './modules/support/support.jobs.js';
+import { registerImageJobs } from './modules/images/images.jobs.js';
 import type { AppServices } from './platform/http/context.js';
 import { buildServer } from './platform/http/server.js';
+import { createStorage, type ObjectStorage } from './platform/storage/object-storage.js';
 
 export interface BuildAppOptions {
   env?: Env;
@@ -34,6 +36,8 @@ export interface BuildAppOptions {
   fcm?: FcmClient;
   /** Permite injetar um Asaas em memória nos testes. */
   asaas?: AsaasClient;
+  /** Permite injetar o armazenamento de imagens (testes). */
+  storage?: ObjectStorage;
 }
 
 export interface BuiltApp {
@@ -75,6 +79,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
     playClient: options.playClient ?? new GooglePlayClient(env),
     fcm: options.fcm ?? new FirebaseFcmClient(env),
     asaas: options.asaas ?? new HttpAsaasClient(env, () => services.logger),
+    storage: options.storage ?? createStorage(env),
   };
 
   const app = await buildServer(services);
@@ -91,6 +96,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerPushJobs(services);
   registerAsaasJobs(services);
   registerSupportJobs(services);
+  registerImageJobs(services);
 
   return {
     app,

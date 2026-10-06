@@ -98,6 +98,14 @@ a raiz), então `www.` é atendido no Cloudflare: registro `A` `www` →
 Rule de `www` para `https://estoquesimples.com.br` (301) e "Sempre usar
 HTTPS" ativado, para que `http://www…` também chegue à regra.
 
+## Imagens (bucket)
+
+As fotos dos produtos ficam num **bucket do Railway** (`estoquesimples-imagens`,
+região `iad`), configurado no serviço pelas variáveis `S3_*` — passo a passo,
+validação e custo em [docs/images.md](docs/images.md). Sem `S3_BUCKET` o envio
+de fotos responde 503 e o resto do sistema funciona normalmente. O bucket não
+está no backup do Postgres. Staging precisa do próprio bucket.
+
 ## Deploy
 
 O `startCommand` roda as migrations antes de abrir a porta, com advisory lock:

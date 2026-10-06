@@ -7,6 +7,7 @@ import {
   stockMovements,
   syncCursors,
   syncOperations,
+  workspaceImages,
   workspaces,
 } from '../../platform/db/schema/index.js';
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
@@ -51,6 +52,9 @@ const CAMPOS_MESCLAVEIS = new Set([
   'minStock',
   'sku',
   'barcode',
+  // Ponteiro da foto: em edição concorrente prevalece o do servidor, e a
+  // imagem perdedora some na coleta de lixo.
+  'photoHash',
 ]);
 
 const CAMPOS_COMPARAVEIS = new Set([...CAMPOS_DE_DECISAO, ...CAMPOS_MESCLAVEIS]);
@@ -392,7 +396,24 @@ export class SyncService {
         message: 'Produto em formato não reconhecido.',
       };
     }
-    const payload = entrada.data;
+    let payload = entrada.data;
+
+    // A foto só vale se a imagem existe nesta empresa. Ponteiro para uma
+    // imagem desconhecida é ignorado (o resto do produto é aplicado): travar o
+    // estoque por causa de uma foto seria o contrário do que o usuário quer. O
+    // aparelho vê no pull que a foto não foi aceita e reenvia a imagem.
+    if (typeof payload.photoHash === 'string') {
+      const [imagem] = await tx
+        .select({ hash: workspaceImages.hash })
+        .from(workspaceImages)
+        .where(and(eq(workspaceImages.workspaceId, workspaceId), eq(workspaceImages.hash, payload.photoHash)))
+        .limit(1);
+      if (!imagem) {
+        const { photoHash: _descartado, ...resto } = payload;
+        const previous = payload.previous ? Object.fromEntries(Object.entries(payload.previous).filter(([campo]) => campo !== 'photoHash')) : undefined;
+        payload = { ...resto, ...(previous ? { previous } : {}) };
+      }
+    }
 
     const [atual] = await tx
       .select()
@@ -636,6 +657,8 @@ export class SyncService {
         return atual.sku;
       case 'barcode':
         return atual.barcode;
+      case 'photoHash':
+        return atual.photoHash;
       default:
         return null;
     }
@@ -675,6 +698,8 @@ export class SyncService {
         return { sku: payload.sku ?? null };
       case 'barcode':
         return { barcode: payload.barcode ?? null };
+      case 'photoHash':
+        return { photoHash: payload.photoHash ?? null };
       default:
         return {};
     }
@@ -742,6 +767,8 @@ export class SyncService {
       location: payload.location ?? null,
       sku: payload.sku ?? null,
       barcode: payload.barcode ?? null,
+      // Só quando o aparelho informou (null remove): ver `productInputSchema`.
+      ...(payload.photoHash !== undefined ? { photoHash: payload.photoHash } : {}),
     };
   }
 
@@ -1022,6 +1049,7 @@ export class SyncService {
         location: row.location,
         sku: row.sku,
         barcode: row.barcode,
+        photoHash: row.photoHash,
         rev: row.rev,
         updatedAt: row.updatedAt.getTime(),
         deletedAt: row.deletedAt ? row.deletedAt.getTime() : null,

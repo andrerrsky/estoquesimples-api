@@ -62,6 +62,13 @@ export const ErrorCode = {
   CONFLICT: 'CONFLICT',
   STALE_REVISION: 'STALE_REVISION',
   DUPLICATE_NAME: 'DUPLICATE_NAME',
+
+  /** Arquivo que não é uma imagem aceita (formato, conteúdo, dimensões). */
+  IMAGE_INVALID: 'IMAGE_INVALID',
+  IMAGE_TOO_LARGE: 'IMAGE_TOO_LARGE',
+  IMAGE_UNSUPPORTED_TYPE: 'IMAGE_UNSUPPORTED_TYPE',
+  /** Sem armazenamento configurado neste ambiente. */
+  IMAGES_UNAVAILABLE: 'IMAGES_UNAVAILABLE',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];

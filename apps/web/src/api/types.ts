@@ -87,6 +87,8 @@ export interface Product {
   location: string | null;
   sku: string | null;
   barcode: string | null;
+  /** Imagem do produto (SHA-256 do conteúdo); `null` = sem foto. */
+  photoHash: string | null;
   rev: number;
   lowStock: boolean;
   outOfStock: boolean;
@@ -96,8 +98,17 @@ export interface Product {
 
 export type ProductFields = Pick<
   Product,
-  'name' | 'description' | 'unitValue' | 'minStock' | 'unit' | 'category' | 'supplier' | 'location' | 'sku' | 'barcode'
+  'name' | 'description' | 'unitValue' | 'minStock' | 'unit' | 'category' | 'supplier' | 'location' | 'sku' | 'barcode' | 'photoHash'
 >;
+
+export interface UploadedImage {
+  hash: string;
+  contentType: string;
+  bytes: number;
+  width: number;
+  height: number;
+  created: boolean;
+}
 
 export interface ProductList {
   items: Product[];

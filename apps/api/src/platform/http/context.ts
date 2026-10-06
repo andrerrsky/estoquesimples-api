@@ -7,6 +7,7 @@ import type { Logger } from '../observability/logger.js';
 import type { PlayStoreClient } from '../../modules/billing/play-client.js';
 import type { FcmClient } from '../../modules/push/fcm-client.js';
 import type { AsaasClient } from '../../modules/billing/asaas/asaas-client.js';
+import type { ObjectStorage } from '../storage/object-storage.js';
 
 /**
  * Container de dependências da aplicação.
@@ -28,6 +29,8 @@ export interface AppServices {
   fcm: FcmClient;
   /** Asaas (assinatura pela web); `configured` diz se há chave. */
   asaas: AsaasClient;
+  /** Armazenamento de objetos das imagens (bucket S3, disco em dev); `configured` diz se está disponível. */
+  storage: ObjectStorage;
   /**
    * Logger de processos que rodam fora de uma requisição (fila de tarefas,
    * reconciliação). Dentro de uma rota, prefira `request.log`, que já carrega

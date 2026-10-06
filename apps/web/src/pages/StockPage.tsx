@@ -12,6 +12,7 @@ import { ProductForm } from '../components/stock/ProductForm';
 import { Card, Chips, ConfirmDialog, Empty, Field, Menu, Modal, Notice, PageHeader, Pagination, QueryState, SearchInput, useToast, type MenuItem } from '../components/ui';
 import { track } from '../lib/analytics';
 import { fmtMoney, fmtQuantity, parseNumber, plural } from '../lib/format';
+import { ProductImage } from '../lib/product-image';
 import { inventoryKeys, SYNC_HEADERS, useDebounced, useInvalidateInventory } from '../lib/inventory';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
 
@@ -148,6 +149,8 @@ export function StockPage() {
   const counts = list.data?.counts;
   const filtered = urlQuery !== '' || lowOnly || category !== '';
   const canSelect = can('produtos.editar');
+  // Miniatura só aparece se algum produto desta página tem foto: sem isso a coluna seria só um ícone repetido.
+  const anyPhoto = items.some((item) => item.photoHash);
   const allSelected = items.length > 0 && items.every((item) => selected.has(item.id));
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -349,8 +352,13 @@ export function StockPage() {
                         </td>
                       )}
                       <td style={{ maxWidth: 380 }}>
-                        <div className="product-row__name">{product.name}</div>
-                        {meta(product)}
+                        <div className="product-cell">
+                          {anyPhoto && <ProductImage workspaceId={workspaceId} hash={product.photoHash} name={product.name} />}
+                          <div style={{ minWidth: 0 }}>
+                            <div className="product-row__name">{product.name}</div>
+                            {meta(product)}
+                          </div>
+                        </div>
                       </td>
                       <td className="num">{quantityCell(product)}</td>
                       <td className="num nowrap">{product.unitValue > 0 ? fmtMoney(product.unitValue, currency) : <span className="faint">—</span>}</td>
@@ -380,9 +388,14 @@ export function StockPage() {
                 <div key={product.id} className="product-card">
                   <div className="product-card__top">
                     <button type="button" onClick={() => setDetailId(product.id)} style={{ all: 'unset', cursor: 'pointer', minWidth: 0, flex: 1 }}>
-                      <div className="product-row__name">{product.name}</div>
-                      {meta(product)}
-                      {product.unitValue > 0 && <div className="product-row__meta">{fmtMoney(product.unitValue, currency)} cada</div>}
+                      <div className="product-cell">
+                        {anyPhoto && <ProductImage workspaceId={workspaceId} hash={product.photoHash} name={product.name} size={48} />}
+                        <div style={{ minWidth: 0 }}>
+                          <div className="product-row__name">{product.name}</div>
+                          {meta(product)}
+                          {product.unitValue > 0 && <div className="product-row__meta">{fmtMoney(product.unitValue, currency)} cada</div>}
+                        </div>
+                      </div>
                     </button>
                     <div style={{ textAlign: 'right' }}>{quantityCell(product)}</div>
                     <Menu

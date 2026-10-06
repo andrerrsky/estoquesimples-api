@@ -128,8 +128,8 @@ contrato completo está em `/docs` (OpenAPI).
 | Suporte | `/app/suporte` | as mesmas solicitações do app ([support.md](support.md)) |
 | Conta e empresas | `/app/conta`, `/app/empresas` | perfil, senha, sessões, exclusão; criar/trocar de empresa |
 
-Adaptações em relação ao app: não há modo offline nem fotos de produto (as
-fotos nunca saem do aparelho); backup local e notificação de estoque baixo
+Adaptações em relação ao app: não há modo offline (as fotos de produto existem
+nas duas pontas: [images.md](images.md)); backup local e notificação de estoque baixo
 pelo sistema são do app; a compra pela Google Play só existe no Android e, na
 web, a contratação é pelo Asaas.
 

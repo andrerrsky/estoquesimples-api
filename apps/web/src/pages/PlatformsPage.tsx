@@ -134,7 +134,7 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
             </a>
           }
         >
-          Funciona até sem internet: tudo fica guardado no celular e sincroniza quando a conexão volta. Tem fotos dos produtos, leitor de código de barras pela câmera e avisos de estoque baixo.
+          Funciona até sem internet: tudo fica guardado no celular e sincroniza quando a conexão volta. Tira foto dos produtos pela câmera, lê código de barras e avisa quando o estoque está baixo.
         </PlatformCard>
         <PlatformCard
           icon="monitor"
@@ -196,7 +196,7 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
             <tbody>
               <tr><th scope="row">Mesma conta e mesmo estoque</th><td>Sim</td><td>Sim</td></tr>
               <tr><th scope="row">Funciona sem internet</th><td>Sim</td><td>Não</td></tr>
-              <tr><th scope="row">Fotos dos produtos</th><td>Sim, só no aparelho</td><td>Não</td></tr>
+              <tr><th scope="row">Fotos dos produtos</th><td>Sim, pela câmera ou galeria</td><td>Sim, escolhendo um arquivo</td></tr>
               <tr><th scope="row">Leitor de código de barras</th><td>Câmera</td><td>Leitor USB (e câmera, em alguns navegadores)</td></tr>
               <tr><th scope="row">Aviso de estoque baixo no aparelho</th><td>Sim</td><td>Não (aparece destacado na lista e nos relatórios)</td></tr>
               <tr><th scope="row">Assinar o plano Equipe</th><td>Google Play</td><td>Pix, boleto ou cartão</td></tr>

@@ -7,6 +7,7 @@ import { bootstrapAnalyticsJobs } from './modules/analytics/analytics.jobs.js';
 import { bootstrapReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { bootstrapBillingJobs } from './modules/billing/billing.jobs.js';
 import { bootstrapAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
+import { bootstrapImageJobs } from './modules/images/images.jobs.js';
 import { bootstrapOpsJobs } from './modules/ops/ops.jobs.js';
 import { bootstrapSyncJobs } from './modules/sync/sync.jobs.js';
 
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
   if (env.JOBS_ENABLED) {
     await bootstrapBillingJobs(services);
     await bootstrapAsaasJobs(services);
+    await bootstrapImageJobs(services);
     await bootstrapSyncJobs(services);
     await bootstrapOpsJobs(services);
     await bootstrapAnalyticsJobs(services);
