@@ -55,6 +55,9 @@ function safeUrl(url: string | null | undefined): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null;
 }
 
+/** MB com vírgula; acima de 1.000 vira GB. */
+const fmtMb = (mb: number): string => (mb >= 1000 ? `${(mb / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} GB` : `${mb.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`);
+
 const paymentStatus = (status: string): { label: string; tone: Tone } => PAYMENT_STATUS[status] ?? { label: status, tone: 'neutral' };
 const subscriptionState = (state: string): { label: string; tone: Tone } =>
   (SUBSCRIPTION_STATE as Record<string, { label: string; tone: Tone }>)[state] ?? { label: state, tone: 'neutral' };
@@ -294,6 +297,17 @@ export function PlanPage() {
                 </div>
               )}
             </div>
+            {entitlement && entitlement.limits.images !== 0 && (
+              <div>
+                <div className="plan-usage__row">
+                  <span>Espaço de fotos</span>
+                  <strong>
+                    {entitlement.limits.images !== null ? `${fmtMb(entitlement.usage.images)} de ${fmtMb(entitlement.limits.images)}` : fmtMb(entitlement.usage.images)}
+                  </strong>
+                </div>
+                {entitlement.limits.images !== null ? <Meter value={entitlement.usage.images} max={entitlement.limits.images} /> : <div className="caption" style={{ marginTop: 4 }}>Sem limite neste plano</div>}
+              </div>
+            )}
           </div>
         </div>
       </Card>

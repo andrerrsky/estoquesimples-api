@@ -96,9 +96,9 @@ export interface EntitlementSnapshot {
   /** A empresa pode sincronizar (recurso `sync.nuvem` do plano em vigor). */
   syncAllowed: boolean;
   /** Tetos do plano em vigor; `null` quando não há limite. */
-  limits: { products: number | null; members: number | null };
+  limits: { products: number | null; members: number | null; images: number | null };
   /** O que a empresa já usa, para o app mostrar "12 de 50". */
-  usage: { products: number; members: number };
+  usage: { products: number; members: number; images: number };
   /** Até quando o app pode confiar neste retrato sem falar com a API. */
   offlineValidUntil: string;
   checkedAt: string;
@@ -436,10 +436,12 @@ export class BillingService {
     }
 
     const [usage] = (
-      await this.db.execute<{ products: number; members: number }>(sql`
+      await this.db.execute<{ products: number; members: number; images: number }>(sql`
         SELECT
           (SELECT count(*)::int FROM products WHERE workspace_id = ${workspaceId} AND deleted_at IS NULL) AS products,
-          (SELECT count(*)::int FROM workspace_members WHERE workspace_id = ${workspaceId} AND status = 'active') AS members
+          (SELECT count(*)::int FROM workspace_members WHERE workspace_id = ${workspaceId} AND status = 'active') AS members,
+          -- Espaço de fotos em uso, em MB (uma casa decimal).
+          (SELECT round(coalesce(sum(bytes), 0) / 1048576.0, 1)::float8 FROM workspace_images WHERE workspace_id = ${workspaceId}) AS images
       `)
     ).rows;
 
@@ -460,8 +462,8 @@ export class BillingService {
       autoRenewing: subscription?.autoRenewing ?? false,
       features,
       syncAllowed: features['sync.nuvem']?.enabled ?? false,
-      limits: { products: limitOf('produtos.sincronizados'), members: limitOf('equipe.membros') },
-      usage: { products: usage?.products ?? 0, members: usage?.members ?? 0 },
+      limits: { products: limitOf('produtos.sincronizados'), members: limitOf('equipe.membros'), images: limitOf('imagens.armazenamento_mb') },
+      usage: { products: usage?.products ?? 0, members: usage?.members ?? 0, images: Number(usage?.images ?? 0) },
       offlineValidUntil: new Date(
         now.getTime() + this.services.env.ENTITLEMENT_OFFLINE_MAX_DAYS * 86_400_000,
       ).toISOString(),

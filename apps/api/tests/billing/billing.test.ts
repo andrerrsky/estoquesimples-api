@@ -102,7 +102,7 @@ describe('vinculação de compra', () => {
     expect(entitlement.state).toBe('ativa');
     expect(entitlement.features['sync.nuvem'].enabled).toBe(true);
     expect(entitlement.features['equipe.membros'].enabled).toBe(true);
-    expect(entitlement.limits).toEqual({ products: null, members: null });
+    expect(entitlement.limits).toEqual({ products: null, members: null, images: 5000 });
   });
 
   it('confirma a compra no Google para não ser reembolsada automaticamente', async () => {
@@ -311,8 +311,8 @@ describe('estados da assinatura', () => {
     expect(response.json().state).toBe('sem_assinatura');
     expect(response.json().syncAllowed).toBe(true);
     expect(response.json().features['equipe.membros'].enabled).toBe(false);
-    expect(response.json().limits).toEqual({ products: 50, members: 0 });
-    expect(response.json().usage).toEqual({ products: 0, members: 1 });
+    expect(response.json().limits).toEqual({ products: 50, members: 0, images: 100 });
+    expect(response.json().usage).toEqual({ products: 0, members: 1, images: 0 });
   });
 
   it('informa até quando o app pode confiar no retrato sem rede', async () => {

@@ -59,8 +59,9 @@ export interface Entitlement {
   autoRenewing: boolean;
   features: Record<string, { enabled: boolean; limit: number | null }>;
   syncAllowed: boolean;
-  limits: { products: number | null; members: number | null };
-  usage: { products: number; members: number };
+  limits: { products: number | null; members: number | null; images: number | null };
+  /** `images`: espaço de fotos em uso, em MB. */
+  usage: { products: number; members: number; images: number };
 }
 
 export type SubscriptionState =
