@@ -48,9 +48,32 @@ const CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8',
   '.woff2': 'font/woff2',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.vtt': 'text/vtt; charset=utf-8',
 };
 
-const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.txt', '.xml']);
+const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.txt', '.xml', '.vtt']);
+
+/**
+ * Interpreta o cabeçalho `Range` de um arquivo com `size` bytes. Aceita uma
+ * faixa só (`bytes=início-fim`, `bytes=início-` ou `bytes=-sufixo`), que é o
+ * que os players de vídeo pedem. `null` = sem faixa válida, entregar inteiro;
+ * `'unsatisfiable'` = faixa fora do arquivo (416).
+ */
+export function byteRange(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec((header ?? '').trim());
+  if (!match || (!match[1] && !match[2])) return null;
+  if (!match[1]) {
+    const suffix = Number(match[2]);
+    if (suffix === 0) return 'unsatisfiable';
+    return { start: Math.max(0, size - suffix), end: size - 1 };
+  }
+  const start = Number(match[1]);
+  const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+  if (start >= size || start > end) return 'unsatisfiable';
+  return { start, end };
+}
 
 interface StaticFile {
   contentType: string;
@@ -140,6 +163,24 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
   const send = (request: FastifyRequest, reply: FastifyReply, file: StaticFile, status = 200): FastifyReply => {
     const accepts = String(request.headers['accept-encoding'] ?? '');
     let body = file.raw;
+    // Vídeo precisa de requisição por faixa: o Safari (iPhone, iPad, Mac) não
+    // toca um <video> cujo servidor ignora `Range`, e os demais navegadores
+    // usam a faixa para avançar sem baixar tudo. Só vale para arquivos sem
+    // compressão — os comprimidos são texto pequeno, entregues inteiros.
+    const compressed = Boolean(file.brotli || file.gzip);
+    if (!compressed && status === 200) {
+      reply.header('Accept-Ranges', 'bytes');
+      const size = file.raw.length;
+      const range = byteRange(request.headers.range, size);
+      if (range === 'unsatisfiable') {
+        return reply.code(416).header('Content-Range', `bytes */${size}`).header('Cache-Control', 'no-store').send('');
+      }
+      if (range) {
+        body = file.raw.subarray(range.start, range.end + 1);
+        status = 206;
+        reply.header('Content-Range', `bytes ${range.start}-${range.end}/${size}`);
+      }
+    }
     if (file.brotli && /\bbr\b/.test(accepts)) {
       body = file.brotli;
       reply.header('Content-Encoding', 'br');
