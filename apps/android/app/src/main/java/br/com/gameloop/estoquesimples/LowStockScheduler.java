@@ -30,6 +30,12 @@ public class LowStockScheduler {
      * @param context Contexto da aplicação
      */
     public static void checkAndScheduleNotifications(Context context) {
+        // Quem desligou o aviso em Configurações não pode voltar a recebê-lo
+        // só porque abriu o app ou cadastrou um produto.
+        if (!SettingsActivity.isLowStockAlertsEnabled(context)) {
+            cancelNotifications(context);
+            return;
+        }
         boolean hasLowStock = checkIfHasLowStockProducts(context);
 
         if (hasLowStock) {

@@ -28,11 +28,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    
-    <!-- Permissões para WorkManager e notificações agendadas -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- O Firebase Analytics pediria o ID de publicidade; o app não tem anúncios
+         e usa o analytics próprio, então a permissão sai do manifest mesclado
+         (e o Data Safety não precisa declarar Advertising ID). -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" />
 
     <application
         android:allowBackup="true"
@@ -158,6 +159,8 @@
             android:theme="@style/zxing_CaptureTheme"
             tools:replace="android:screenOrientation" />
         
+        <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+
         <!-- Push: canal e ícone usados quando o sistema exibe a mensagem
              com o app em segundo plano. -->
         <meta-data
