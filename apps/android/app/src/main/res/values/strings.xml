@@ -96,4 +96,5 @@
     <string name="report_btn_low_stock">Estoque baixo</string>
     <string name="report_btn_category">Por categoria</string>
     <string name="report_btn_financial">Financeiro / valor de inventário</string>
+    <string name="about_version">Versão %1$s</string>
 </resources>

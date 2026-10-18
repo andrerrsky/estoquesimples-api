@@ -30,10 +30,11 @@
                 android:textAppearance="@style/TextAppearance.Estoque.Title.OnBrand" />
 
             <TextView
+                android:id="@+id/about_version"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/field_gap"
-                android:text="Versão 11.0"
+                tools:text="Versão 24"
                 android:textColor="@color/color_text_on_brand_muted"
                 android:textSize="15sp" />
         </LinearLayout>

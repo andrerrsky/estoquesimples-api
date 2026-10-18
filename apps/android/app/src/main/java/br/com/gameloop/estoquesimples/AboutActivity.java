@@ -15,6 +15,8 @@ public class AboutActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_about);
+        // A versão vem do build: o texto fixo no layout ficou para trás ("11.0").
+        ((TextView) findViewById(R.id.about_version)).setText(getString(R.string.about_version, BuildConfig.VERSION_NAME));
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

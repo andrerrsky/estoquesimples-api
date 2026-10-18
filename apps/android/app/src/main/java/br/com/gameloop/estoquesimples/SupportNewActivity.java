@@ -43,6 +43,10 @@ public class SupportNewActivity extends BaseActivity {
     private TextView[] chips;
     private String category = SupportClient.CATEGORY_QUESTION;
 
+    /** Sem a permissão a solicitação funciona igual; só a resposta não vira aviso. */
+    private final androidx.activity.result.ActivityResultLauncher<String> notificationPermission =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(), granted -> { });
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,6 +68,13 @@ public class SupportNewActivity extends BaseActivity {
 
         boolean signedIn = SessionManager.get(this).isSignedIn();
         findViewById(R.id.contactGroup).setVisibility(signedIn ? View.GONE : View.VISIBLE);
+
+        // A resposta chega por notificação: no Android 13+ ela só aparece
+        // com a permissão, que até aqui só era pedida em Configurações.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                && !new NotificationHelper(this).hasNotificationPermission()) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
+        }
 
         chips = new TextView[] {
                 findViewById(R.id.chipQuestion),
