@@ -387,6 +387,31 @@
   line-height: 1.55;
 }
 
+/* Vídeo de apresentação: título centralizado e o player em 16:9 logo abaixo. */
+.lp-video__head {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+.lp-video__head .lp-lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+.lp-video__frame {
+  max-width: 1040px;
+  margin: 36px auto 0;
+  overflow: hidden;
+  border-radius: var(--radius-hero);
+  background: #0a1c2e;
+  box-shadow: 0 24px 60px -24px rgba(10, 40, 70, 0.45);
+}
+.lp-video__player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0a1c2e;
+}
+
 /* Texto de um lado, ilustração do outro; a ordem alterna a cada seção. */
 .lp-split {
   display: grid;

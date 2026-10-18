@@ -28,6 +28,14 @@ subida, com gzip/brotli, `Cache-Control: immutable` para `/assets/` e
 `/admin`, `/docs`, `/metrics` e `/ops` **não** existem nesses hosts. CSP
 `default-src 'self'`: nada de script, fonte ou imagem de terceiros.
 
+Arquivos sem compressão (imagens e o vídeo da página inicial) respondem a
+`Range` com 206 (`byteRange` em `web-app.ts`): o Safari não toca `<video>`
+sem isso. O vídeo de apresentação fica em `apps/web/src/assets/video/`
+(720p, ~8,6 MB, carregado em memória com o resto do build; nome com hash,
+cache imutável) e a legenda em `apps/web/public/video/apresentacao.vtt`. Por
+causa da CSP ele não pode vir do YouTube nem de outro domínio. Ao trocar o
+vídeo, mantenha-o leve: cada instância guarda o build inteiro na memória.
+
 ### Aba aberta durante um deploy
 
 Cada tela é um arquivo com o nome da versão (`SupportPage-<hash>.js`). Depois

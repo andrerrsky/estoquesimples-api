@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { Icon, Logo, type IconName } from '../components/Icon';
 import { ROLE_LABEL } from '../lib/labels';
 
+import videoCapa from '../assets/video/apresentacao-capa.jpg';
+import videoApresentacao from '../assets/video/apresentacao.mp4';
 import '../styles/pages-public.css';
 
 const PLAY_URL = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
@@ -136,6 +138,38 @@ function HeroArt() {
   );
 }
 
+/**
+ * Vídeo de apresentação (o mesmo da Google Play e do YouTube), servido pela
+ * própria origem: a CSP não permite iframe nem mídia de terceiros. Só começa
+ * a baixar quando a pessoa aperta play (`preload="none"`) e tem legenda, para
+ * quem assiste sem som. As telas do vídeo são do app com dados de exemplo.
+ */
+function VideoSection() {
+  return (
+    <section className="landing__section lp-video" id="video" aria-labelledby="lp-video">
+      <div className="lp-video__head">
+        <p className="lp-kicker">Veja em 1 minuto e meio</p>
+        <h2 className="landing__h2" id="lp-video">Como o Estoque Simples funciona no dia a dia.</h2>
+        <p className="lp-lead">Cadastro, entradas e saídas, aviso de estoque baixo, relatórios, a conta grátis e o plano Equipe, no aplicativo de verdade.</p>
+      </div>
+      <div className="lp-video__frame">
+        <video
+          className="lp-video__player"
+          controls
+          playsInline
+          preload="none"
+          poster={videoCapa}
+          aria-label="Vídeo de apresentação do Estoque Simples, com narração e legendas"
+        >
+          <source src={videoApresentacao} type="video/mp4" />
+          <track kind="captions" src="/video/apresentacao.vtt" srcLang="pt-BR" label="Português" default />
+          Seu navegador não toca vídeos. <a href={videoApresentacao}>Baixe o vídeo</a>.
+        </video>
+      </div>
+    </section>
+  );
+}
+
 /** Histórico em miniatura: entrada, saídas e um estorno, com as cores da tela real. */
 function HistoryArt() {
   return (
@@ -258,6 +292,7 @@ export function LandingPage() {
             <Logo size={34} /> Estoque Simples
           </Link>
           <nav className="lp-nav__links" aria-label="Seções da página">
+            <a className="lp-nav__link" href="#video">Vídeo</a>
             <a className="lp-nav__link" href="#recursos">Recursos</a>
             <a className="lp-nav__link" href="#plataformas">Plataformas</a>
             <a className="lp-nav__link" href="#planos">Planos</a>
@@ -304,6 +339,8 @@ export function LandingPage() {
             <HeroArt />
           </div>
         </section>
+
+        <VideoSection />
 
         <section className="landing__section" id="recursos" aria-labelledby="lp-dia-a-dia">
           <div className="lp-split">
