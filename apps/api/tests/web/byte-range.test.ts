@@ -26,3 +26,14 @@ describe('byteRange: cabeçalho Range dos arquivos estáticos', () => {
     expect(byteRange('bytes=-0', 1000)).toBe('unsatisfiable');
   });
 });
+
+import { etagFor } from '../../src/platform/http/web-app.js';
+
+describe('etagFor: revalidação dos arquivos estáticos', () => {
+  it('é determinística, fraca e muda com o conteúdo', () => {
+    const a = etagFor(Buffer.from('abc'));
+    expect(a).toBe(etagFor(Buffer.from('abc')));
+    expect(a.startsWith('W/"')).toBe(true);
+    expect(a).not.toBe(etagFor(Buffer.from('abd')));
+  });
+});

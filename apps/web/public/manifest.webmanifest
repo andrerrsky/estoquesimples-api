@@ -1,4 +1,5 @@
 {
+  "id": "/app",
   "name": "Estoque Simples",
   "short_name": "Estoque",
   "description": "Controle de estoque simples: produtos, entradas e saídas, relatórios e equipe.",

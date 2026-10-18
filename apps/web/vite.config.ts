@@ -17,6 +17,10 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     target: 'es2022',
+    // Duas páginas: a aplicação (index.html) e a página inicial
+    // (landing.html), que tem uma entrada própria e leve. O que é comum
+    // (React) vira um pedaço compartilhado, baixado uma vez.
+    rollupOptions: { input: { app: 'index.html', landing: 'landing.html' } },
   },
   server: {
     port: 5173,

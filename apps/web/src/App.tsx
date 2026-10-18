@@ -1,19 +1,18 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
-import { BrandedLoginPage, ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/AuthPages';
 import { LandingPage } from './pages/LandingPage';
 
 /**
  * Rotas. As telas internas são carregadas sob demanda: quem só visita a
  * página inicial ou a de entrada não baixa o código do estoque.
  */
-const page = <T extends Record<string, ComponentType>>(loader: () => Promise<T>, name: keyof T) =>
-  lazy(() => importPage(loader).then((module) => ({ default: module[name] as ComponentType })));
+const page = <T extends object>(loader: () => Promise<T>, name: keyof T) =>
+  lazy(() => importPage(loader).then((module) => ({ default: module[name] as unknown as ComponentType })));
 
 const StockPage = page(() => import('./pages/StockPage'), 'StockPage');
 const HistoryPage = page(() => import('./pages/HistoryPage'), 'HistoryPage');
@@ -31,6 +30,15 @@ const SupportTicketPage = page(() => import('./pages/SupportPage'), 'SupportTick
 const AccountPage = page(() => import('./pages/AccountPage'), 'AccountPage');
 const CompaniesPage = page(() => import('./pages/CompaniesPage'), 'CompaniesPage');
 const LegalPage = page(() => import('./pages/LegalPage'), 'LegalPage');
+// As telas de conta também ficam fora do pacote inicial: a página inicial
+// (a mais visitada) não precisa delas para pintar.
+const LoginPage = page(() => import('./pages/AuthPages'), 'LoginPage');
+const BrandedLoginPage = page(() => import('./pages/AuthPages'), 'BrandedLoginPage');
+const RegisterPage = page(() => import('./pages/AuthPages'), 'RegisterPage');
+const ForgotPasswordPage = page(() => import('./pages/AuthPages'), 'ForgotPasswordPage');
+const ResetPasswordPage = page(() => import('./pages/AuthPages'), 'ResetPasswordPage');
+const VerifyEmailPage = page(() => import('./pages/AuthPages'), 'VerifyEmailPage');
+const InvitePage = page(() => import('./pages/AuthPages'), 'InvitePage');
 const HelpPage = page(() => import('./pages/HelpPage'), 'HelpPage');
 const PlatformsPage = page(() => import('./pages/PlatformsPage'), 'PlatformsPage');
 const PublicPlatformsPage = page(() => import('./pages/PlatformsPage'), 'PublicPlatformsPage');
@@ -60,16 +68,28 @@ function NotFound() {
   );
 }
 
-/** Moldura de todas as rotas: a tela da vez e o chat de suporte por cima. */
+/**
+ * Moldura de todas as rotas: a tela da vez e o chat de suporte por cima.
+ *
+ * O chat e a restauração de rolagem só entram depois do primeiro render: a
+ * página inicial chega pré-renderizada só com a tela (`main.tsx` hidrata), e
+ * qualquer nó a mais aqui faria o React descartar o HTML pronto.
+ */
 function Root() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   return (
     <>
       <Outlet />
-      {/* Tela nova começa no topo; voltar restaura onde a pessoa estava; link com
-          #âncora vai até ela. A chave é o caminho: mudar só a busca ou o filtro
-          na URL (lista de produtos, ajuda) não joga a página para o topo. */}
-      <ScrollRestoration getKey={(location) => location.pathname} />
-      <SupportChat />
+      {mounted && (
+        <>
+          {/* Tela nova começa no topo; voltar restaura onde a pessoa estava; link com
+              #âncora vai até ela. A chave é o caminho: mudar só a busca ou o filtro
+              na URL (lista de produtos, ajuda) não joga a página para o topo. */}
+          <ScrollRestoration getKey={(location) => location.pathname} />
+          <SupportChat />
+        </>
+      )}
     </>
   );
 }
@@ -81,14 +101,14 @@ export const router = createBrowserRouter([
     errorElement: <RouteError fullScreen />,
     children: [
       { path: '/', element: <LandingPage /> },
-      { path: '/entrar', element: <LoginPage /> },
+      { path: '/entrar', element: <Suspense fallback={<FullScreenLoading />}><LoginPage /></Suspense> },
       // Entrada personalizada da empresa (identificadores reservados nunca chegam aqui: ver brand-rules.ts).
-      { path: '/:slug/entrar', element: <BrandedLoginPage /> },
-      { path: '/criar-conta', element: <RegisterPage /> },
-      { path: '/esqueci-a-senha', element: <ForgotPasswordPage /> },
-      { path: '/redefinir-senha', element: <ResetPasswordPage /> },
-      { path: '/confirmar-email', element: <VerifyEmailPage /> },
-      { path: '/convite/:token', element: <InvitePage /> },
+      { path: '/:slug/entrar', element: <Suspense fallback={<FullScreenLoading />}><BrandedLoginPage /></Suspense> },
+      { path: '/criar-conta', element: <Suspense fallback={<FullScreenLoading />}><RegisterPage /></Suspense> },
+      { path: '/esqueci-a-senha', element: <Suspense fallback={<FullScreenLoading />}><ForgotPasswordPage /></Suspense> },
+      { path: '/redefinir-senha', element: <Suspense fallback={<FullScreenLoading />}><ResetPasswordPage /></Suspense> },
+      { path: '/confirmar-email', element: <Suspense fallback={<FullScreenLoading />}><VerifyEmailPage /></Suspense> },
+      { path: '/convite/:token', element: <Suspense fallback={<FullScreenLoading />}><InvitePage /></Suspense> },
       { path: '/termos', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
       { path: '/privacidade', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
       { path: '/ajuda', element: <Suspense fallback={<FullScreenLoading />}><PublicHelpPage /></Suspense> },

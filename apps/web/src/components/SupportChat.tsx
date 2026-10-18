@@ -65,11 +65,11 @@ function useDesktop(): boolean {
  * conversa que ele abre. Só em telas de computador: no celular o balão
  * tomaria a tela inteira, e a área de suporte já está a um toque no menu.
  */
-export function SupportChat() {
+export function SupportChat({ initialOpen = false }: { initialOpen?: boolean } = {}) {
   const { status } = useAuth();
   const location = useLocation();
   const desktop = useDesktop();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const launcher = useRef<HTMLButtonElement | null>(null);
 
   // Na própria área de suporte o chat seria a mesma conversa duas vezes.

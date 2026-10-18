@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /convite/
+Disallow: /redefinir-senha
+Disallow: /confirmar-email
+
+Sitemap: https://estoquesimples.com.br/sitemap.xml

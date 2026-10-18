@@ -91,7 +91,9 @@ function useRedirectIfAuthed(): ReactNode | null {
   const location = useLocation();
   if (status === 'loading') return <FullScreenLoading />;
   if (status === 'authed') {
-    const from = (location.state as { from?: string } | null)?.from;
+    // Vem do estado da navegação ou, para links comuns (a página inicial
+    // não usa o roteador), da URL: /criar-conta?depois=/app/plano.
+    const from = (location.state as { from?: string } | null)?.from ?? new URLSearchParams(location.search).get('depois');
     return <Navigate to={from && from.startsWith('/app') ? from : '/app'} replace />;
   }
   return null;

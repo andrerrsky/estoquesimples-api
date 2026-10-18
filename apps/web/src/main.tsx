@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 
 import '@estoquesimples/design/tokens.css';
@@ -38,7 +38,8 @@ window.addEventListener('vite:preloadError', (event) => {
 // Abre já com a última marca da empresa (a API confirma ou desfaz depois).
 bootBrand();
 
-createRoot(document.getElementById('root') as HTMLElement).render(
+const container = document.getElementById('root') as HTMLElement;
+const app = (
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -49,5 +50,18 @@ createRoot(document.getElementById('root') as HTMLElement).render(
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );
+
+// A página inicial chega já renderizada (apps/web/scripts/prerender.mjs):
+// hidratar aproveita o DOM que está na tela em vez de reconstruí-lo, então o
+// vídeo que a pessoa já deu play e o foco do teclado continuam onde estavam.
+// Qualquer diferença entre o HTML e o que o React esperava é registrada no
+// console (em produção o React refaz a árvore sozinho).
+if (container.firstElementChild) {
+  hydrateRoot(container, app, {
+    onRecoverableError: (error) => console.warn('hidratação da página inicial:', error),
+  });
+} else {
+  createRoot(container).render(app);
+}

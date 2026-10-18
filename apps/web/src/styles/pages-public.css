@@ -2,10 +2,49 @@
    Estoque Simples · página inicial pública
    Complementa as classes .landing__*, .preview e .feature de app.css; tudo o
    que nasce aqui começa com .lp- para não esbarrar nas outras telas (as
-   folhas de estilo são globais depois de carregadas). A identidade é a do app: faixa azul da marca, superfícies claras,
-   raios 16/14/10/8, sem sombras e sem degradês. As ilustrações são HTML de
-   verdade, feitas com as mesmas peças das telas internas.
+   folhas de estilo são globais depois de carregadas). A identidade é a do
+   app: faixa azul da marca, superfícies claras, raios 16/14/10/8, sem sombras
+   e sem degradês. As ilustrações são HTML de verdade, feitas com as mesmas
+   peças das telas internas.
+
+   Tipografia: o corpo é a fonte do sistema (a mesma do app); só os títulos
+   grandes usam uma família própria, hospedada aqui mesmo (a CSP não permite
+   fontes de fora). É o que diferencia a página de um modelo pronto sem
+   mudar o resto da identidade. O arquivo é pré-carregado só na página
+   inicial (ver scripts/prerender.mjs).
    ========================================================================== */
+
+/* Bricolage Grotesque (SIL Open Font License 1.1), só o peso 800 e o
+   subconjunto latino (20 KB): public/assets/fonts/. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/assets/fonts/bricolage-grotesque-800-latin.woff2') format('woff2');
+}
+/* Enquanto a fonte não chega, a Arial ajustada às métricas dela ocupa o
+   mesmo espaço: a troca não move o layout em conexão lenta. */
+@font-face {
+  font-family: 'Bricolage Fallback';
+  src: local('Arial'), local('Helvetica'), local('Roboto');
+  size-adjust: 113%;
+  ascent-override: 82%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+.lp {
+  --lp-display: 'Bricolage Grotesque', 'Bricolage Fallback', var(--font);
+}
+.lp .landing__title,
+.lp .landing__h2,
+.lp-cta h2,
+.lp-plan__name,
+.lp-platform__title {
+  font-family: var(--lp-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
 
 .lp {
   /* Texto de apoio sobre o azul. O --on-brand-muted (70%) não dá contraste
@@ -15,9 +54,20 @@
   background: var(--surface-content);
 }
 
+/* A arte da abertura desce sobre a seção seguinte: a faixa azul precisa
+   ficar acima dela na pilha, senão o branco de baixo cobre o celular. */
+.lp .landing__hero {
+  position: relative;
+  z-index: 1;
+}
+
 /* O anel de foco padrão é azul: sobre a faixa azul ele precisa ser claro. */
 .lp-on-brand :focus-visible {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7);
+}
+/* No botão branco da faixa azul o anel claro sumiria: azul por dentro, branco por fora. */
+.lp-on-brand .btn--on-brand:focus-visible {
+  box-shadow: 0 0 0 2px var(--brand), 0 0 0 5px #fff;
 }
 
 .lp-skip {
@@ -93,8 +143,18 @@
 .lp .landing__hero-inner {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: 40px;
+  align-items: start;
   padding-top: 40px;
+  padding-bottom: 0;
+}
+.lp-hero__text {
+  padding-top: 28px;
   padding-bottom: 72px;
+}
+/* Os botões principais trocam de texto quando a sessão é retomada; a largura
+   mínima evita que o bloco salte no primeiro segundo. */
+.lp .landing__cta .btn--lg {
+  min-width: 11.5em;
 }
 .lp-eyebrow {
   margin-bottom: 14px;
@@ -126,10 +186,13 @@
   justify-self: end;
   width: 100%;
   max-width: 540px;
-  padding: 0 28px 80px 0;
+  padding: 0 28px 0 0;
   pointer-events: none;
   user-select: none;
-  animation: rise 420ms ease;
+  /* A arte desce além da faixa azul: é a única peça que cruza as duas
+     superfícies da abertura, e o celular, que está na frente, aterrissa
+     sobre o branco. */
+  margin-bottom: -48px;
 }
 
 .lp-desk {
@@ -254,16 +317,36 @@
   white-space: nowrap;
 }
 .lp-mini--in {
-  color: var(--success);
+  color: var(--text);
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
 }
+.lp-mini--in svg {
+  color: var(--success);
+}
 .lp-mini--out {
-  color: var(--warning);
+  color: var(--text);
   border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+.lp-mini--out svg {
+  color: var(--warning);
+}
+/* Nas miniaturas o texto é pequeno demais para o laranja passar em 3:1: a
+   cor fica no ícone e o número em preto. */
+.lp-art .qty--low,
+.lp-phone__qty--low {
+  color: var(--text);
+}
+.lp-move--reversed .movement {
+  color: var(--text-muted);
 }
 
 /* 34 (barra) + 14 (respiro) + 42 (título) + 54 (filtros) + 54 (1ª linha) = 198:
-   o celular começa logo depois, cobrindo só os botões das linhas seguintes. */
+   o celular começa logo depois, cobrindo os botões das linhas seguintes. Os
+   botões cobertos não são desenhados: um pedaço de "Saída" espiando pela
+   borda do aparelho denunciaria a montagem. */
+.lp-row:not(.lp-row--featured) .lp-row__actions {
+  visibility: hidden;
+}
 .lp-phone {
   position: absolute;
   top: 206px;
@@ -323,7 +406,7 @@
   letter-spacing: 0;
 }
 .lp-phone__qty--low {
-  color: var(--warning);
+  color: var(--text);
 }
 .lp-phone__actions {
   display: grid;
@@ -366,6 +449,16 @@
   padding-bottom: 88px;
   scroll-margin-top: 8px;
 }
+/* O respiro varia com o peso da seção: a de plataformas é densa, a de planos
+   é onde se decide. */
+.lp .landing__section--dense {
+  padding-top: 64px;
+  padding-bottom: 72px;
+}
+.lp .landing__section--roomy {
+  padding-top: 104px;
+  padding-bottom: 112px;
+}
 .lp-kicker {
   margin-bottom: 10px;
   color: var(--brand);
@@ -402,14 +495,27 @@
   margin: 36px auto 0;
   overflow: hidden;
   border-radius: var(--radius-hero);
+  border: 1px solid var(--border);
   background: #0a1c2e;
-  box-shadow: 0 24px 60px -24px rgba(10, 40, 70, 0.45);
 }
 .lp-video__player {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #0a1c2e;
+  /* O texto de apoio (navegador sem <video>) fica sobre o fundo escuro. */
+  color: #fff;
+}
+.lp-video__player a {
+  color: inherit;
+  text-decoration: underline;
+}
+/* O quadro recorta o anel de foco de fora (overflow: hidden): o do player
+   fica por dentro, branco sobre o vídeo. */
+.lp-video__player:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -6px;
+  box-shadow: none;
 }
 
 /* Texto de um lado, ilustração do outro; a ordem alterna a cada seção. */
@@ -433,9 +539,23 @@
 }
 .lp-point {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+}
+.lp-point__icon {
+  margin-top: 1px;
+  color: var(--brand);
+}
+.lp-point__title {
+  font-size: var(--fs-section);
+  font-weight: 700;
+}
+.lp-point__title--row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
 }
 .lp-point p {
   margin-top: 3px;
@@ -484,7 +604,6 @@
   text-align: center;
 }
 .lp-move--reversed .movement {
-  color: var(--text-faint);
   text-decoration: line-through;
 }
 .lp-move--reversed .list__title {
@@ -506,53 +625,11 @@
   white-space: nowrap;
 }
 
-/* App Android + código de barras + equipe */
-.lp-duo {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap: 20px;
-}
-.lp-android {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 40px;
-  border-radius: var(--radius-hero);
-  background: var(--brand-soft);
-}
-.lp-android .check-list {
-  margin: 22px 0 28px;
-  font-size: var(--fs-body);
-}
-.lp-android .check-list svg {
-  color: var(--brand);
-}
-.lp-android__cta {
-  margin-top: auto;
-}
-.lp-duo__side {
-  display: grid;
-  gap: 20px;
-}
-.lp-duo__side .card {
-  padding: 24px;
-}
-.lp-duo__side .feature p {
-  color: var(--text-muted);
-  line-height: 1.55;
-}
-.lp-feature__title {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  margin-top: 6px;
-}
 .lp-roles {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 6px 0 0;
+  margin: 8px 0 2px;
   padding: 0;
   list-style: none;
 }
@@ -568,7 +645,9 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
-  align-items: stretch;
+  /* Cada cartão tem a própria altura: o Equipe, com mais itens, é mais alto,
+     e o Gratuito termina no botão, sem vão. */
+  align-items: start;
 }
 /* Não usa .plan-card: a tela Plano tem regras próprias para essa classe. */
 .lp-plan {
@@ -580,11 +659,13 @@
 .lp-plan--featured {
   border: 1.5px solid var(--brand);
 }
-.lp-plan__name {
+.lp-plan__head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 10px;
+}
+.lp-plan__name {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -594,9 +675,9 @@
   color: var(--text-muted);
 }
 .lp-plan .check-list {
-  flex: 1;
   line-height: 1.45;
 }
+
 /* Limite do plano: é informação, não vantagem. Ícone neutro em vez do "ok". */
 .lp-plan .check-list li.lp-limit svg {
   color: var(--text-muted);
@@ -672,11 +753,234 @@
   list-style: none;
 }
 .lp-footer__links a {
+  display: inline-block;
+  padding: 4px 0;
   color: var(--text-muted);
   font-weight: 500;
 }
 .lp-footer__links a:hover {
   color: var(--brand);
+}
+/* O "Fale com o suporte" vira botão quando o chat está na página: mesmo desenho do link. */
+.lp-footer__button {
+  display: inline-block;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-chip);
+}
+.lp-footer__button:hover {
+  color: var(--brand);
+}
+
+
+/* --------------------------------------------------------------------------
+   Plataformas: dois blocos de pesos diferentes (Android com a miniatura do
+   celular; navegador só texto), e os dois extras numa lista sem cartões.
+   -------------------------------------------------------------------------- */
+
+.lp-platforms__head {
+  max-width: 640px;
+  margin-bottom: 28px;
+}
+.lp-platforms {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 20px;
+}
+.lp-platform {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 28px;
+  border-radius: var(--radius-hero);
+}
+.lp-platform p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.lp-platform p + p {
+  margin-top: 8px;
+}
+.lp-platform__title {
+  margin-bottom: 10px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+.lp-platform--android {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  background: var(--brand-soft);
+}
+.lp-platform--web {
+  border: 1px solid var(--border);
+  background: var(--surface-content);
+}
+.lp-platform__art {
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+}
+.lp-phone--static {
+  position: static;
+  width: 150px;
+}
+.lp-phone__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface-content);
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.lp-phone__search svg:last-child {
+  margin-left: auto;
+  color: var(--brand);
+}
+.lp-platform__cta {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 14px;
+  white-space: normal;
+  text-align: center;
+  justify-content: center;
+}
+.lp-platform__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin-top: auto;
+}
+.lp-platform__actions .lp-platform__cta {
+  margin-top: 0;
+}
+.lp-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  color: var(--brand);
+  font-weight: 600;
+}
+.lp-extras {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  margin: 32px 0 0;
+  padding: 28px 0 0;
+  border-top: 1px solid var(--border);
+}
+.lp-extras > div {
+  max-width: 720px;
+}
+.lp-extras p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* --------------------------------------------------------------------------
+   Prova social: a nota da Google Play, com o número da própria listagem.
+   -------------------------------------------------------------------------- */
+
+.lp-rating {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 12px;
+  padding: 3px 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-muted);
+  font-size: var(--fs-supporting);
+}
+.lp-rating:hover {
+  text-decoration: none;
+}
+.lp-rating strong {
+  color: var(--text);
+}
+/* Estrelas e nota não se separam numa quebra de linha. */
+.lp-rating__score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.lp-rating__stars {
+  position: relative;
+  display: inline-block;
+  color: var(--border);
+  font-size: 15px;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.lp-rating__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  color: #e8a317;
+  white-space: nowrap;
+}
+.lp-rating--on-brand {
+  margin-top: 22px;
+  color: var(--lp-on-brand-soft);
+}
+.lp-rating--on-brand strong {
+  color: var(--on-brand);
+}
+.lp-rating--on-brand .lp-rating__stars {
+  color: rgba(255, 255, 255, 0.3);
+}
+.lp-rating--on-brand .lp-rating__fill {
+  color: #ffd166;
+}
+.lp-platform .lp-rating {
+  margin-top: 12px;
+}
+/* Sobre o azul claro do cartão Android o âmbar precisa ser mais escuro. */
+.lp-platform--android .lp-rating__stars {
+  color: var(--text-faint);
+}
+.lp-platform--android .lp-rating__fill {
+  color: #c47f0a;
+}
+
+/* --------------------------------------------------------------------------
+   Atalhos das seções no celular: a barra do topo não tem espaço para eles,
+   então ficam logo abaixo da abertura, em chips que quebram de linha (nada
+   fica escondido fora da borda).
+   -------------------------------------------------------------------------- */
+
+.lp-sections {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px var(--page-x) 0;
+}
+.lp-sections .lp-chip {
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  color: var(--brand);
+  font-size: var(--fs-label);
 }
 
 /* --------------------------------------------------------------------------
@@ -686,41 +990,62 @@
 @media (max-width: 980px) {
   .lp .landing__hero-inner {
     grid-template-columns: minmax(0, 1fr);
-    gap: 40px;
+    gap: 32px;
     padding-top: 28px;
-    padding-bottom: 56px;
   }
+  .lp-hero__text {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  /* Numa coluna só, nada abaixo reserva a saliência do celular (77px além
+     da lista): a própria arte guarda esse espaço. */
   .lp-art {
-    justify-self: start;
+    justify-self: center;
+    margin-bottom: 0;
+    padding-bottom: 96px;
+  }
+  .lp .landing__hero-inner {
+    padding-bottom: 0;
   }
   .lp-plans {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
   }
+  .lp-platforms {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Marca + 5 atalhos + 2 botões precisam de ~890px: abaixo de 900 os atalhos
+   descem para os chips (mesmo corte do chat, DESKTOP em SupportChat). */
+@media (max-width: 899px) {
+  .lp-nav__links {
+    display: none;
+  }
+  .lp-sections {
+    display: flex;
+  }
 }
 
 @media (max-width: 860px) {
-  .lp-nav__links {
-    display: none;
+  .lp .landing__hero-inner {
+    padding-bottom: 24px;
   }
   .lp .landing__section {
     padding-top: 56px;
     padding-bottom: 56px;
   }
-  .lp-split,
-  .lp-duo {
+  .lp .landing__section--roomy {
+    padding-top: 72px;
+    padding-bottom: 80px;
+  }
+  .lp-split {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
-  }
-  .lp-duo {
-    gap: 16px;
   }
   /* No celular o texto vem sempre antes da ilustração. */
   .lp-split--reverse .lp-split__art {
     order: 0;
-  }
-  .lp-android {
-    padding: 28px 22px;
   }
   .lp-cta__inner {
     padding: 48px var(--page-x);
@@ -739,16 +1064,22 @@
   }
   .lp .landing__cta .btn {
     flex: 1 1 auto;
+    min-width: 0;
   }
-  /* Sem espaço para os dois aparelhos: fica a lista, com os botões do
-     primeiro produto embaixo dele, como nos cartões do estoque no celular. */
+  /* Sem espaço para a lista inteira e o celular: fica o celular em primeiro
+     plano, com a lista recortada atrás, para a ilustração continuar dizendo
+     "o mesmo dado nos dois aparelhos" justamente no aparelho do público. */
   .lp-art {
     padding: 0;
+    min-height: 362px;
   }
-  .lp-phone {
-    display: none;
+  .lp-desk {
+    width: calc(100% - 96px);
   }
-  .lp-desk__head .btn {
+  .lp-desk__head .btn,
+  .lp-desk__sub,
+  .lp-desk__chips .lp-chip:not(.lp-chip--active),
+  .lp-row:nth-child(n + 5) {
     display: none;
   }
   .lp-row {
@@ -757,16 +1088,24 @@
   .lp-row__actions {
     display: none;
   }
-  .lp-row--featured .lp-row__actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    flex-basis: 100%;
-    gap: 8px;
-    padding-bottom: 2px;
+  .lp-art .lp-phone {
+    top: 90px;
+    width: 190px;
   }
-  .lp-row--featured .lp-mini {
-    justify-content: center;
-    height: 34px;
+  /* Os botões da lista estão escondidos aqui: quem é pressionado é o "Saída"
+     do celular, para a troca de número ter causa visível. */
+  .lp-row--featured .lp-mini--out {
+    animation: none;
+  }
+  .lp-phone__actions .lp-mini--out {
+    animation: lp-press 0.9s ease-in-out 1.8s 1;
+  }
+  .lp-platform--android {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .lp-platform {
+    padding: 22px;
   }
   .lp-plans__cards {
     grid-template-columns: minmax(0, 1fr);
@@ -790,64 +1129,125 @@
   }
 }
 
-/* Plataformas (Android, web, web app) */
-.lp-platforms__head {
-  max-width: 640px;
-  margin-bottom: 28px;
-}
-.lp-platforms {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
-}
-.lp-platform {
+/* --------------------------------------------------------------------------
+   Dúvidas: quatro perguntas abertas por <details>, sem cartão, uma linha
+   fina entre elas.
+   -------------------------------------------------------------------------- */
+
+.lp-faq__head {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 28px;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-bottom: 20px;
 }
-.lp-platform p {
-  margin: 0;
+.lp-faq__head .landing__h2 {
+  max-width: 18em;
+}
+.lp-faq__list {
+  border-top: 1px solid var(--border);
+}
+.lp-faq__item {
+  border-bottom: 1px solid var(--border);
+}
+.lp-faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 4px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 17px;
+  font-weight: 700;
+  border-radius: var(--radius-chip);
+}
+.lp-faq__q::-webkit-details-marker {
+  display: none;
+}
+.lp-faq__q:hover {
+  color: var(--brand);
+}
+.lp-faq__chevron {
+  flex: none;
   color: var(--text-muted);
-  line-height: 1.55;
+  transition: transform var(--transition);
 }
-.lp-platform__cta {
-  margin-top: auto;
-  align-self: flex-start;
+.lp-faq__item[open] .lp-faq__chevron {
+  transform: rotate(180deg);
 }
-.lp-platform p + .lp-platform__cta {
-  margin-top: 14px;
-}
-.lp-platform--accent {
-  border-color: var(--brand);
-  background: var(--brand-tint);
-}
-.lp-duo--pair {
-  margin-top: 20px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.lp-duo--pair .card {
-  padding: 24px;
-}
-.lp-duo--pair .feature p {
+.lp-faq__a {
+  max-width: 44em;
+  padding: 0 4px 20px;
   color: var(--text-muted);
-  line-height: 1.55;
-}
-@media (max-width: 980px) {
-  .lp-platforms {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .lp-duo--pair {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  line-height: 1.6;
 }
 
-.lp-platform {
-  min-width: 0;
+/* --------------------------------------------------------------------------
+   A abertura em movimento, uma vez só: pouco depois de a página abrir, o
+   botão "Saída" do primeiro produto é pressionado na lista e a quantidade
+   muda de 42 para 30 nos dois aparelhos, e fica assim. Só CSS; nada se move
+   para quem pediu menos movimento (prefers-reduced-motion).
+   -------------------------------------------------------------------------- */
+
+.lp-anim-qty {
+  position: relative;
+  display: inline-block;
 }
-.lp-platform__cta {
-  max-width: 100%;
-  white-space: normal;
-  text-align: center;
-  justify-content: center;
+.lp-anim-qty__after {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+}
+.lp-anim-qty__before {
+  animation: lp-qty-before 1.2s ease-in-out 2.4s 1 forwards;
+}
+.lp-anim-qty__after {
+  animation: lp-qty-after 1.2s ease-in-out 2.4s 1 forwards;
+}
+.lp-row--featured .lp-mini--out {
+  animation: lp-press 0.9s ease-in-out 1.8s 1;
+}
+@keyframes lp-qty-before {
+  0%,
+  40% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes lp-qty-after {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes lp-press {
+  0%,
+  100% {
+    transform: scale(1);
+    background: var(--surface-content);
+  }
+  35%,
+  65% {
+    transform: scale(0.94);
+    background: var(--warning-soft);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-anim-qty__before,
+  .lp-anim-qty__after,
+  .lp-row--featured .lp-mini--out {
+    animation: none;
+  }
 }
