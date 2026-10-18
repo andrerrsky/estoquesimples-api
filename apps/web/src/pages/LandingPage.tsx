@@ -382,6 +382,58 @@ const FAQ = [
   },
 ];
 
+/**
+ * Três situações comuns de quem controla estoque na mão e o que o app faz
+ * em cada uma. São exemplos escritos por nós, não depoimentos: a página diz
+ * isso, e cada "o que o app faz" cita só recursos que existem.
+ */
+const CASES = [
+  {
+    icon: 'box' as IconName,
+    who: 'Mercearia',
+    situation: 'O arroz acabou na sexta e só deu para perceber no sábado, com o cliente na frente.',
+    how: 'Cada produto tem um estoque mínimo. Quando o arroz chega nele, aparece destacado na lista, entra no relatório de reposição e, no aplicativo Android, vira um aviso no celular.',
+  },
+  {
+    icon: 'users' as IconName,
+    who: 'Loja de roupas',
+    situation: 'Duas pessoas no balcão, cada uma anotando a venda de um jeito, e no fim do dia a conta não fecha.',
+    how: 'No plano Equipe, cada pessoa lança do próprio celular, com papel definido (quem só consulta, quem movimenta, quem administra). O histórico guarda cada lançamento e, na web, quem fez.',
+  },
+  {
+    icon: 'chart' as IconName,
+    who: 'Pet shop',
+    situation: 'A ração de 10 kg é o produto mais caro da loja e ninguém sabe quanto dinheiro está parado na prateleira.',
+    how: 'O relatório mostra o valor em estoque por produto e por categoria. A saída se registra pelo código de barras, em segundos, e o número fica certo para o próximo pedido.',
+  },
+];
+
+function CasesSection() {
+  return (
+    <section className="landing__section" id="exemplos" aria-labelledby="lp-exemplos">
+      <div className="lp-cases__head">
+        <p className="lp-kicker">Na prática</p>
+        <h2 className="landing__h2" id="lp-exemplos">Três balcões, o mesmo problema.</h2>
+        <p className="lp-lead">Exemplos escritos por nós, não depoimentos: situações comuns de quem controla estoque na mão e o que o app faz em cada uma.</p>
+      </div>
+      <div className="lp-cases">
+        {CASES.map((item) => (
+          <article key={item.who} className="lp-case">
+            <p className="lp-case__who">
+              <Icon name={item.icon} size={20} aria-hidden="true" /> {item.who}
+            </p>
+            <h3 className="lp-case__situation">{item.situation}</h3>
+            <p className="lp-case__how">
+              <span className="lp-case__label">No app</span>
+              {item.how}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FaqSection() {
   return (
     <section className="landing__section lp-faq" id="duvidas" aria-labelledby="lp-duvidas">
@@ -584,6 +636,8 @@ export function LandingPage() {
             </div>
           </section>
         </div>
+
+        <CasesSection />
 
         <section className="landing__section landing__section--dense" id="plataformas" aria-labelledby="lp-plataformas">
           <div className="lp-platforms__head">
