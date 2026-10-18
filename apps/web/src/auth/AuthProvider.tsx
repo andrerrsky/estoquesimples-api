@@ -1,24 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { api, onSessionChange, refreshSession, sessionApi } from '../api/client';
 import type { User } from '../api/types';
 import { track } from '../lib/analytics';
 import { clearProductImages } from '../lib/product-image';
+import { AuthContext, type AuthContextValue, type Status } from './context';
 
-type Status = 'loading' | 'guest' | 'authed';
-
-interface AuthContextValue {
-  status: Status;
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  /** Relê o perfil (nome alterado, e-mail confirmado). */
-  reloadUser: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+// Os hooks continuam importáveis daqui (é o que o resto da aplicação usa).
+export { useAuth, useAuthOptional } from './context';
 
 /**
  * Sessão do usuário. Ao abrir a página, tenta retomar pelo cookie
@@ -92,8 +82,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth fora do AuthProvider');
-  return context;
-}

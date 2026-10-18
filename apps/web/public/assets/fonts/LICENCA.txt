@@ -1,0 +1,4 @@
+Bricolage Grotesque — Copyright 2022 The Bricolage Grotesque Project Authors
+(https://github.com/ateliertriay/bricolage). Licença: SIL Open Font License 1.1
+(https://openfontlicense.org). Arquivo: subconjunto latino, eixo de peso,
+obtido do Google Fonts (v9). Usado só nos títulos da página inicial.

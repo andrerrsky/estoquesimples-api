@@ -68,6 +68,8 @@
   --fs-label: 13px;
   --fs-caption: 12px;
 
-  --focus-ring: 0 0 0 3px rgba(28, 103, 157, 0.25);
+  /* Anel duplo (branco + marca): visível sobre fundo claro, sobre o azul e
+     sobre o próprio botão primário; o anel único a 25% ficava em 1,4:1. */
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px var(--brand);
   --transition: 140ms ease;
 }

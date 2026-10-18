@@ -4,7 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1C679D" />
-    <meta name="description" content="Estoque Simples: controle de estoque simples e rápido. Funciona no Android, no iPhone, no tablet e no computador, com os mesmos dados. Produtos, entradas e saídas, relatórios e equipe." />
+    <title>Estoque Simples · Controle de estoque no celular e na web</title>
+    <meta name="description" content="Controle de estoque para pequenos negócios: cadastre produtos, lance entradas e saídas e saiba o que está acabando. Grátis para uma pessoa." />
+    <link rel="canonical" href="https://estoquesimples.com.br/" />
+    <!-- Prévia do link no WhatsApp, Telegram, LinkedIn e afins. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Estoque Simples" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://estoquesimples.com.br/" />
+    <meta property="og:title" content="Estoque Simples · Controle de estoque para pequenos negócios" />
+    <meta property="og:description" content="Cadastre produtos, registre entradas e saídas e saiba o que está acabando. Celular e computador com os mesmos dados. Grátis para uma pessoa, sem cartão." />
+    <meta property="og:image" content="https://estoquesimples.com.br/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Estoque Simples: seu estoque na palma da mão. Tela do aplicativo com a lista de produtos." />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <!-- Web app: instalável na tela inicial (Android, iPhone/iPad) e no computador. -->
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -13,7 +27,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Estoque Simples" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>Estoque Simples</title>
+    <!-- Dados estruturados: é JSON, não script; a CSP não o bloqueia. Sem preço do plano pago (é configurável no servidor). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Estoque Simples",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Android, Web",
+        "inLanguage": "pt-BR",
+        "url": "https://estoquesimples.com.br/",
+        "installUrl": "https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL", "description": "Plano Gratuito, para uma pessoa" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

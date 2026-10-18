@@ -30,9 +30,13 @@ subida, com gzip/brotli, `Cache-Control: immutable` para `/assets/` e
 
 Arquivos sem compressão (imagens e o vídeo da página inicial) respondem a
 `Range` com 206 (`byteRange` em `web-app.ts`): o Safari não toca `<video>`
-sem isso. O vídeo de apresentação fica em `apps/web/src/assets/video/`
-(720p, ~8,6 MB, carregado em memória com o resto do build; nome com hash,
-cache imutável) e a legenda em `apps/web/public/video/apresentacao.vtt`. Por
+sem isso. Todo arquivo sai com `ETag` fraca e responde 304 a `If-None-Match`
+(`etagFor`), então o HTML em `no-cache` e os arquivos de `public/` são
+revalidados sem download. O vídeo de apresentação e a capa ficam em
+`apps/web/public/assets/video/` com nome fixo (720p, ~8,6 MB, carregado em
+memória com o resto do build; em `/assets/` o cache é de um ano, então ao
+trocar o vídeo troque também o nome do arquivo, que é a URL que o Google
+indexa pelo `VideoObject`) e a legenda em `apps/web/public/video/`. Por
 causa da CSP ele não pode vir do YouTube nem de outro domínio. Ao trocar o
 vídeo, mantenha-o leve: cada instância guarda o build inteiro na memória.
 
@@ -54,6 +58,50 @@ antigos, que não existem mais. Três camadas evitam que isso vire tela de erro:
 
 O `index.html` nunca é guardado em cache, então recarregar sempre traz a
 versão nova.
+
+## Página inicial pré-renderizada
+
+A página inicial é uma **segunda página do build** (`apps/web/landing.html`,
+entrada `src/landing-main.tsx`; `vite.config.ts` declara as duas), com o
+mesmo `<head>` do `index.html` e um JavaScript bem menor: React e a própria
+página, sem roteador, sem cache de consultas e sem o provedor de sessão
+(~85 KB gz, dos quais ~64 KB são o React). Por isso os links dela são `<a>`
+comuns. O que a aplicação completa teria a mais (o chat de suporte e a
+retomada da sessão, que troca "Criar conta" por "Abrir meu estoque") chega
+depois, em ociosidade, por `src/landing-extras.tsx`, montado numa raiz
+própria ao lado da página.
+
+O build (`apps/web/package.json`, script `build`) ainda roda `vite build
+--ssr src/entry-prerender.tsx` e `scripts/prerender.mjs`, que reescreve
+`dist/landing.html` com a `LandingPage` já em HTML dentro de `#root`, o
+JSON-LD do vídeo (`VideoObject`, com os caminhos com hash do build) e a nota
+da Google Play (`aggregateRating`), e põe a data do build no `sitemap.xml`.
+`web-app.ts` entrega esse arquivo em `/` e o `index.html` nas demais rotas.
+Buscadores e prévias de link (WhatsApp, Telegram) leem o conteúdo sem
+JavaScript e a primeira pintura não espera o bundle; no navegador
+`landing-main.tsx` **hidrata** esse HTML (`hydrateRoot`), então o que já
+estava na tela (um vídeo em andamento, o foco do teclado) continua onde
+estava. Para a hidratação bater, a `LandingPage` não pode depender de
+`window` na renderização (só em efeitos) e o portal dos avisos
+(`ToastProvider`) e o chat da raiz da aplicação só entram depois do primeiro
+render. O `prerender.mjs` recusa um HTML que não comece pela página.
+
+A `LandingPage` também continua sendo a rota `/` da aplicação (`App.tsx`),
+para quem navega de volta a ela de dentro da aplicação; lá ela lê a sessão
+com `useAuthOptional` (de `auth/context.ts`, que tem só o contexto e os
+hooks, para o pacote da página não arrastar o cliente HTTP). No celular os
+extras não baixam o chat (ele só aparece a partir de 900px): só a sessão.
+
+Visitante sem sessão não chama `/v1/auth/web/refresh` ao abrir a página: o
+cliente guarda em `localStorage` (`es_web_sessao`) se já houve login neste
+navegador e só tenta renovar quando pode haver cookie (ver `api/client.ts`).
+
+SEO estático fica no `index.html`: título, descrição, canonical, Open Graph
+(`public/og.jpg`, 1200×630), JSON-LD `SoftwareApplication` (sem preço do
+plano pago). `public/robots.txt` libera o site e bloqueia `/app/`, convites e
+redefinição de senha; `public/sitemap.xml` lista as páginas públicas. A nota
+da Google Play exibida na página (`PLAY_RATING` em `LandingPage.tsx`) é
+copiada da listagem a cada versão, com a data no comentário.
 
 ## Web app instalável
 

@@ -19,3 +19,6 @@ gcp-*.json
 # Chave da conta de serviço do Google Play baixada na raiz (nunca versionar)
 estoque-simples-*.json
 .data/
+
+# Saída intermediária da pré-renderização da página inicial (apps/web)
+dist-ssr/

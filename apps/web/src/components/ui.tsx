@@ -40,6 +40,11 @@ const ToastContext = createContext<{ push: (message: string, options?: ToastOpti
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const counter = useRef(0);
+  // O portal dos avisos só entra depois do primeiro render: a página inicial
+  // chega pré-renderizada e é hidratada (main.tsx), e o React não aceita um
+  // portal no meio da hidratação.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const dismiss = useCallback((id: number) => setToasts((current) => current.filter((toast) => toast.id !== id)), []);
 
@@ -58,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {createPortal(
+      {mounted && createPortal(
         <div className="toasts" role="status" aria-live="polite">
           {toasts.map((toast) => (
             <div key={toast.id} className={`toast ${toast.tone && toast.tone !== 'default' ? `toast--${toast.tone}` : ''}`}>

@@ -85,9 +85,36 @@ export function onSessionChange(listener: SessionListener): () => void {
   return () => listeners.delete(listener);
 }
 
+/**
+ * O cookie do refresh é `httpOnly`, invisível ao JavaScript. Este marcador
+ * no `localStorage` lembra se há sessão neste navegador: '1' depois de um
+ * login, '0' depois de um logout ou de uma renovação recusada. Com '0', a
+ * abertura da página não pede renovação à API (seria um 401 por visita na
+ * página mais vista do site). Sem marcador (navegador que nunca passou por
+ * aqui, ou sessão anterior a esta versão) a renovação é tentada uma vez.
+ */
+const SESSION_HINT = 'es_web_sessao';
+
+function rememberSession(active: boolean): void {
+  try {
+    localStorage.setItem(SESSION_HINT, active ? '1' : '0');
+  } catch {
+    // Armazenamento bloqueado: só perde a economia da requisição.
+  }
+}
+
+function mayHaveSession(): boolean {
+  try {
+    return localStorage.getItem(SESSION_HINT) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 function setSession(auth: WebAuth | null, notify = true): void {
   accessToken = auth?.accessToken ?? null;
   accessExpiresAt = auth ? Date.now() + auth.expiresIn * 1000 : 0;
+  rememberSession(auth !== null);
   if (notify) for (const listener of listeners) listener(auth);
 }
 
@@ -135,6 +162,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  */
 export function refreshSession(): Promise<WebAuth | null> {
   if (refreshing) return refreshing;
+  if (!accessToken && !mayHaveSession()) return Promise.resolve(null);
 
   const attempt = async (): Promise<WebAuth | null> => {
     for (let tries = 0; tries < 4; tries += 1) {

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, sep } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
@@ -78,9 +79,29 @@ export function byteRange(header: string | undefined, size: number): { start: nu
 interface StaticFile {
   contentType: string;
   cacheControl: string;
+  /** ETag fraca (vale para as três codificações): `no-cache` vira 304 em vez de baixar de novo. */
+  etag: string;
   raw: Buffer;
   gzip: Buffer | null;
   brotli: Buffer | null;
+}
+
+/**
+ * Arquivos do Vite têm hash no nome e podem ficar imutáveis. HTML é sempre
+ * revalidado (é o que muda a cada deploy). O resto de `public/` (ícones,
+ * manifest, robots, legendas) não tem hash mas muda raramente: uma hora de
+ * cache poupa uma revalidação por navegação sem segurar uma troca por muito
+ * tempo.
+ */
+function cacheControlFor(urlPath: string, extension: string): string {
+  if (urlPath.startsWith('/assets/')) return 'public, max-age=31536000, immutable';
+  if (extension === '.html') return 'no-cache';
+  return 'public, max-age=3600, must-revalidate';
+}
+
+/** ETag fraca a partir do conteúdo; a mesma para o arquivo cru, gzip e brotli. */
+export function etagFor(raw: Buffer): string {
+  return `W/"${createHash('sha1').update(raw).digest('base64url').slice(0, 20)}"`;
 }
 
 /** Carrega o build inteiro em memória: são poucos arquivos e não mudam até o próximo deploy. */
@@ -99,9 +120,8 @@ function loadFiles(distDir: string): Map<string, StaticFile> {
       const compress = COMPRESSIBLE.has(extension) && raw.length > 1024;
       files.set(urlPath, {
         contentType: CONTENT_TYPES[extension] ?? 'application/octet-stream',
-        // Arquivos do Vite têm hash no nome e podem ficar imutáveis; o resto
-        // (index.html, robots.txt, páginas legais) precisa ser revalidado.
-        cacheControl: urlPath.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+        cacheControl: cacheControlFor(urlPath, extension),
+        etag: etagFor(raw),
         raw,
         gzip: compress ? gzipSync(raw, { level: 9 }) : null,
         brotli: compress ? brotliCompressSync(raw) : null,
@@ -155,13 +175,24 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
   const index: StaticFile = files.get('/index.html') ?? {
     contentType: 'text/html; charset=utf-8',
     cacheControl: 'no-store',
+    etag: etagFor(PLACEHOLDER),
     raw: PLACEHOLDER,
     gzip: null,
     brotli: null,
   };
+  // A página inicial sai do build já renderizada (apps/web/scripts/prerender.mjs):
+  // buscadores e prévias de link leem o conteúdo sem JavaScript. Sem o
+  // arquivo, `/` cai no index como qualquer outra rota.
+  const landing = files.get('/landing.html') ?? index;
+  files.delete('/landing.html');
 
   const send = (request: FastifyRequest, reply: FastifyReply, file: StaticFile, status = 200): FastifyReply => {
     const accepts = String(request.headers['accept-encoding'] ?? '');
+    // Revalidação: o navegador já tem esta versão (HTML em `no-cache`,
+    // arquivos de public/ depois de uma hora) e só precisa de um 304.
+    if (status === 200 && String(request.headers['if-none-match'] ?? '').includes(file.etag)) {
+      return reply.code(304).header('ETag', file.etag).header('Cache-Control', file.cacheControl).header('Vary', 'Accept-Encoding').send('');
+    }
     let body = file.raw;
     // Vídeo precisa de requisição por faixa: o Safari (iPhone, iPad, Mac) não
     // toca um <video> cujo servidor ignora `Range`, e os demais navegadores
@@ -195,6 +226,7 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
       .code(status)
       .header('Content-Type', file.contentType)
       .header('Cache-Control', file.cacheControl)
+      .header('ETag', file.etag)
       .header('Vary', 'Accept-Encoding')
       .header('Content-Security-Policy', CSP)
       .header('X-Frame-Options', 'DENY')
@@ -246,7 +278,9 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
       return reply.code(404).header('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send('Não encontrado.');
     }
 
-    // Qualquer outra rota é da SPA: o roteador do cliente decide.
-    return send(request, reply, { ...index, cacheControl: 'no-store' });
+    // Qualquer outra rota é da SPA: o roteador do cliente decide. A página
+    // inicial fica em `no-cache` (revalida a cada visita, mas deixa o
+    // navegador guardar a página para o botão Voltar); as demais, `no-store`.
+    return send(request, reply, path === '/' ? landing : { ...index, cacheControl: 'no-store' });
   });
 }

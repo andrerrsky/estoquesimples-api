@@ -506,7 +506,8 @@ button {
   background: var(--brand-soft);
 }
 .btn--outline-on-brand {
-  border-color: rgba(255, 255, 255, 0.5);
+  /* 72% dá 4:1 sobre o azul da marca: o contorno do botão precisa de 3:1. */
+  border-color: rgba(255, 255, 255, 0.72);
   color: var(--on-brand);
 }
 .btn--outline-on-brand:hover:not(:disabled) {
