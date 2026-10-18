@@ -915,13 +915,7 @@
 }
 .lp-rating strong {
   color: var(--text);
-}
-/* Estrelas e nota não se separam numa quebra de linha. */
-.lp-rating__score {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  font-weight: 700;
 }
 .lp-rating__stars {
   position: relative;
