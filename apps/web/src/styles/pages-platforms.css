@@ -51,6 +51,8 @@
 }
 
 .plat-install {
+  /* Chegando por #plat-instalar (link da página inicial), o título não fica colado no topo. */
+  scroll-margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;

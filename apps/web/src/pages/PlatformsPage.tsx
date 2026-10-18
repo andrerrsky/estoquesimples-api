@@ -92,6 +92,16 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
   const [installer, setInstaller] = useState<InstallPrompt | null>(null);
   const [installed, setInstalled] = useState(false);
 
+  // A página é carregada sob demanda: quando a URL traz uma âncora (a página
+  // inicial manda para #plat-instalar), o navegador já tentou rolar antes de
+  // o conteúdo existir; rola de novo agora que ele está na tela.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   useEffect(() => {
     const onPrompt = (event: Event) => {
       event.preventDefault();

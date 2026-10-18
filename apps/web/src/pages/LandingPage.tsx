@@ -28,17 +28,19 @@ export const VIDEO = {
 };
 
 /**
- * Avaliação pública do app na Google Play. A página não consulta nada ao
- * vivo (CSP só permite a própria origem), então o número é copiado da
- * listagem a cada versão: `ratingValue` e `ratingCount` em
+ * Números públicos do app na Google Play. A página não consulta nada ao
+ * vivo (CSP só permite a própria origem), então são copiados da listagem a
+ * cada versão: `ratingValue`, `ratingCount` e a faixa de downloads em
  * play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples.
- * Conferido em 17/10/2026: 4,50 com 3.096 avaliações. Arredondado para
- * baixo de propósito, para a página nunca prometer mais do que a loja mostra.
+ * Conferido em 18/10/2026: 4,50 com 3.096 avaliações e "100 mil+"
+ * downloads. Arredondado para baixo de propósito, para a página nunca
+ * prometer mais do que a loja mostra.
  */
 export const PLAY_RATING = {
-  /** Como aparece na página. */
+  /** Nota (só nas estrelas e no texto para leitor de tela) e os números ao lado. */
   stars: '4,5',
-  count: 'mais de 3 mil avaliações',
+  users: '+100 mil usuários',
+  count: '+3 mil avaliações',
   /** Como vai no JSON-LD (scripts/prerender.mjs); mesmos números, formato da schema.org. */
   ratingValue: '4.5',
   ratingCount: '3096',
@@ -341,17 +343,13 @@ function PlayLink({ className, children }: { className: string; children: ReactN
 function PlayRating({ className }: { className?: string }) {
   return (
     <PlayLink className={`lp-rating ${className ?? ''}`}>
-      <span className="lp-rating__score">
-        <span className="lp-rating__stars" aria-hidden="true">
-          ★★★★★<span className="lp-rating__fill" style={{ width: '90%' }}>★★★★★</span>
-        </span>
-        <strong>
-          <span className="sr-only">nota </span>
-          {PLAY_RATING.stars}
-          <span className="sr-only"> de 5</span>
-        </strong>
+      <span className="lp-rating__stars" aria-hidden="true">
+        ★★★★★<span className="lp-rating__fill" style={{ width: '90%' }}>★★★★★</span>
       </span>
-      <span>na Google Play · {PLAY_RATING.count}</span>
+      <span className="sr-only">nota {PLAY_RATING.stars} de 5 na Google Play, </span>
+      <span>
+        <strong>{PLAY_RATING.users}</strong> · <strong>{PLAY_RATING.count}</strong>
+      </span>
     </PlayLink>
   );
 }
@@ -383,6 +381,58 @@ const FAQ = [
     answer: 'No celular, sem usar a nuvem, não há limite. Na nuvem há um teto de produtos, e o número aparece em Plano, na web, ou em Conta e nuvem, no aplicativo, junto com quantos você já usa.',
   },
 ];
+
+/**
+ * Três situações comuns de quem controla estoque na mão e o que o app faz
+ * em cada uma. São exemplos escritos por nós, não depoimentos: a página diz
+ * isso, e cada "o que o app faz" cita só recursos que existem.
+ */
+const CASES = [
+  {
+    icon: 'box' as IconName,
+    who: 'Mercearia',
+    situation: 'O arroz acabou na sexta e só deu para perceber no sábado, com o cliente na frente.',
+    how: 'Cada produto tem um estoque mínimo. Quando o arroz chega nele, aparece destacado na lista, entra no relatório de reposição e, no aplicativo Android, vira um aviso no celular.',
+  },
+  {
+    icon: 'users' as IconName,
+    who: 'Loja de roupas',
+    situation: 'Duas pessoas no balcão, cada uma anotando a venda de um jeito, e no fim do dia a conta não fecha.',
+    how: 'No plano Equipe, cada pessoa lança do próprio celular, com papel definido (quem só consulta, quem movimenta, quem administra). O histórico guarda cada lançamento e, na web, quem fez.',
+  },
+  {
+    icon: 'chart' as IconName,
+    who: 'Pet shop',
+    situation: 'A ração de 10 kg é o produto mais caro da loja e ninguém sabe quanto dinheiro está parado na prateleira.',
+    how: 'O relatório mostra o valor em estoque por produto e por categoria. A saída se registra pelo código de barras, em segundos, e o número fica certo para o próximo pedido.',
+  },
+];
+
+function CasesSection() {
+  return (
+    <section className="landing__section" id="exemplos" aria-labelledby="lp-exemplos">
+      <div className="lp-cases__head">
+        <p className="lp-kicker">Na prática</p>
+        <h2 className="landing__h2" id="lp-exemplos">Três balcões, o mesmo problema.</h2>
+        <p className="lp-lead">Exemplos escritos por nós, não depoimentos: situações comuns de quem controla estoque na mão e o que o app faz em cada uma.</p>
+      </div>
+      <div className="lp-cases">
+        {CASES.map((item) => (
+          <article key={item.who} className="lp-case">
+            <p className="lp-case__who">
+              <Icon name={item.icon} size={20} aria-hidden="true" /> {item.who}
+            </p>
+            <h3 className="lp-case__situation">{item.situation}</h3>
+            <p className="lp-case__how">
+              <span className="lp-case__label">No app</span>
+              {item.how}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function FaqSection() {
   return (
@@ -587,6 +637,8 @@ export function LandingPage() {
           </section>
         </div>
 
+        <CasesSection />
+
         <section className="landing__section landing__section--dense" id="plataformas" aria-labelledby="lp-plataformas">
           <div className="lp-platforms__head">
             <p className="lp-kicker">Plataformas</p>
@@ -634,7 +686,7 @@ export function LandingPage() {
                 <a href={authed ? '/app' : '/criar-conta'} className="btn btn--secondary lp-platform__cta">
                   {authed ? 'Abrir meu estoque' : 'Criar conta e entrar'}
                 </a>
-                <a href="/plataformas" className="lp-textlink">
+                <a href="/plataformas#plat-instalar" className="lp-textlink">
                   Como instalar na tela inicial <Icon name="arrowRight" size={16} />
                 </a>
               </div>
