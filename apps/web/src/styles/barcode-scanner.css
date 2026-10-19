@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Leitor de código de barras: tela cheia no celular (a câmera precisa de
+   espaço), painel centralizado no computador. Fundo escuro de propósito:
+   é a câmera, não a interface.
+   ========================================================================== */
+
+.scanner {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) + 5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 16, 24, 0.72);
+  animation: fade 140ms ease;
+}
+.scanner__panel {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-hero);
+  background: #0d141c;
+  color: #fff;
+}
+.scanner__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 20px;
+}
+.scanner__title {
+  font-size: 17px;
+  font-weight: 700;
+}
+.scanner__hint {
+  min-height: 1.4em;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--fs-supporting);
+}
+.scanner__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.scanner__close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.scanner__view {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  overflow: hidden;
+}
+.scanner__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scanner__view--idle .scanner__video {
+  opacity: 0;
+}
+/* A moldura cobre o mesmo recorte que é lido (86% × até 62%). */
+.scanner__frame {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 50%;
+  height: min(62%, 64.5vw);
+  max-height: 62%;
+  transform: translateY(-50%);
+  border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.38);
+  outline: 3px solid rgba(255, 255, 255, 0.92);
+  outline-offset: -3px;
+}
+.scanner__laser {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: #ff4d4d;
+  box-shadow: 0 0 12px 2px rgba(255, 77, 77, 0.7);
+  animation: scanner-laser 1.8s ease-in-out infinite alternate;
+}
+@keyframes scanner-laser {
+  from {
+    transform: translateY(-38px);
+  }
+  to {
+    transform: translateY(38px);
+  }
+}
+.scanner__message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
+}
+.scanner__message p {
+  max-width: 34em;
+}
+.scanner__retry {
+  background: #fff;
+  color: var(--text);
+}
+.scanner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+}
+.scanner__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+}
+.scanner__action:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.scanner__action.is-on {
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.16);
+  color: #ffd166;
+}
+.scanner :focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* Celular: a câmera ocupa a tela inteira, os botões ficam ao alcance do polegar. */
+@media (max-width: 640px) {
+  .scanner {
+    padding: 0;
+    background: #0d141c;
+  }
+  .scanner__panel {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .scanner__top {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  .scanner__view {
+    flex: 1;
+    aspect-ratio: auto;
+  }
+  .scanner__frame {
+    height: 34%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner__laser {
+    animation: none;
+  }
+}

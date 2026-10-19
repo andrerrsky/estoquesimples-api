@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.photos.PhotoViewer;
+
 import br.com.gameloop.estoquesimples.analytics.Analytics;
 import br.com.gameloop.estoquesimples.photos.ImageOptimizer;
 import br.com.gameloop.estoquesimples.photos.PhotoFiles;
@@ -1191,39 +1193,8 @@ public class EditActivity extends BaseActivity {
             Log.e(TAG, "photo is null, cannot setup click listener");
             return;
         }
-
-        photo.setOnClickListener(v -> {
-            try {
-                File file = new File(photoPath);
-                
-                // Usar FileUriHelper para criar URI segura
-                Uri photoUri = FileUriHelper.getUriForFile(EditActivity.this, file);
-                
-                if (photoUri == null) {
-                    Toast.makeText(EditActivity.this, "Erro ao criar referência para foto", Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Failed to create URI for photo viewer");
-                    return;
-                }
-                
-                // Verificar se a URI é segura
-                if (!FileUriHelper.isUriSafe(photoUri)) {
-                    Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto", Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Created URI is not safe for photo viewer: " + photoUri);
-                    return;
-                }
-                
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(photoUri, IMAGE_TYPE);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(intent);
-            } catch (android.os.FileUriExposedException e) {
-                Log.e(TAG, "FileUriExposedException when opening photo viewer", e);
-                Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto. Por favor, atualize o aplicativo.", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                Log.e(TAG, "Error opening photo viewer", e);
-                Toast.makeText(EditActivity.this, "Erro ao abrir visualizador de foto", Toast.LENGTH_SHORT).show();
-            }
-        });
+        // Foto em tela cheia, dentro do app (zoom por pinça e toque duplo).
+        photo.setOnClickListener(v -> PhotoViewer.show(EditActivity.this, photoPath, currentTitle()));
     }
 
     /**
@@ -1234,28 +1205,13 @@ public class EditActivity extends BaseActivity {
             Log.e(TAG, "photo is null, cannot setup click listener for URI");
             return;
         }
+        photo.setOnClickListener(v -> PhotoViewer.show(EditActivity.this, uri == null ? null : uri.toString(), currentTitle()));
+    }
 
-        photo.setOnClickListener(v -> {
-            try {
-                // Verificar se a URI é segura
-                if (!FileUriHelper.isUriSafe(uri)) {
-                    Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto", Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "URI is not safe for sharing: " + uri);
-                    return;
-                }
-                
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(uri, IMAGE_TYPE);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(intent);
-            } catch (android.os.FileUriExposedException e) {
-                Log.e(TAG, "FileUriExposedException when opening photo viewer from URI", e);
-                Toast.makeText(EditActivity.this, "Erro de segurança ao abrir foto. Por favor, atualize o aplicativo.", Toast.LENGTH_SHORT).show();
-            } catch (Exception e) {
-                Log.e(TAG, "Error opening photo viewer from URI", e);
-                Toast.makeText(EditActivity.this, "Erro ao abrir visualizador de foto", Toast.LENGTH_SHORT).show();
-            }
-        });
+    /** Nome do produto para o título do visualizador (o digitado, se já mudou). */
+    private String currentTitle() {
+        CharSequence typed = name == null ? null : name.getText();
+        return typed != null && typed.length() > 0 ? typed.toString() : productName;
     }
 
     /**

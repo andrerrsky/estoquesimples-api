@@ -1,5 +1,7 @@
 package br.com.gameloop.estoquesimples;
 
+import br.com.gameloop.estoquesimples.photos.PhotoViewer;
+
 import br.com.gameloop.estoquesimples.branding.BrandStore;
 import br.com.gameloop.estoquesimples.analytics.Analytics;
 
@@ -173,41 +175,8 @@ public class CustomListView extends ArrayAdapter<String> {
             }
         });
 
-        photo.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String photoPath = photos.get(finalPosition);
-                if (PhotoPathHelper.isEmptyPhotoReference(photoPath)) {
-                    return;
-                }
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                    if (PhotoPathHelper.isContentUri(photoPath)) {
-                        intent.setDataAndType(Uri.parse(photoPath), IMAGE_TYPE);
-                    } else {
-                        File photoFile = new File(photoPath);
-                        if (photoFile.exists()) {
-                            Uri photoUri = FileProvider.getUriForFile(
-                                context,
-                                context.getApplicationContext().getPackageName() + ".fileprovider",
-                                photoFile
-                            );
-                            intent.setDataAndType(photoUri, IMAGE_TYPE);
-                        } else {
-                            Toast.makeText(context, "Arquivo de foto não encontrado", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    }
-
-                    context.startActivity(intent);
-                } catch (Exception e) {
-                    Log.e(TAG, "Erro ao abrir foto", e);
-                    Toast.makeText(context, "Erro ao abrir foto: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+        // Foto em tela cheia, dentro do app (zoom por pinça e toque duplo).
+        photo.setOnClickListener(v -> PhotoViewer.show(context, photos.get(finalPosition), names.get(finalPosition)));
 
         // Definir valores básicos
         name.setText(names.get(position));

@@ -577,11 +577,43 @@ public class MainActivity extends BaseActivity {
 
     }
 
+    private static final long ENTITLEMENT_REFRESH_MS = 60_000L;
+    private static volatile long lastEntitlementRefresh = 0L;
+    private static final java.util.concurrent.ExecutorService ENTITLEMENT_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    /**
+     * Confere direitos e identidade visual ao voltar para a tela inicial (no
+     * máximo uma vez por minuto). Assim uma marca trocada pela web aparece no
+     * app em segundos, sem esperar a próxima sincronização (15 min) nem sair
+     * da conta. Sem conta ou sem rede, não faz nada.
+     */
+    private void refreshEntitlementSoon() {
+        long now = System.currentTimeMillis();
+        if (now - lastEntitlementRefresh < ENTITLEMENT_REFRESH_MS) {
+            return;
+        }
+        final android.content.Context app = getApplicationContext();
+        if (!br.com.gameloop.estoquesimples.sync.SessionManager.get(app).isSignedIn()) {
+            return;
+        }
+        lastEntitlementRefresh = now;
+        ENTITLEMENT_EXECUTOR.execute(() -> {
+            try {
+                new br.com.gameloop.estoquesimples.sync.EntitlementManager(app).refresh();
+            } catch (Exception e) {
+                // Sem rede ou sessão expirada: vale o retrato guardado; a sincronização tenta de novo.
+                Log.w("MainActivity", "direitos não atualizados ao voltar: " + e.getClass().getSimpleName());
+            }
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         // Logotipo da empresa (se a marca estiver ativa e o arquivo já tiver sido baixado).
         br.com.gameloop.estoquesimples.branding.BrandApplier.applyLogo(this);
+        refreshEntitlementSoon();
         if (bottomNavigationView != null) {
             bottomNavigationView.setSelectedItemId(R.id.navigation_home);
         }

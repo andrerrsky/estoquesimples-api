@@ -88,6 +88,9 @@ public final class BrandApplier {
             int height = Math.round(activity.getResources().getDisplayMetrics().density * 32);
             android.graphics.drawable.Drawable logo = BrandLogo.barDrawable(activity, brand, height);
             if (logo == null) {
+                // Sem logotipo (removido, ou marca desligada): tira o que estava na barra.
+                bar.setLogo(null);
+                bar.setDisplayUseLogoEnabled(false);
                 return;
             }
             bar.setLogo(logo);

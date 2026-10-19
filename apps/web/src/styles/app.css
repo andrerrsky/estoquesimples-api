@@ -646,6 +646,18 @@ button {
   background: var(--surface-content);
   transition: border-color var(--transition);
 }
+/* Telas de toque (iPhone, iPad, Android): campos com 16px. Abaixo disso o
+   Safari amplia a página ao focar o campo e não desfaz ao trocar de tela
+   (cartões colados na borda, cortados). Vale para todo campo de texto, com
+   ou sem a classe .input. Ver também lib/viewport.ts. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 .input::placeholder,
 .textarea::placeholder {
   color: var(--text-faint);

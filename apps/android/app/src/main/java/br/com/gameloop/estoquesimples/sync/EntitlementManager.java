@@ -216,9 +216,15 @@ public final class EntitlementManager {
 
         ApiClient.Response response = api.get(
                 "/v1/workspaces/" + workspaceId + "/entitlement", session.accessToken());
+        String marcaAntes = BrandStore.key(BrandStore.current(appContext));
         store(response.body);
         // Logotipo da marca (se houver): rede, por isso aqui e não no store().
         BrandLogo.ensure(appContext, BrandStore.current(appContext));
+        // Cor, fonte ou logotipo trocados pela web: as telas abertas se redesenham já,
+        // sem precisar sair da conta (o logotipo novo já está no aparelho a esta altura).
+        if (!marcaAntes.equals(BrandStore.key(BrandStore.current(appContext)))) {
+            BrandStore.notifyChanged();
+        }
         return canSync();
     }
 
@@ -232,7 +238,11 @@ public final class EntitlementManager {
         if (body == null) {
             return;
         }
+        String marcaAntes = BrandStore.key(BrandStore.current(appContext));
         store(body);
+        if (!marcaAntes.equals(BrandStore.key(BrandStore.current(appContext)))) {
+            BrandStore.notifyChanged();
+        }
     }
 
     private void store(JSONObject body) {

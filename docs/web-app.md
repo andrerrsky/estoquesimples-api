@@ -239,3 +239,31 @@ responder nesse host).
 - Não guardar token em `localStorage` nem pôr credencial de provedor
   (Asaas, Google) no bundle.
 - Não reutilizar o cookie do painel para clientes: são identidades distintas.
+
+## Leitor de código de barras e fotos
+
+O leitor (`components/BarcodeScanner.tsx`) aparece na busca do estoque e no
+campo de código de barras do cadastro/edição, em qualquer navegador com
+câmera. A decodificação (`lib/barcode-decode.ts`, carregado só ao abrir o
+leitor, ~110 KB gz) usa o `BarcodeDetector` nativo quando ele existe e lê os
+formatos de produto (Chrome no Android e no Mac) e, nos demais (Safari no
+iPhone e no iPad, Firefox, Chrome no Windows), a ZXing empacotada com a
+aplicação — nada sai da página e a CSP continua `'self'`. Sem câmera ao vivo
+(permissão negada), dá para tirar uma foto do código; leitores USB funcionam
+sem nada disso, porque digitam no campo.
+
+A foto do produto abre em tela cheia (`components/PhotoViewer.tsx`) na ficha
+do produto e no formulário de edição, com zoom da foto (pinça, toque duplo,
+roda do mouse, botões) sem ampliar a página; o Voltar do aparelho fecha.
+
+No iPhone, campos com menos de 16px fazem o Safari ampliar a página ao focar
+e não desfazer: em telas de toque todo campo tem 16px (`app.css`) e, por
+segurança, a troca de tela desfaz um zoom que tenha ficado (`lib/viewport.ts`).
+
+A identidade visual salva (ou o logotipo trocado/removido) vale na hora: a
+confirmação do servidor que chega com a prévia aberta é guardada
+(`lib/brand.ts`, `committed`) e é ela que fica ao sair da tela de edição. No
+app Android, uma marca trocada pela web aparece ao voltar para a tela inicial
+(o app confere os direitos no máximo uma vez por minuto) e as telas abertas
+se redesenham (`BaseActivity`, `BrandStore.notifyChanged`).
+

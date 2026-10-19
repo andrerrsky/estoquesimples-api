@@ -35,6 +35,45 @@ public final class BrandStore {
         return context.getApplicationContext().getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE);
     }
 
+    /** Quem quer saber que a marca mudou (as telas abertas se redesenham). */
+    public interface Listener {
+        void onBrandChanged();
+    }
+
+    private static final java.util.Set<Listener> LISTENERS = new java.util.concurrent.CopyOnWriteArraySet<>();
+
+    public static void addListener(Listener listener) {
+        LISTENERS.add(listener);
+    }
+
+    public static void removeListener(Listener listener) {
+        LISTENERS.remove(listener);
+    }
+
+    /**
+     * Identidade do que está na tela: cores, fonte e logotipo. Duas marcas
+     * com a mesma chave desenham igual; mudou a chave, a tela precisa ser
+     * refeita. {@code ""} = visual padrão.
+     */
+    public static String key(@Nullable Brand brand) {
+        if (brand == null) {
+            return "";
+        }
+        return brand.slug + "|" + brand.version + "|" + brand.primary + "|" + brand.accent + "|" + brand.text
+                + "|" + brand.serif + "|" + (brand.logoHash == null ? "" : brand.logoHash);
+    }
+
+    /** Avisa as telas abertas (chamado depois de o logotipo novo estar no aparelho). */
+    public static void notifyChanged() {
+        for (Listener listener : LISTENERS) {
+            try {
+                listener.onBrandChanged();
+            } catch (RuntimeException ignored) {
+                // uma tela com problema não impede as outras de se atualizarem
+            }
+        }
+    }
+
     /** Marca em vigor agora, ou {@code null} = visual padrão do Estoque Simples. */
     @Nullable
     public static Brand current(Context context) {

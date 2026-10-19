@@ -1,0 +1,141 @@
+/* ==========================================================================
+   Foto do produto em tela cheia. Fundo escuro de propósito (a foto é a
+   protagonista); barra com nome e controles no topo, dica embaixo.
+   ========================================================================== */
+
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) + 5);
+  display: flex;
+  flex-direction: column;
+  background: #080c12;
+  color: #fff;
+  animation: fade 140ms ease;
+}
+.photo-viewer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left));
+}
+.photo-viewer__title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-viewer__tools {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.photo-viewer__button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.photo-viewer__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+.photo-viewer__button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.photo-viewer__stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  /* Os gestos são da foto: a página não amplia nem rola por baixo. */
+  touch-action: none;
+  user-select: none;
+  cursor: zoom-in;
+}
+.photo-viewer__stage.is-zoomed {
+  cursor: grab;
+}
+.photo-viewer__stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  transition: opacity 160ms ease;
+  will-change: transform;
+  -webkit-user-drag: none;
+}
+.photo-viewer__spinner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: photo-viewer-spin 0.8s linear infinite;
+}
+@keyframes photo-viewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.photo-viewer__hint {
+  margin: 0;
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-label);
+  text-align: center;
+}
+.photo-viewer :focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* A foto que abre em tela cheia: o cursor e um selo discreto avisam. */
+.pimg-zoom {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: var(--radius-panel);
+}
+.pimg-zoom__badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(13, 20, 28, 0.72);
+  color: #fff;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  pointer-events: none;
+}
+.pimg-zoom--inline {
+  display: inline-block;
+  width: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-viewer__spinner {
+    animation-duration: 2s;
+  }
+}

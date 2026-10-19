@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api, errorMessage } from '../api/client';
 import type { Conflict, Facets, Product, ProductList } from '../api/types';
-import { BarcodeScanner, barcodeScanningSupported } from '../components/BarcodeScanner';
+import { BarcodeScanner } from '../components/BarcodeScanner';
 import { Icon } from '../components/Icon';
 import { MovementDialog } from '../components/stock/MovementDialog';
 import { ProductDrawer } from '../components/stock/ProductDrawer';
@@ -247,11 +247,9 @@ export function StockPage() {
           onChange={setSearch}
           placeholder="Buscar por nome, SKU ou código de barras"
           action={
-            barcodeScanningSupported() ? (
-              <button type="button" className="icon-btn" aria-label="Ler código de barras com a câmera" onClick={() => setScanning(true)}>
-                <Icon name="barcode" />
-              </button>
-            ) : undefined
+            <button type="button" className="icon-btn" aria-label="Ler código de barras com a câmera" onClick={() => setScanning(true)}>
+              <Icon name="barcode" />
+            </button>
           }
         />
         <select className="select" value={category} onChange={(event) => update({ categoria: event.target.value })} aria-label="Categoria" style={{ width: 'auto', maxWidth: 220 }}>

@@ -319,3 +319,41 @@
 .card--danger .card__title {
   color: var(--error);
 }
+
+/* Seletor de cor da identidade visual: só um círculo com a cor escolhida.
+   O <input type="color"> nativo fica transparente por cima (é ele que abre
+   a paleta do sistema). */
+.color-swatch {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18), 0 0 0 3px var(--surface-content), 0 0 0 4px var(--border);
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+.color-swatch:hover {
+  transform: scale(1.06);
+}
+.color-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.color-swatch:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18), var(--focus-ring);
+}
+.color-swatch.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.color-swatch.is-disabled input {
+  cursor: not-allowed;
+}
