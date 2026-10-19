@@ -180,8 +180,9 @@ export function HistoryPage() {
     canCancel &&
     movement.canCancel &&
     (compact ? (
-      <button type="button" className="icon-btn" aria-label={`Estornar ${movementLabel(movement.type).toLowerCase()} de ${movement.productName}`} onClick={() => setCancelling(movement)}>
-        <Icon name="undo" />
+      // No celular era só o ícone (um círculo com seta, que ninguém entendia): agora diz o que faz.
+      <button type="button" className="btn btn--ghost btn--sm history-undo" aria-label={`Estornar ${movementLabel(movement.type).toLowerCase()} de ${movement.productName}`} onClick={() => setCancelling(movement)}>
+        <Icon name="undo" size={15} /> Estornar
       </button>
     ) : (
       <button type="button" className="btn btn--ghost btn--sm" aria-label={`Estornar ${movementLabel(movement.type).toLowerCase()} de ${movement.productName}`} onClick={() => setCancelling(movement)}>

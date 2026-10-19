@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
-import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
+import { resetZoom } from './lib/viewport';
 import { LandingPage } from './pages/LandingPage';
 
 /**
@@ -78,6 +79,11 @@ function NotFound() {
 function Root() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // iPhone/iPad: a tela nova não herda o zoom que o Safari deu num campo da anterior.
+  const { pathname } = useLocation();
+  useEffect(() => {
+    resetZoom();
+  }, [pathname]);
   return (
     <>
       <Outlet />

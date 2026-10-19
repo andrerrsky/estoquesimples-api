@@ -72,7 +72,7 @@ export function ProductDrawer({
         <QueryState loading={product.isLoading} error={product.error} onRetry={() => void product.refetch()} />
       ) : (
         <div className="stack stack--loose">
-          {item.photoHash && <ProductImage workspaceId={workspaceId} hash={item.photoHash} name={item.name} size={260} className="pimg--hero" />}
+          {item.photoHash && <ProductImage workspaceId={workspaceId} hash={item.photoHash} name={item.name} size={260} className="pimg--hero" zoomable />}
           <div className="row row--between" style={{ alignItems: 'flex-end' }}>
             <div>
               <div className="caption">Em estoque</div>

@@ -11,7 +11,7 @@ import { inventoryKeys, useDebounced, useInvalidateInventory } from '../../lib/i
 import { ProductImage } from '../../lib/product-image';
 import { fractionMessage, hasFraction, isValidUnit, isWholeUnit, UNIT_ERROR } from '../../lib/units';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
-import { BarcodeScanner, barcodeScanningSupported } from '../BarcodeScanner';
+import { BarcodeScanner } from '../BarcodeScanner';
 import { Icon } from '../Icon';
 import { ConfirmDialog, Drawer, Field, Notice, useToast } from '../ui';
 
@@ -286,7 +286,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
               {photo.kind === 'new' ? (
                 <img src={photo.prepared.previewUrl} alt="Prévia da nova foto" />
               ) : photo.kind === 'keep' && product?.photoHash ? (
-                <ProductImage workspaceId={workspaceId} hash={product.photoHash} name={product.name} size={112} />
+                <ProductImage workspaceId={workspaceId} hash={product.photoHash} name={product.name} size={112} zoomable />
               ) : (
                 <span className="photo-field__empty"><Icon name="box" size={30} /></span>
               )}
@@ -341,11 +341,9 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
             <Field label="Código de barras">
               <div className="input-group input-group--suffix">
                 <input className="input" value={form.barcode} onChange={(event) => set('barcode')(event.target.value)} maxLength={80} inputMode="numeric" />
-                {barcodeScanningSupported() && (
-                  <button type="button" className="icon-btn input-group__action" aria-label="Ler com a câmera" onClick={() => setScanning(true)}>
-                    <Icon name="barcode" />
-                  </button>
-                )}
+                <button type="button" className="icon-btn input-group__action" aria-label="Ler o código de barras com a câmera" onClick={() => setScanning(true)}>
+                  <Icon name="barcode" />
+                </button>
               </div>
             </Field>
             <Field label="Categoria" full>

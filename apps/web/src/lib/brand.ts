@@ -35,6 +35,14 @@ let current: ActiveBrand | null = null;
 let source: Source | null = null;
 /** Tela de edição mostrando uma prévia: nada de fora a derruba. */
 let previewing = false;
+/**
+ * O que o servidor disse por último, mesmo durante uma prévia. Era isto que
+ * faltava: salvar a marca (ou remover o logotipo) acontece COM a prévia na
+ * tela, então a confirmação do servidor era ignorada e, ao sair da tela de
+ * edição, a prévia devolvia a marca de antes — a nova só aparecia depois de
+ * sair e entrar de novo.
+ */
+let committed: { brand: ActiveBrand | null; source: Source | null } | null = null;
 const listeners = new Set<() => void>();
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -96,13 +104,25 @@ function persist(brand: ActiveBrand | null): void {
   }
 }
 
+function sameBrand(a: ActiveBrand | null, b: ActiveBrand | null): boolean {
+  if (!a || !b) return a === b;
+  return a.slug === b.slug && a.version === b.version && a.logoUrl === b.logoUrl && JSON.stringify(a.theme) === JSON.stringify(b.theme);
+}
+
 /** Troca a marca ativa. `null` volta ao visual padrão. */
 export function setBrand(view: BrandingView | null | undefined, from: Source): void {
-  if (previewing) return;
   const next = fromView(view);
+  if (previewing) {
+    // Não mexe na tela (a prévia continua), mas guarda: é isto que volta ao sair da edição.
+    if (from === 'workspace') {
+      committed = { brand: next, source: next ? from : null };
+      persist(next);
+    }
+    return;
+  }
   // Uma tela pública não derruba a marca de uma sessão já carregada.
   if (from === 'public' && source === 'workspace' && current) return;
-  if (next && current && next.slug === current.slug && next.version === current.version && next.logoUrl === current.logoUrl && source === from) return;
+  if (sameBrand(next, current) && (source === from || (!next && !current))) return;
   current = next;
   source = next ? from : null;
   paint(next);
@@ -149,6 +169,7 @@ export function bootBrand(): void {
 export function previewBrand(theme: BrandTheme | null, logoUrl: string | null, slug: string): () => void {
   const before = current;
   const beforeSource = source;
+  committed = null;
   previewing = true;
   if (theme && valid(theme)) {
     current = { slug, displayName: null, version: -1, theme, logoUrl };
@@ -162,9 +183,13 @@ export function previewBrand(theme: BrandTheme | null, logoUrl: string | null, s
   emit();
   return () => {
     previewing = false;
-    current = before;
-    source = beforeSource;
-    paint(before);
+    // Se o servidor confirmou algo durante a prévia (salvou, trocou ou tirou
+    // o logotipo), vale o que ele disse; senão, volta ao que estava antes.
+    const restore = committed ?? { brand: before, source: beforeSource };
+    committed = null;
+    current = restore.brand;
+    source = restore.source;
+    paint(current);
     emit();
   };
 }

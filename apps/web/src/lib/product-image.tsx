@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { fetchBlob } from '../api/client';
 import { Icon } from '../components/Icon';
+import { PhotoViewer } from '../components/PhotoViewer';
 
 import '../styles/pages-stock.css';
 
@@ -90,9 +91,31 @@ export function useProductImage(workspaceId: string, hash: string | null | undef
   return state;
 }
 
-/** Miniatura/foto do produto, com espaço reservado enquanto carrega e quando não há foto. */
-export function ProductImage({ workspaceId, hash, name, size = 44, className = '' }: { workspaceId: string; hash: string | null | undefined; name: string; size?: number; className?: string }) {
+/**
+ * Miniatura/foto do produto, com espaço reservado enquanto carrega e quando
+ * não há foto. Com `zoomable`, um toque abre a foto em tela cheia.
+ */
+export function ProductImage({ workspaceId, hash, name, size = 44, className = '', zoomable = false }: { workspaceId: string; hash: string | null | undefined; name: string; size?: number; className?: string; zoomable?: boolean }) {
   const state = useProductImage(workspaceId, hash);
+  const [viewing, setViewing] = useState(false);
+  const picture = <ProductPicture state={state} name={name} size={size} className={className} />;
+  if (!zoomable || state?.status !== 'ready') return picture;
+  return (
+    <>
+      <button type="button" className={`pimg-zoom ${className.includes('pimg--hero') ? '' : 'pimg-zoom--inline'}`} onClick={() => setViewing(true)} aria-label={`Ver a foto de ${name} em tela cheia`}>
+        {picture}
+        {className.includes('pimg--hero') && (
+          <span className="pimg-zoom__badge" aria-hidden="true">
+            <Icon name="maximize" size={14} /> Ampliar
+          </span>
+        )}
+      </button>
+      <PhotoViewer src={viewing ? state.url : null} alt={`Foto de ${name}`} onClose={() => setViewing(false)} />
+    </>
+  );
+}
+
+function ProductPicture({ state, name, size, className }: { state: State | null; name: string; size: number; className: string }) {
   return (
     <span className={`pimg ${className}`} style={{ width: size, height: size }}>
       {state?.status === 'ready' ? (

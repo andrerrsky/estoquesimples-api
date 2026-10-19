@@ -40,6 +40,8 @@ const COLORS: Array<{ key: ColorKey; field: Problem['field']; label: string; hin
   { key: 'textColor', field: 'text', label: 'Cor do texto', hint: 'Textos de leitura. Precisa de alto contraste com o fundo.', fallback: '#1a2330' },
 ];
 
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
 const slugify = (value: string): string =>
   value
     .normalize('NFKD')
@@ -237,7 +239,12 @@ export function BrandPage() {
                   return (
                     <Field key={key} label={label} hint={hint} error={problem?.message ?? fieldErrors[field]}>
                       <div className="row" style={{ gap: 8 }}>
-                        <input type="color" aria-label={`${label} (seletor)`} disabled={!editable} value={value ?? fallback} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} style={{ width: 44, height: 36, padding: 2 }} />
+                        {/* O seletor nativo fica invisível por cima do círculo: o toque abre a paleta do
+                            sistema, mas o que se vê é só a cor (o desenho do <input type="color"> varia muito
+                            entre navegadores e no iPhone vira um anel colorido). */}
+                        <label className={`color-swatch ${editable ? '' : 'is-disabled'}`} style={{ background: HEX_COLOR.test(value ?? '') ? (value as string) : fallback }} title={`Escolher ${label.toLowerCase()}`}>
+                          <input type="color" aria-label={`${label}: abrir o seletor de cores`} disabled={!editable} value={HEX_COLOR.test(value ?? '') ? (value as string).toLowerCase() : fallback} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+                        </label>
                         <input className="input" style={{ maxWidth: 130 }} disabled={!editable} value={value ?? ''} placeholder="Padrão" maxLength={7} onChange={(event) => setDraft({ ...draft, [key]: event.target.value.trim() === '' ? null : event.target.value.trim() })} />
                         {value && <button type="button" className="btn btn--sm" disabled={!editable} onClick={() => setDraft({ ...draft, [key]: null })}>Usar padrão</button>}
                         {problem?.suggestion && <button type="button" className="btn btn--sm" disabled={!editable} onClick={() => setDraft({ ...draft, [key]: problem.suggestion ?? null })}>Usar {problem.suggestion}</button>}

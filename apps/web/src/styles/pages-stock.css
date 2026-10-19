@@ -459,3 +459,14 @@
 @media (prefers-reduced-motion: reduce) {
   .pimg__loading { animation: none; }
 }
+
+/* Histórico no celular: o estorno é um botão com texto, alinhado à direita
+   sob o saldo (antes era só um ícone de seta circular). */
+.history-undo {
+  margin-top: 4px;
+  margin-right: -8px;
+  color: var(--text-muted);
+}
+.history-undo:hover {
+  color: var(--accent, var(--brand));
+}
