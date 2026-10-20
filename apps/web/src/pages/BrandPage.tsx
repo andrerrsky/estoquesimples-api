@@ -239,15 +239,43 @@ export function BrandPage() {
                   return (
                     <Field key={key} label={label} hint={hint} error={problem?.message ?? fieldErrors[field]}>
                       <div className="row" style={{ gap: 8 }}>
-                        {/* O seletor nativo fica invisível por cima do círculo: o toque abre a paleta do
+                        {/* O campo de código vem antes no HTML (o <label> do campo foca ele, e não abre a
+                            paleta, quando se toca no título ou na dica) e o círculo aparece antes pela ordem do CSS.
+                            O seletor nativo fica invisível por cima do círculo: o toque abre a paleta do
                             sistema, mas o que se vê é só a cor (o desenho do <input type="color"> varia muito
                             entre navegadores e no iPhone vira um anel colorido). */}
-                        <label className={`color-swatch ${editable ? '' : 'is-disabled'}`} style={{ background: HEX_COLOR.test(value ?? '') ? (value as string) : fallback }} title={`Escolher ${label.toLowerCase()}`}>
+                        <input className="input" style={{ maxWidth: 130 }} aria-label={`${label} (código)`} disabled={!editable} value={value ?? ''} placeholder="Padrão" maxLength={7} onChange={(event) => setDraft({ ...draft, [key]: event.target.value.trim() === '' ? null : event.target.value.trim() })} />
+                        <span className={`color-swatch color-swatch--first ${editable ? '' : 'is-disabled'}`} style={{ background: HEX_COLOR.test(value ?? '') ? (value as string) : fallback }} title={`Escolher ${label.toLowerCase()}`}>
                           <input type="color" aria-label={`${label}: abrir o seletor de cores`} disabled={!editable} value={HEX_COLOR.test(value ?? '') ? (value as string).toLowerCase() : fallback} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
-                        </label>
-                        <input className="input" style={{ maxWidth: 130 }} disabled={!editable} value={value ?? ''} placeholder="Padrão" maxLength={7} onChange={(event) => setDraft({ ...draft, [key]: event.target.value.trim() === '' ? null : event.target.value.trim() })} />
-                        {value && <button type="button" className="btn btn--sm" disabled={!editable} onClick={() => setDraft({ ...draft, [key]: null })}>Usar padrão</button>}
-                        {problem?.suggestion && <button type="button" className="btn btn--sm" disabled={!editable} onClick={() => setDraft({ ...draft, [key]: problem.suggestion ?? null })}>Usar {problem.suggestion}</button>}
+                        </span>
+                        {/* preventDefault: o campo inteiro é um <label>; sem isso, o clique (o botão some em
+                            seguida) "cai" no label e abre o seletor de cores. */}
+                        {value && (
+                          <button
+                            type="button"
+                            className="btn btn--sm"
+                            disabled={!editable}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setDraft({ ...draft, [key]: null });
+                            }}
+                          >
+                            Usar padrão
+                          </button>
+                        )}
+                        {problem?.suggestion && (
+                          <button
+                            type="button"
+                            className="btn btn--sm"
+                            disabled={!editable}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setDraft({ ...draft, [key]: problem.suggestion ?? null });
+                            }}
+                          >
+                            Usar {problem.suggestion}
+                          </button>
+                        )}
                       </div>
                     </Field>
                   );
@@ -258,11 +286,11 @@ export function BrandPage() {
                     <option value="serif">Com serifa</option>
                   </select>
                 </Field>
-                <div className="row" style={{ gap: 8 }}>
+                <div className="brand-actions">
                   <button type="button" className="btn btn--primary" disabled={!editable || save.isPending || problems.length > 0 || draft.slug.length < 3 || (!dirty && !!data.config.slug)} onClick={() => save.mutate(draft)}>
                     {save.isPending ? 'Salvando…' : 'Salvar identidade visual'}
                   </button>
-                  <button type="button" className="btn" disabled={!can('marca.gerenciar') || reset.isPending || !data.config.slug} onClick={() => setConfirmReset(true)}>Voltar ao visual padrão</button>
+                  <button type="button" className="btn btn--secondary" disabled={!can('marca.gerenciar') || reset.isPending || !data.config.slug} onClick={() => setConfirmReset(true)}>Voltar ao visual padrão</button>
                 </div>
                 {editable && <p className="field__hint">O que você vê agora nesta tela já é a prévia. Só vale para todos depois de salvar.</p>}
               </div>

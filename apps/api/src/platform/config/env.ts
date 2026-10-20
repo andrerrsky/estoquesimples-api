@@ -172,6 +172,11 @@ const envSchema = z
     FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
     FIREBASE_PROJECT_ID: z.string().optional(),
     PUSH_SEND_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(16),
+    // Web Push (VAPID). Opcionais: sem elas, a API gera um par na primeira vez
+    // e guarda cifrado em `admin_settings` (o mesmo par para todas as instâncias).
+    VAPID_PUBLIC_KEY: z.string().min(40).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(20).optional(),
+    VAPID_SUBJECT: z.string().min(8).optional(),
 
     // -----------------------------------------------------------------------
     // Aplicação web (apps/web), servida pela própria API em outro domínio

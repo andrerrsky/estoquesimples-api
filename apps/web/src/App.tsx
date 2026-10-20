@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
-import { createBrowserRouter, Navigate, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
 import { resetZoom } from './lib/viewport';
+import { listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
+import { useAuth } from './auth/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
 
 /**
@@ -84,6 +86,23 @@ function Root() {
   useEffect(() => {
     resetZoom();
   }, [pathname]);
+
+  // Avisos do web app: reenvia a inscrição (se ligada aqui) quando a sessão
+  // muda, para ela ficar ligada à conta certa; e o toque numa notificação com
+  // o app já aberto navega por aqui, sem recarregar a página.
+  const { status } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (status !== 'loading') void refreshPushSubscription();
+  }, [status]);
+  useEffect(
+    () =>
+      listenToServiceWorker((url) => {
+        const target = new URL(url, window.location.origin);
+        if (target.origin === window.location.origin) navigate(`${target.pathname}${target.search}`);
+      }),
+    [navigate],
+  );
   return (
     <>
       <Outlet />

@@ -68,7 +68,40 @@ duas coisas.
   agregado), falhas por motivo, entregas por hora, aparelhos alcançáveis.
 - Tudo auditado em `admin_audit_log` (`push.*`).
 
-## Versão web
+## Versão web (Web Push)
 
-Mesmo contrato com `platform: "web"` e tokens do Firebase JS SDK; o service
-worker faz o papel do `FirebaseMessagingService`.
+O web app recebe push pelo **Web Push padrão** (RFC 8030/8291/8292), sem
+Firebase: Safari no iPhone/iPad com o web app adicionado à tela inicial (iOS
+16.4+), Chrome/Edge/Firefox no Android e no computador. Numa aba comum do
+Safari a Apple não oferece push; a tela explica como instalar.
+
+- **Chaves VAPID**: `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (opcionais) ou,
+  sem elas, um par gerado na primeira vez e guardado cifrado em
+  `admin_settings` (`web_push_vapid`), o mesmo para todas as instâncias.
+  Nunca troque o par: as inscrições existentes deixam de valer.
+  `VAPID_SUBJECT` (https: ou mailto:) é opcional.
+- **Inscrição**: `GET /v1/push/web-config` → `{ publicKey }`; o navegador se
+  inscreve e manda `PUT /v1/push/tokens` com `platform: "web"`, `token` = o
+  endpoint e `keys: { p256dh, auth }` (Bearer opcional, como no app).
+  `DELETE /v1/push/tokens { token, installId }` desliga neste navegador.
+  Só endpoints dos serviços de push conhecidos (Google, Mozilla, Apple,
+  Microsoft) são aceitos (`isAllowedPushEndpoint`), para a API nunca fazer
+  POST para um endereço qualquer.
+- **Envio**: `dispatchPush` (`push-dispatch.ts`) escolhe o canal pela linha
+  de `push_tokens` (Web Push para `web`, FCM para o resto) e revoga a
+  inscrição que o serviço diz não existir mais (404/410). Notificações da
+  caixa, respostas do suporte e campanhas passam por ele; uma campanha
+  chega aos web apps mesmo sem Firebase configurado.
+- **Mensagem**: o mesmo JSON `{ title, body, data }`; `data.notificationType`
+  é o tipo da caixa (`support.reply`, `billing.*`, `team.*`, `stock.low`,
+  `campaign`). O service worker (`apps/web/public/sw.js`, sem cache e sem
+  interceptar requisições) mostra a notificação, mede entrega/abertura das
+  campanhas e, no toque, leva à tela certa (foca a janela aberta, se houver).
+- **Estoque baixo** (`push.low_stock_alert`, `low-stock.jobs.ts`): uma vez por
+  dia, às 8h de Brasília, para cada empresa com produto no mínimo ou abaixo
+  dele, quem pode ver o estoque na nuvem (proprietário; demais membros com o
+  plano Equipe) e tem avisos ligados num navegador recebe um Web Push e o
+  aviso na caixa. Só navegadores: o app Android já avisa sozinho.
+- **Na web**: `apps/web/src/lib/web-push.ts` (estado, ligar/desligar, reenvio
+  da inscrição na abertura e após login) e `components/PushSettings.tsx`
+  (cartão em Notificações e na conversa do suporte).
