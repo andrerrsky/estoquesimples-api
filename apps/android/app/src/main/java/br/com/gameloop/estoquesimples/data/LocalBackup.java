@@ -44,13 +44,23 @@ public final class LocalBackup {
      * conter as últimas transações — elas ainda estariam no diário à parte, que
      * não seria copiado junto, e o backup nasceria desatualizado.
      */
+    /**
+     * Integra o WAL ao arquivo do banco.
+     *
+     * Por rawQuery com leitura do resultado: o pragma devolve uma linha, e o
+     * Android recusa {@code execSQL} para comandos que devolvem linhas ("Queries
+     * can be performed using rawQuery only") — a consolidação nunca acontecia.
+     * Ler a primeira linha é o que faz o cursor (preguiçoso) executar de fato.
+     */
+    private static void checkpoint(SQLiteDatabase db) {
+        try (android.database.Cursor cursor = db.rawQuery("PRAGMA wal_checkpoint(FULL)", null)) {
+            cursor.moveToFirst();
+        }
+    }
+
     public static File create(Context context, SQLiteDatabase db, String motivo) {
         try {
-            // execSQL, e não rawQuery: o cursor do Android é preguiçoso e só
-            // executa a consulta quando alguém lê. Com rawQuery().close(), o
-            // pragma nunca chegava a rodar e a cópia nascia sem as últimas
-            // transações — que continuavam só no diário, fora do arquivo.
-            db.execSQL("PRAGMA wal_checkpoint(FULL)");
+            checkpoint(db);
         } catch (Exception e) {
             Log.w(TAG, "não foi possível consolidar o diário antes da cópia", e);
         }
@@ -176,7 +186,7 @@ public final class LocalBackup {
      */
     public static boolean exportTo(SQLiteDatabase db, OutputStream destino) {
         try {
-            db.execSQL("PRAGMA wal_checkpoint(FULL)");
+            checkpoint(db);
         } catch (Exception e) {
             Log.w(TAG, "não foi possível consolidar o diário antes da exportação", e);
         }

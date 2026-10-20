@@ -123,6 +123,23 @@ export const passwordResetTokens = pgTable(
   (table) => [index('password_reset_tokens_user_idx').on(table.userId)],
 );
 
+/** Código de uso único para abrir a web já conectado a partir do app (2 min). */
+export const webHandoffTokens = pgTable(
+  'web_handoff_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', tz).notNull(),
+    usedAt: timestamp('used_at', tz),
+    requestedIp: inet('requested_ip'),
+  },
+  (table) => [index('web_handoff_tokens_user_idx').on(table.userId), index('web_handoff_tokens_expires_idx').on(table.expiresAt)],
+);
+
 export const emailVerificationTokens = pgTable(
   'email_verification_tokens',
   {

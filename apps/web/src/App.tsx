@@ -37,6 +37,7 @@ const LegalPage = page(() => import('./pages/LegalPage'), 'LegalPage');
 // (a mais visitada) não precisa delas para pintar.
 const LoginPage = page(() => import('./pages/AuthPages'), 'LoginPage');
 const BrandedLoginPage = page(() => import('./pages/AuthPages'), 'BrandedLoginPage');
+const AppHandoffPage = page(() => import('./pages/AuthPages'), 'AppHandoffPage');
 const RegisterPage = page(() => import('./pages/AuthPages'), 'RegisterPage');
 const ForgotPasswordPage = page(() => import('./pages/AuthPages'), 'ForgotPasswordPage');
 const ResetPasswordPage = page(() => import('./pages/AuthPages'), 'ResetPasswordPage');
@@ -127,6 +128,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <LandingPage /> },
       { path: '/entrar', element: <Suspense fallback={<FullScreenLoading />}><LoginPage /></Suspense> },
+      // Vindo do app ("Abrir na web"), já conectado: ver AppHandoffPage.
+      { path: '/entrar/app', element: <Suspense fallback={<FullScreenLoading />}><AppHandoffPage /></Suspense> },
       // Entrada personalizada da empresa (identificadores reservados nunca chegam aqui: ver brand-rules.ts).
       { path: '/:slug/entrar', element: <Suspense fallback={<FullScreenLoading />}><BrandedLoginPage /></Suspense> },
       { path: '/criar-conta', element: <Suspense fallback={<FullScreenLoading />}><RegisterPage /></Suspense> },

@@ -351,6 +351,12 @@ export const sessionApi = {
     setSession(auth);
     return auth;
   },
+  /** Código de uso único vindo do app ("Abrir na web"): vira uma sessão web própria. */
+  async handoff(code: string): Promise<WebAuth> {
+    const auth = await parse<WebAuth>(await rawFetch('POST', '/v1/auth/web/handoff', { code, device: deviceInfo() }, CSRF));
+    setSession(auth);
+    return auth;
+  },
   /** Aceita um convite; quando a conta nasce agora, a sessão vem junto. */
   async acceptInvite(token: string, account?: { name: string; password: string }): Promise<{ workspaceId: string; roleKey: string; auth: WebAuth | null }> {
     const headers: Record<string, string> = { ...CSRF };

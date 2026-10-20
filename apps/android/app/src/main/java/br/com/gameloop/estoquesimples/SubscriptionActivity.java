@@ -48,6 +48,7 @@ import br.com.gameloop.estoquesimples.sync.EntitlementManager;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.SubscriptionClient;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
+import br.com.gameloop.estoquesimples.sync.WebHandoff;
 
 /**
  * Única tela de contratação paga: a assinatura recorrente.
@@ -62,9 +63,6 @@ public class SubscriptionActivity extends BaseActivity {
             "https://play.google.com/store/account/subscriptions"
                     + "?sku=" + Constants.SUBSCRIPTION_PRODUCT_ID
                     + "&package=br.com.gameloop.estoquesimples";
-
-    /** Onde se gerencia a assinatura contratada pela versão web. */
-    private static final String WEB_MANAGE_URL = "https://estoquesimples.com.br/app/plano";
 
     /** Tempo para a loja reconectar antes de acusar falha na tela. */
     private static final long PLAY_CONNECT_TIMEOUT_MS = 12_000L;
@@ -101,6 +99,9 @@ public class SubscriptionActivity extends BaseActivity {
     private Button manageButton;
     private Button goAccountButton;
     private Button retryButton;
+    private Button webButton;
+    /** A conferência silenciosa com a Google Play já rodou nesta visita. */
+    private boolean playChecked;
 
     private final Runnable playConnectTimeout = () -> {
         if (isFinishing() || (playBilling != null && playBilling.isReady())) {
@@ -172,6 +173,7 @@ public class SubscriptionActivity extends BaseActivity {
         manageButton = findViewById(R.id.manageButton);
         goAccountButton = findViewById(R.id.goAccountButton);
         retryButton = findViewById(R.id.retryButton);
+        webButton = findViewById(R.id.webButton);
         legacyProTitle = findViewById(R.id.legacyProTitle);
         legacyProMessage = findViewById(R.id.legacyProMessage);
         restoreLegacyProButton = findViewById(R.id.restoreLegacyProButton);
@@ -179,9 +181,15 @@ public class SubscriptionActivity extends BaseActivity {
 
         subscribeButton.setOnClickListener(v -> initiateSubscribe());
         restoreButton.setOnClickListener(v -> restorePurchase());
-        manageButton.setOnClickListener(v ->
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(
-                        entitlements.managedOnWeb() ? WEB_MANAGE_URL : PLAY_MANAGE_URL))));
+        manageButton.setOnClickListener(v -> {
+            if (entitlements.managedOnWeb()) {
+                // Assinatura da web: abre a tela do plano lá, já conectado.
+                WebHandoff.open(this, "/app/plano", this::setBusy);
+            } else {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_MANAGE_URL)));
+            }
+        });
+        webButton.setOnClickListener(v -> WebHandoff.open(this, "/app", this::setBusy));
         goAccountButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AccountActivity.class)));
         retryButton.setOnClickListener(v -> retry());
@@ -207,6 +215,7 @@ public class SubscriptionActivity extends BaseActivity {
                     showMessage(null);
                     loadOffer();
                     maybeResumePending();
+                    syncWithPlayQuietly();
                 });
             }
 
@@ -279,7 +288,10 @@ public class SubscriptionActivity extends BaseActivity {
             stateView.setVisibility(View.GONE);
         } else {
             stateView.setVisibility(View.VISIBLE);
-            stateView.setText(entitlements.stateLegivel());
+            String origem = entitlements.origemLegivel();
+            stateView.setText(origem == null
+                    ? entitlements.stateLegivel()
+                    : entitlements.stateLegivel() + "\n" + origem);
         }
         if (ativa) {
             priceView.setVisibility(View.GONE);
@@ -313,6 +325,8 @@ public class SubscriptionActivity extends BaseActivity {
 
         retryButton.setVisibility(offerLoadFailed && !ativa ? View.VISIBLE : View.GONE);
 
+        webButton.setVisibility(signedInWithWorkspace ? View.VISIBLE : View.GONE);
+
         if (!signedInWithWorkspace) {
             goAccountButton.setVisibility(View.VISIBLE);
             subscribeButton.setVisibility(View.GONE);
@@ -340,7 +354,37 @@ public class SubscriptionActivity extends BaseActivity {
         }
 
         subscribeButton.setVisibility(ativa ? View.GONE : View.VISIBLE);
-        restoreButton.setVisibility(View.VISIBLE);
+        // Restaurar procura compras da Google Play: não faz sentido com a
+        // assinatura paga pela web.
+        restoreButton.setVisibility(entitlements.managedOnWeb() ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * Mantém a tela de acordo com a Google Play sem a pessoa tocar em nada:
+     * se esta conta Google tem uma assinatura ativa que a empresa ainda não
+     * reconhece (compra feita e app fechado antes de confirmar, reinstalação),
+     * ela é vinculada aqui mesmo. A assinatura da web vem da API em
+     * {@link #refreshEntitlementInBackground()}.
+     */
+    private void syncWithPlayQuietly() {
+        if (playChecked || playBilling == null || !playBilling.isReady()
+                || !session.isSignedIn() || session.workspaceId() == null
+                || !"proprietario".equals(session.role())
+                || entitlements.isPaid() || pending.hasToken() || linkingInFlight) {
+            return;
+        }
+        playChecked = true;
+        playBilling.queryPurchases((purchases, error) -> main.post(() -> {
+            if (isFinishing() || error != null || entitlements.isPaid() || linkingInFlight) {
+                return;
+            }
+            Purchase found = PlayBilling.findPurchasedSubscription(purchases);
+            if (found != null) {
+                pending.save(found.getPurchaseToken());
+                updatePendingNotice();
+                linkToken(found.getPurchaseToken(), true);
+            }
+        }));
     }
 
     /** O que já vem de graça, com o teto real do plano gratuito. */
@@ -349,6 +393,8 @@ public class SubscriptionActivity extends BaseActivity {
         if (resumo == null) {
             return;
         }
+        // Com o plano pago, falar do que o gratuito oferece só confunde.
+        resumo.setVisibility(entitlements.isPaid() ? View.GONE : View.VISIBLE);
         int limite = entitlements.productLimit();
         String teto = limite == EntitlementManager.SEM_LIMITE || !entitlements.hasSnapshot()
                 ? "até 50 produtos"
@@ -472,6 +518,7 @@ public class SubscriptionActivity extends BaseActivity {
                     setBusy(false);
                     renderFromLocal();
                     showMessage(null);
+                    syncWithPlayQuietly();
                 });
             } catch (ApiException e) {
                 main.post(() -> {
@@ -752,7 +799,8 @@ public class SubscriptionActivity extends BaseActivity {
         goAccountButton.setEnabled(true);
         restoreLegacyProButton.setEnabled(!legacyQueryInFlight);
         retryButton.setEnabled(true);
-        manageButton.setEnabled(true);
+        manageButton.setEnabled(!busy);
+        if (webButton != null) webButton.setEnabled(!busy);
     }
 
     private void showMessage(String mensagem) {

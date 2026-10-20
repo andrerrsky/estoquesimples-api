@@ -397,6 +397,9 @@ public class ImportActivity extends BaseActivity {
                     status.setText(LOG_PREFIX + done.asLog());
                 }
                 Toast.makeText(this, "Importação concluída.", Toast.LENGTH_SHORT).show();
+                if (done.created + done.updated > 0) {
+                    syncAfterImport();
+                }
             });
         });
     }
@@ -604,6 +607,30 @@ public class ImportActivity extends BaseActivity {
             MainActivity.instance.openOrCreateDB();
             MainActivity.instance.prepareList();
             MainActivity.instance.markListDirty(true);
+        }
+        // Com a conta conectada, o banco trocado é conferido com a nuvem na
+        // próxima rodada (que já pedimos): baixa o que está lá e envia o que só
+        // existe na cópia. Sem isso a cópia e a nuvem ficavam divergentes.
+        br.com.gameloop.estoquesimples.sync.SessionManager session =
+                br.com.gameloop.estoquesimples.sync.SessionManager.get(this);
+        if (session.isSignedIn() && session.workspaceId() != null) {
+            try {
+                br.com.gameloop.estoquesimples.sync.SyncEngine.markForReconcile(
+                        br.com.gameloop.estoquesimples.data.LocalDb.open(this));
+                syncAfterImport();
+            } catch (Exception e) {
+                Log.w(TAG, "não foi possível marcar a reconciliação com a nuvem", e);
+            }
+        }
+    }
+
+    /** Leva o que acabou de entrar para a nuvem agora, em vez de esperar a rodada periódica. */
+    private void syncAfterImport() {
+        br.com.gameloop.estoquesimples.sync.SessionManager session =
+                br.com.gameloop.estoquesimples.sync.SessionManager.get(this);
+        if (session.isSignedIn() && session.workspaceId() != null) {
+            br.com.gameloop.estoquesimples.sync.SyncStatus.markRequestedByUser();
+            br.com.gameloop.estoquesimples.sync.SyncBootstrap.start(this);
         }
     }
 

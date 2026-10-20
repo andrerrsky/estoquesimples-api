@@ -2,6 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/menu_sync_now"
+        android:title="Sincronizar agora"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_bulk_edit"
         android:title="@string/bulk_edit_title"
         app:showAsAction="never" />

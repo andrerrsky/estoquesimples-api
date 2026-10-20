@@ -16,19 +16,24 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 24
-        versionName "24"
+        versionCode 25
+        versionName "25"
 
         // Endereço da API e versão do protocolo de sincronização. Ficam aqui
         // para que o app de depuração possa apontar para outro ambiente sem
         // alterar código, e para que a versão do protocolo acompanhe o binário.
         buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
         buildConfigField "int", "SYNC_PROTOCOL", "1"
+        // Endereço da versão web ("Abrir na web" já conectado).
+        buildConfigField "String", "WEB_BASE_URL", "\"https://estoquesimples.com.br\""
     }
 
     buildTypes {
         debug {
-            buildConfigField "String", "API_BASE_URL", "\"https://api.estoquesimples.com.br\""
+            // -PapiBaseUrl=http://10.0.2.2:3000 aponta o app de depuração para a API local.
+            buildConfigField "String", "API_BASE_URL", "\"${project.findProperty('apiBaseUrl') ?: 'https://api.estoquesimples.com.br'}\""
+            // Em desenvolvimento a API local também serve a web.
+            buildConfigField "String", "WEB_BASE_URL", "\"${project.findProperty('apiBaseUrl') ?: 'https://estoquesimples.com.br'}\""
         }
 
         release {

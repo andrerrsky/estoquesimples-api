@@ -136,6 +136,21 @@ novo — além de serializar a renovação entre abas com Web Locks
 O restante da API (`/v1/me`, `/v1/workspaces/*`…) é chamado com
 `Authorization: Bearer`, exatamente como o app faz.
 
+### Abrir na web já conectado
+
+"Abrir a versão web" no app (Conta e Assinatura) e "Abrir no navegador" no
+web app instalado (Minha conta, só em modo tela inicial) evitam digitar a
+senha de novo:
+
+1. o cliente (Bearer) chama `POST /v1/auth/web-handoff` e recebe um código de
+   uso único (`web_handoff_tokens`, só o hash; vale 2 minutos e uma vez);
+2. abre `/entrar/app#codigo=…&para=/app/plano&empresa=<id>`; o código vai no
+   **fragmento** (não chega a servidor nenhum, nem a logs ou `Referer`) e a
+   página o apaga da barra antes de usar;
+3. a página chama `POST /v1/auth/web/handoff` (mesmas regras anti-CSRF das
+   rotas web) e recebe uma sessão web própria, em cookie. A sessão do app não
+   muda. `para` só aceita caminhos dentro de `/app`.
+
 ## Estoque: lê por REST, grava pelo motor de sincronização
 
 A web é online (não guarda o estoque no navegador). Lê por rotas paginadas e
@@ -158,7 +173,12 @@ grava por rotas REST que **montam operações e as entregam ao mesmo
 - idempotência: o cliente gera o `id` do produto/movimentação; repetir a
   requisição não duplica;
 - a primeira gravação pela web marca a empresa como semeada (`seeded_at`); um
-  aparelho que sincronizar depois adota a nuvem (`SYNC_ALREADY_SEEDED`).
+  aparelho que sincronizar depois adota a nuvem (`SYNC_ALREADY_SEEDED`). Se
+  esse aparelho nunca sincronizou, os produtos cadastrados nele antes do login
+  vão para a nuvem junto, com o histórico (`LocalMerge`); repetidos (mesmo
+  código de barras ou nome) ficam com a versão da nuvem. Restaurar uma cópia
+  do banco com a conta conectada faz a mesma conferência na rodada seguinte
+  (`SyncMeta.RECONCILIAR`).
 
 Rotas (todas em `/v1/workspaces/:workspaceId`): `products` (lista com busca,
 filtros e paginação; `facets`; detalhe; criar; editar; excluir; `restore`;

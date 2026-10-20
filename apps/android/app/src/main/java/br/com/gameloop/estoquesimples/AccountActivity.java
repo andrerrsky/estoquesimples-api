@@ -48,6 +48,7 @@ import br.com.gameloop.estoquesimples.sync.RememberedLogin;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
 import br.com.gameloop.estoquesimples.sync.SyncScheduler;
+import br.com.gameloop.estoquesimples.sync.SyncStatus;
 import br.com.gameloop.estoquesimples.sync.TeamClient;
 
 /**
@@ -74,6 +75,8 @@ public class AccountActivity extends BaseActivity {
     private TextView accountLastSync;
     private TextView accountPending;
     private TextView syncStatus;
+    /** O aviso da primeira sincronização apareceu nesta visita: some ao sair. */
+    private boolean avisoMesclaVisto;
     private TextView messageView;
     private ProgressBar progress;
     private TextInputLayout nameLayout;
@@ -125,6 +128,16 @@ public class AccountActivity extends BaseActivity {
         super.onResume();
         render();
         refreshEntitlementIfSignedIn();
+        SyncStatus.addListener(syncListener);
+        if (SyncStatus.current().running) {
+            showSyncRunning(true);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        SyncStatus.removeListener(syncListener);
+        super.onPause();
     }
 
     private void bindViews() {
@@ -176,6 +189,12 @@ public class AccountActivity extends BaseActivity {
         emailField.addTextChangedListener(regrasAoDigitar);
 
         findViewById(R.id.syncNowButton).setOnClickListener(v -> syncNow());
+        Button openWeb = findViewById(R.id.openWebButton);
+        openWeb.setOnClickListener(v -> br.com.gameloop.estoquesimples.sync.WebHandoff.open(
+                this, "/app", busy -> {
+                    openWeb.setEnabled(!busy);
+                    openWeb.setText(busy ? "Abrindo…" : getString(R.string.open_web_version));
+                }));
         findViewById(R.id.conflictsButton).setOnClickListener(v ->
                 startActivity(new Intent(this, ConflictsActivity.class)));
         findViewById(R.id.teamButton).setOnClickListener(v ->
@@ -384,6 +403,11 @@ public class AccountActivity extends BaseActivity {
             if (erro != null) {
                 appendNote(notas, erro);
             }
+            String avisoMescla = meta.get(SyncMeta.AVISO_MESCLA);
+            if (avisoMescla != null) {
+                appendNote(notas, avisoMescla);
+                avisoMesclaVisto = true;
+            }
             String avisoFotos = meta.get(SyncMeta.FOTOS_AVISO);
             if (avisoFotos != null) {
                 appendNote(notas, avisoFotos);
@@ -429,8 +453,10 @@ public class AccountActivity extends BaseActivity {
 
         titulo.setText(entitlements.planLegivel());
         if (pago) {
+            String origem = entitlements.origemLegivel();
             descricao.setText(entitlements.stateLegivel()
-                    + " Equipe, produtos sem limite e Análise Avançada liberados.");
+                    + " Equipe, produtos sem limite e Análise Avançada liberados."
+                    + (origem != null ? "\n" + origem : ""));
             plano.setText("Gerenciar assinatura");
         } else {
             String estado = entitlements.state();
@@ -1035,12 +1061,52 @@ public class AccountActivity extends BaseActivity {
         // O bootstrap reavalia o interruptor (sessão + assinatura). Sem isso,
         // um toque logo após o login encontrava o portão ainda fechado e o
         // toast de "solicitada" não correspondia a trabalho nenhum.
+        // Ele mesmo dispara a rodada quando tudo está pronto.
+        SyncStatus.markRequestedByUser();
+        aguardandoSync = true;
+        showSyncRunning(true);
         SyncBootstrap.start(this);
-        SyncScheduler.syncNow(this);
-        Toast.makeText(this, "Sincronização solicitada.", Toast.LENGTH_SHORT).show();
-        // Um atraso curto dá tempo do worker registrar o resultado antes de a
-        // tela reler o estado.
-        main.postDelayed(this::render, 1500);
+        // Rodada que não começa logo (sem rede de verdade, sistema segurando o
+        // trabalho): o botão volta e a pessoa sabe que ela sai sozinha depois.
+        main.postDelayed(() -> {
+            if (aguardandoSync && !SyncStatus.current().running && !isFinishing()) {
+                aguardandoSync = false;
+                showSyncRunning(false);
+                Feedback.show(this, "A sincronização vai rodar assim que o aparelho tiver conexão.");
+            }
+        }, 15_000);
+    }
+
+    /** Uma rodada pedida aqui ainda não terminou. */
+    private boolean aguardandoSync;
+
+    private final SyncStatus.Listener syncListener = snapshot -> {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (snapshot.running) {
+            showSyncRunning(true);
+            return;
+        }
+        if (aguardandoSync || snapshot.requestedByUser) {
+            aguardandoSync = false;
+            showSyncRunning(false);
+            render();
+            Feedback.show(this, SyncStatus.summary(snapshot));
+        } else {
+            showSyncRunning(false);
+            render();
+        }
+    };
+
+    /** Botão "Sincronizar agora" vira "Sincronizando…", com o indicador ao lado. */
+    private void showSyncRunning(boolean running) {
+        Button button = findViewById(R.id.syncNowButton);
+        if (button != null) {
+            button.setEnabled(!running);
+            button.setText(running ? "Sincronizando…" : "Sincronizar agora");
+        }
+        progress.setVisibility(running ? View.VISIBLE : View.GONE);
     }
 
     /**
@@ -1343,6 +1409,19 @@ public class AccountActivity extends BaseActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (avisoMesclaVisto) {
+            avisoMesclaVisto = false;
+            try {
+                new SyncMeta(LocalDb.open(this)).remove(SyncMeta.AVISO_MESCLA);
+            } catch (Exception ignored) {
+                // aparece de novo na próxima visita; nada se perde
+            }
+        }
     }
 
     @Override

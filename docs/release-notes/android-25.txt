@@ -1,0 +1,11 @@
+<pt-BR>
+Nova versão com várias melhorias:
+• Produtos cadastrados antes de entrar na conta agora vão para a nuvem
+• Fotos da câmera sem distorção e sincronização de fotos mais estável
+• Abra a versão web já conectado, sem digitar a senha
+• Assinatura mostra se foi feita pela Google Play ou pela web
+• Aviso claro enquanto sincroniza, com "Sincronizar agora" no menu
+• Teclado fecha ao sair do cadastro
+• Importar arquivos envia tudo para a nuvem na hora
+• Boas-vindas mais simples e correções
+</pt-BR>

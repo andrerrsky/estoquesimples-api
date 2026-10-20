@@ -64,6 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authed');
   }, []);
 
+  const loginWithAppCode = useCallback(
+    async (code: string) => {
+      const auth = await sessionApi.handoff(code);
+      // Outra conta podia estar aberta neste navegador: nada dela fica na tela.
+      queryClient.clear();
+      clearProductImages();
+      setUser(auth.user);
+      setStatus('authed');
+    },
+    [queryClient],
+  );
+
   const logout = useCallback(async () => {
     await sessionApi.logout();
     setUser(null);
@@ -78,7 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authed');
   }, []);
 
-  const value = useMemo(() => ({ status, user, login, register, logout, reloadUser }), [status, user, login, register, logout, reloadUser]);
+  const value = useMemo(
+    () => ({ status, user, login, register, logout, reloadUser, loginWithAppCode }),
+    [status, user, login, register, logout, reloadUser, loginWithAppCode],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

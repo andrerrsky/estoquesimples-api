@@ -16,6 +16,7 @@ import java.util.Map;
 import br.com.gameloop.estoquesimples.PhotoPathHelper;
 import br.com.gameloop.estoquesimples.data.LocalBackup;
 import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.LocalMerge;
 import br.com.gameloop.estoquesimples.data.OutboxRepository;
 import br.com.gameloop.estoquesimples.data.RemoteChanges;
 import br.com.gameloop.estoquesimples.data.SyncGate;
@@ -169,14 +170,55 @@ public final class SyncEngine {
      * o que a equipe já usa. A cópia de segurança feita antes garante que nada
      * é irreversível.
      */
-    public int adoptCloudState() throws ApiException {
+    public LocalMerge.Result adoptCloudState() throws ApiException {
+        return adoptCloudState(false);
+    }
+
+    /**
+     * Depois de restaurar uma cópia com a conta conectada (ver
+     * {@link SyncMeta#RECONCILIAR}): mesma adoção, sempre levando para a nuvem
+     * o que só existe na cópia.
+     */
+    public LocalMerge.Result reconcileAfterRestore() throws ApiException {
+        LocalMerge.Result mescla = adoptCloudState(true);
+        meta.remove(SyncMeta.RECONCILIAR);
+        return mescla;
+    }
+
+    /**
+     * Marca o banco recém-trocado para reconciliar na próxima rodada. A fila e
+     * o cursor que vieram no arquivo descrevem outro momento (às vezes outro
+     * aparelho) e não valem aqui; o que a cópia tem de próprio volta para a
+     * fila na reconciliação.
+     */
+    public static void markForReconcile(SQLiteDatabase db) {
+        new OutboxRepository(db).clear();
+        SyncMeta meta = new SyncMeta(db);
+        meta.remove(SyncMeta.UPLOAD_ID);
+        meta.remove(SyncMeta.UPLOAD_PROXIMO_LOTE);
+        meta.put(SyncMeta.RECONCILIAR, true);
+    }
+
+    private LocalMerge.Result adoptCloudState(boolean sempreMesclar) throws ApiException {
         String workspaceId = session.workspaceId();
         if (workspaceId == null) {
             throw new ApiException(0, "SEM_EMPRESA",
                     "Escolha uma empresa antes de sincronizar.", null);
         }
 
-        int recebidas = fullResync(workspaceId);
+        // Aparelho que nunca sincronizou: o que ele tem foi cadastrado aqui, por
+        // esta pessoa, e vai para a nuvem junto (ver LocalMerge). Um aparelho
+        // que já usou outra empresa só adota a nuvem, como antes.
+        boolean mesclar = sempreMesclar || meta.get(SyncMeta.WORKSPACE_ID) == null;
+        RemoteChanges acumulador = remoteChanges();
+        int recebidas = pullDesde(workspaceId, 0L, acumulador);
+        LocalBackup.create(context, db, "adocao-da-nuvem");
+        LocalMerge.Result mescla = mesclar
+                ? LocalMerge.enqueueLocalOnly(db, acumulador.produtosVistos())
+                : new LocalMerge.Result(0, 0);
+        int removidos = acumulador.removeAusentes();
+        Log.i(TAG, "nuvem adotada: " + recebidas + " recebidas, " + mescla.enviados
+                + " do aparelho a enviar, " + removidos + " removidos");
 
         db.beginTransaction();
         try {
@@ -189,7 +231,7 @@ public final class SyncEngine {
             db.endTransaction();
         }
 
-        return recebidas;
+        return mescla;
     }
 
     // -------------------------------------------------------------------------

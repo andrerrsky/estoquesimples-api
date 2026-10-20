@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters;
 
 import br.com.gameloop.estoquesimples.data.LocalBackup;
 import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.LocalMerge;
 import br.com.gameloop.estoquesimples.data.OutboxRepository;
 import br.com.gameloop.estoquesimples.data.SyncGate;
 import br.com.gameloop.estoquesimples.data.SyncMeta;
@@ -66,6 +67,7 @@ public final class SyncWorker extends Worker {
         // edições locais sejam enfileiradas — a fila é o registro do que
         // precisa subir quando o acesso voltar.
         SyncGate.setActive(true);
+        SyncStatus.started();
 
         EntitlementManager entitlements = new EntitlementManager(context);
         try {
@@ -79,10 +81,12 @@ public final class SyncWorker extends Worker {
         }
 
         if (!entitlements.canSync()) {
-            recordStatus(context, entitlements.isStale()
+            String motivo = entitlements.isStale()
                     ? "Não foi possível confirmar sua conta na nuvem. Os dados seguem no aparelho."
                     : "A sincronização na nuvem não está disponível para esta empresa agora. "
-                            + "Os dados seguem no aparelho.");
+                            + "Os dados seguem no aparelho.";
+            recordStatus(context, motivo);
+            SyncStatus.failed(motivo);
             return Result.success();
         }
 
@@ -93,11 +97,28 @@ public final class SyncWorker extends Worker {
         } catch (Exception e) {
             Log.e(TAG, "falha inesperada na sincronização", e);
             recordStatus(context, "Erro inesperado ao sincronizar.");
+            SyncStatus.failed("Erro inesperado ao sincronizar. Vamos tentar de novo.");
             return Result.retry();
         }
     }
 
+    /**
+     * Uma rodada por vez no processo. O trabalho periódico e o imediato têm
+     * nomes diferentes no WorkManager e podiam rodar juntos: as duas rodadas
+     * adotavam a nuvem ao mesmo tempo, disputavam os mesmos arquivos de foto
+     * e a segunda apagava o aviso da primeira. A segunda espera e, quando
+     * entra, encontra o trabalho feito.
+     */
+    private static final Object RODADA = new Object();
+
     private Result synchronize(Context context, RemoteConfig config, SessionManager session)
+            throws ApiException {
+        synchronized (RODADA) {
+            return synchronizeLocked(context, config, session);
+        }
+    }
+
+    private Result synchronizeLocked(Context context, RemoteConfig config, SessionManager session)
             throws ApiException {
         SQLiteDatabase db = LocalDb.open(context);
         SyncMeta meta = new SyncMeta(db);
@@ -108,6 +129,7 @@ public final class SyncWorker extends Worker {
                 config.maxBatchItems(), interrupcao);
         InitialUpload upload = new InitialUpload(db, api, session, config.maxBatchItems());
 
+        String avisoNovo = null;
         if (!upload.isComplete()) {
             // Antes do primeiro envio, sempre uma cópia do banco. É o único
             // ponto de retorno se a carga inicial correr mal.
@@ -121,11 +143,25 @@ public final class SyncWorker extends Worker {
                 // Segundo aparelho entrando numa empresa que já tem dados. O
                 // banco local dele é quase sempre uma cópia velha; enviá-lo por
                 // cima duplicaria o que a equipe já usa.
-                int recebidas = engine.adoptCloudState();
-                new SyncMeta(db).put(SyncMeta.ULTIMO_ERRO,
-                        "Este aparelho passou a usar os dados da empresa na nuvem. "
-                                + "Uma cópia do que havia aqui ficou guardada.");
-                Log.i(TAG, "estado da nuvem adotado com " + recebidas + " registro(s)");
+                LocalMerge.Result mescla = engine.adoptCloudState();
+                avisoNovo = mensagemDaMescla(mescla);
+                meta.put(SyncMeta.AVISO_MESCLA, avisoNovo);
+                // A adoção já conferiu tudo com a nuvem: não há o que reconciliar.
+                meta.remove(SyncMeta.RECONCILIAR);
+            }
+        }
+
+        // Banco trocado por uma cópia com a conta conectada: reconcilia com a
+        // nuvem antes do envio normal (ver SyncMeta.RECONCILIAR).
+        if (meta.getBoolean(SyncMeta.RECONCILIAR, false)) {
+            if (!upload.isComplete()) {
+                // Empresa ainda vazia na nuvem: a carga inicial acima já cuidou.
+                meta.remove(SyncMeta.RECONCILIAR);
+            } else {
+                LocalBackup.create(context, db, "reconciliacao");
+                LocalMerge.Result mescla = engine.reconcileAfterRestore();
+                avisoNovo = mensagemDaRestauracao(mescla);
+                meta.put(SyncMeta.AVISO_MESCLA, avisoNovo);
             }
         }
 
@@ -141,8 +177,9 @@ public final class SyncWorker extends Worker {
 
         SyncEngine.Resultado resultado = engine.run();
 
+        int fotosBaixadas = 0;
         try {
-            photos.downloadMissing();
+            fotosBaixadas = photos.downloadMissing();
         } catch (RuntimeException e) {
             Log.w(TAG, "falha inesperada ao baixar fotos", e);
         }
@@ -153,20 +190,56 @@ public final class SyncWorker extends Worker {
         meta.remove(SyncMeta.ULTIMO_ERRO);
         meta.remove(SyncMeta.BLOQUEIO_PLANO);
 
+        // O aviso da mescla sobrevive a esta limpeza: ele explica a primeira
+        // sincronização e some quando a pessoa o vê na tela de conta.
         Log.i(TAG, "sincronização concluída: " + resultado.enviadas + " enviada(s), "
                 + resultado.recebidas + " recebida(s), " + resultado.conflitos + " conflito(s), "
                 + resultado.recusadas + " recusada(s), " + pendentes + " na fila");
 
         // Operação recusada em definitivo não se resolve sozinha. O aviso fica
         // na tela de conta em vez de sumir junto com o registro do worker.
+        String aviso = avisoNovo;
         if (new OutboxRepository(db).failedCount() > 0) {
             meta.put(SyncMeta.ULTIMO_ERRO,
                     "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.");
+            aviso = "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.";
         }
+        SyncStatus.finished(resultado.enviadas, resultado.recebidas + fotosBaixadas, aviso);
         return Result.success();
     }
 
+    static String mensagemDaRestauracao(LocalMerge.Result mescla) {
+        StringBuilder texto = new StringBuilder("Cópia restaurada e conferida com a nuvem.");
+        if (mescla.enviados > 0) {
+            texto.append(mescla.enviados == 1
+                    ? " 1 produto que só existia na cópia foi enviado."
+                    : " " + mescla.enviados + " produtos que só existiam na cópia foram enviados.");
+        }
+        if (mescla.repetidos > 0) {
+            texto.append(" Produtos repetidos (mesmo nome ou código) ficaram com a versão da nuvem.");
+        }
+        return texto.toString();
+    }
+
+    /** Explica, em uma frase, o que aconteceu com o que havia no aparelho. */
+    static String mensagemDaMescla(LocalMerge.Result mescla) {
+        StringBuilder texto = new StringBuilder("Este aparelho passou a usar o estoque da empresa na nuvem.");
+        if (mescla.enviados > 0) {
+            texto.append(mescla.enviados == 1
+                    ? " O produto cadastrado aqui foi enviado para lá."
+                    : " Os " + mescla.enviados + " produtos cadastrados aqui foram enviados para lá.");
+        }
+        if (mescla.repetidos > 0) {
+            texto.append(mescla.repetidos == 1
+                    ? " 1 produto que já existia na nuvem com o mesmo nome ou código ficou com a versão de lá."
+                    : " " + mescla.repetidos + " produtos que já existiam na nuvem com o mesmo nome ou código ficaram com a versão de lá.");
+        }
+        texto.append(" Uma cópia do que havia aqui ficou guardada.");
+        return texto.toString();
+    }
+
     private Result handleApiFailure(Context context, ApiException e) {
+        SyncStatus.failed(e.userMessage());
         // Papel alterado por um administrador: o token descreve permissões que
         // não existem mais. Descartá-lo e tentar de novo renova o acesso sem
         // exigir login — expulsar alguém do app por uma mudança de papel seria

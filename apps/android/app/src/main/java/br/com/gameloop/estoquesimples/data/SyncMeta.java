@@ -43,6 +43,20 @@ public final class SyncMeta {
      */
     public static final String FOTOS_AVISO = "fotos_aviso";
 
+    /**
+     * O que a primeira sincronização fez com o que havia no aparelho (produtos
+     * enviados, repetidos que ficaram com a versão da nuvem). Mostrado na tela
+     * de conta até a pessoa vê-lo; não é erro e não some na rodada seguinte.
+     */
+    public static final String AVISO_MESCLA = "aviso_mescla";
+
+    /**
+     * O banco foi trocado por uma cópia (restauração, importação de .db) com a
+     * conta conectada: a próxima rodada baixa tudo da nuvem de novo e envia o
+     * que só existe na cópia, em vez de confiar no cursor e na fila do arquivo.
+     */
+    public static final String RECONCILIAR = "reconciliar_apos_restauracao";
+
     private final SQLiteDatabase db;
 
     public SyncMeta(SQLiteDatabase db) {

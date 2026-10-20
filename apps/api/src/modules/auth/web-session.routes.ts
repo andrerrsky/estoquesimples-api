@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { resolveAuth } from '../../platform/http/authenticate.js';
+import { requireAuth, resolveAuth } from '../../platform/http/authenticate.js';
 import { AppError, ErrorCode, forbidden, unauthorized } from '../../platform/http/errors.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { acceptInviteBodySchema, inviteTokenParamsSchema } from '../invites/invites.schemas.js';
@@ -11,6 +11,7 @@ import { requestMeta } from './auth.routes.js';
 import { AuthService } from './auth.service.js';
 import {
   authSuccessSchema,
+  deviceInfoSchema,
   errorSchema,
   loginBodySchema,
   messageSchema,
@@ -134,6 +135,46 @@ export async function registerWebSessionRoutes(app: FastifyInstance): Promise<vo
         }
         throw error;
       }
+    },
+  );
+
+  // Abrir a web já conectado a partir do app: o app (Bearer) pede um código
+  // de uso único e abre o navegador em /entrar/app#codigo=...; a página troca
+  // o código por uma sessão web própria. O código vai no fragmento da URL, que
+  // o navegador não envia a servidor nenhum nem guarda no Referer.
+  routes.post(
+    '/web-handoff',
+    {
+      ...strictLimit,
+      preHandler: app.authenticate,
+      schema: {
+        tags: ['auth'],
+        summary: 'Código de uso único para abrir a web já conectado (pedido pelo app)',
+        security: [{ bearerAuth: [] }],
+        response: { 200: z.object({ code: z.string(), expiresIn: z.number().int() }), ...errors },
+      },
+    },
+    async (request) => {
+      const auth = requireAuth(request);
+      return service.createWebHandoff(auth.userId, requestMeta(request));
+    },
+  );
+
+  routes.post(
+    '/web/handoff',
+    {
+      ...strictLimit,
+      schema: {
+        tags: ['auth'],
+        summary: 'Troca o código vindo do app por uma sessão web (cookie httpOnly)',
+        body: z.object({ code: z.string().min(20).max(200), device: deviceInfoSchema.optional() }).strict(),
+        response: { 200: webAuthSchema, ...errors },
+      },
+    },
+    async (request, reply) => {
+      assertSameSite(request);
+      const auth = await service.redeemWebHandoff(request.body.code, request.body.device, requestMeta(request));
+      return startSession(reply, auth);
     },
   );
 
