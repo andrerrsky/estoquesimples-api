@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { resolveAuth } from '../../platform/http/authenticate.js';
 import { errorSchema, messageSchema } from '../auth/auth.schemas.js';
-import { pushEventBodySchema, registerTokenBodySchema } from './push.schemas.js';
+import { pushEventBodySchema, registerTokenBodySchema, revokeTokenBodySchema } from './push.schemas.js';
 import { PushService } from './push.service.js';
 
 /**
@@ -39,6 +39,41 @@ export async function registerPushRoutes(app: FastifyInstance): Promise<void> {
         deviceId: auth?.deviceId ?? null,
       });
       return { message: 'Token registrado.' };
+    },
+  );
+
+  routes.get(
+    '/push/web-config',
+    {
+      ...limit,
+      schema: {
+        tags: ['push'],
+        summary: 'Chave pública VAPID para o navegador se inscrever no Web Push',
+        response: { 200: z.object({ publicKey: z.string() }), 503: errorSchema },
+      },
+    },
+    async (_request, reply) => {
+      // A chave pública não muda: o navegador pode guardar por um dia.
+      reply.header('Cache-Control', 'public, max-age=86400');
+      return { publicKey: await app.services.webPush.publicKey() };
+    },
+  );
+
+  routes.delete(
+    '/push/tokens',
+    {
+      ...limit,
+      schema: {
+        tags: ['push'],
+        summary: 'Cancela a inscrição deste aparelho/navegador (desligar os avisos)',
+        description: 'Só revoga se o installId bater com o da inscrição.',
+        body: revokeTokenBodySchema,
+        response: { 200: messageSchema, 400: errorSchema, 429: errorSchema },
+      },
+    },
+    async (request) => {
+      await service.revokeToken(request.body.token, request.body.installId);
+      return { message: 'Avisos desligados neste aparelho.' };
     },
   );
 

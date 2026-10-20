@@ -10,12 +10,16 @@ import { ACTIVITY_SQL, sqlList } from '../admin/admin-series.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from '../admin/admin-audit.service.js';
 import { offsetOf, type Paginated, type PaginationQuery } from '../admin/admin.schemas.js';
 import { PUSH_SEND_CAMPAIGN_JOB } from './push.jobs.js';
+import { dispatchPush } from './push-dispatch.js';
+import { isAllowedPushEndpoint } from './web-push-client.js';
 import type { Audience, CampaignBody } from './push.schemas.js';
 
 export interface TokenRegistration {
   token: string;
   installId: string;
   platform: 'android' | 'ios' | 'web';
+  /** Web Push: chaves da inscrição do navegador (`token` é o endpoint). */
+  keys?: { p256dh: string; auth: string } | undefined;
   appVersionCode?: number;
   locale?: string;
   notificationsEnabled?: boolean;
@@ -68,6 +72,10 @@ export class PushService {
   // -------------------------------------------------------------------------
 
   async registerToken(input: TokenRegistration): Promise<void> {
+    if (input.platform === 'web' && (!input.keys || !isAllowedPushEndpoint(input.token))) {
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Inscrição de push do navegador inválida.');
+    }
+    const webPushKeys = input.platform === 'web' ? (input.keys ?? null) : null;
     await this.db.transaction(async (tx) => {
       // Um aparelho tem um token válido por vez: os anteriores da mesma
       // instalação saem de circulação para a campanha não chegar em dobro.
@@ -87,6 +95,7 @@ export class PushService {
           appVersionCode: input.appVersionCode ?? null,
           locale: input.locale ?? null,
           notificationsEnabled: input.notificationsEnabled ?? null,
+          webPushKeys,
           lastSeenAt: new Date(),
         })
         .onConflictDoUpdate({
@@ -101,12 +110,21 @@ export class PushService {
             appVersionCode: input.appVersionCode ?? null,
             locale: input.locale ?? null,
             notificationsEnabled: input.notificationsEnabled ?? null,
+            webPushKeys,
             lastSeenAt: new Date(),
             revokedAt: null,
             revokeReason: null,
           },
         });
     });
+  }
+
+  /** A pessoa desligou os avisos neste navegador/aparelho. Só o dono da instalação revoga. */
+  async revokeToken(token: string, installId: string): Promise<void> {
+    await this.db
+      .update(pushTokens)
+      .set({ revokedAt: new Date(), revokeReason: 'user' })
+      .where(and(eq(pushTokens.token, token), eq(pushTokens.installId, installId), isNull(pushTokens.revokedAt)));
   }
 
   async recordEvent(input: { campaignId: string; installId: string; event: 'delivered' | 'opened' }): Promise<boolean> {
@@ -415,9 +433,7 @@ export class PushService {
 
   /** Coloca a campanha na fila; o job faz o envio. */
   async send(actor: AdminActor, id: string): Promise<void> {
-    if (!this.services.fcm.configured) {
-      throw new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, 'Firebase não configurado neste ambiente.');
-    }
+    // Sem Firebase a campanha ainda chega aos web apps (Web Push) e à caixa de notificações.
     await this.db.transaction(async (tx) => {
       const campaign = await this.lock(tx, id);
       if (campaign.status !== 'draft') throw conflict(ErrorCode.CONFLICT, 'Esta campanha já foi enviada ou está na fila.');
@@ -440,9 +456,6 @@ export class PushService {
 
   /** Envio de teste: cria a campanha marcada como teste e envia na hora. */
   async sendTest(actor: AdminActor, body: CampaignBody, email: string) {
-    if (!this.services.fcm.configured) {
-      throw new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, 'Firebase não configurado neste ambiente.');
-    }
     const test: CampaignBody = { ...body, audience: { type: 'users', emails: [email] }, activeWithinDays: 365 };
     const created = await this.createCampaign(actor, test, { isTest: true });
     if ((created['targeted'] as number) === 0) {
@@ -529,8 +542,9 @@ export class PushService {
       if (status[0]?.status === 'cancelled') break;
 
       const batch = await this.db
-        .select({ token: pushDeliveries.token })
+        .select({ token: pushDeliveries.token, platform: pushTokens.platform, webPushKeys: pushTokens.webPushKeys })
         .from(pushDeliveries)
+        .leftJoin(pushTokens, eq(pushTokens.token, pushDeliveries.token))
         .where(and(eq(pushDeliveries.campaignId, campaignId), eq(pushDeliveries.status, 'pending')))
         .limit(concurrency * 4);
       if (batch.length === 0) break;
@@ -538,14 +552,12 @@ export class PushService {
       for (let i = 0; i < batch.length; i += concurrency) {
         const slice = batch.slice(i, i + concurrency);
         const results = await Promise.all(
-          slice.map(async ({ token }) => {
-            try {
-              return { token, result: await this.services.fcm.send(token, message) };
-            } catch (error) {
-              // 401/403 do Firebase: credencial errada. Sem sentido continuar.
-              throw error;
-            }
-          }),
+          // Web Push para navegadores, FCM para o app. 401/403 do Firebase
+          // (credencial errada) sobe e interrompe: não faz sentido continuar.
+          slice.map(async ({ token, platform, webPushKeys }) => ({
+            token,
+            result: await dispatchPush(this.services, { token, platform: platform ?? 'android', webPushKeys: webPushKeys ?? null }, message),
+          })),
         );
         for (const { token, result } of results) {
           if (result.ok) {
@@ -560,12 +572,6 @@ export class PushService {
               .update(pushDeliveries)
               .set({ status: 'failed', error: result.reason })
               .where(and(eq(pushDeliveries.campaignId, campaignId), eq(pushDeliveries.token, token)));
-            if (result.reason === 'unregistered' || result.reason === 'invalid') {
-              await this.db
-                .update(pushTokens)
-                .set({ revokedAt: new Date(), revokeReason: result.reason })
-                .where(and(eq(pushTokens.token, token), isNull(pushTokens.revokedAt)));
-            }
           }
         }
         await this.db

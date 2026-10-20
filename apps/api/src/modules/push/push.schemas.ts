@@ -46,12 +46,29 @@ export type CampaignBody = z.infer<typeof campaignBodySchema>;
 
 export const registerTokenBodySchema = z
   .object({
+    /** Token FCM (app) ou endpoint da inscrição Web Push (navegador). */
     token: z.string().min(20).max(4096),
     installId: z.string().min(8).max(128),
     platform: z.enum(['android', 'ios', 'web']).default('android'),
     appVersionCode: z.number().int().nonnegative().optional(),
     locale: z.string().max(16).optional(),
     notificationsEnabled: z.boolean().optional(),
+    /** Web Push: chaves da inscrição (`PushSubscription.toJSON().keys`). Obrigatórias com `platform: "web"`. */
+    keys: z
+      .object({
+        p256dh: z.string().min(40).max(200).regex(/^[A-Za-z0-9_-]+=*$/),
+        auth: z.string().min(16).max(64).regex(/^[A-Za-z0-9_-]+=*$/),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .refine((body) => body.platform !== 'web' || !!body.keys, { message: 'Inscrição web sem chaves.', path: ['keys'] });
+
+export const revokeTokenBodySchema = z
+  .object({
+    token: z.string().min(20).max(4096),
+    installId: z.string().min(8).max(128),
   })
   .strict();
 

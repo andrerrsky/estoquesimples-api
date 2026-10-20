@@ -350,10 +350,26 @@
 .color-swatch:focus-within {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18), var(--focus-ring);
 }
+.color-swatch--first {
+  order: -1;
+}
 .color-swatch.is-disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 .color-swatch.is-disabled input {
   cursor: not-allowed;
+}
+
+/* Salvar e voltar ao padrão: lado a lado quando cabem; no celular, um embaixo
+   do outro, na largura toda (antes o segundo ficava colado na borda). */
+.brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .brand-actions .btn {
+    flex: 1 1 100%;
+  }
 }

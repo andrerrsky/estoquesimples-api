@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 
 import { api, ApiError, errorMessage } from '../api/client';
 import type { Ticket, TicketMessage } from '../api/types';
+import { PushSettings } from '../components/PushSettings';
 import { Icon } from '../components/Icon';
 import { Badge, Card, ConfirmDialog, Empty, Field, Notice, PageHeader, QueryState, Time, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
@@ -390,6 +391,9 @@ function TicketConversation({ ticketId }: { ticketId: string }) {
           )
         }
       />
+
+      {/* Quem espera resposta é quem mais ganha com o aviso: oferece aqui, se ainda não está ligado. */}
+      {!resolved && <PushSettings compact />}
 
       <div className="thread-panel">
         <div className="thread" role="log" aria-label="Conversa com o suporte">

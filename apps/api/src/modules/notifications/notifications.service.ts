@@ -3,6 +3,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { notifications, pushTokens } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { notFound } from '../../platform/http/errors.js';
+import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 
 /**
  * Tipos de notificação conhecidos.
@@ -15,6 +16,7 @@ import { notFound } from '../../platform/http/errors.js';
  *   billing.payment_confirmed|payment_overdue|subscription_suspended|
  *     subscription_ended|subscription_refunded   { workspaceId }
  *   team.invite_accepted                         { workspaceId }
+ *   stock.low                                    { workspaceId, count }
  *   campaign                                     { campaignId, screen?, url? }
  */
 export const NotificationType = {
@@ -26,6 +28,7 @@ export const NotificationType = {
   BILLING_SUBSCRIPTION_ENDED: 'billing.subscription_ended',
   BILLING_SUBSCRIPTION_REFUNDED: 'billing.subscription_refunded',
   TEAM_INVITE_ACCEPTED: 'team.invite_accepted',
+  STOCK_LOW: 'stock.low',
   CAMPAIGN: 'campaign',
 } as const;
 
@@ -43,6 +46,8 @@ export interface NotifyInput {
   dedupeKey?: string;
   /** Também manda push para os aparelhos do usuário (padrão: sim). */
   push?: boolean;
+  /** Só para estas plataformas (ex.: estoque baixo só na web, o app Android avisa sozinho). */
+  pushPlatforms?: Array<'android' | 'ios' | 'web'>;
 }
 
 export interface NotifyResult {
@@ -92,11 +97,15 @@ export class NotificationService {
     if (!id) return { id: null, pushAccepted: 0, pushFailed: 0, pushMuted: 0, pushError: null };
 
     if (input.push === false) return { id, pushAccepted: 0, pushFailed: 0, pushMuted: 0, pushError: null };
-    const push = await this.pushToUser(input.userId, {
-      title,
-      body,
-      data: { ...stringify(input.data ?? {}), type: pushType(input.type), notificationId: id },
-    });
+    const push = await this.pushToUser(
+      input.userId,
+      {
+        title,
+        body,
+        data: { ...stringify(input.data ?? {}), type: pushType(input.type), notificationType: input.type, notificationId: id },
+      },
+      { platforms: input.pushPlatforms },
+    );
     return { id, ...push };
   }
 
@@ -108,10 +117,9 @@ export class NotificationService {
   async pushToUser(
     userId: string | null,
     message: { title: string; body: string; data: Record<string, string> },
-    options: { installId?: string | null } = {},
+    options: { installId?: string | null; platforms?: Array<'android' | 'ios' | 'web'> | undefined } = {},
   ): Promise<{ pushAccepted: number; pushFailed: number; pushMuted: number; pushError: string | null }> {
     const result = { pushAccepted: 0, pushFailed: 0, pushMuted: 0, pushError: null as string | null };
-    if (!this.services.fcm.configured) return { ...result, pushError: 'Firebase não configurado' };
     if (!userId && !options.installId) return result;
 
     const owner = userId && options.installId
@@ -121,29 +129,27 @@ export class NotificationService {
         : eq(pushTokens.installId, options.installId as string);
 
     const tokens = await this.db
-      .select({ token: pushTokens.token, enabled: pushTokens.notificationsEnabled })
+      .select({ ...pushTargetColumns, enabled: pushTokens.notificationsEnabled })
       .from(pushTokens)
       .where(and(isNull(pushTokens.revokedAt), owner))
       .limit(10);
 
     for (const row of tokens) {
+      if (options.platforms && !options.platforms.includes(row.platform as 'android' | 'ios' | 'web')) continue;
       if (row.enabled === false) {
         result.pushMuted += 1;
         continue;
       }
       try {
-        const sent = await this.services.fcm.send(row.token, message);
+        // Web Push para navegadores, FCM para o app; revoga a inscrição que não existe mais.
+        const sent = await dispatchPush(this.services, row, message);
         if (sent.ok) {
           result.pushAccepted += 1;
-        } else {
+        } else if (sent.reason !== 'unconfigured') {
           result.pushFailed += 1;
           result.pushError = sent.message;
-          if (sent.reason === 'unregistered' || sent.reason === 'invalid') {
-            await this.db
-              .update(pushTokens)
-              .set({ revokedAt: new Date(), revokeReason: sent.reason })
-              .where(eq(pushTokens.token, row.token));
-          }
+        } else {
+          result.pushError = sent.message;
         }
       } catch (error) {
         result.pushFailed += 1;

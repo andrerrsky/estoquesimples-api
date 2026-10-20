@@ -180,13 +180,13 @@ export function HistoryPage() {
     canCancel &&
     movement.canCancel &&
     (compact ? (
-      // No celular era só o ícone (um círculo com seta, que ninguém entendia): agora diz o que faz.
+      // Só o texto: o ícone de seta circular parecia um elemento solto, não um botão.
       <button type="button" className="btn btn--ghost btn--sm history-undo" aria-label={`Estornar ${movementLabel(movement.type).toLowerCase()} de ${movement.productName}`} onClick={() => setCancelling(movement)}>
-        <Icon name="undo" size={15} /> Estornar
+        Estornar
       </button>
     ) : (
       <button type="button" className="btn btn--ghost btn--sm" aria-label={`Estornar ${movementLabel(movement.type).toLowerCase()} de ${movement.productName}`} onClick={() => setCancelling(movement)}>
-        <Icon name="undo" size={15} /> Estornar
+        Estornar
       </button>
     ));
 

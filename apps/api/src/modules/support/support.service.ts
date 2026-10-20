@@ -9,6 +9,7 @@ import { AdminAction, recordAdminAudit, type AdminActor } from '../admin/admin-a
 import { iso, offsetOf, type Paginated, type PaginationQuery } from '../admin/admin.schemas.js';
 import { AnalyticsService } from '../analytics/analytics.service.js';
 import { AnalyticsEventName } from '../analytics/analytics.events.js';
+import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 import { NotificationService, NotificationType } from '../notifications/notifications.service.js';
 import { OpenAiClient } from '../reviews/openai-client.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
@@ -778,7 +779,7 @@ export class SupportService {
     }
 
     const tokens = await this.db
-      .select({ token: pushTokens.token, enabled: pushTokens.notificationsEnabled })
+      .select({ ...pushTargetColumns, enabled: pushTokens.notificationsEnabled })
       .from(pushTokens)
       .where(
         and(
@@ -795,29 +796,27 @@ export class SupportService {
     let muted = 0;
     let lastError: string | null = null;
 
-    if (this.services.fcm.configured && tokens.length > 0) {
+    // Aparelho Android (FCM) ou navegador/web app (Web Push): o despachante escolhe.
+    let unconfigured = 0;
+    if (tokens.length > 0) {
       for (const row of tokens) {
         if (row.enabled === false) {
           muted += 1;
           continue;
         }
         try {
-          const result = await this.services.fcm.send(row.token, {
+          const result = await dispatchPush(this.services, row, {
             title: notice.title,
             body: notice.body,
             data: { type: 'support', ticketId: ticket.id, ticketNumber: String(ticket.number), event: notice.kind },
           });
           if (result.ok) {
             accepted += 1;
+          } else if (result.reason === 'unconfigured') {
+            unconfigured += 1;
           } else {
             failed += 1;
             lastError = result.message;
-            if (result.reason === 'unregistered' || result.reason === 'invalid') {
-              await this.db
-                .update(pushTokens)
-                .set({ revokedAt: new Date(), revokeReason: result.reason })
-                .where(eq(pushTokens.token, row.token));
-            }
           }
         } catch (error) {
           failed += 1;
@@ -838,7 +837,7 @@ export class SupportService {
           await this.services.mailer.send({ to: email, subject: notice.email.subject, text: notice.email.text, kind: 'support_reply' });
           return {
             status: 'email',
-            detail: !this.services.fcm.configured
+            detail: unconfigured > 0 && unconfigured + muted === tokens.length
               ? 'Firebase não configurado; avisado por e-mail'
               : tokens.length === 0
                 ? 'nenhum aparelho registrado; avisado por e-mail'
@@ -853,8 +852,8 @@ export class SupportService {
       }
     }
 
-    if (!this.services.fcm.configured) return { status: 'none', detail: 'Firebase não configurado' };
     if (tokens.length === 0) return { status: 'none', detail: 'nenhum aparelho registrado para avisar' };
+    if (unconfigured > 0 && unconfigured + muted === tokens.length) return { status: 'none', detail: 'Firebase não configurado' };
     if (muted > 0 && failed === 0) return { status: 'muted', detail: 'notificações desligadas no aparelho' };
     return { status: 'failed', detail: lastError ?? 'push recusado' };
   }

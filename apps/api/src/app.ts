@@ -17,6 +17,8 @@ import { registerReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { registerSyncJobs } from './modules/sync/sync.jobs.js';
 import { GooglePlayClient, type PlayStoreClient } from './modules/billing/play-client.js';
 import { FirebaseFcmClient, type FcmClient } from './modules/push/fcm-client.js';
+import { WebPushClient } from './modules/push/web-push-client.js';
+import { registerLowStockJobs } from './modules/push/low-stock.jobs.js';
 import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas-client.js';
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
@@ -68,7 +70,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
 
   const purchaseTokens = createPurchaseTokenCipher(env);
 
-  const services: AppServices = {
+  const services = {
     env,
     dbHandle,
     db: dbHandle.db,
@@ -80,7 +82,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
     fcm: options.fcm ?? new FirebaseFcmClient(env),
     asaas: options.asaas ?? new HttpAsaasClient(env, () => services.logger),
     storage: options.storage ?? createStorage(env),
-  };
+  } as AppServices;
+  // Depende de `services` (banco e cifra das chaves guardadas).
+  services.webPush = new WebPushClient(services);
 
   const app = await buildServer(services);
   services.logger = app.log;
@@ -94,6 +98,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerAnalyticsJobs(services);
   registerReviewsJobs(services);
   registerPushJobs(services);
+  registerLowStockJobs(services);
   registerAsaasJobs(services);
   registerSupportJobs(services);
   registerImageJobs(services);

@@ -1,0 +1,72 @@
+/* Cartão "Avisos neste aparelho" (notificações, suporte). */
+.push-settings {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px 14px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+}
+.push-settings--off,
+.push-settings--install {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+  background: var(--brand-tint);
+}
+.push-settings--denied {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+  background: var(--warning-soft);
+}
+.push-settings__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.push-settings--on .push-settings__icon {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.push-settings--denied .push-settings__icon {
+  background: #fff;
+  color: var(--warning);
+}
+.push-settings__text strong {
+  display: block;
+  font-size: var(--fs-body);
+}
+.push-settings__text p {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-supporting);
+  line-height: 1.5;
+}
+.push-settings__error {
+  color: var(--error) !important;
+}
+.push-settings__action {
+  display: flex;
+  justify-content: flex-end;
+}
+.push-settings__action:empty {
+  display: none;
+}
+.push-settings--compact {
+  margin: 12px 0 0;
+}
+@media (max-width: 560px) {
+  .push-settings {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .push-settings__action {
+    grid-column: 1 / -1;
+  }
+  .push-settings__action .btn {
+    flex: 1;
+  }
+}

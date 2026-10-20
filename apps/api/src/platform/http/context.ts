@@ -6,6 +6,7 @@ import type { Mailer } from '../email/mailer.js';
 import type { Logger } from '../observability/logger.js';
 import type { PlayStoreClient } from '../../modules/billing/play-client.js';
 import type { FcmClient } from '../../modules/push/fcm-client.js';
+import type { WebPushClient } from '../../modules/push/web-push-client.js';
 import type { AsaasClient } from '../../modules/billing/asaas/asaas-client.js';
 import type { ObjectStorage } from '../storage/object-storage.js';
 
@@ -27,6 +28,8 @@ export interface AppServices {
   playClient: PlayStoreClient;
   /** Envio de push pelo Firebase; `configured` diz se há credencial. */
   fcm: FcmClient;
+  /** Web Push do web app (navegadores); ver modules/push/web-push-client.ts. */
+  webPush: WebPushClient;
   /** Asaas (assinatura pela web); `configured` diz se há chave. */
   asaas: AsaasClient;
   /** Armazenamento de objetos das imagens (bucket S3, disco em dev); `configured` diz se está disponível. */

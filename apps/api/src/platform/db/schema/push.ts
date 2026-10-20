@@ -21,6 +21,8 @@ export const pushTokens = pgTable(
     lastSeenAt: timestamp('last_seen_at', tz).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', tz),
     revokeReason: text('revoke_reason'),
+    /** Web Push: chaves da inscrição do navegador (`token` é o endpoint). Nulo nos tokens FCM. */
+    webPushKeys: jsonb('web_push_keys').$type<{ p256dh: string; auth: string }>(),
   },
   (table) => [
     index('push_tokens_install_idx').on(table.installId),

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api, ApiError } from '../api/client';
 import type { AppNotification, NotificationList } from '../api/types';
+import { PushSettings } from '../components/PushSettings';
 import { Icon, type IconName } from '../components/Icon';
 import { Card, Chips, Empty, PageHeader, QueryState, Time, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
@@ -36,6 +37,7 @@ const TYPE_META: Record<string, TypeMeta> = {
   'billing.subscription_refunded': { icon: 'undo', label: 'Plano' },
   'team.invite_accepted': { icon: 'users', label: 'Equipe' },
   'team.member_joined': { icon: 'users', label: 'Equipe' },
+  'stock.low': { icon: 'alert', label: 'Estoque' },
   campaign: { icon: 'sparkle', label: 'Novidade' },
 };
 
@@ -43,6 +45,7 @@ const FAMILY_META: Record<string, TypeMeta> = {
   support: { icon: 'help', label: 'Suporte' },
   billing: { icon: 'card', label: 'Plano' },
   team: { icon: 'users', label: 'Equipe' },
+  stock: { icon: 'box', label: 'Estoque' },
 };
 
 const DEFAULT_META: TypeMeta = { icon: 'bell', label: 'Aviso' };
@@ -90,6 +93,7 @@ function destinationOf(notification: AppNotification): Destination {
   }
   if (type.startsWith('billing.')) return { to: '/app/plano', workspaceId };
   if (type.startsWith('team.')) return { to: '/app/equipe', workspaceId };
+  if (type === 'stock.low') return { to: '/app/estoque?filtro=baixo', workspaceId };
 
   const route = SCREEN_ROUTE[text(data['screen']) ?? ''];
   if (route) return { to: route, workspaceId };
@@ -203,6 +207,8 @@ export function NotificationsPage() {
           </button>
         }
       />
+
+      <PushSettings />
 
       <Chips
         label="Filtro de notificações"
