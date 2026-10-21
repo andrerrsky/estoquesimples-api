@@ -137,6 +137,47 @@ public class ImageLoadHelper {
     }
     
     /**
+     * Miniatura quadrada da foto nos formulários de cadastro e edição.
+     *
+     * A foto preenche o quadro recortando as sobras (center crop), sem
+     * esticar: com {@code fitXY} uma foto em pé tirada pela câmera ficava
+     * achatada no quadrado. Sem foto, o ícone da câmera aparece inteiro e com
+     * respiro, em vez de esticado até as bordas.
+     */
+    public static void loadFormPhoto(Context context, String imagePath, ImageView imageView) {
+        if (PhotoPathHelper.isEmptyPhotoReference(imagePath)) {
+            showFormPlaceholder(imageView);
+            return;
+        }
+        asFormPhoto(imageView);
+        loadDetailImage(context, imagePath, imageView);
+    }
+
+    public static void loadFormPhotoFromUri(Context context, Uri uri, ImageView imageView) {
+        if (uri == null) {
+            showFormPlaceholder(imageView);
+            return;
+        }
+        asFormPhoto(imageView);
+        loadDetailImageFromUri(context, uri, imageView);
+    }
+
+    /** Quadro vazio: ícone da câmera centralizado. */
+    public static void showFormPlaceholder(ImageView imageView) {
+        int padding = Math.round(26 * imageView.getResources().getDisplayMetrics().density);
+        imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        imageView.setPadding(padding, padding, padding, padding);
+        imageView.setImageResource(R.drawable.ic_camera);
+    }
+
+    private static void asFormPhoto(ImageView imageView) {
+        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        imageView.setPadding(0, 0, 0, 0);
+        // Recorta a foto nos cantos arredondados do fundo do quadro.
+        imageView.setClipToOutline(true);
+    }
+
+    /**
      * Configura o Picasso com otimizações globais.
      * Deve ser chamado no Application.onCreate() ou MainActivity.onCreate().
      * 

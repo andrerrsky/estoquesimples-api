@@ -310,8 +310,11 @@ public final class PhotoSync {
                     Log.i(TAG, "download de fotos pausado: " + e.getCode());
                     break;
                 } catch (IOException e) {
+                    // Problema com este arquivo (disco, nome em uso): as demais
+                    // fotos seguem, e esta é tentada de novo daqui a pouco.
                     Log.w(TAG, "não foi possível gravar a imagem baixada", e);
-                    break;
+                    meta.put(META_ADIAR + hash, agora + 5 * 60 * 1000L);
+                    continue;
                 }
             }
 

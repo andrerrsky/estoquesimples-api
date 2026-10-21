@@ -811,7 +811,7 @@ public class AddActivity extends BaseActivity {
                 return;
             }
 
-            ImageLoadHelper.loadDetailImage(this, photoPath, productPhoto);
+            ImageLoadHelper.loadFormPhoto(this, photoPath, productPhoto);
             
             setupPhotoClickListener(photoPath);
         } catch (Exception e) {
@@ -831,7 +831,7 @@ public class AddActivity extends BaseActivity {
                 return;
             }
 
-            ImageLoadHelper.loadDetailImageFromUri(this, uri, productPhoto);
+            ImageLoadHelper.loadFormPhotoFromUri(this, uri, productPhoto);
             
             setupPhotoClickListenerUri(uri);
         } catch (Exception e) {

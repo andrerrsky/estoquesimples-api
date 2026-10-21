@@ -255,7 +255,8 @@
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:src="@drawable/ic_camera"
-                android:scaleType="fitXY"
+                android:scaleType="centerInside"
+                android:padding="26dp"
                 android:background="@drawable/bg_photo"
                 android:contentDescription="Foto do produto" />
 

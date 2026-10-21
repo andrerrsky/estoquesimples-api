@@ -255,6 +255,38 @@
                     android:text="Equipe" />
             </LinearLayout>
 
+            <!-- Versão web: mesmo estoque no computador, já conectado -->
+            <LinearLayout
+                android:id="@+id/webCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:orientation="vertical"
+                android:background="@drawable/bg_surface"
+                android:padding="@dimen/group_padding">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Use também no computador"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="O mesmo estoque, com tela grande para cadastrar, importar planilhas e ver relatórios. Abre já conectado, sem digitar a senha."
+                    android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+
+                <Button
+                    android:id="@+id/openWebButton"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/open_web_version" />
+            </LinearLayout>
+
             <Button
                 android:id="@+id/diagnosticsButton"
                 style="@style/Widget.Estoque.Button.Secondary"

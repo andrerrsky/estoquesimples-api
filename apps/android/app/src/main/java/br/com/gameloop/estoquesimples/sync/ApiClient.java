@@ -205,7 +205,11 @@ public final class ApiClient {
             // A API só é acessada por HTTPS. O app ainda permite tráfego em
             // texto claro para outros usos legados, e nada garante que uma
             // configuração errada não aponte a base para http://.
-            if (!(connection instanceof HttpsURLConnection)) {
+            // Exceção única: o build de depuração apontado para a API local
+            // do emulador (-PapiBaseUrl=http://10.0.2.2:3000).
+            boolean apiLocalDeDepuracao = br.com.gameloop.estoquesimples.BuildConfig.DEBUG
+                    && ("10.0.2.2".equals(url.getHost()) || "localhost".equals(url.getHost()));
+            if (!(connection instanceof HttpsURLConnection) && !apiLocalDeDepuracao) {
                 throw new ApiException(0, "TLS_OBRIGATORIO",
                         "A sincronização exige uma conexão segura.", null);
             }

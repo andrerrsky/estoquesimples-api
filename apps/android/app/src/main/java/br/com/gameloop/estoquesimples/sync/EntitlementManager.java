@@ -166,6 +166,27 @@ public final class EntitlementManager {
         return isPaid() && "asaas".equals(prefs.getString(CHAVE_PROVEDOR, null));
     }
 
+    /** Onde a assinatura em vigor foi contratada, em uma frase; nulo sem assinatura paga. */
+    public String origemLegivel() {
+        if (!isPaid()) {
+            return null;
+        }
+        String provedor = prefs.getString(CHAVE_PROVEDOR, null);
+        if ("asaas".equals(provedor)) {
+            return "Contratada pela versão web (cartão, Pix ou boleto).";
+        }
+        if ("google_play".equals(provedor) || "play".equals(provedor) || provedor == null) {
+            return "Contratada pela Google Play.";
+        }
+        return null;
+    }
+
+    /** "no Google Play" ou "na versão web": onde se atualiza o pagamento. */
+    private String ondePagar() {
+        return "asaas".equals(prefs.getString(CHAVE_PROVEDOR, null))
+                ? "na versão web" : "no Google Play";
+    }
+
     public boolean autoRenewing() {
         return prefs.getBoolean(CHAVE_AUTO_RENOVANDO, false);
     }
@@ -184,14 +205,14 @@ public final class EntitlementManager {
         }
         switch (estado) {
             case "pendente":
-                return "Pagamento em processamento. Assim que o Google confirmar, "
+                return "Pagamento em processamento. Assim que for confirmado, "
                         + "o plano Equipe liga sozinho.";
             case "ativa":
                 return "Plano Equipe ativo. Renova em " + formatDate(currentPeriodEnd()) + ".";
             case "carencia":
                 return "Houve um problema no pagamento. O plano Equipe continua até "
                         + formatDate(graceUntil())
-                        + "; atualize a forma de pagamento no Google Play.";
+                        + "; atualize a forma de pagamento " + ondePagar() + ".";
             case "cancelada_mas_ativa":
                 return "Renovação desligada. O plano Equipe vale até "
                         + formatDate(currentPeriodEnd()) + "; depois a empresa volta ao plano gratuito.";

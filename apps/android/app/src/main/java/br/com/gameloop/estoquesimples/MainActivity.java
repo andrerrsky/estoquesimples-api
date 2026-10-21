@@ -10,6 +10,7 @@ import br.com.gameloop.estoquesimples.data.MovementRepository;
 import br.com.gameloop.estoquesimples.data.ProductRepository;
 import br.com.gameloop.estoquesimples.data.SyncMeta;
 import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
+import br.com.gameloop.estoquesimples.sync.EntitlementManager;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
 
 import android.content.ContentValues;
@@ -608,6 +609,31 @@ public class MainActivity extends BaseActivity {
         });
     }
 
+    /**
+     * Ao voltar de outra tela (cadastro, edição, importação) a lista recebe o
+     * foco da janela: o teclado que tenha sobrado de lá é recolhido, a menos
+     * que a pessoa esteja de fato digitando uma busca.
+     */
+    @Override
+    protected void onPause() {
+        br.com.gameloop.estoquesimples.sync.SyncStatus.removeListener(syncListener);
+        super.onPause();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (!hasFocus) {
+            return;
+        }
+        boolean buscando = searchView != null && searchView.hasFocus()
+                && searchView.getQuery() != null && searchView.getQuery().length() > 0;
+        if (!buscando) {
+            androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                    .hide(androidx.core.view.WindowInsetsCompat.Type.ime());
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -648,6 +674,10 @@ public class MainActivity extends BaseActivity {
 
         updateConflictsBanner();
         updatePlanBanner();
+
+        br.com.gameloop.estoquesimples.sync.SyncStatus.addListener(syncListener);
+        onSyncChanged(br.com.gameloop.estoquesimples.sync.SyncStatus.current());
+        invalidateOptionsMenu();
 
         if (pendingMessage != null) {
             String message = pendingMessage;
@@ -1351,20 +1381,21 @@ public class MainActivity extends BaseActivity {
     }
 
     public void showWelcomeMessage() {
-
-        AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
-        alertDialog.setTitle("Bem-vindo ao Estoque Simples");
-        alertDialog.setMessage("Cadastre seus produtos e registre cada entrada e saída pelos botões do "
-                + "próprio card. O estoque fica salvo neste aparelho, sem precisar de internet ou "
-                + "cadastro.\n\nDúvidas ou problemas? Fale com a gente em ⋮ > Sobre.");
-        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Começar",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                });
-        alertDialog.show();
-
+        // Curta e prática: o que fazer agora, em três passos, e o aviso que
+        // evita o erro mais comum de quem já usa na web ou em outro celular
+        // (cadastrar aqui antes de entrar na conta).
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
+                .setTitle("Comece em 3 passos")
+                .setMessage("1. Toque em Novo e cadastre um produto.\n"
+                        + "2. Use Entrada e Saída no card para mexer no estoque.\n"
+                        + "3. Veja tudo em Histórico e Relatórios.\n\n"
+                        + "Funciona sem internet e sem cadastro.\n\n"
+                        + "Já usa na web ou em outro celular? Entre na sua conta antes de "
+                        + "cadastrar, para ver o mesmo estoque aqui.")
+                .setPositiveButton("Começar", (dialog, which) -> dialog.dismiss())
+                .setNeutralButton("Já tenho conta", (dialog, which) ->
+                        startActivity(new Intent(MainActivity.this, AccountActivity.class)))
+                .show();
     }
 
     @Override
@@ -1374,10 +1405,144 @@ public class MainActivity extends BaseActivity {
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem sync = menu.findItem(R.id.menu_sync_now);
+        if (sync != null) {
+            br.com.gameloop.estoquesimples.sync.SessionManager session =
+                    br.com.gameloop.estoquesimples.sync.SessionManager.get(this);
+            sync.setVisible(session.isSignedIn() && session.workspaceId() != null);
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    // -------------------------------------------------------------------------
+    // Retorno da sincronização
+    // -------------------------------------------------------------------------
+
+    /** Última rodada terminada que esta tela já tratou (evita repetir o resumo). */
+    private long syncHandledAt;
+
+    private final br.com.gameloop.estoquesimples.sync.SyncStatus.Listener syncListener =
+            this::onSyncChanged;
+
+    private void onSyncChanged(br.com.gameloop.estoquesimples.sync.SyncStatus.Snapshot snapshot) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (snapshot.running) {
+            showSyncPill(true, null, false);
+            return;
+        }
+        if (snapshot.finishedAt == 0L || snapshot.finishedAt <= syncHandledAt) {
+            hideSyncPill(false);
+            return;
+        }
+        syncHandledAt = snapshot.finishedAt;
+        // O que chegou da nuvem (produtos, fotos) aparece sem precisar sair da tela.
+        if (snapshot.recebidas > 0 || snapshot.enviadas > 0) {
+            updateList();
+            updateConflictsBanner();
+            updatePlanBanner();
+        }
+        android.view.View pill = findViewById(R.id.syncPill);
+        boolean pillVisivel = pill != null && pill.getVisibility() == android.view.View.VISIBLE;
+        if (pillVisivel || snapshot.requestedByUser) {
+            // Fecho da pílula: um check e uma palavra, e ela some sozinha.
+            showSyncPill(false, snapshot.erro != null ? "Não deu para sincronizar"
+                    : snapshot.recebidas > 0 ? (snapshot.recebidas == 1 ? "1 novidade recebida"
+                    : snapshot.recebidas + " novidades recebidas") : "Tudo sincronizado", snapshot.erro != null);
+            hideSyncPill(true);
+        }
+        // Detalhe só quando há algo a explicar: erro num pedido da pessoa ou o
+        // aviso da primeira sincronização (o que aconteceu com o que havia aqui).
+        if (snapshot.aviso != null || (snapshot.erro != null && snapshot.requestedByUser)) {
+            Feedback.show(this, br.com.gameloop.estoquesimples.sync.SyncStatus.summary(snapshot));
+        }
+    }
+
+    private final Runnable esconderPilula = () -> hideSyncPill(false);
+
+    /** @param running girando ("Sincronizando…") ou fechando com {@code texto}. */
+    private void showSyncPill(boolean running, String texto, boolean erro) {
+        android.view.View pill = findViewById(R.id.syncPill);
+        if (pill == null) {
+            return;
+        }
+        pill.removeCallbacks(esconderPilula);
+        findViewById(R.id.syncPillSpinner).setVisibility(running ? android.view.View.VISIBLE : android.view.View.GONE);
+        android.widget.ImageView done = findViewById(R.id.syncPillDone);
+        done.setVisibility(running ? android.view.View.GONE : android.view.View.VISIBLE);
+        done.setImageResource(erro ? R.drawable.ic_warning_small : R.drawable.ic_check);
+        done.setColorFilter(androidx.core.content.ContextCompat.getColor(this,
+                erro ? R.color.color_warning : R.color.color_success));
+        ((android.widget.TextView) findViewById(R.id.syncPillText))
+                .setText(running ? "Sincronizando com a nuvem…" : texto);
+        if (pill.getVisibility() != android.view.View.VISIBLE) {
+            pill.setAlpha(0f);
+            pill.setTranslationY(-12f * getResources().getDisplayMetrics().density);
+            pill.setVisibility(android.view.View.VISIBLE);
+            pill.animate().alpha(1f).translationY(0f).setDuration(220).start();
+        }
+    }
+
+    /** @param depois espera um instante (para ler o fecho) antes de sumir. */
+    private void hideSyncPill(boolean depois) {
+        android.view.View pill = findViewById(R.id.syncPill);
+        if (pill == null || pill.getVisibility() != android.view.View.VISIBLE) {
+            return;
+        }
+        pill.removeCallbacks(esconderPilula);
+        if (depois) {
+            pill.postDelayed(esconderPilula, 1800);
+            return;
+        }
+        pill.animate().alpha(0f).translationY(-12f * getResources().getDisplayMetrics().density)
+                .setDuration(200)
+                .withEndAction(() -> pill.setVisibility(android.view.View.GONE))
+                .start();
+    }
+
+    private void syncNowFromMenu() {
+        EntitlementManager entitlements = new EntitlementManager(this);
+        if (!entitlements.canSync()) {
+            // A tela de conta explica o motivo (assinatura, sessão, empresa).
+            startActivity(new Intent(this, AccountActivity.class));
+            return;
+        }
+        android.net.ConnectivityManager manager =
+                (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        android.net.NetworkCapabilities caps = manager == null || manager.getActiveNetwork() == null
+                ? null : manager.getNetworkCapabilities(manager.getActiveNetwork());
+        if (caps == null || !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            ConnectivityPrompt.show(this, this::syncNowFromMenu);
+            return;
+        }
+        br.com.gameloop.estoquesimples.sync.SyncStatus.markRequestedByUser();
+        long pedidoEm = System.currentTimeMillis();
+        showSyncPill(true, null, false);
+        br.com.gameloop.estoquesimples.sync.SyncBootstrap.start(this);
+        // Rodada que não começa (o sistema segurou o trabalho): a pílula não fica girando à toa.
+        android.view.View pill = findViewById(R.id.syncPill);
+        if (pill != null) {
+            pill.postDelayed(() -> {
+                br.com.gameloop.estoquesimples.sync.SyncStatus.Snapshot agora =
+                        br.com.gameloop.estoquesimples.sync.SyncStatus.current();
+                if (!agora.running && agora.finishedAt < pedidoEm && !isFinishing()) {
+                    showSyncPill(false, "Sincroniza assim que houver conexão", true);
+                    hideSyncPill(true);
+                }
+            }, 15_000);
+        }
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
         
-        if (itemId == R.id.menu_bulk_edit) {
+        if (itemId == R.id.menu_sync_now) {
+            syncNowFromMenu();
+            return true;
+        } else if (itemId == R.id.menu_bulk_edit) {
             showBulkEditDialog();
             return true;
         } else if (itemId == R.id.menu_analytics) {

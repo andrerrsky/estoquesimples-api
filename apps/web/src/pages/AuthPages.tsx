@@ -497,3 +497,61 @@ export function InvitePage() {
     </AuthLayout>
   );
 }
+
+/** Destinos que o app pode pedir ao abrir a web (nada fora da área interna). */
+function safeAppPath(value: string | null): string {
+  if (!value || !value.startsWith('/app') || value.startsWith('//') || /[\\\s]/.test(value)) return '/app';
+  return value;
+}
+
+/**
+ * "Abrir na web" do app: o app manda um código de uso único no fragmento da
+ * URL (#codigo=…&para=/app/plano&empresa=…). O fragmento é lido e apagado da
+ * barra de endereço na hora — não fica no histórico nem vai para servidor
+ * nenhum — e o código vira uma sessão web desta mesma pessoa.
+ */
+export function AppHandoffPage() {
+  const { status, loginWithAppCode } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useState(() => new URLSearchParams(window.location.hash.replace(/^#/, '')));
+  const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    // Some da barra (e do histórico) antes de qualquer outra coisa.
+    if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
+  useEffect(() => {
+    if (status === 'loading' || started.current) return;
+    started.current = true;
+    const code = params.get('codigo');
+    if (!code) {
+      setError('O link está incompleto. Abra a versão web de novo pelo app.');
+      return;
+    }
+    const workspaceId = params.get('empresa');
+    if (workspaceId && /^[0-9a-f-]{36}$/i.test(workspaceId)) {
+      try {
+        localStorage.setItem('es_web_workspace', workspaceId);
+      } catch {
+        // sem armazenamento: abre na primeira empresa da conta
+      }
+    }
+    loginWithAppCode(code)
+      .then(() => {
+        navigate(safeAppPath(params.get('para')), { replace: true });
+      })
+      .catch((reason: unknown) => setError(errorMessage(reason)));
+  }, [status, params, loginWithAppCode, navigate]);
+
+  if (!error) return <FullScreenLoading />;
+  return (
+    <AuthLayout title="Não foi possível entrar" subtitle="O acesso que veio do app vale por 2 minutos e uma vez só.">
+      <Notice tone="error">{error}</Notice>
+      <Link className="btn btn--primary btn--lg btn--block" to={status === 'authed' ? '/app' : '/entrar'}>
+        {status === 'authed' ? 'Ir para o estoque' : 'Entrar com e-mail e senha'}
+      </Link>
+    </AuthLayout>
+  );
+}

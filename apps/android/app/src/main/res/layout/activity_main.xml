@@ -335,4 +335,52 @@
 
     </LinearLayout>
 
+    <!-- Sincronização em andamento: pílula flutuante abaixo dos filtros, por
+         cima da lista (não empurra nada). Vira "Sincronizado" com um check e
+         some sozinha (MainActivity.onSyncChanged). -->
+    <LinearLayout
+        android:id="@+id/syncPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/filterBar"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_sync_pill"
+        android:elevation="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="14dp"
+        android:paddingTop="8dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone"
+        android:accessibilityLiveRegion="polite">
+
+        <ProgressBar
+            android:id="@+id/syncPillSpinner"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/color_accent" />
+
+        <ImageView
+            android:id="@+id/syncPillDone"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_check"
+            android:visibility="gone"
+            android:contentDescription="@null"
+            app:tint="@color/color_success" />
+
+        <TextView
+            android:id="@+id/syncPillText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:text="Sincronizando com a nuvem…"
+            android:textColor="@color/color_text"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
 </RelativeLayout>

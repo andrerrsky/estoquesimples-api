@@ -10,6 +10,8 @@ export interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Entra com o código de uso único que o app manda ao abrir a web. */
+  loginWithAppCode: (code: string) => Promise<void>;
   /** Relê o perfil (nome alterado, e-mail confirmado). */
   reloadUser: () => Promise<void>;
 }

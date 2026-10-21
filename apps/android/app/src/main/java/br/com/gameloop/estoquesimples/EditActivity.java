@@ -279,7 +279,7 @@ public class EditActivity extends BaseActivity {
         removePhoto = true;
         newPhotoPath = null;
         if (photo != null) {
-            photo.setImageResource(R.drawable.ic_camera);
+            ImageLoadHelper.showFormPlaceholder(photo);
             photo.setOnClickListener(null);
         }
         if (removePhotoButton != null) {
@@ -578,7 +578,7 @@ public class EditActivity extends BaseActivity {
                                     MainActivity.stock.update("Estoque", photoUpdate, "uuid=?", new String[]{productUuid});
                                 }
                             }
-                            ImageLoadHelper.loadDetailImage(this, displayPath, photo);
+                            ImageLoadHelper.loadFormPhoto(this, displayPath, photo);
                             if (PhotoPathHelper.isContentUri(displayPath)) {
                                 setupPhotoClickListenerUri(Uri.parse(displayPath));
                             } else {
@@ -1158,7 +1158,7 @@ public class EditActivity extends BaseActivity {
                 return;
             }
 
-            ImageLoadHelper.loadDetailImage(this, photoPath, photo);
+            ImageLoadHelper.loadFormPhoto(this, photoPath, photo);
             showRemovePhotoButton(true);
             
             setupPhotoClickListener(photoPath);
@@ -1179,7 +1179,7 @@ public class EditActivity extends BaseActivity {
                 return;
             }
 
-            ImageLoadHelper.loadDetailImageFromUri(this, uri, photo);
+            ImageLoadHelper.loadFormPhotoFromUri(this, uri, photo);
             
             setupPhotoClickListenerUri(uri);
         } catch (Exception e) {

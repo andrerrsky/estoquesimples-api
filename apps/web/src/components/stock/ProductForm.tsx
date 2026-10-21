@@ -13,6 +13,7 @@ import { fractionMessage, hasFraction, isValidUnit, isWholeUnit, UNIT_ERROR } fr
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { Icon } from '../Icon';
+import { SuggestInput } from '../SuggestInput';
 import { ConfirmDialog, Drawer, Field, Notice, useToast } from '../ui';
 
 interface FormState {
@@ -100,7 +101,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     setDraftId(newId());
   }, [open, product]);
 
-  const facets = useQuery({ queryKey: inventoryKeys.facets(workspaceId), queryFn: () => api.get<Facets>(`${base}/products/facets`), enabled: open, staleTime: 60_000 });
+  const facets = useQuery({ queryKey: inventoryKeys.facets(workspaceId), queryFn: () => api.get<Facets>(`${base}/products/facets`), enabled: open, staleTime: 5_000, refetchOnMount: 'always' });
 
   // Aviso de nome parecido, como no app: evita cadastrar duas vezes o mesmo item.
   const nameQuery = useDebounced(form.name.trim(), 400);
@@ -347,8 +348,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
               </div>
             </Field>
             <Field label="Categoria" full>
-              <input className="input" value={form.category} onChange={(event) => set('category')(event.target.value)} maxLength={120} list={`${listId}-categories`} />
-              <datalist id={`${listId}-categories`}>{facets.data?.categories.map((item) => <option key={item.value} value={item.value} />)}</datalist>
+              <SuggestInput value={form.category} onChange={set('category')} maxLength={120} options={facets.data?.categories.map((item) => item.value) ?? []} />
             </Field>
             <Field label="Descrição" full>
               <textarea className="textarea" value={form.description} onChange={(event) => set('description')(event.target.value)} maxLength={2000} rows={2} />
@@ -361,8 +361,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
               <input className="input num" disabled={editing && !can('movimentacoes.ajuste')} value={form.quantity} onChange={(event) => set('quantity')(event.target.value)} inputMode="decimal" placeholder="0" aria-invalid={errors.quantity ? true : undefined} />
             </Field>
             <Field label="Unidade" error={errors.unit}>
-              <input className="input" value={form.unit} onChange={(event) => set('unit')(event.target.value)} maxLength={30} list={`${listId}-units`} aria-invalid={errors.unit ? true : undefined} />
-              <datalist id={`${listId}-units`}>{units.map((unit) => <option key={unit} value={unit} />)}</datalist>
+              <SuggestInput value={form.unit} onChange={set('unit')} maxLength={30} options={units} invalid={!!errors.unit} />
             </Field>
             <Field label="Valor unitário" error={errors.unitValue}>
               <div className="input-affix">
@@ -378,12 +377,10 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
           <div className="form-section">Informações adicionais</div>
           <div className="form-grid">
             <Field label="Fornecedor">
-              <input className="input" value={form.supplier} onChange={(event) => set('supplier')(event.target.value)} maxLength={120} list={`${listId}-suppliers`} />
-              <datalist id={`${listId}-suppliers`}>{facets.data?.suppliers.map((item) => <option key={item.value} value={item.value} />)}</datalist>
+              <SuggestInput value={form.supplier} onChange={set('supplier')} maxLength={120} options={facets.data?.suppliers.map((item) => item.value) ?? []} />
             </Field>
             <Field label="Localização no estoque">
-              <input className="input" value={form.location} onChange={(event) => set('location')(event.target.value)} maxLength={120} list={`${listId}-locations`} />
-              <datalist id={`${listId}-locations`}>{facets.data?.locations.map((item) => <option key={item.value} value={item.value} />)}</datalist>
+              <SuggestInput value={form.location} onChange={set('location')} maxLength={120} options={facets.data?.locations.map((item) => item.value) ?? []} />
             </Field>
           </div>
         </form>

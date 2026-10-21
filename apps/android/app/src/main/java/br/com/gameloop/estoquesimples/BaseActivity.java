@@ -4,8 +4,10 @@ import br.com.gameloop.estoquesimples.analytics.Analytics;
 import br.com.gameloop.estoquesimples.branding.BrandApplier;
 import br.com.gameloop.estoquesimples.branding.BrandStore;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
@@ -47,6 +49,29 @@ public abstract class BaseActivity extends AppCompatActivity {
     protected void onPause() {
         BrandStore.removeListener(brandListener);
         super.onPause();
+    }
+
+    /**
+     * Fecha o teclado junto com a tela. Sem isso, sair do cadastro (voltar,
+     * seta da barra ou salvar) deixava o teclado aberto por cima da lista: ele
+     * pertence à janela que está saindo e o sistema não o recolhe sozinho.
+     */
+    @Override
+    public void finish() {
+        hideKeyboard();
+        super.finish();
+    }
+
+    protected void hideKeyboard() {
+        View focus = getCurrentFocus();
+        View target = focus != null ? focus : getWindow().getDecorView();
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null && target != null) {
+            imm.hideSoftInputFromWindow(target.getWindowToken(), 0);
+        }
+        if (focus != null) {
+            focus.clearFocus();
+        }
     }
 
     private void recreateIfBrandChanged() {

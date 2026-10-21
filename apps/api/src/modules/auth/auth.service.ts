@@ -7,6 +7,7 @@ import {
   refreshTokens,
   sessions,
   users,
+  webHandoffTokens,
 } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
@@ -256,6 +257,77 @@ export class AuthService {
       userId: user.id,
       deviceId: result.deviceId,
       properties: { platform: input.device?.platform ?? null },
+    });
+    return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // Abrir a web já conectado (a partir do app)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Código de uso único que o app passa para o navegador. Vale 2 minutos e
+   * uma vez: o navegador o troca por uma sessão própria, e a sessão do app
+   * continua como está. Só o hash é guardado.
+   */
+  async createWebHandoff(userId: string, meta: RequestMeta): Promise<{ code: string; expiresIn: number }> {
+    const code = generateToken();
+    const expiresIn = 120;
+    // Faxina dos códigos vencidos desta pessoa: a tabela não cresce sem limite.
+    await this.db
+      .delete(webHandoffTokens)
+      .where(and(eq(webHandoffTokens.userId, userId), sql`${webHandoffTokens.expiresAt} < now() - interval '1 hour'`));
+    await this.db.insert(webHandoffTokens).values({
+      userId,
+      tokenHash: hashToken(code),
+      expiresAt: new Date(Date.now() + expiresIn * 1000),
+      requestedIp: meta.ipAddress,
+    });
+    return { code, expiresIn };
+  }
+
+  async redeemWebHandoff(code: string, device: DeviceInfo | undefined, meta: RequestMeta): Promise<AuthSuccess> {
+    const invalid = () => unauthorized(ErrorCode.AUTH_REQUIRED, 'Este link de acesso expirou. Abra a versão web de novo pelo app.');
+    const result = await this.db.transaction(async (tx) => {
+      // UPDATE ... RETURNING: duas abas com o mesmo código não ganham as duas.
+      const [token] = await tx
+        .update(webHandoffTokens)
+        .set({ usedAt: new Date() })
+        .where(
+          and(
+            eq(webHandoffTokens.tokenHash, hashToken(code)),
+            isNull(webHandoffTokens.usedAt),
+            sql`${webHandoffTokens.expiresAt} > now()`,
+          ),
+        )
+        .returning({ userId: webHandoffTokens.userId });
+      if (!token) throw invalid();
+
+      const [user] = await tx
+        .select()
+        .from(users)
+        .where(and(eq(users.id, token.userId), isNull(users.deletedAt)))
+        .limit(1);
+      if (!user || user.status !== 'active') throw invalid();
+
+      const deviceId = device ? await this.upsertDevice(tx, user.id, { ...device, platform: 'web' }) : null;
+      const session = await this.issueSession(tx, { userId: user.id, deviceId, meta });
+      await recordAudit(tx, {
+        actorUserId: user.id,
+        actorDeviceId: deviceId,
+        action: AuditAction.USER_LOGGED_IN,
+        entityType: 'user',
+        entityId: user.id,
+        ipAddress: meta.ipAddress,
+        metadata: { via: 'app' },
+      });
+      return this.buildAuthSuccess(user, session, deviceId);
+    });
+    await trackServerEvent(this.services, {
+      name: 'user.logged_in',
+      userId: result.user.id,
+      deviceId: result.deviceId,
+      properties: { platform: 'web', via: 'app' },
     });
     return result;
   }

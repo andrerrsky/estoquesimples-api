@@ -37,7 +37,10 @@ public final class PhotoFiles {
      * arquivo pela metade, e uma queda no meio deixa só o temporário.
      */
     public static void writeAtomically(File destination, byte[] bytes) throws IOException {
-        File temp = new File(destination.getParentFile(), destination.getName() + ".tmp");
+        // Nome temporário único: duas gravações do mesmo arquivo ao mesmo tempo
+        // (fotos repetidas entre produtos, duas rodadas) não disputam o mesmo .tmp.
+        File temp = new File(destination.getParentFile(), destination.getName() + "."
+                + java.util.UUID.randomUUID().toString().substring(0, 8) + ".tmp");
         try (FileOutputStream out = new FileOutputStream(temp)) {
             out.write(bytes);
             out.getFD().sync();
@@ -49,6 +52,10 @@ public final class PhotoFiles {
         if (!temp.renameTo(destination)) {
             //noinspection ResultOfMethodCallIgnored
             temp.delete();
+            // Outra gravação chegou antes com o mesmo conteúdo: está tudo certo.
+            if (destination.isFile() && destination.length() == bytes.length) {
+                return;
+            }
             throw new IOException("não foi possível renomear " + temp.getName());
         }
     }

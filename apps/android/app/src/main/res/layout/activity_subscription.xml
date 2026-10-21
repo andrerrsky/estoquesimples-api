@@ -191,6 +191,15 @@
             android:visibility="gone" />
 
         <Button
+            android:id="@+id/webButton"
+            style="@style/Widget.Estoque.Button.Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/field_gap"
+            android:text="@string/open_web_version"
+            android:visibility="gone" />
+
+        <Button
             android:id="@+id/retryButton"
             style="@style/Widget.Estoque.Button.Secondary"
             android:layout_width="match_parent"

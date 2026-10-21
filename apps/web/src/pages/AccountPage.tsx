@@ -6,6 +6,7 @@ import { api, ApiError, errorMessage } from '../api/client';
 import type { DeviceSummary, SessionSummary, User } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
+import { OpenInBrowserCard } from '../components/OpenInBrowserCard';
 import { Badge, Card, ConfirmDialog, Empty, Field, Notice, PageHeader, QueryState, Time, useToast } from '../components/ui';
 import { APP_VERSION } from '../lib/device';
 import { fmtDate } from '../lib/format';
@@ -26,6 +27,7 @@ export function AccountPage() {
     <div className="page page--narrow">
       <PageHeader title="Minha conta" subtitle="Seus dados de acesso valem para o aplicativo e para o navegador." />
       <ProfileCard />
+      <OpenInBrowserCard />
       <PasswordCard />
       <SessionsCard />
       <DeleteAccountCard />
