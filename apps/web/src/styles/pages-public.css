@@ -14,27 +14,29 @@
    inicial (ver scripts/prerender.mjs).
    ========================================================================== */
 
-/* Bricolage Grotesque (SIL Open Font License 1.1), só o peso 800 e o
-   subconjunto latino (20 KB): public/assets/fonts/. */
+/* Plus Jakarta Sans (SIL Open Font License 1.1), só o peso 800 e o
+   subconjunto latino (12 KB): public/assets/fonts/. Geométrica e limpa,
+   próxima da Inter do corpo; a Bricolage Grotesque de antes tinha letras
+   comprimidas demais para títulos longos. */
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Plus Jakarta Sans';
   font-style: normal;
   font-weight: 800;
   font-display: swap;
-  src: url('/assets/fonts/bricolage-grotesque-800-latin.woff2') format('woff2');
+  src: url('/assets/fonts/plus-jakarta-sans-800-latin.woff2') format('woff2');
 }
 /* Enquanto a fonte não chega, a Arial ajustada às métricas dela ocupa o
    mesmo espaço: a troca não move o layout em conexão lenta. */
 @font-face {
-  font-family: 'Bricolage Fallback';
+  font-family: 'Jakarta Fallback';
   src: local('Arial'), local('Helvetica'), local('Roboto');
-  size-adjust: 113%;
-  ascent-override: 82%;
-  descent-override: 24%;
+  size-adjust: 144%;
+  ascent-override: 72%;
+  descent-override: 15.5%;
   line-gap-override: 0%;
 }
 .lp {
-  --lp-display: 'Bricolage Grotesque', 'Bricolage Fallback', var(--font);
+  --lp-display: 'Plus Jakarta Sans', 'Jakarta Fallback', var(--font);
 }
 .lp .landing__title,
 .lp .landing__h2,
@@ -43,7 +45,7 @@
 .lp-platform__title {
   font-family: var(--lp-display);
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .lp {
@@ -165,7 +167,10 @@
   text-transform: uppercase;
 }
 .lp .landing__title {
-  font-size: clamp(30px, 2.6vw + 21px, 52px);
+  /* A Plus Jakarta é mais larga que a fonte anterior: um pouco menor para o
+     título caber em três linhas na coluna do computador. */
+  font-size: clamp(30px, 2.2vw + 20px, 46px);
+  line-height: 1.1;
   text-wrap: balance;
 }
 .lp .landing__lead {
