@@ -10,6 +10,7 @@ import { BrandMark } from '../components/BrandMark';
 import { Icon } from '../components/Icon';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
+import { applyRememberedLogin, readRememberedLogin } from '../lib/remembered-login';
 import { clearPublicBrand, setBrand, useBrand } from '../lib/brand';
 import { fmtDate } from '../lib/format';
 import { ROLE_LABEL } from '../lib/labels';
@@ -106,8 +107,10 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [saved] = useState(readRememberedLogin);
+  const [email, setEmail] = useState(saved?.email ?? '');
+  const [password, setPassword] = useState(saved?.password ?? '');
+  const [remember, setRemember] = useState(saved !== null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,6 +122,8 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
     setError(null);
     try {
       await login(email.trim(), password);
+      // Só depois de entrar: um login recusado não guarda nem apaga nada.
+      applyRememberedLogin(remember, { email: email.trim(), password });
       if (brandSlug) {
         try {
           sessionStorage.setItem(BRAND_HINT_KEY, brandSlug);
@@ -138,9 +143,13 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
       <form className="stack" onSubmit={submit}>
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="E-mail">
-          <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" autoFocus required />
+          <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" autoFocus={saved === null} required />
         </Field>
         <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
+        <label className="checkbox">
+          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+          Lembrar meus dados
+        </label>
         <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
           {busy ? 'Entrando…' : 'Entrar'}
         </button>
