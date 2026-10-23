@@ -93,7 +93,16 @@ export class ImageService {
     // Objeto primeiro, linha depois: se a gravação do objeto falhar, nada
     // aponta para ele; se a linha falhar, sobra um objeto sem referência
     // (inofensivo, e o reenvio o reaproveita porque a chave é o hash).
-    await this.storage.put(imageKey(workspaceId, normalized.hash), normalized.bytes, normalized.contentType);
+    try {
+      await this.storage.put(imageKey(workspaceId, normalized.hash), normalized.bytes, normalized.contentType);
+    } catch (error) {
+      // Bucket fora, credencial vencida, rede: a pessoa vê uma mensagem clara junto
+      // da foto (e pode salvar sem ela); a causa exata vai para Admin › Erros.
+      throw new AppError(503, ErrorCode.IMAGES_UNAVAILABLE, 'Não foi possível guardar a foto agora. Tente de novo em instantes ou salve o produto sem foto.', {
+        cause: error,
+        expected: false,
+      });
+    }
 
     const [row] = await tx
       .insert(workspaceImages)
@@ -125,7 +134,14 @@ export class ImageService {
 
   async read(workspaceId: string, hash: string): Promise<Buffer | null> {
     this.assertAvailable();
-    return this.storage.get(imageKey(workspaceId, hash));
+    try {
+      return await this.storage.get(imageKey(workspaceId, hash));
+    } catch (error) {
+      throw new AppError(503, ErrorCode.IMAGES_UNAVAILABLE, 'Não foi possível carregar a foto agora. Tente de novo em instantes.', {
+        cause: error,
+        expected: false,
+      });
+    }
   }
 
   /** Dos hashes informados, quais existem nesta empresa. */

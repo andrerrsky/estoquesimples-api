@@ -41,6 +41,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
     section: 'Plataforma',
     items: [
       { to: '/operacao', label: 'Operação', icon: 'activity', badge: (counts) => counts.alerts || undefined },
+      { to: '/erros', label: 'Erros', icon: 'alert' },
       { to: '/planos', label: 'Planos', icon: 'tag' },
       { to: '/administradores', label: 'Administradores', icon: 'shield', minRole: 'owner' },
       { to: '/ajuda', label: 'Ajuda', icon: 'book' },

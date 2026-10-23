@@ -11,8 +11,12 @@ import { router } from './App';
 import { AuthProvider } from './auth/AuthProvider';
 import { bootBrand } from './lib/brand';
 import { reloadForNewVersion } from './lib/chunks';
+import { installGlobalErrorReporting } from './lib/error-reporter';
 import { ToastProvider } from './components/ui';
 import { WorkspaceProvider } from './workspace/WorkspaceProvider';
+
+// Erros de JavaScript da web e do web app vão para Admin › Erros.
+installGlobalErrorReporting();
 
 const queryClient = new QueryClient({
   defaultOptions: {

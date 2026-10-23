@@ -6,6 +6,7 @@ import type { Entitlement, WorkspaceDetail, WorkspaceSummary } from '../api/type
 import { useAuth } from '../auth/AuthProvider';
 import { setAnalyticsWorkspace, track } from '../lib/analytics';
 import { dropWorkspaceBrand, setBrand } from '../lib/brand';
+import { setErrorReporterWorkspace } from '../lib/error-reporter';
 
 const STORAGE_KEY = 'es_web_workspace';
 
@@ -73,6 +74,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAnalyticsWorkspace(workspaceId);
+    setErrorReporterWorkspace(() => workspaceId);
   }, [workspaceId]);
 
   const detail = useQuery({

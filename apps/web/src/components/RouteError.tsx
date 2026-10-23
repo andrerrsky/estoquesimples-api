@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useRouteError } from 'react-router-dom';
 
 import { isChunkLoadError } from '../lib/chunks';
+import { reportException } from '../lib/error-reporter';
 import { Empty } from './ui';
 
 /**
@@ -11,6 +13,11 @@ import { Empty } from './ui';
 export function RouteError({ fullScreen }: { fullScreen?: boolean }) {
   const error = useRouteError();
   const outdated = isChunkLoadError(error);
+
+  // Tela que quebrou é defeito nosso: vai para Admin › Erros (a de versão antiga, não).
+  useEffect(() => {
+    if (!outdated) reportException(error, 'render');
+  }, [error, outdated]);
 
   const content = (
     <Empty

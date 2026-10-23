@@ -14,7 +14,7 @@ import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { Icon } from '../Icon';
 import { SuggestInput } from '../SuggestInput';
-import { ConfirmDialog, Drawer, Field, Notice, useToast } from '../ui';
+import { ConfirmDialog, Drawer, Field, Notice, revealIfHidden, useToast } from '../ui';
 
 interface FormState {
   name: string;
@@ -226,8 +226,9 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     onSettled: () => setProgress(null),
     onError: (error) => {
       // Falha do envio da foto: o aviso fica junto da foto, onde a pessoa vai olhar.
-      if (error instanceof ApiError && /^(IMAGE_|PLAN_LIMIT|PAYLOAD_TOO_LARGE)/.test(error.code)) {
+      if (error instanceof ApiError && /^(IMAGE_|IMAGES_|PLAN_LIMIT|PAYLOAD_TOO_LARGE)/.test(error.code)) {
         setPhotoError(errorMessage(error));
+        window.setTimeout(() => revealIfHidden(document.querySelector('.drawer .field__error')), 0);
         return;
       }
       if (error instanceof ApiError && error.code === 'DUPLICATE_NAME') {
@@ -247,7 +248,15 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     event.preventDefault();
     setServerError(null);
     const result = validate();
-    if (!result.ok) return;
+    if (!result.ok) {
+      // Campo com erro fora da vista (a quantidade fica no meio do formulário): vai até ele.
+      window.setTimeout(() => {
+        const first = document.querySelector('.drawer [aria-invalid="true"], .drawer .field__error');
+        revealIfHidden(first);
+        if (first instanceof HTMLInputElement) first.focus({ preventScroll: true });
+      }, 0);
+      return;
+    }
     if (product && result.quantity !== product.quantity) {
       setConfirmQuantity(true);
       return;

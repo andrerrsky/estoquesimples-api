@@ -34,3 +34,4 @@ export * from './reviews.js';
 export * from './push.js';
 export * from './support.js';
 export * from './notifications.js';
+export * from './errors.js';
