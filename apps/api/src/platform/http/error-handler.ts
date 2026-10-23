@@ -7,6 +7,7 @@ import {
 import { AppError, ErrorCode, type ErrorCodeValue, type ErrorDetail } from './errors.js';
 import { isProduction } from '../config/env.js';
 import { pgErrorCode } from '../db/client.js';
+import { recordError } from '../../modules/errors/error-log.js';
 
 interface ErrorBody {
   error: {
@@ -39,6 +40,33 @@ export function registerErrorHandler(app: FastifyInstance): void {
     return reply.code(404).send(body);
   });
 
+  /**
+   * Toda resposta 5xx vai para o registro de erros (Admin › Erros), com o
+   * correlationId que o cliente recebe: quem vê "Erro interno" na tela pode
+   * informar o código e o erro completo aparece no painel. Sem esperar a
+   * gravação: a resposta sai na hora.
+   */
+  const remember = (request: FastifyRequest, error: Error, status: number, code: string) => {
+    const route = request.routeOptions?.url ?? request.url.split('?')[0];
+    void recordError(app.services, {
+      source: 'api',
+      kind: 'api',
+      code,
+      // A causa original (erro do bucket, do banco) é o que interessa para corrigir.
+      message: error.cause instanceof Error ? `${error.name}: ${error.message} ← ${error.cause.name}: ${error.cause.message}` : `${error.name}: ${error.message}`,
+      stack: error.cause instanceof Error ? (error.cause.stack ?? error.stack ?? null) : (error.stack ?? null),
+      httpMethod: request.method,
+      route,
+      status,
+      correlationId: request.id,
+      userId: request.auth?.userId ?? null,
+      workspaceId: request.workspace?.workspaceId ?? null,
+      deviceId: request.auth?.deviceId ?? null,
+      userAgent: request.headers['user-agent'] ?? null,
+      context: { pgCode: pgErrorCode(error) ?? null },
+    });
+  };
+
   app.setErrorHandler((error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) => {
     const correlationId = request.id;
 
@@ -46,6 +74,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
       if (!error.expected) {
         request.log.error({ err: error, code: error.code }, 'erro inesperado tratado');
       }
+      if (error.statusCode >= 500) remember(request, error, error.statusCode, error.code);
       const body: ErrorBody = {
         error: {
           code: error.code,
@@ -82,6 +111,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
         { err: error, route: `${error.method} ${error.url}` },
         'resposta fora do schema declarado',
       );
+      remember(request, error, 500, 'RESPONSE_SCHEMA');
       const body: ErrorBody = {
         error: {
           code: ErrorCode.INTERNAL,
@@ -185,6 +215,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
     // Qualquer coisa que chegue aqui é imprevista. O log leva o erro completo;
     // a resposta, apenas o correlationId para o suporte cruzar com o log.
     request.log.error({ err: error }, 'erro não tratado');
+    remember(request, error, 500, ErrorCode.INTERNAL);
 
     const body: ErrorBody = {
       error: {

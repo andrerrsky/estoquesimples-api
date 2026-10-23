@@ -5,6 +5,7 @@ import { Shell } from './components/Shell';
 import { AdminsPage } from './pages/AdminsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { AuditPage } from './pages/AuditPage';
+import { ErrorsPage } from './pages/ErrorsPage';
 import { EventsPage } from './pages/EventsPage';
 import { HelpPage } from './pages/HelpPage';
 import { LoginPage } from './pages/LoginPage';
@@ -70,6 +71,7 @@ export const router = createBrowserRouter(
         { path: '/notificacoes/:campaignId', element: <CampaignDetailPage /> },
         { path: '/analytics', element: <AnalyticsPage /> },
         { path: '/eventos', element: <EventsPage /> },
+        { path: '/erros', element: <ErrorsPage /> },
         { path: '/auditoria', element: <AuditPage /> },
         { path: '/operacao', element: <OpsPage /> },
         { path: '/administradores', element: <AdminsPage /> },

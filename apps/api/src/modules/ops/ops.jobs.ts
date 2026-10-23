@@ -1,6 +1,7 @@
 import { enqueueJob, registerJobHandler } from '../../platform/jobs/runner.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { OpsService } from './ops.service.js';
+import { purgeOldErrors } from '../errors/error-log.js';
 
 export const OPS_WATCHDOG_JOB = 'ops.watchdog';
 
@@ -30,6 +31,10 @@ export function registerOpsJobs(services: AppServices): void {
     if (alertas.length === 0) {
       context.logger.info({ snapshot }, 'verificação periódica sem alertas');
     }
+
+    // Registro de erros guarda 30 dias (Admin › Erros).
+    const apagados = await purgeOldErrors(services);
+    if (apagados > 0) context.logger.info({ apagados }, 'erros antigos removidos do registro');
 
     await agendar(services);
   });

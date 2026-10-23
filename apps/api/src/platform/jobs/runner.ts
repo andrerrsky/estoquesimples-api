@@ -6,6 +6,7 @@ import { jobs } from '../db/schema/index.js';
 import type { AppServices } from '../http/context.js';
 import type { Logger } from '../observability/logger.js';
 import { recordJobResult } from '../observability/metrics.js';
+import { recordError } from '../../modules/errors/error-log.js';
 
 /**
  * Fila de tarefas em cima do próprio Postgres.
@@ -123,6 +124,17 @@ async function claimAndRun(
       { err: error, kind: claimed.kind, jobId: claimed.id, attempt: claimed.attempts, exhausted },
       'tarefa falhou',
     );
+    // Só a última tentativa vai para o painel: as anteriores são retentativas normais.
+    if (exhausted) {
+      void recordError(services, {
+        source: 'api',
+        kind: 'job',
+        code: claimed.kind,
+        message: error instanceof Error ? `${error.name}: ${message}` : message,
+        stack: error instanceof Error ? (error.stack ?? null) : null,
+        context: { jobId: claimed.id, tentativas: claimed.attempts },
+      });
+    }
 
     await db
       .update(jobs)

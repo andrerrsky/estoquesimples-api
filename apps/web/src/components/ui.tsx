@@ -193,6 +193,19 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone | 'solid'; c
   return <span className={`badge ${tone === 'neutral' ? '' : `badge--${tone}`}`}>{children}</span>;
 }
 
+/** Rola até o elemento se ele não estiver inteiro na tela (suave, se o sistema permitir). */
+export function revealIfHidden(element: Element | null): void {
+  if (!element || typeof window === 'undefined') return;
+  const box = element.getBoundingClientRect();
+  // Dentro de uma gaveta ou diálogo, o que vale é a área rolável dela.
+  const scroller = element.closest('.drawer__body, .dialog__body, .modal__body');
+  const area = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  const topbar = scroller ? 0 : 72;
+  if (box.top >= area.top + topbar && box.bottom <= area.bottom) return;
+  const smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  element.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+}
+
 export function Notice({
   tone = 'info',
   title,
@@ -205,8 +218,16 @@ export function Notice({
   action?: ReactNode;
 }) {
   const icon: IconName = tone === 'success' ? 'check' : tone === 'info' ? 'info' : 'alert';
+  const ref = useRef<HTMLDivElement>(null);
+  const text = typeof children === 'string' ? children : title ?? '';
+  // Aviso de erro que aparece fora da vista (topo de um formulário longo, de
+  // uma gaveta rolada): a tela vai até ele, para a pessoa ver o que houve.
+  useEffect(() => {
+    if (tone !== 'error') return;
+    revealIfHidden(ref.current);
+  }, [tone, text]);
   return (
-    <div className={`notice notice--${tone}`} role={tone === 'error' ? 'alert' : 'status'}>
+    <div ref={ref} className={`notice notice--${tone}`} role={tone === 'error' ? 'alert' : 'status'}>
       <Icon name={icon} />
       <div style={{ minWidth: 0 }}>
         {title && <div className="notice__title">{title}</div>}

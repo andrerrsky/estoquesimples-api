@@ -42,6 +42,8 @@ public final class SyncWorker extends Worker {
     @Override
     public Result doWork() {
         Context context = getApplicationContext();
+        // A sincronização pode rodar com o app fechado (sem nenhuma tela aberta).
+        br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.install(context);
 
         RemoteConfig config = new RemoteConfig(context);
         config.refresh();
@@ -96,6 +98,7 @@ public final class SyncWorker extends Worker {
             return handleApiFailure(context, e);
         } catch (Exception e) {
             Log.e(TAG, "falha inesperada na sincronização", e);
+            br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.report("sync", e);
             recordStatus(context, "Erro inesperado ao sincronizar.");
             SyncStatus.failed("Erro inesperado ao sincronizar. Vamos tentar de novo.");
             return Result.retry();
@@ -205,6 +208,7 @@ public final class SyncWorker extends Worker {
             aviso = "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.";
         }
         SyncStatus.finished(resultado.enviadas, resultado.recebidas + fotosBaixadas, aviso);
+        br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.flushAsync();
         return Result.success();
     }
 

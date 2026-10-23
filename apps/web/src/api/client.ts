@@ -1,5 +1,6 @@
 import { deviceInfo } from '../lib/device';
 import type { WebAuth } from './types';
+import { reportApiFailure, setErrorReporterAuth } from '../lib/error-reporter';
 
 /**
  * Cliente HTTP da aplicação web.
@@ -34,6 +35,11 @@ export class ApiError extends Error {
     return this.status === 0;
   }
 
+  /** Código que liga este erro ao registro do servidor (Admin › Erros). */
+  get correlationId(): string | null {
+    return typeof this.extra['correlationId'] === 'string' ? (this.extra['correlationId'] as string) : null;
+  }
+
   /** O plano não permite a ação (equipe, teto de produtos, análise). */
   get isPlanBlocked(): boolean {
     return this.code === 'SUBSCRIPTION_REQUIRED' || this.code === 'PLAN_LIMIT_REACHED';
@@ -50,6 +56,8 @@ export function errorMessage(error: unknown): string {
     if (error.isNetwork) return 'Sem conexão com o servidor. Confira a internet e tente de novo.';
     if (error.status === 429) return 'Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.';
     if (error.status >= 500 && error.code === 'UNKNOWN') return 'O servidor está indisponível no momento. Tente de novo em instantes.';
+    // Erro do servidor: o código curto liga o que a pessoa viu ao registro em Admin › Erros.
+    if (error.status >= 500 && error.correlationId) return `${error.message} (código ${error.correlationId.slice(0, 8)})`;
     return error.message;
   }
   return error instanceof Error ? error.message : 'Algo deu errado. Tente de novo.';
@@ -73,6 +81,7 @@ function buildQuery(params?: QueryParams): string {
 // ---------------------------------------------------------------------------
 
 let accessToken: string | null = null;
+setErrorReporterAuth(() => accessToken);
 let accessExpiresAt = 0;
 let refreshing: Promise<WebAuth | null> | null = null;
 
@@ -142,7 +151,17 @@ async function parse<T>(response: Response): Promise<T> {
     }
   }
   if (!response.ok) {
-    throw new ApiError(response.status, json as Record<string, unknown> | null, `Erro ${response.status}`);
+    const error = new ApiError(response.status, json as Record<string, unknown> | null, `Erro ${response.status}`);
+    if (response.status >= 500) {
+      let path = response.url;
+      try {
+        path = new URL(response.url).pathname;
+      } catch {
+        // URL relativa
+      }
+      reportApiFailure({ path, status: response.status, code: error.code, message: error.message, correlationId: error.correlationId });
+    }
+    throw error;
   }
   return json as T;
 }
@@ -310,7 +329,11 @@ export function uploadBinary<T>(path: string, body: Blob, onProgress?: (ratio: n
     } catch {
       json = null;
     }
-    if (result.status < 200 || result.status >= 300) throw new ApiError(result.status, json as Record<string, unknown> | null, `Erro ${result.status}`);
+    if (result.status < 200 || result.status >= 300) {
+      const error = new ApiError(result.status, json as Record<string, unknown> | null, `Erro ${result.status}`);
+      if (result.status >= 500) reportApiFailure({ method: 'PUT', path, status: result.status, code: error.code, message: error.message, correlationId: error.correlationId });
+      throw error;
+    }
     return json as T;
   })();
 }

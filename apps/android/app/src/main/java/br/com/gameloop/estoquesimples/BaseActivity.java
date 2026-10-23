@@ -26,6 +26,8 @@ public abstract class BaseActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // Registro de erros (Admin › Erros): quedas do app e falhas inesperadas.
+        br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.install(this);
         // Identidade visual da empresa: antes de qualquer layout ser inflado.
         BrandApplier.apply(this);
         brandKey = BrandStore.key(BrandStore.current(this));

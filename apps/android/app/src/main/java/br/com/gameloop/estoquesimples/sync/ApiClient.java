@@ -108,6 +108,14 @@ public final class ApiClient {
         return execute("POST", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
     }
 
+    /** O envio do próprio registro de erros não pode gerar outro registro (laço). */
+    private boolean reportErrors = true;
+
+    public Response postWithoutReporting(String path, JSONObject body, String accessToken) throws ApiException {
+        reportErrors = false;
+        return execute("POST", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
+    }
+
     /**
      * A API aceita PUT onde documenta PATCH justamente por causa deste
      * cliente: {@link HttpURLConnection} recusa PATCH com ProtocolException.
@@ -276,7 +284,16 @@ public final class ApiClient {
             if (status >= 200 && status < 300) {
                 return new Response(status, json);
             }
-            throw errorFrom(status, json, connection.getHeaderField("Retry-After"));
+            ApiException failure = errorFrom(status, json, connection.getHeaderField("Retry-After"));
+            // 5xx é defeito nosso (ou da infraestrutura): vai para Admin › Erros com o
+            // correlationId que a API registrou do lado dela.
+            if (status >= 500 && reportErrors) {
+                JSONObject error = json.optJSONObject("error");
+                br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.reportApi(method, path, status,
+                        failure.getCode(), failure.getMessage(),
+                        error != null ? error.optString("correlationId", null) : null);
+            }
+            throw failure;
 
         } catch (ApiException e) {
             throw e;
