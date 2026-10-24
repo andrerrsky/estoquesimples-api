@@ -16,8 +16,8 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 25
-        versionName "25"
+        versionCode 26
+        versionName "26"
 
         // Endereço da API e versão do protocolo de sincronização. Ficam aqui
         // para que o app de depuração possa apontar para outro ambiente sem

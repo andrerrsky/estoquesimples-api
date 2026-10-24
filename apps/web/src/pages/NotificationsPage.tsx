@@ -30,6 +30,7 @@ interface TypeMeta {
 const TYPE_META: Record<string, TypeMeta> = {
   'support.reply': { icon: 'help', label: 'Suporte' },
   'support.resolved': { icon: 'check', label: 'Suporte' },
+  'blog.post': { icon: 'book', label: 'Blog' },
   'billing.payment_confirmed': { icon: 'card', label: 'Plano' },
   'billing.payment_overdue': { icon: 'alert', label: 'Plano' },
   'billing.subscription_suspended': { icon: 'alert', label: 'Plano' },
@@ -70,6 +71,7 @@ const SCREEN_ROUTE: Record<string, string> = {
   subscription: '/app/plano',
   team: '/app/equipe',
   import: '/app/importar',
+  blog: '/blog',
 };
 
 type Destination =
@@ -94,6 +96,10 @@ function destinationOf(notification: AppNotification): Destination {
   if (type.startsWith('billing.')) return { to: '/app/plano', workspaceId };
   if (type.startsWith('team.')) return { to: '/app/equipe', workspaceId };
   if (type === 'stock.low') return { to: '/app/estoque?filtro=baixo', workspaceId };
+  if (type === 'blog.post') {
+    const slug = text(data['slug']);
+    return { to: slug ? `/blog/${slug}` : '/blog' };
+  }
 
   const route = SCREEN_ROUTE[text(data['screen']) ?? ''];
   if (route) return { to: route, workspaceId };

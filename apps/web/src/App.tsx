@@ -10,6 +10,7 @@ import { listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
 import { useAuth } from './auth/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
 import { CookieConsent } from './components/CookieConsent';
+import './styles/pages-blog.css';
 import { bootGa, installGaClickTracking } from './lib/ga';
 
 /**
@@ -40,6 +41,8 @@ const LegalPage = page(() => import('./pages/LegalPage'), 'LegalPage');
 const LoginPage = page(() => import('./pages/AuthPages'), 'LoginPage');
 const BrandedLoginPage = page(() => import('./pages/AuthPages'), 'BrandedLoginPage');
 const AppHandoffPage = page(() => import('./pages/AuthPages'), 'AppHandoffPage');
+const BlogIndexPage = page(() => import('./pages/BlogPage'), 'BlogIndexPage');
+const BlogPostPage = page(() => import('./pages/BlogPage'), 'BlogPostPage');
 const RegisterPage = page(() => import('./pages/AuthPages'), 'RegisterPage');
 const ForgotPasswordPage = page(() => import('./pages/AuthPages'), 'ForgotPasswordPage');
 const ResetPasswordPage = page(() => import('./pages/AuthPages'), 'ResetPasswordPage');
@@ -149,6 +152,9 @@ export const router = createBrowserRouter([
       { path: '/privacidade', element: <Suspense fallback={<FullScreenLoading />}><LegalPage /></Suspense> },
       { path: '/ajuda', element: <Suspense fallback={<FullScreenLoading />}><PublicHelpPage /></Suspense> },
       { path: '/plataformas', element: <Suspense fallback={<FullScreenLoading />}><PublicPlatformsPage /></Suspense> },
+      // Blog: a API entrega estas páginas já renderizadas (SEO); aqui a SPA assume.
+      { path: '/blog', element: <Suspense fallback={<FullScreenLoading />}><BlogIndexPage /></Suspense> },
+      { path: '/blog/:slug', element: <Suspense fallback={<FullScreenLoading />}><BlogPostPage /></Suspense> },
       {
         path: '/app',
         element: <AppShell />,

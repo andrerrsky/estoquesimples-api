@@ -86,6 +86,7 @@ const SECTIONS = [
   { href: '#plataformas', label: 'Plataformas' },
   { href: '#planos', label: 'Planos' },
   { href: '#duvidas', label: 'Dúvidas' },
+  { href: '/blog', label: 'Blog' },
 ];
 
 /**
@@ -804,6 +805,7 @@ export function LandingPage() {
             <Logo size={26} /> Estoque Simples <span>© {year}</span>
           </div>
           <ul className="lp-footer__links">
+            <li><a href="/blog">Blog</a></li>
             <li><a href="/ajuda">Central de ajuda</a></li>
             {/* Só quando o chat está na página (telas largas): no celular o
                 visitante não tem canal sem conta, e a Central de ajuda já está ao lado. */}

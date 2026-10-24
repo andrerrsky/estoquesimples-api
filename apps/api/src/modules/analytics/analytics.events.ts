@@ -80,6 +80,8 @@ export const AnalyticsEventName = {
   PLATFORM_DEVICE_SELECTED: 'platform.device_selected',
   PLATFORM_INSTALL_CLICKED: 'platform.install_clicked',
   PLATFORM_INSTALL_VIDEO_PLAYED: 'platform.install_video_played',
+  BLOG_POST_VIEWED: 'blog.post_viewed',
+  BLOG_POST_SHARED: 'blog.post_shared',
   PLATFORM_WEB_APP_INSTALLED: 'platform.web_app_installed',
 
   // Identidade visual por empresa
@@ -147,6 +149,8 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'platform.device_selected', source: 'app', description: 'Escolheu o aparelho no passo a passo de instalar o web app.', properties: { device: 'ios | android | desktop | mac' } },
   { name: 'platform.install_clicked', source: 'app', description: 'Clicou em "Instalar agora" (navegador com instalação em um clique).', properties: { device: 'ios | android | desktop | mac' } },
   { name: 'platform.install_video_played', source: 'app', description: 'Deu play no vídeo de como instalar o web app, na página Plataformas.' },
+  { name: 'blog.post_viewed', source: 'app', description: 'Abriu um post do blog (web ou app).', properties: { slug: 'endereço do post', category: 'categoria' } },
+  { name: 'blog.post_shared', source: 'app', description: 'Compartilhou um post do blog.', properties: { slug: 'endereço do post', via: 'whatsapp | share' } },
   { name: 'platform.web_app_installed', source: 'app', description: 'O navegador confirmou a instalação do web app.' },
   { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda (só a contagem, nunca o texto).', properties: { results: 'quantidade' } },
   { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },

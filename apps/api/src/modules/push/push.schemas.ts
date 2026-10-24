@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Telas que a notificação pode abrir; o app mapeia para a Activity. */
-export const PUSH_SCREENS = ['main', 'history', 'reports', 'analysis', 'account', 'subscription', 'team', 'import'] as const;
+export const PUSH_SCREENS = ['main', 'history', 'reports', 'analysis', 'account', 'subscription', 'team', 'import', 'blog'] as const;
 
 export const pushActionSchema = z
   .object({

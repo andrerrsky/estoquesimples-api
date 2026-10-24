@@ -193,6 +193,16 @@ public class MainActivity extends BaseActivity {
         String url = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_URL);
         String screen = intent.getStringExtra(EstoqueFirebaseMessagingService.EXTRA_SCREEN);
         try {
+            // Post do blog: abre dentro do app (o link leva ao mesmo post no site).
+            if ("blog".equals(screen)) {
+                String slug = url == null ? null : android.net.Uri.parse(url).getLastPathSegment();
+                if (slug != null && !slug.isEmpty() && !"blog".equals(slug)) {
+                    br.com.gameloop.estoquesimples.blog.BlogPostActivity.open(this, slug);
+                } else {
+                    br.com.gameloop.estoquesimples.blog.BlogActivity.open(this);
+                }
+                return;
+            }
             if (url != null && (url.startsWith("https://") || url.startsWith("http://"))) {
                 startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
                 return;
@@ -1559,6 +1569,9 @@ public class MainActivity extends BaseActivity {
             return true;
         } else if (itemId == R.id.menu_settings) {
             showSettingsActivity();
+            return true;
+        } else if (itemId == R.id.menu_blog) {
+            br.com.gameloop.estoquesimples.blog.BlogActivity.open(this);
             return true;
         } else if (itemId == R.id.menu_support) {
             // Mesmo destino do AppMenu: a ajuda primeiro, o suporte a um toque.

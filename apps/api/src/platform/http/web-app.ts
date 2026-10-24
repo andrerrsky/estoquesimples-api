@@ -5,6 +5,7 @@ import { extname, join, relative, sep } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 import { resolveAppDist } from './app-dist.js';
+import { BlogPages, isBlogPagePath } from '../../modules/blog/blog-pages.js';
 import { ErrorCode } from './errors.js';
 
 /**
@@ -190,6 +191,18 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
   // arquivo, `/` cai no index como qualquer outra rota.
   const landing = files.get('/landing.html') ?? index;
   files.delete('/landing.html');
+  // Blog, sitemap e feed: HTML/XML montados pela API a cada pedido (ver
+  // modules/blog/blog-pages.ts), a partir do index.html do build.
+  const blogPages = new BlogPages(app.services);
+  const indexTemplate = index.raw.toString('utf8');
+  // Tela de "não encontrado" do blog: o index sem o canonical da página
+  // inicial e com noindex, para um link errado não virar cópia da home.
+  const notFoundRaw = Buffer.from(
+    indexTemplate.replace(/<link rel="canonical" href="[^"]*" \/>\n?/, '').replace('</head>', '    <meta name="robots" content="noindex" />\n  </head>'),
+    'utf8',
+  );
+  const blogNotFound: StaticFile = { ...index, cacheControl: 'no-store', etag: etagFor(notFoundRaw), raw: notFoundRaw, gzip: gzipSync(notFoundRaw, { level: 6 }), brotli: null };
+  const landingLastmod = (/<loc>https:\/\/estoquesimples\.com\.br\/<\/loc><lastmod>([^<]*)/.exec(files.get('/sitemap.xml')?.raw.toString('utf8') ?? '')?.[1] ?? new Date().toISOString().slice(0, 10));
 
   const send = (request: FastifyRequest, reply: FastifyReply, file: StaticFile, status = 200): FastifyReply => {
     const accepts = String(request.headers['accept-encoding'] ?? '');
@@ -262,8 +275,34 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
       });
     }
 
+    // Variações do endereço de um post (barra no fim, maiúsculas) são a mesma
+    // página: 301 para a forma canônica em vez de um segundo HTML indexável.
+    if (/^\/blog(\/|$)/i.test(path) && path !== '/blog/feed.xml') {
+      const canonicalPath = path.toLowerCase().replace(/\/+$/, '');
+      if (canonicalPath !== path) {
+        const query = (request.raw.url ?? '').split('?')[1];
+        return reply.redirect(`${canonicalPath}${query ? `?${query}` : ''}`, 301);
+      }
+    }
+
+    if (isBlogPagePath(path)) {
+      const page = await blogPages.render(path, request.raw.url ?? path, indexTemplate, landingLastmod);
+      if (page && 'redirect' in page) return reply.redirect(page.redirect, 301);
+      if (page && 'unavailable' in page) {
+        return reply.code(503).header('Retry-After', '120').header('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send('Blog temporariamente indisponível. Tente de novo em instantes.');
+      }
+      if (page) {
+        const raw = Buffer.from(page.body, 'utf8');
+        return send(request, reply, { contentType: page.contentType, cacheControl: page.cacheControl, etag: etagFor(raw), raw, gzip: raw.length > 1024 ? gzipSync(raw, { level: 6 }) : null, brotli: null }, page.status);
+      }
+    }
+
     const file = files.get(path);
     if (file) return send(request, reply, file);
+
+    // Post que não existe (ou qualquer caminho inválido sob /blog/): 404 de
+    // verdade, com a SPA mostrando a própria tela de "não encontrado".
+    if (path.startsWith('/blog/')) return send(request, reply, blogNotFound, 404);
 
     // Script de uma versão que já saiu do ar: uma aba aberta antes do deploy
     // pede a tela pelo nome antigo. Em vez de um 404 (que vira tela de erro),

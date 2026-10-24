@@ -36,7 +36,12 @@ export function brandLogoKey(workspaceId: string, hash: string): string {
   return `workspaces/${workspaceId}/brand/${hash}.webp`;
 }
 
-const KEY_PATTERN = /^workspaces\/[0-9a-f-]{36}\/(images|brand)\/[0-9a-f]{64}\.webp$/;
+/** Capa de post do blog: pública, fora de qualquer empresa. */
+export function blogCoverKey(hash: string): string {
+  return `blog/covers/${hash}.webp`;
+}
+
+const KEY_PATTERN = /^(workspaces\/[0-9a-f-]{36}\/(images|brand)|blog\/covers)\/[0-9a-f]{64}\.webp$/;
 
 function assertKey(key: string): void {
   if (!KEY_PATTERN.test(key)) throw new Error('Chave de objeto inválida.');

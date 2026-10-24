@@ -18,6 +18,7 @@ const SCREEN_ROUTE = {
   subscription: '/app/plano',
   team: '/app/equipe',
   import: '/app/importar',
+  blog: '/blog',
 };
 
 function destination(data) {
@@ -26,6 +27,7 @@ function destination(data) {
   if (type.startsWith('billing.')) return '/app/plano';
   if (type.startsWith('team.')) return '/app/equipe';
   if (type === 'stock.low') return '/app/estoque?filtro=baixo';
+  if (type === 'blog.post') return data.slug ? `/blog/${data.slug}` : '/blog';
   if (data.screen && SCREEN_ROUTE[data.screen]) return SCREEN_ROUTE[data.screen];
   if (data.url) {
     try {

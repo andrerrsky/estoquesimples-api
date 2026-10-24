@@ -72,6 +72,12 @@ export const AdminAction = {
   SUPPORT_DRAFT_GENERATED: 'support.draft_generated',
 
   DATA_EXPORTED: 'data.exported',
+
+  BLOG_POST_CREATED: 'blog.post_created',
+  BLOG_POST_UPDATED: 'blog.post_updated',
+  BLOG_POST_PUBLISHED: 'blog.post_published',
+  BLOG_POST_UNPUBLISHED: 'blog.post_unpublished',
+  BLOG_POST_DELETED: 'blog.post_deleted',
 } as const;
 
 export type AdminActionValue = (typeof AdminAction)[keyof typeof AdminAction];

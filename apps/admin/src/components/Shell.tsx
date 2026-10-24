@@ -44,6 +44,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
     items: [
       { to: '/operacao', label: 'Operação', icon: 'activity', badge: (counts) => counts.alerts || undefined },
       { to: '/erros', label: 'Erros', icon: 'alert' },
+      { to: '/blog', label: 'Blog', icon: 'note' },
       { to: '/planos', label: 'Planos', icon: 'tag' },
       { to: '/administradores', label: 'Administradores', icon: 'shield', minRole: 'owner' },
       { to: '/ajuda', label: 'Ajuda', icon: 'book' },
