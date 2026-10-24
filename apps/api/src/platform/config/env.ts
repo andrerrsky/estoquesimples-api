@@ -233,11 +233,13 @@ const envSchema = z
      * gera). Sem `S3_BUCKET` as imagens ficam desligadas em produção; em
      * desenvolvimento e teste grava em disco (`IMAGE_FS_DIR`).
      */
-    S3_BUCKET: z.string().min(1).optional(),
-    S3_ENDPOINT: z.string().url().optional(),
-    S3_REGION: z.string().min(1).default('auto'),
-    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
-    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    // `.trim()`: um espaço ou quebra de linha colado junto no painel do
+    // Railway entra na assinatura e o bucket responde SignatureDoesNotMatch.
+    S3_BUCKET: z.string().trim().min(1).optional(),
+    S3_ENDPOINT: z.string().trim().url().optional(),
+    S3_REGION: z.string().trim().min(1).default('auto'),
+    S3_ACCESS_KEY_ID: z.string().trim().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().trim().min(1).optional(),
     /** MinIO e similares exigem `bucket` no caminho; o Railway usa o padrão. */
     S3_FORCE_PATH_STYLE: z
       .enum(['true', 'false'])

@@ -5,6 +5,7 @@ import { Icon, Logo, type IconName } from '../components/Icon';
 import { ROLE_LABEL } from '../lib/labels';
 
 import '../styles/pages-public.css';
+import { openCookiePreferences } from '../lib/ga';
 
 /**
  * Vídeo e capa ficam em public/assets/video com nome fixo (e cache de um
@@ -816,6 +817,11 @@ export function LandingPage() {
             <li><a href="/plataformas">Onde usar</a></li>
             <li><a href="/termos">Termos de Uso</a></li>
             <li><a href="/privacidade">Política de Privacidade</a></li>
+            <li>
+              <button type="button" className="lp-footer__button" onClick={openCookiePreferences}>
+                Preferências de cookies
+              </button>
+            </li>
             <li><a href="/entrar">Entrar</a></li>
           </ul>
         </div>

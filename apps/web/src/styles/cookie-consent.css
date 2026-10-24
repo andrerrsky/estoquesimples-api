@@ -1,0 +1,69 @@
+/* Aviso de cookies de análise (CookieConsent). */
+.cookie-consent {
+  position: fixed;
+  z-index: calc(var(--z-toast, 60) - 1);
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 560px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+  box-shadow: 0 12px 32px rgba(26, 35, 48, 0.16);
+  color: var(--text);
+  animation: cookie-consent-in 180ms ease-out;
+}
+.cookie-consent__text {
+  margin: 0;
+  font-size: var(--fs-supporting);
+  line-height: 1.45;
+}
+.cookie-consent__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+/* No celular: faixa inteira, acima da barra de navegação do app (quando houver). */
+@media (max-width: 640px) {
+  .cookie-consent {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body:has(.bottomnav) .cookie-consent {
+    bottom: calc(var(--bottomnav-height, 60px) + 12px + env(safe-area-inset-bottom, 0px));
+  }
+  .cookie-consent__actions .btn {
+    flex: 1;
+  }
+}
+@keyframes cookie-consent-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cookie-consent {
+    animation: none;
+  }
+}
+
+/* Botão com cara de link ("Preferências de cookies" em Minha conta). */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}

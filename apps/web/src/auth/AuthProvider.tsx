@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { api, onSessionChange, refreshSession, sessionApi } from '../api/client';
 import type { User } from '../api/types';
 import { track } from '../lib/analytics';
+import { gaEvent } from '../lib/ga';
 import { clearProductImages } from '../lib/product-image';
 import { AuthContext, type AuthContextValue, type Status } from './context';
 
@@ -56,12 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = await sessionApi.login(email, password);
     setUser(auth.user);
     setStatus('authed');
+    gaEvent('auth.login', { method: 'email' });
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     const auth = await sessionApi.register(name, email, password);
     setUser(auth.user);
     setStatus('authed');
+    gaEvent('signup.completed', { method: 'email' });
   }, []);
 
   const loginWithAppCode = useCallback(
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearProductImages();
       setUser(auth.user);
       setStatus('authed');
+      gaEvent('auth.login', { method: 'app' });
     },
     [queryClient],
   );

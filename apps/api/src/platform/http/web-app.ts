@@ -20,13 +20,18 @@ import { ErrorCode } from './errors.js';
  * ser a página inicial aqui e a identificação da API lá, sem conflito.
  */
 
+// Google Analytics (gtag.js): só carrega com o consentimento da pessoa
+// (apps/web/src/lib/ga.ts), mas os domínios precisam estar liberados aqui.
+const GA_SCRIPT = 'https://www.googletagmanager.com';
+const GA_BEACONS = 'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self' ${GA_SCRIPT}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${GA_BEACONS}`,
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${GA_BEACONS}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

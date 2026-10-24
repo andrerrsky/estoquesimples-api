@@ -10,9 +10,11 @@ import { OpenInBrowserCard } from '../components/OpenInBrowserCard';
 import { Badge, Card, ConfirmDialog, Empty, Field, Notice, PageHeader, QueryState, Time, useToast } from '../components/ui';
 import { APP_VERSION } from '../lib/device';
 import { fmtDate } from '../lib/format';
+import { openCookiePreferences } from '../lib/ga';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 
 import '../styles/pages-company.css';
+import '../styles/cookie-consent.css';
 
 /**
  * Conta do usuário: perfil, senha, onde a conta está aberta e exclusão.
@@ -40,6 +42,7 @@ export function AccountPage() {
           <div className="link-row" style={{ fontSize: 'var(--fs-supporting)' }}>
             <Link to="/termos">Termos de Uso</Link>
             <Link to="/privacidade">Política de Privacidade</Link>
+            <button type="button" className="link-button" onClick={openCookiePreferences}>Preferências de cookies</button>
             <Link to="/app/suporte">Ajuda e suporte</Link>
           </div>
         </div>

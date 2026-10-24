@@ -4,6 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { errorMessage } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 /**
  * "Lembrar de mim" guarda e-mail e senha no armazenamento local deste
@@ -39,6 +40,7 @@ export function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +123,22 @@ export function LoginPage() {
           </label>
           <label className="field">
             <span className="field__label">Senha</span>
-            <input className="input" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <div className="password-input">
+              <input className="input" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+              <button
+                type="button"
+                className="password-input__toggle"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showPassword}
+                onClick={(event) => {
+                  // O campo está dentro de um <label>: o clique não pode focar outra coisa.
+                  event.preventDefault();
+                  setShowPassword((current) => !current);
+                }}
+              >
+                <Icon name={showPassword ? 'eyeOff' : 'eye'} size={18} />
+              </button>
+            </div>
           </label>
           <label className="checkbox">
             <input type="checkbox" checked={remember} onChange={(event) => toggleRemember(event.target.checked)} />
