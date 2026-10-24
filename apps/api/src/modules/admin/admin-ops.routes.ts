@@ -1,10 +1,12 @@
 import { eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 import { appConfig, jobs } from '../../platform/db/schema/index.js';
 import { migrationStatus } from '../../platform/db/migrate.js';
+import { imageKey } from '../../platform/storage/object-storage.js';
 import { ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
 import { OpsService } from '../ops/ops.service.js';
 import { AdminAction, recordAdminAudit } from './admin-audit.service.js';
@@ -196,6 +198,66 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         pageSize: f.pageSize,
         total: total.rows[0]?.total ?? 0,
       };
+    },
+  );
+
+  /**
+   * Testa o armazenamento de fotos de ponta a ponta (grava, lê e apaga um
+   * objeto de teste) e mostra a configuração sem revelar segredos. É o que
+   * diz, depois de trocar uma variável no Railway, se as fotos voltaram.
+   */
+  routes.post(
+    '/ops/storage/test',
+    {
+      preHandler: requireAdmin('support'),
+      schema: { tags: ['admin'], summary: 'Testa o armazenamento de fotos', hide: true, response: { 200: z.any(), ...commonAdminErrors } },
+    },
+    async () => {
+      const storage = app.services.storage;
+      const raw = process.env;
+      const mask = (value: string | undefined) => (value ? `…${value.slice(-4)} (${value.length} caracteres)` : null);
+      const spaces = (name: string) => {
+        const value = raw[name];
+        return value !== undefined && value !== value.trim();
+      };
+      const config = {
+        kind: storage.kind,
+        configured: storage.configured,
+        bucket: env.S3_BUCKET ?? null,
+        endpoint: env.S3_ENDPOINT ? new URL(env.S3_ENDPOINT).host : null,
+        region: env.S3_REGION,
+        forcePathStyle: env.S3_FORCE_PATH_STYLE,
+        accessKeyId: mask(env.S3_ACCESS_KEY_ID),
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY ? `${env.S3_SECRET_ACCESS_KEY.length} caracteres` : null,
+        // Espaço ou quebra de linha colados no valor original (já ignorados pela API).
+        espacosNasVariaveis: ['S3_BUCKET', 'S3_ENDPOINT', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'].filter(spaces),
+      };
+      if (!storage.configured) return { ok: false, config, steps: [], message: 'Armazenamento não configurado (sem S3_BUCKET).' };
+
+      const key = imageKey('00000000-0000-4000-8000-000000000000', createHash('sha256').update(`teste-${Date.now()}`).digest('hex'));
+      const body = Buffer.from('teste do painel');
+      const steps: Array<{ step: string; ok: boolean; ms: number; error?: string }> = [];
+      const run = async (step: string, action: () => Promise<unknown>) => {
+        const start = Date.now();
+        try {
+          await action();
+          steps.push({ step, ok: true, ms: Date.now() - start });
+          return true;
+        } catch (error) {
+          const err = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+          steps.push({ step, ok: false, ms: Date.now() - start, error: `${err.name ?? 'Erro'}${err.$metadata?.httpStatusCode ? ` (${err.$metadata.httpStatusCode})` : ''}: ${err.message ?? String(error)}` });
+          return false;
+        }
+      };
+      if (await run('gravar', () => storage.put(key, body, 'image/webp'))) {
+        await run('ler', async () => {
+          const read = await storage.get(key);
+          if (!read || !read.equals(body)) throw new Error('o conteúdo lido não confere com o gravado');
+        });
+        await run('apagar', () => storage.delete(key));
+      }
+      const ok = steps.every((step) => step.ok);
+      return { ok, config, steps, message: ok ? 'Armazenamento funcionando: gravou, leu e apagou.' : 'Armazenamento com falha: veja a etapa e o erro.' };
     },
   );
 

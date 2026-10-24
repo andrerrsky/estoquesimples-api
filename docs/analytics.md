@@ -105,3 +105,40 @@ Pacote `br.com.gameloop.estoquesimples.analytics` no app:
   **estes** eventos.
 
 Para a versão web, o mesmo desenho vale com IndexedDB no lugar do SQLite.
+
+## Google Analytics 4 (site, web app e app)
+
+Além do analytics próprio, os eventos também vão para o Google Analytics:
+
+- **Site e web app** (`apps/web/src/lib/ga.ts`, propriedade `G-V6S41QGPMS`,
+  trocável por `VITE_GA_MEASUREMENT_ID` no build). O `gtag.js` **só carrega
+  com consentimento**: o aviso de cookies (`CookieConsent`) aparece na
+  primeira visita, "Recusar" não baixa nada do Google, e a escolha muda em
+  "Preferências de cookies" (rodapé da página inicial e Minha conta). A
+  Política de Privacidade (seção 5) descreve isso. Sinais de publicidade
+  desligados.
+  - Todo `track()` vai também para o GA com o nome trocado de ponto para
+    sublinhado (`product.created` → `product_created`). Alguns viram também o
+    evento recomendado: `signup.completed` → `sign_up`, `auth.login` →
+    `login`, `purchase.started` → `begin_checkout`, `help.searched` →
+    `search`, `platform.web_app_installed` → `app_install`.
+  - Página inicial e públicas: cliques em "Criar conta" (`cta_criar_conta`),
+    "Entrar", Google Play, "Onde usar", plano e "Abrir meu estoque", com a
+    seção onde ficou o botão (`location`); vídeo iniciado e assistido até o
+    fim (`video_started`, `video_completed`).
+  - Visualizações de página: a medição otimizada do GA4 (eventos de
+    histórico do navegador) registra cada troca de rota. Deixe ligada em
+    Administrador › Fluxos de dados › Web › Medição otimizada.
+  - A CSP libera `www.googletagmanager.com` (script) e os domínios
+    `*.google-analytics.com`, `*.analytics.google.com` e
+    `*.googletagmanager.com` (envio).
+- **App Android**: o Firebase Analytics (projeto `estoque-simples-f3604`)
+  registra sozinho primeira abertura, sessões, telas e atualizações; os
+  eventos do analytics próprio são espelhados nele (`FirebaseMirror`), com os
+  mesmos recomendados, mais `sign_up`/`login` na tela de conta. Para ver app
+  e site juntos, vincule o projeto Firebase à mesma propriedade do GA4
+  (Firebase › Configurações do projeto › Integrações › Google Analytics) ou
+  adicione um fluxo Android à propriedade `G-V6S41QGPMS`.
+
+Nada de identificação vai para o Google: sem e-mail, nome, id de pessoa ou
+empresa, nome de produto ou valores.

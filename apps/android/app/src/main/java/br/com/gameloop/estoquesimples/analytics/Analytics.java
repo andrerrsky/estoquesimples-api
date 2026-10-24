@@ -59,6 +59,8 @@ public final class Analytics {
         final long agora = System.currentTimeMillis();
         final String sessao = sessaoAtual(agora);
         final String propriedades = props == null || props.isEmpty() ? null : new JSONObject(limpar(props)).toString();
+        // O mesmo evento no Firebase Analytics (GA4 do app).
+        FirebaseMirror.log(app, name, props == null ? null : limpar(props));
 
         EXECUTOR.execute(() -> {
             try {

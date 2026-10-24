@@ -140,4 +140,31 @@ describe('registro de erros', () => {
     const anonymous = await context.app.inject({ method: 'GET', url: '/admin/api/errors' });
     expect(anonymous.statusCode).toBe(401);
   });
+
+  it('o painel testa o armazenamento de fotos e mostra a etapa que falhou, sem revelar a chave', async () => {
+    const email = `admin.${randomUUID()}@exemplo.com.br`;
+    await context.services.db.insert(platformAdmins).values({ email, name: 'Suporte', passwordHash: await hashPassword('PainelSeguro#2026'), role: 'support' });
+    const login = await context.app.inject({ method: 'POST', url: '/admin/api/auth/login', headers: { 'x-requested-with': 'estoquesimples-admin' }, payload: { email, password: 'PainelSeguro#2026' } });
+    const raw = login.headers['set-cookie'];
+    const headers = { cookie: (Array.isArray(raw) ? raw[0] : raw)!.split(';')[0]!, 'x-requested-with': 'estoquesimples-admin' };
+
+    const ok = await context.app.inject({ method: 'POST', url: '/admin/api/ops/storage/test', headers, payload: {} });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ ok: true, steps: [{ step: 'gravar', ok: true }, { step: 'ler', ok: true }, { step: 'apagar', ok: true }] });
+
+    const storage = context.services.storage as { put: (...args: unknown[]) => Promise<void> };
+    const original = storage.put;
+    storage.put = async () => {
+      const error = new Error('The request signature we calculated does not match the signature you provided.');
+      error.name = 'SignatureDoesNotMatch';
+      throw error;
+    };
+    try {
+      const failed = await context.app.inject({ method: 'POST', url: '/admin/api/ops/storage/test', headers, payload: {} });
+      expect(failed.json().ok).toBe(false);
+      expect(failed.json().steps).toEqual([expect.objectContaining({ step: 'gravar', ok: false, error: expect.stringContaining('SignatureDoesNotMatch') })]);
+    } finally {
+      storage.put = original;
+    }
+  });
 });

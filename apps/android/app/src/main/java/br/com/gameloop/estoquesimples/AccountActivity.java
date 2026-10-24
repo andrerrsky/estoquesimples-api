@@ -554,6 +554,10 @@ public class AccountActivity extends BaseActivity {
                 } else {
                     accounts.login(email, senha);
                 }
+                // Cadastro e login no GA4 do app (eventos recomendados sign_up / login).
+                br.com.gameloop.estoquesimples.analytics.FirebaseMirror.log(this,
+                        registerMode ? "signup.completed" : "auth.login",
+                        br.com.gameloop.estoquesimples.analytics.Analytics.props("method", "email"));
                 List<AccountService.Workspace> workspaces = accounts.listWorkspaces();
 
                 main.post(() -> {

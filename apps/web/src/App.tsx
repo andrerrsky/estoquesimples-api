@@ -9,6 +9,8 @@ import { resetZoom } from './lib/viewport';
 import { listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
 import { useAuth } from './auth/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
+import { CookieConsent } from './components/CookieConsent';
+import { bootGa, installGaClickTracking } from './lib/ga';
 
 /**
  * Rotas. As telas internas são carregadas sob demanda: quem só visita a
@@ -96,6 +98,11 @@ function Root() {
   useEffect(() => {
     if (status !== 'loading') void refreshPushSubscription();
   }, [status]);
+  // Google Analytics: carrega para quem já aceitou os cookies e mede os cliques das páginas públicas.
+  useEffect(() => {
+    bootGa();
+    return installGaClickTracking();
+  }, []);
   useEffect(
     () =>
       listenToServiceWorker((url) => {
@@ -114,6 +121,7 @@ function Root() {
               na URL (lista de produtos, ajuda) não joga a página para o topo. */}
           <ScrollRestoration getKey={(location) => location.pathname} />
           <SupportChat />
+          <CookieConsent />
         </>
       )}
     </>

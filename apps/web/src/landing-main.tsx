@@ -4,7 +4,9 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 import '@estoquesimples/design/tokens.css';
 import './styles/app.css';
 
+import { CookieConsent } from './components/CookieConsent';
 import { reloadForNewVersion } from './lib/chunks';
+import { bootGa, installGaClickTracking } from './lib/ga';
 import { LandingPage, LandingSessionContext } from './pages/LandingPage';
 
 /**
@@ -53,9 +55,18 @@ function Landing() {
     };
   }, []);
 
+  // Google Analytics (só com consentimento) e o aviso de cookies, depois de hidratar.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    bootGa();
+    return installGaClickTracking();
+  }, []);
+
   return (
     <LandingSessionContext.Provider value={authed}>
       <LandingPage />
+      {mounted && <CookieConsent />}
     </LandingSessionContext.Provider>
   );
 }

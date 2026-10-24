@@ -199,6 +199,26 @@ neles, mas considere uma cópia periódica do bucket se as fotos virarem crític
 3. `GET https://api.estoquesimples.com.br/ready` continua `ready` (o bucket
    não é checado no `/ready`; um bucket mal configurado aparece como 503
    `IMAGES_UNAVAILABLE`/erro nos logs ao enviar).
+4. **Admin › Operação › Armazenamento de fotos › Testar agora** grava, lê e
+   apaga um arquivo de teste e mostra a configuração em uso (bucket, host do
+   endpoint, região, final da chave de acesso e o tamanho da chave secreta,
+   nunca ela) e a etapa que falhou, com o erro do provedor.
+
+### `SignatureDoesNotMatch`
+
+O bucket recusou a assinatura: a chave secreta não corresponde à chave de
+acesso (copiada errada, de outro bucket, ou credencial recriada no Railway).
+Os valores das variáveis passam por `trim()`, então espaço ou quebra de linha
+colados não causam mais o erro; o teste do painel ainda avisa se houver.
+Para corrigir, pegue de novo as credenciais e regrave as duas chaves juntas:
+
+```bash
+railway bucket credentials --bucket estoquesimples-imagens --json
+railway variables --service estoquesimples-api \
+  --set S3_ACCESS_KEY_ID=<accessKeyId> --set S3_SECRET_ACCESS_KEY=<secretAccessKey>
+```
+
+Depois do redeploy, "Testar agora" deve mostrar gravar, ler e apagar em verde.
 
 ## Custo
 

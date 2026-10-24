@@ -1,5 +1,6 @@
 import { api } from '../api/client';
 import { APP_VERSION, installId, newId } from './device';
+import { gaEvent } from './ga';
 
 /**
  * Eventos de uso, no mesmo catálogo e na mesma rota do app Android
@@ -49,6 +50,8 @@ function schedule(): void {
 }
 
 export function track(name: string, properties?: Record<string, string | number | boolean | null>): void {
+  // O mesmo evento vai para o Google Analytics, se a pessoa aceitou os cookies.
+  gaEvent(name, properties);
   queue.push({
     id: newId(),
     name,

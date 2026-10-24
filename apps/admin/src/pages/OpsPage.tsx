@@ -129,6 +129,8 @@ export function OpsPage() {
         </Card>
       </div>
 
+      <StorageTestCard />
+
       <Card title="Tarefas por tipo" subtitle="Rotinas periódicas da API">
         {data ? (
           <div className="table-wrap">
@@ -273,6 +275,64 @@ function JobsCard() {
           void queryClient.invalidateQueries({ queryKey: ['ops'] });
         }}
       />
+    </Card>
+  );
+}
+
+interface StorageTest {
+  ok: boolean;
+  message: string;
+  config: Record<string, unknown> & { espacosNasVariaveis?: string[] };
+  steps: Array<{ step: string; ok: boolean; ms: number; error?: string }>;
+}
+
+/** Grava, lê e apaga um objeto de teste no bucket das fotos: diz na hora se a configuração do Railway está certa. */
+function StorageTestCard() {
+  const { can } = useAuth();
+  const [result, setResult] = useState<StorageTest | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await api.post<StorageTest>('/ops/storage/test'));
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const { espacosNasVariaveis, ...config } = result?.config ?? {};
+  return (
+    <Card
+      title="Armazenamento de fotos"
+      subtitle="Bucket S3 das fotos de produto e dos logotipos"
+      actions={can('support') ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => void run()} disabled={busy}>{busy ? 'Testando…' : 'Testar agora'}</button> : undefined}
+    >
+      {error && <Notice tone="error">{error}</Notice>}
+      {!result && !error && <p className="muted">Grava, lê e apaga um arquivo de teste e mostra a configuração em uso (sem revelar a chave secreta).</p>}
+      {result && (
+        <div className="stack" style={{ gap: 12 }}>
+          <Notice tone={result.ok ? 'success' : 'error'}>{result.message}</Notice>
+          {result.steps.length > 0 && (
+            <ul className="stack" style={{ gap: 6, margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+              {result.steps.map((step) => (
+                <li key={step.step}>
+                  <Badge tone={step.ok ? 'success' : 'error'}>{step.step}</Badge> <span className="muted small">{step.ms} ms</span>
+                  {step.error && <div className="mono small" style={{ marginTop: 4, overflowWrap: 'anywhere' }}>{step.error}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(espacosNasVariaveis?.length ?? 0) > 0 && (
+            <Notice tone="warning">Há espaço ou quebra de linha no valor de {espacosNasVariaveis!.join(', ')} no Railway. A API já ignora, mas vale corrigir lá.</Notice>
+          )}
+          <KeyValue items={Object.entries(config).map(([label, value]) => ({ label, value: value === null || value === undefined ? '—' : String(value) }))} />
+        </div>
+      )}
     </Card>
   );
 }

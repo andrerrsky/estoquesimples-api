@@ -1889,3 +1889,34 @@ code,
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
+
+/* Senha com botão de mostrar/ocultar (login do painel). */
+.password-input {
+  position: relative;
+}
+.password-input .input {
+  padding-right: 44px;
+}
+.password-input__toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.password-input__toggle:hover {
+  background: var(--chip);
+  color: var(--text);
+}
+.password-input__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
