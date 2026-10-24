@@ -10,6 +10,7 @@ import { normalizeImage } from '../images/image-processing.js';
 import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 import { BLOG_CATEGORIES, blogCategory } from './blog.categories.js';
 import { DEFAULT_BLOG_SETTINGS, blogSettingsSchema, type BlogListQuery, type BlogPostBody, type BlogSettings } from './blog.schemas.js';
+import { fontsKnownMissing } from './blog-cover.js';
 import { readingMinutes, renderMarkdown, slugify } from './markdown.js';
 
 export const BLOG_NOTIFY_JOB = 'blog.notify_post';
@@ -77,7 +78,8 @@ export class BlogService {
       publishedAt: row.publishedAt?.toISOString() ?? null,
       updatedAt: row.updatedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
-      coverUrl: row.coverHash ? `/v1/blog/covers/${row.coverHash}.webp` : `/v1/blog/covers/auto/${row.slug}.webp`,
+      // Sem fonte no servidor não há capa gerada: nenhum cliente recebe um endereço que só redireciona.
+      coverUrl: row.coverHash ? `/v1/blog/covers/${row.coverHash}.webp` : fontsKnownMissing() ? null : `/v1/blog/covers/auto/${row.slug}.webp`,
       coverAuto: !row.coverHash,
       coverAlt: row.coverAlt ?? (row.coverHash ? null : `${row.title} — ${category.label}, no blog do Estoque Simples`),
       authorName: row.authorName,
