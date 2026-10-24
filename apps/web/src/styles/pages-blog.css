@@ -113,8 +113,15 @@
 
 .blog-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 20px;
+}
+/* Um ou dois posts: cartões largos em vez de uma coluna estreita. */
+.blog-grid:not(.blog-grid--related):has(> :nth-child(1):last-child) {
+  grid-template-columns: minmax(0, 560px);
+}
+.blog-grid:not(.blog-grid--related):has(> :nth-child(2):last-child) {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
 }
 .blog-grid--related {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -144,10 +151,14 @@
   text-decoration: none;
 }
 .blog-card__cover {
+  /* Qualquer proporção de imagem (16:9, 4:3, quadrada, retrato) vira 16:9
+     recortada pelo centro; `height: auto` anula o atributo height do <img>. */
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
+  object-position: center;
   background: var(--brand-soft);
 }
 .blog-card__cover--placeholder {
@@ -257,6 +268,10 @@
   display: block;
   width: 100%;
   height: auto;
+  max-height: 480px;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  object-position: center;
   margin-bottom: 24px;
   border-radius: var(--radius-card);
   background: var(--brand-soft);
