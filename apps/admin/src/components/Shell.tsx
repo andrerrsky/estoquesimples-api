@@ -7,6 +7,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { ADMIN_ROLE } from '../lib/labels';
 import { initials } from '../lib/format';
 import { Icon, type IconName } from './Icon';
+import { writePrivateParam } from '../lib/hooks';
+import { openCookiePreferences } from '../lib/ga';
 
 interface NavItem {
   to: string;
@@ -77,7 +79,9 @@ export function Shell({ children }: { children: ReactNode }) {
     event.preventDefault();
     const term = search.trim();
     if (!term) return;
-    navigate(`/usuarios?q=${encodeURIComponent(term)}`);
+    // A busca (e-mail, nome) não vai na URL: fica na sessão da tela de usuários.
+    writePrivateParam('/usuarios', 'q', term);
+    navigate('/usuarios', { state: { searchedAt: Date.now() } });
   };
 
   if (!admin) return null;
@@ -135,6 +139,9 @@ export function Shell({ children }: { children: ReactNode }) {
               <Icon name="logout" size={16} />
             </button>
           </div>
+          <button type="button" className="sidebar__cookies" onClick={openCookiePreferences}>
+            Preferências de cookies
+          </button>
         </div>
       </aside>
 

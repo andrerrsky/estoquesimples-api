@@ -7,8 +7,12 @@ import { ApiError } from './api/client';
 import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ui';
 import { router } from './App';
+import { bootGa } from './lib/ga';
 import '@estoquesimples/design/tokens.css';
 import './styles/app.css';
+
+// Google Analytics: só para quem aceitou os cookies do painel.
+bootGa();
 
 const queryClient = new QueryClient({
   defaultOptions: {

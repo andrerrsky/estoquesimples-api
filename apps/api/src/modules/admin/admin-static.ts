@@ -15,13 +15,17 @@ import { ErrorCode } from '../../platform/http/errors.js';
  * estáticos, o que é desprezível para um painel usado por poucas pessoas.
  */
 
+// Google Analytics do painel (só com consentimento: apps/admin/src/lib/ga.ts).
+const GA_SCRIPT = 'https://www.googletagmanager.com';
+const GA_BEACONS = 'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self' ${GA_SCRIPT}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  `img-src 'self' data: ${GA_BEACONS}`,
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${GA_BEACONS}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

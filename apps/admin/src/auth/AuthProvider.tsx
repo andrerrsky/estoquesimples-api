@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 
 import { api, ApiError, onUnauthorized } from '../api/client';
+import { gaEvent } from '../lib/ga';
 
 export type AdminRole = 'owner' | 'support' | 'viewer';
 
@@ -59,11 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const result = await api.post<{ admin: AdminMe }>('/auth/login', { email, password });
     setAdmin(result.admin);
+    gaEvent('login', { method: 'painel', role: result.admin.role });
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
+      gaEvent('logout', {});
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 401)) throw error;
     } finally {
