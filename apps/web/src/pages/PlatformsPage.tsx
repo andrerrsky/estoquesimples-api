@@ -20,6 +20,15 @@ const DEVICES: Array<{ key: Device; label: string }> = [
 ];
 
 /** Passos de cada aparelho. Os nomes dos botões são os que aparecem na tela do sistema. */
+/**
+ * Vídeo do passo a passo (iPhone em detalhe, depois Android e computador).
+ * Fica em public/, sem hash no nome: troque o nome do arquivo ao trocar o vídeo.
+ */
+const INSTALL_VIDEO = {
+  src: '/assets/video/instalar-web-app.mp4',
+  poster: '/assets/video/instalar-web-app-capa.webp',
+};
+
 const STEPS: Record<Device, { intro: string; steps: ReactNode[]; note?: string }> = {
   ios: {
     intro: 'No iPhone e no iPad a instalação é feita pelo Safari, em 4 passos:',
@@ -167,6 +176,23 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
             <p>Escolha o seu aparelho. Os passos são feitos uma vez só.</p>
           </div>
         </div>
+
+        <figure className="plat-video">
+          <video
+            className="plat-video__player"
+            controls
+            playsInline
+            preload="none"
+            poster={INSTALL_VIDEO.poster}
+            aria-label="Vídeo: como instalar o web app no iPhone, no iPad, no Android e no computador, com narração e legendas"
+            onPlay={() => track('platform.install_video_played')}
+          >
+            <source src={INSTALL_VIDEO.src} type="video/mp4" />
+            <track kind="captions" src="/video/instalar-web-app.vtt" srcLang="pt-BR" label="Português" default />
+            Seu navegador não toca vídeos. <a href={INSTALL_VIDEO.src}>Baixe o vídeo</a>.
+          </video>
+          <figcaption>Veja em 1 minuto e 20 segundos, ou siga os passos abaixo.</figcaption>
+        </figure>
 
         {running || installed ? (
           <p className="plat-ok"><Icon name="check" size={18} /> Você já está usando o Estoque Simples como aplicativo.</p>

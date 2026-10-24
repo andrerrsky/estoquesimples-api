@@ -116,6 +116,14 @@ passos, e oferecem "Instalar agora" nos navegadores que disparam
 `beforeinstallprompt`. Os ícones PNG são gerados a partir de
 `packages/design/icon.svg`; se a marca mudar, regere-os.
 
+A caixa "Instalar o web app" de `/plataformas` abre com um vídeo de 1 min
+20 s (`public/assets/video/instalar-web-app.mp4`, 1280×720, com capa
+`instalar-web-app-capa.webp` e legendas `public/video/instalar-web-app.vtt`):
+iPhone em detalhe (Safari, Compartilhar, Adicionar à Tela de Início,
+Adicionar), depois Android e computador, com narração. Os arquivos ficam em
+`public/` sem hash: ao trocar o vídeo, troque também o nome do arquivo. O
+play gera o evento `platform.install_video_played`.
+
 ## Sessão
 
 | | Android | Web |

@@ -214,3 +214,26 @@
   white-space: normal;
   text-align: center;
 }
+
+/* Vídeo do passo a passo, no topo da caixa de instalação. */
+.plat-video {
+  margin: 0;
+}
+.plat-video__player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-panel);
+  background: #0a1c2e;
+  color: #fff;
+}
+.plat-video__player a {
+  color: inherit;
+  text-decoration: underline;
+}
+.plat-video figcaption {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: var(--fs-supporting);
+  text-align: center;
+}
