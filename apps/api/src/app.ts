@@ -19,6 +19,7 @@ import { GooglePlayClient, type PlayStoreClient } from './modules/billing/play-c
 import { FirebaseFcmClient, type FcmClient } from './modules/push/fcm-client.js';
 import { WebPushClient } from './modules/push/web-push-client.js';
 import { registerLowStockJobs } from './modules/push/low-stock.jobs.js';
+import { registerBlogJobs } from './modules/blog/blog.jobs.js';
 import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas-client.js';
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
@@ -99,6 +100,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerReviewsJobs(services);
   registerPushJobs(services);
   registerLowStockJobs(services);
+  registerBlogJobs(services);
   registerAsaasJobs(services);
   registerSupportJobs(services);
   registerImageJobs(services);

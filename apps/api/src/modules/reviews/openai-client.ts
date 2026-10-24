@@ -143,6 +143,44 @@ export class OpenAiClient {
     return text.length > input.maxLength ? `${text.slice(0, input.maxLength - 1).trimEnd()}…` : text;
   }
 
+  /**
+   * Resposta obrigatoriamente em JSON (um objeto). Usado pelo blog: o modelo
+   * devolve título, resumo, texto e perguntas num formato que a API valida.
+   */
+  async completeJson(system: string, user: string, maxTokens: number, temperature = 0.5): Promise<unknown> {
+    const response = await this.fetchWithTimeout(API_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    });
+    if (response.status === 401) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
+    }
+    if (response.status === 429) {
+      throw new AppError(429, ErrorCode.RATE_LIMITED, 'A OpenAI está limitando as chamadas. Tente em instantes.');
+    }
+    if (!response.ok) {
+      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}.`);
+    }
+    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = body.choices?.[0]?.message?.content?.trim() ?? '';
+    try {
+      // Alguns modelos embrulham o JSON em ```json … ```.
+      return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+    } catch {
+      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'A OpenAI não devolveu um JSON válido.');
+    }
+  }
+
   private async complete(system: string, user: string, maxTokens: number): Promise<string> {
     const response = await this.fetchWithTimeout(API_URL, {
       method: 'POST',

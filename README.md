@@ -108,6 +108,7 @@ docs/         contratos e decisões (web, Asaas, notificações, analytics,
 | [docs/branding.md](docs/branding.md) | identidade visual por empresa: cores, fonte, logotipo, URL de entrada, regras e aplicação em Android e web |
 | [docs/images.md](docs/images.md) | fotos dos produtos: armazenamento, envio, sincronização, segurança e limites |
 | [docs/help.md](docs/help.md) | central de ajuda: onde fica o conteúdo e como alterar |
+| [docs/blog.md](docs/blog.md) | blog: posts, SEO no servidor, IA duas vezes por semana, push a cada post |
 | [docs/support.md](docs/support.md) · [docs/push.md](docs/push.md) · [docs/analytics.md](docs/analytics.md) | contratos para os clientes |
 
 Segredos nunca entram no repositório: `.env` local é ignorado e a produção

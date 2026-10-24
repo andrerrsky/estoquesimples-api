@@ -36,6 +36,7 @@ const BRAND_NAV: NavItem = { to: '/app/marca', label: 'Identidade visual', icon:
 
 const HELP_NAV: NavItem[] = [
   { to: '/app/ajuda', label: 'Central de ajuda', icon: 'book' },
+  { to: '/blog', label: 'Dicas e novidades', icon: 'sparkle' },
   { to: '/app/plataformas', label: 'Plataformas', icon: 'phone' },
   { to: '/app/suporte', label: 'Falar com o suporte', icon: 'help' },
 ];

@@ -54,7 +54,11 @@ const MAX_STORED_BYTES = 1_048_576;
 
 const invalid = (message: string): AppError => new AppError(422, ErrorCode.IMAGE_INVALID, message);
 
-export async function normalizeImage(input: Buffer, declaredContentType: string, options: { maxEdge: number; maxBytes?: number }): Promise<NormalizedImage> {
+export async function normalizeImage(
+  input: Buffer,
+  declaredContentType: string,
+  options: { maxEdge: number; maxBytes?: number; /** Recorta e redimensiona para exatamente este tamanho (capas). */ cover?: { width: number; height: number } },
+): Promise<NormalizedImage> {
   const sniffed = sniffImage(input);
   if (!sniffed) {
     throw new AppError(415, ErrorCode.IMAGE_UNSUPPORTED_TYPE, 'Formato não aceito. Envie uma imagem WebP, JPEG ou PNG.');
@@ -99,7 +103,7 @@ export async function normalizeImage(input: Buffer, declaredContentType: string,
     try {
       result = await base()
         .rotate()
-        .resize({ width: options.maxEdge, height: options.maxEdge, fit: 'inside', withoutEnlargement: true })
+        .resize(options.cover ? { width: options.cover.width, height: options.cover.height, fit: 'cover', position: 'attention' } : { width: options.maxEdge, height: options.maxEdge, fit: 'inside', withoutEnlargement: true })
         .webp({ quality, effort: 4 })
         .toBuffer({ resolveWithObject: true });
     } catch {

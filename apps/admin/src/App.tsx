@@ -7,6 +7,8 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { AuditPage } from './pages/AuditPage';
 import { ErrorsPage } from './pages/ErrorsPage';
 import { EventsPage } from './pages/EventsPage';
+import { BlogEditorPage } from './pages/BlogEditorPage';
+import { BlogPage } from './pages/BlogPage';
 import { HelpPage } from './pages/HelpPage';
 import { LoginPage } from './pages/LoginPage';
 import { OpsPage } from './pages/OpsPage';
@@ -79,6 +81,9 @@ export const router = createBrowserRouter(
         { path: '/auditoria', element: <AuditPage /> },
         { path: '/operacao', element: <OpsPage /> },
         { path: '/administradores', element: <AdminsPage /> },
+        { path: '/blog', element: <BlogPage /> },
+        { path: '/blog/novo', element: <BlogEditorPage /> },
+        { path: '/blog/:postId', element: <BlogEditorPage /> },
         { path: '/ajuda', element: <HelpPage /> },
         { path: '*', element: <NotFound /> },
       ],

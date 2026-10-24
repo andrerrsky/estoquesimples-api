@@ -75,6 +75,14 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
+            android:name=".blog.BlogActivity"
+            android:label="Dicas e novidades"
+            android:exported="false" />
+        <activity
+            android:name=".blog.BlogPostActivity"
+            android:label="Blog"
+            android:exported="false" />
+        <activity
             android:name=".HelpActivity"
             android:label="Central de ajuda"
             android:exported="false"

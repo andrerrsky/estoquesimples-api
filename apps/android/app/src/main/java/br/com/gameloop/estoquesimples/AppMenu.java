@@ -28,6 +28,9 @@ public final class AppMenu {
         } else if (id == R.id.menu_settings) {
             activity.startActivity(new Intent(activity, SettingsActivity.class));
             return true;
+        } else if (id == R.id.menu_blog) {
+            br.com.gameloop.estoquesimples.blog.BlogActivity.open(activity);
+            return true;
         } else if (id == R.id.menu_support) {
             // "Ajuda e suporte" começa pelas perguntas frequentes; falar com
             // o suporte fica a um toque, no fim daquela tela.

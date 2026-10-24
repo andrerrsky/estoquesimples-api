@@ -22,6 +22,10 @@
         android:title="@string/settings_title"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_blog"
+        android:title="Dicas e novidades"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_support"
         android:title="Ajuda e suporte"
         app:showAsAction="never" />

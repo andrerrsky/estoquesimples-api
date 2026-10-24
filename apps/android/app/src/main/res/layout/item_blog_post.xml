@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_surface"
+    android:padding="@dimen/group_padding">
+
+    <TextView
+        android:id="@+id/postCategory"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Estoque.Caption"
+        android:textColor="@color/color_accent"
+        android:textAllCaps="true"
+        android:letterSpacing="0.04"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/postTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+    <TextView
+        android:id="@+id/postExcerpt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxLines="3"
+        android:ellipsize="end"
+        android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+
+    <TextView
+        android:id="@+id/postMeta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:textAppearance="@style/TextAppearance.Estoque.Caption" />
+</LinearLayout>

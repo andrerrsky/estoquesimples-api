@@ -62,7 +62,12 @@ const app = (
 // vídeo que a pessoa já deu play e o foco do teclado continuam onde estavam.
 // Qualquer diferença entre o HTML e o que o React esperava é registrada no
 // console (em produção o React refaz a árvore sozinho).
-if (container.firstElementChild) {
+// Blog vindo pronto da API (data-ssr): não é a árvore da aplicação, então não
+// dá para hidratar; o React desenha por cima e a página (idêntica) assume.
+if (container.querySelector('[data-ssr]')) {
+  container.replaceChildren();
+  createRoot(container).render(app);
+} else if (container.firstElementChild) {
   hydrateRoot(container, app, {
     onRecoverableError: (error) => console.warn('hidratação da página inicial:', error),
   });
