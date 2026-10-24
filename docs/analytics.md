@@ -142,3 +142,25 @@ Além do analytics próprio, os eventos também vão para o Google Analytics:
 
 Nada de identificação vai para o Google: sem e-mail, nome, id de pessoa ou
 empresa, nome de produto ou valores.
+
+### Painel administrativo
+
+O painel (`apps/admin/src/lib/ga.ts`) usa a mesma propriedade, também só com
+consentimento (aviso próprio; "Preferências de cookies" no rodapé da barra
+lateral). Todo evento sai com `traffic_type: internal` e `app_area: painel`:
+no GA, Administrador › Coleta e modificação de dados › Filtros de dados ›
+"Internal Traffic" separa o uso da equipe — "Ativo" tira o painel dos
+relatórios do site, "Em teste" deixa ver os dois.
+
+- `login` (com o papel do administrador) e `logout`;
+- `admin_action` a cada ação que altera algo (responder suporte, suspender
+  conta, reembolsar, testar o armazenamento…), com `action` = método e
+  caminho da API sem ids (`POST /users/:id/suspend`), nunca o conteúdo;
+- telas: pela medição otimizada (troca de rota).
+
+A busca por texto do painel (e-mail, nome de cliente) **não fica mais na
+URL**: mora na sessão do navegador, por tela (`useListParams`, chave `q`).
+As visualizações de página do GA4 levam a URL real (o Google ignora
+substituições de `page_location` nessas visualizações automáticas), e e-mail
+na URL violaria os termos do GA. Links antigos com `?q=` continuam
+funcionando: o termo é aproveitado e sai da barra de endereço.

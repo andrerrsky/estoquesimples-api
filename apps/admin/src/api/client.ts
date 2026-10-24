@@ -5,6 +5,8 @@
  * código precisa garantir é o cabeçalho anti-CSRF em toda mutação e a
  * tradução do envelope de erro da API para uma exceção com código estável.
  */
+import { gaEvent, normalizePath } from '../lib/ga';
+
 export const API_BASE = '/admin/api';
 export const CSRF_HEADER = 'x-requested-with';
 export const CSRF_VALUE = 'estoquesimples-admin';
@@ -80,6 +82,11 @@ async function request<T>(method: string, path: string, options: { params?: Quer
       for (const listener of unauthorizedListeners) listener();
     }
     throw new ApiError(response.status, body, `Erro ${response.status} ao chamar a API.`);
+  }
+  // Ação feita pelo painel (responder suporte, suspender conta, reembolsar…):
+  // vai para o GA só o método e o caminho sem ids, nunca o conteúdo.
+  if (method !== 'GET' && !path.startsWith('/auth/')) {
+    gaEvent('admin_action', { action: `${method} ${normalizePath(path)}` });
   }
   return body as T;
 }

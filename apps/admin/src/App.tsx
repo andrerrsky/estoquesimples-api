@@ -21,6 +21,7 @@ import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { WorkspaceDetailPage } from './pages/WorkspaceDetailPage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
+import { CookieConsent } from './components/CookieConsent';
 
 function RequireAuth() {
   const { admin, loading } = useAuth();
@@ -34,9 +35,12 @@ function RequireAuth() {
   }
   if (!admin) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return (
-    <Shell>
-      <Outlet />
-    </Shell>
+    <>
+      <Shell>
+        <Outlet />
+      </Shell>
+      <CookieConsent />
+    </>
   );
 }
 
