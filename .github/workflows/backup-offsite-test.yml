@@ -1,0 +1,186 @@
+name: Teste do backup externo
+
+# Exercita scripts/backup-offsite.sh de ponta a ponta contra MinIO (bucket
+# versionado para as fotos, bucket com Object Lock para os dumps) e uma API
+# falsa: as mesmas fases que rodam toda noite em produção, mais as travas
+# (destino sem versionamento, origem vazia, exclusões demais, registro sem
+# fotos). Roda em PRs que mexem no backup e sob demanda.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/backup-*.sh'
+      - 'scripts/backup-test-api.mjs'
+      - 'scripts/install-backup-tools.sh'
+      - 'apps/api/src/platform/db/verify-backup.ts'
+      - 'apps/api/src/platform/db/migrations/**'
+      - '.github/workflows/backup-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backup-offsite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estoque
+          POSTGRES_PASSWORD: estoque
+          POSTGRES_DB: origem
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U estoque"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGPASSWORD: estoque
+      ORIGEM: postgres://estoque:estoque@localhost:5432/origem
+      WORKDIR: ${{ github.workspace }}/.backup-offsite
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio-senha-de-teste
+      AWS_DEFAULT_REGION: us-east-1
+      S3: http://127.0.0.1:9000
+      # Um único MinIO faz o papel dos três: origem das fotos, cópia das fotos e dumps.
+      RCLONE_CONFIG_MINIO_TYPE: s3
+      RCLONE_CONFIG_MINIO_PROVIDER: Minio
+      RCLONE_CONFIG_MINIO_ENDPOINT: http://127.0.0.1:9000
+      RCLONE_CONFIG_MINIO_ACCESS_KEY_ID: minio
+      RCLONE_CONFIG_MINIO_SECRET_ACCESS_KEY: minio-senha-de-teste
+      DUMPS_REMOTE: minio:dumps
+      IMAGES_SOURCE: minio:fotos-origem
+      IMAGES_DEST: minio:fotos-copia
+      API_BASE_URL: http://127.0.0.1:8787
+      OPS_BACKUP_TOKEN: token-de-backup-do-teste
+      ALLOW_INSECURE_DB: '1'
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Ferramentas
+        run: bash scripts/install-backup-tools.sh
+
+      - name: MinIO, buckets e fotos de exemplo
+        run: |
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio-senha-de-teste \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data
+          for i in $(seq 1 30); do curl -fsS "$S/minio/health/live" && break; sleep 1; done
+          aws --endpoint-url "$S" s3api create-bucket --bucket dumps --object-lock-enabled-for-bucket
+          aws --endpoint-url "$S" s3api put-object-lock-configuration --bucket dumps \
+            --object-lock-configuration '{"ObjectLockEnabled":"Enabled","Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":35}}}'
+          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-origem
+          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-copia
+          aws --endpoint-url "$S" s3api put-bucket-versioning --bucket fotos-copia --versioning-configuration Status=Enabled
+          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-sem-versao
+          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-vazio
+          for n in 1 2 3; do
+            head -c 2048 /dev/urandom > foto$n.webp
+            aws --endpoint-url "$S" s3 cp foto$n.webp "s3://fotos-origem/workspaces/teste/images/foto$n.webp"
+          done
+
+      - name: Banco de origem e usuário de leitura (receita de docs/seguranca.md)
+        run: |
+          (cd apps/api && DATABASE_URL="$ORIGEM" npx tsx src/platform/db/migrate.ts up && DATABASE_URL="$ORIGEM" npx tsx scripts/seed-drill.ts)
+          psql "$ORIGEM" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE backup_reader LOGIN PASSWORD 'leitura';
+          GRANT CONNECT ON DATABASE origem TO backup_reader;
+          GRANT pg_read_all_data TO backup_reader;
+          ALTER ROLE backup_reader BYPASSRLS;
+          ALTER ROLE backup_reader SET default_transaction_read_only = on;
+          ALTER ROLE backup_reader CONNECTION LIMIT 2;
+          SQL
+          psql "$ORIGEM" -c 'CREATE DATABASE restauracao'
+          age-keygen -o chave-teste.key 2> chave-publica.txt
+          echo "AGE_RECIPIENT=$(grep -o 'age1[0-9a-z]*' chave-publica.txt)" >> "$GITHUB_ENV"
+
+      - name: API falsa
+        run: node scripts/backup-test-api.mjs 8787 "$OPS_BACKUP_TOKEN" "$GITHUB_WORKSPACE/registro.json" &
+
+      - name: Recusa URL sem TLS em produção
+        env:
+          BACKUP_DATABASE_URL: postgres://backup_reader:leitura@localhost:5432/origem
+          ALLOW_INSECURE_DB: ''
+        run: |
+          if bash scripts/backup-offsite.sh check; then echo "::error::check aceitou URL sem sslmode"; exit 1; fi
+
+      - name: Fluxo completo (check, dump, verify, upload, photos, register, finish)
+        env:
+          BACKUP_DATABASE_URL: postgres://backup_reader:leitura@localhost:5432/origem
+          DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
+        run: |
+          for fase in check dump verify upload photos register finish; do
+            echo "::group::$fase"; bash scripts/backup-offsite.sh "$fase"; echo "::endgroup::"
+          done
+
+      - name: Conferir o que foi registrado e guardado
+        run: |
+          cat registro.json; echo
+          [ "$(jq '.fotos' registro.json)" = "3" ] || { echo "::error::fotos != 3"; exit 1; }
+          [ "$(jq -r '.schemaAtras' registro.json)" = "false" ] || { echo "::error::schemaAtras"; exit 1; }
+          objeto="$(jq -r '.objeto' registro.json)"
+          sha="$(jq -r '.sha256' registro.json)"
+          rclone cat "minio:dumps/$objeto" > baixado.age
+          [ "$(sha256sum baixado.age | cut -d' ' -f1)" = "$sha" ] || { echo "::error::hash do dump guardado não confere"; exit 1; }
+          # O dump decifra com a chave privada e restaura (o roteiro de incidente, passos 2 e 3).
+          age --decrypt --identity chave-teste.key --output restaurado.dump baixado.age
+          psql "$ORIGEM" -c 'CREATE DATABASE restauracao2'
+          npm run backup:verify --workspace @estoquesimples/api -- --dump "$PWD/restaurado.dump" --target postgres://estoque:estoque@localhost:5432/restauracao2
+          [ "$(rclone lsf minio:fotos-copia --recursive --files-only | wc -l)" = "3" ] || { echo "::error::cópia das fotos incompleta"; exit 1; }
+
+      - name: Object Lock impede apagar o dump
+        run: |
+          objeto="$(jq -r '.objeto' registro.json)"
+          versao="$(aws --endpoint-url "$S" s3api list-object-versions --bucket dumps --prefix "$objeto" --query 'Versions[0].VersionId' --output text)"
+          if aws --endpoint-url "$S" s3api delete-object --bucket dumps --key "$objeto" --version-id "$versao"; then
+            echo "::error::a versão travada do dump foi apagada"; exit 1
+          fi
+
+      - name: Foto apagada na origem continua como versão antiga na cópia
+        run: |
+          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto1.webp"
+          bash scripts/backup-offsite.sh photos
+          versoes="$(aws --endpoint-url "$S" s3api list-object-versions --bucket fotos-copia --prefix workspaces/teste/images/foto1.webp --query 'length(Versions)' --output text)"
+          [ "$versoes" -ge 1 ] || { echo "::error::a versão antiga da foto apagada sumiu"; exit 1; }
+          # Restauração no ponto anterior (roteiro, passo 6) traz a foto de volta.
+          rclone copy --s3-version-at "$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)" minio:fotos-copia minio:fotos-restauradas --s3-no-check-bucket
+          rclone lsf minio:fotos-restauradas --recursive | grep -q foto1.webp || { echo "::error::restauração no ponto anterior não trouxe a foto"; exit 1; }
+
+      - name: 'Trava: destino sem versionamento'
+        env:
+          IMAGES_DEST: minio:fotos-sem-versao
+        run: |
+          if bash scripts/backup-offsite.sh photos; then echo "::error::espelhou para bucket sem versionamento"; exit 1; fi
+
+      - name: 'Trava: origem vazia'
+        env:
+          IMAGES_SOURCE: minio:fotos-vazio
+        run: |
+          if bash scripts/backup-offsite.sh photos; then echo "::error::espelhou a partir de bucket vazio"; exit 1; fi
+
+      - name: 'Trava: exclusões demais numa noite'
+        env:
+          MAX_DELETE: '1'
+        run: |
+          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto2.webp"
+          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto3.webp"
+          head -c 2048 /dev/urandom > foto4.webp
+          aws --endpoint-url "$S" s3 cp foto4.webp "s3://fotos-origem/workspaces/teste/images/foto4.webp"
+          if bash scripts/backup-offsite.sh photos; then echo "::error::apagou mais que MAX_DELETE"; exit 1; fi
+
+      - name: 'Trava: registro sem a fase das fotos'
+        run: |
+          rm -f "$WORKDIR/fotos.json"
+          if bash scripts/backup-offsite.sh register; then echo "::error::registrou sem fotos"; exit 1; fi

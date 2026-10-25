@@ -124,7 +124,7 @@ describe('métricas', () => {
 describe('retrato do sistema', () => {
   it('responde sem alertas num banco saudável', async () => {
     // Banco saudável inclui backup restaurado recentemente (senão o alerta backup_desatualizado dispara).
-    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1 } });
+    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1, fotos: 3 } });
     const response = await context.app.inject({
       method: 'GET',
       url: '/ops/status',
@@ -192,7 +192,7 @@ describe('retrato do sistema', () => {
 
   it('o vigia enxerga exatamente o que o endpoint mostra', async () => {
     // Banco saudável inclui backup restaurado recentemente (senão o alerta backup_desatualizado dispara).
-    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1 } });
+    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1, fotos: 3 } });
     const service = new OpsService(context.services);
     const snapshot = await service.snapshot();
     expect(service.alertas(snapshot)).toEqual([]);
@@ -311,6 +311,14 @@ describe('token de backup (OPS_BACKUP_TOKEN)', () => {
     expect((await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload })).statusCode).toBe(200);
     const status = await backupContext.app.inject({ method: 'GET', url: '/ops/status', headers: auth });
     expect(status.json().alertas.map((alerta: { nome: string }) => alerta.nome)).toContain('backup_schema_divergente');
+  });
+
+  it('avisa quando o backup chega sem a contagem das fotos', async () => {
+    const payload = { origem: 'backup-offsite', tabelas: 1, registros: 1, duracaoSegundos: 1 };
+    expect((await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload })).statusCode).toBe(200);
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/status', headers: auth });
+    const nomes = status.json().alertas.map((alerta: { nome: string }) => alerta.nome);
+    expect(nomes).toContain('backup_sem_fotos');
   });
 
   it('não abre mais nada além do registro de backup', async () => {

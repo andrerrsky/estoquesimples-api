@@ -156,6 +156,7 @@ nesse campo, e não em texto da mensagem.
 | `assinaturas_sem_verificacao` | assinatura ativa sem confirmação do Google há 48h | verificar credenciais da service account |
 | `conflitos_esquecidos` | conflitos pendentes há mais de 7 dias | avisar os clientes envolvidos; os aparelhos seguem divergentes |
 | `backup_schema_divergente` | o último dump guardado está numa migration diferente da que a API roda | conferir `BACKUP_DATABASE_URL` (banco certo?) e se o último deploy subiu |
+| `backup_sem_fotos` | o último backup externo veio sem a cópia das fotos | ver o passo "Espelhar as fotos" do último run de `backup-offsite.yml` |
 | `backup_desatualizado` | nenhuma restauração de teste de backup real nas últimas `BACKUP_MAX_AGE_HOURS` horas | ver o último run de `backup-offsite.yml` no GitHub ([docs/seguranca.md](docs/seguranca.md#backup-e-restauração)) |
 
 Os mesmos alertas aparecem na visão geral e na tela Operação do painel, que

@@ -31,6 +31,10 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      lado e conferido de volta) e o resultado registrado em `/ops/backup`;
    - o bucket dos dumps tem **Object Lock**: nenhum dump pode ser apagado
      ou trocado antes de 35 dias, nem com a chave do workflow;
+   - a lógica fica em `scripts/backup-offsite.sh`, exercitada em todo PR que
+     mexe no backup por `backup-offsite-test.yml` (MinIO com Object Lock e
+     versionamento: fluxo completo, decifrar e restaurar, restauração de foto
+     no ponto anterior e cada trava);
    - as fotos são **espelhadas** (`rclone sync`) num **segundo bucket**, com
      versionamento: foto apagada na origem vira versão antiga e fica 35
      dias. O espelho só roda se o versionamento estiver ativo e a origem não
@@ -41,34 +45,42 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 4. **No aparelho**: o app Android funciona sem internet, guarda uma cópia do
    banco local antes da primeira sincronização e entra no backup do Android
    (só o banco do estoque; sessão e login lembrado ficam de fora).
-5. **Alertas**: `backup_desatualizado` quando não há restauração de teste
-   registrada nas últimas `BACKUP_MAX_AGE_HOURS` horas (48 h), e
-   `backup_schema_divergente` quando o último dump guardado está numa
-   migration diferente da que a API roda (banco errado ou deploy pendente).
+5. **Alertas**: `backup_desatualizado` quando não há backup externo
+   registrado nas últimas `BACKUP_MAX_AGE_HOURS` horas (48 h);
+   `backup_schema_divergente` quando o último dump guardado está à frente da
+   migration que a API roda, ou atrás mesmo tendo sido feito depois do deploy
+   dela (banco errado ou parado); `backup_sem_fotos` quando o registro chega
+   sem a contagem das fotos espelhadas.
 
 ### Ligar a cópia externa **[dono]**
 
-1. Num provedor diferente do Railway (Backblaze B2, Cloudflare R2 ou AWS S3),
-   crie **dois buckets**:
-   - **dumps** (`BACKUP_S3_BUCKET`): **Object Lock** ligado, retenção padrão
-     de **35 dias** (modo *compliance*, ou *governance* se quiser poder
-     encurtar com a conta raiz) e regra de expiração de objetos atuais em 35
-     dias. Chave **só deste bucket**, com listar, ler e gravar (`s3:ListBucket`,
-     `s3:GetObject`, `s3:PutObject`; no B2 `listFiles`, `readFiles`,
-     `writeFiles`) e **sem apagar** — o workflow nunca apaga ali;
-   - **fotos** (`BACKUP_IMAGES_BUCKET`): **versionamento** ligado; nenhuma
-     expiração por idade dos objetos atuais e **versões não atuais expiram em
-     35 dias** (S3/R2: *Lifecycle* `NoncurrentVersionExpiration`; B2:
-     `daysFromHidingToDeleting: 35`). Chave **só deste bucket**, com listar,
-     ler, gravar e apagar a versão atual (o espelho precisa), **sem**
-     `s3:DeleteObjectVersion` nem permissão de mudar a regra do bucket. No B2,
-     que não informa o versionamento pela API, defina a variável do GitHub
-     `BACKUP_IMAGES_VERSIONING_CONFIRMED=true` depois de conferir a regra.
+1. Num provedor **e conta diferentes** de onde estão o banco e as fotos de
+   produção — **AWS S3** (recomendado) ou **Backblaze B2**; Cloudflare R2 não
+   serve (não tem versionamento S3 nem Object Lock com modos) —, crie dois
+   buckets:
+   - **dumps** (`BACKUP_S3_BUCKET`): **Object Lock** ligado na criação, retenção
+     padrão de **35 dias** (modo *compliance*). Regras de ciclo de vida: objetos
+     atuais expiram em 35 dias **e** versões não atuais são apagadas 1 dia
+     depois (S3: `Expiration: 35` + `NoncurrentVersionExpiration: 1`; B2:
+     `daysFromUploadingToHiding: 35`, `daysFromHidingToDeleting: 1`) — sem a
+     segunda regra o arquivo expirado continua guardado para sempre. O Object
+     Lock garante que nada sai antes dos 35 dias. Chave **só deste bucket**,
+     com listar, ler e gravar (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`;
+     B2: `listFiles`, `readFiles`, `writeFiles`) e **sem apagar**;
+   - **cópia das fotos** (`BACKUP_IMAGES_BUCKET`): **S3**: versionamento ligado,
+     sem expiração dos objetos atuais e `NoncurrentVersionExpiration: 35`; chave
+     só deste bucket com `s3:ListBucket`, `s3:GetBucketVersioning`,
+     `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` e **sem**
+     `s3:DeleteObjectVersion` nem permissão de mudar o bucket. **B2**: as
+     chaves do B2 que apagam também apagam versões, então ligue **Object Lock**
+     com retenção padrão de 35 dias neste bucket também (apagar só esconde;
+     `daysFromHidingToDeleting: 35`) e defina a variável do GitHub
+     `BACKUP_IMAGES_VERSIONING_CONFIRMED=true` (o B2 não informa o
+     versionamento pela API S3).
 
-   Com isso, uma chave vazada do GitHub não destrói nada antes do prazo: a
-   dos dumps não apaga e o Object Lock impediria; a das fotos só cria versões
-   antigas, que ficam 35 dias. O dado de uma conta expurgada sai das cópias
-   em até 35 dias.
+   Com isso, uma chave vazada do GitHub não destrói nada antes do prazo, e o
+   dado de uma conta expurgada sai das cópias em até 36 dias. **Trimestralmente**,
+   confira que não há objeto com mais de 36 dias em `db/` (`rclone lsl`).
 2. Gere o par de chaves `age` num computador confiável:
    `age-keygen -o estoque-backup.key` — guarde o arquivo **no gerenciador de
    senhas** (e uma cópia offline); a linha `public key: age1…` vai para o GitHub.
@@ -106,7 +118,32 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 1. **Decidir a origem**: perda recente e Railway de pé → backup do Railway
    (painel do Postgres → *Restore*). Railway indisponível, conta comprometida
    ou backup do Railway inválido → cópia externa.
-2. **Baixar e decifrar** a cópia externa mais recente:
+2. **Baixar e decifrar** a cópia externa mais recente. No computador de quem
+   restaura: rclone 1.66 ou mais novo (o do apt é antigo para
+   `--s3-version-at`/`--b2-version-at`) e um `rclone.conf` com os três remotos
+   usados abaixo — `backup` (bucket dos dumps), `backupimg` (cópia das fotos)
+   e `imagens` (bucket das fotos de produção, com a chave de **escrita** da
+   API, `S3_*` do Railway):
+   ```ini
+   [backup]
+   type = s3
+   provider = AWS          # ou Other, com endpoint do B2
+   access_key_id = ...
+   secret_access_key = ...
+   region = ...
+   [backupimg]
+   type = s3
+   provider = AWS
+   access_key_id = ...
+   secret_access_key = ...
+   region = ...
+   [imagens]
+   type = s3
+   provider = Other
+   endpoint = <S3_ENDPOINT>
+   access_key_id = <S3_ACCESS_KEY_ID>
+   secret_access_key = <S3_SECRET_ACCESS_KEY>
+   ```
    ```bash
    rclone copy backup:<bucket-dos-dumps>/db/AAAA/MM/DD/ ./restauracao/
    sha256sum -c <(echo "$(cat arquivo.dump.age.sha256)  arquivo.dump.age")
@@ -125,7 +162,9 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    done
    pg_restore --no-owner --single-transaction --dbname "$NOVO" backup.dump
    ```
-   (`backup:verify` faz o mesmo automaticamente no banco descartável do passo 3.)
+   (`backup:verify` faz o mesmo automaticamente no banco descartável do passo 3;
+   ele não registra nada em `/ops/backup` — isso é só do workflow, depois de a
+   cópia estar guardada.)
 5. **Apontar a API**: troque `DATABASE_URL` do serviço da API para o banco
    novo; o deploy roda as migrations pendentes na subida. Confira `/ready`.
 6. **Fotos**: restaure o bucket como estava **antes** do incidente (as fotos
@@ -247,7 +286,8 @@ histórico de incidentes.
 | --- | --- | --- |
 | Conta excluída | 30 dias após o pedido | `privacy.daily` |
 | Conversas de suporte de quem não tinha conta, com o e-mail da conta excluída | junto com a conta | `privacy.daily` |
-| Avisos do Google Play/Asaas já processados (`subscription_events`) | 400 dias | `privacy.daily` |
+| Avisos do Google Play/Asaas (`subscription_events`, processados ou não) | 400 dias do recebimento | `privacy.daily` |
+| Conversas de suporte de quem nunca teve conta (qualquer estado) | 2 anos sem mensagem nova | `privacy.daily` |
 | Sessões encerradas ou vencidas (IP, navegador) | 90 dias | `privacy.daily` |
 | Tokens de uso único vencidos | 30 dias | `privacy.daily` |
 | IP em registros de auditoria (cliente e painel) | 180 dias (o registro fica) | `privacy.daily` |
@@ -259,7 +299,8 @@ histórico de incidentes.
 | E-mails do público de campanhas (tipo "usuários") | 180 dias após o envio | `privacy.daily` |
 | Erros registrados | 30 dias | `ops` (`error_events`) |
 | Eventos de uso (analytics) | `ANALYTICS_RETENTION_DAYS` (400) | `analytics.retention` |
-| Backups | 35 dias | regra do bucket / Railway |
+| Backups externos (dumps e versões antigas de fotos) | 35 dias (+1 de limpeza) | Object Lock e regras do bucket |
+| Backups do Railway | conforme o plano (mínimo 14 dias) | Railway |
 
 ## Riscos aceitos (revisar na data)
 

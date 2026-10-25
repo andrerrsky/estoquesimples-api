@@ -130,3 +130,32 @@ describe('expurgo: o que não está ligado por chave estrangeira', () => {
     expect(await count(sql`SELECT count(*)::int AS n FROM workspaces WHERE id = ${workspaceId}`)).toBe(0);
   });
 });
+
+describe('expurgo e retenção: suporte anônimo e avisos de cobrança', () => {
+  it('apaga a conversa anônima com o e-mail da conta expurgada e mantém a de outra pessoa', async () => {
+    const user = await registerUser(context);
+    await context.services.db.execute(sql`
+      INSERT INTO support_tickets (install_id, subject, contact_email) VALUES
+        ('instalacao-anonima-000000000000000001', 'Dúvida', ${user.email.toUpperCase()}),
+        ('instalacao-anonima-000000000000000002', 'Outra dúvida', 'outra.pessoa@exemplo.com.br')
+    `);
+    await context.services.db.execute(sql`UPDATE users SET status = 'pending_deletion', deletion_requested_at = now() - interval '40 days' WHERE id = ${user.userId}`);
+    expect((await new PrivacyService(context.services).purgeDeletedAccounts()).purged).toBe(1);
+    const restantes = (await context.services.db.execute<{ contact_email: string }>(sql`SELECT contact_email FROM support_tickets`)).rows;
+    expect(restantes.map((row) => row.contact_email)).toEqual(['outra.pessoa@exemplo.com.br']);
+  });
+
+  it('apaga avisos de cobrança com mais de 400 dias (processados ou não) e mantém os recentes', async () => {
+    const old = new Date(Date.now() - (RETENTION.billingEvents + 5) * 86_400_000);
+    await context.services.db.execute(sql`
+      INSERT INTO subscription_events (notification_id, received_at, processed_at) VALUES
+        ('evento-antigo-processado', ${old}, ${old}),
+        ('evento-antigo-falhou', ${old}, NULL),
+        ('evento-recente', now(), NULL)
+    `);
+    const removed = await new PrivacyService(context.services).applyRetention();
+    expect(removed['billingEvents']).toBe(2);
+    const restantes = (await context.services.db.execute<{ notification_id: string }>(sql`SELECT notification_id FROM subscription_events`)).rows;
+    expect(restantes.map((row) => row.notification_id)).toEqual(['evento-recente']);
+  });
+});

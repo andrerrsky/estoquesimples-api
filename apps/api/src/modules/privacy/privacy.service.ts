@@ -30,7 +30,7 @@ export const RETENTION = {
   closedInvites: 90,
   /** Lista de e-mails do público de campanhas encerradas há mais de N dias. */
   campaignEmails: 180,
-  /** Avisos do Google Play e do Asaas já processados. */
+  /** Avisos do Google Play e do Asaas (processados ou que falharam de vez). */
   billingEvents: 400,
 } as const;
 
@@ -151,7 +151,8 @@ export class PrivacyService {
       pushTokens: sql`DELETE FROM push_tokens WHERE (revoked_at IS NOT NULL AND revoked_at < ${days(RETENTION.endedSessions)}) OR last_seen_at < ${days(RETENTION.stalePushTokens)}`,
       supportTickets: sql`DELETE FROM support_tickets WHERE status = 'resolved' AND last_message_at < ${days(RETENTION.closedSupport)}`,
       campaignEmails: sql`UPDATE push_campaigns SET audience = jsonb_set(audience, '{emails}', '[]'::jsonb) WHERE audience->>'type' = 'users' AND jsonb_array_length(audience->'emails') > 0 AND COALESCE(completed_at, created_at) < ${days(RETENTION.campaignEmails)}`,
-      billingEvents: sql`DELETE FROM subscription_events WHERE processed_at IS NOT NULL AND processed_at < ${days(RETENTION.billingEvents)}`,
+      billingEvents: sql`DELETE FROM subscription_events WHERE COALESCE(processed_at, received_at) < ${days(RETENTION.billingEvents)}`,
+      anonymousSupport: sql`DELETE FROM support_tickets WHERE user_id IS NULL AND last_message_at < ${days(RETENTION.closedSupport)}`,
       invites: sql`DELETE FROM invites WHERE (accepted_at IS NOT NULL OR cancelled_at IS NOT NULL OR expires_at < now()) AND COALESCE(accepted_at, cancelled_at, expires_at) < ${days(RETENTION.closedInvites)}`,
       jobs: sql`DELETE FROM jobs WHERE (completed_at IS NOT NULL AND completed_at < ${days(RETENTION.finishedJobs)}) OR (failed_at IS NOT NULL AND failed_at < ${days(RETENTION.finishedJobs)})`,
     };

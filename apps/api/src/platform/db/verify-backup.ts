@@ -13,7 +13,8 @@ import { loadMigrations } from './migrate.js';
  * hora de descobrir que o arquivo está truncado não é durante um incidente.
  * Este script restaura um dump num banco descartável, confere que as tabelas
  * essenciais vieram com conteúdo e registra o resultado na API, para que a
- * ausência de uma verificação recente apareça no plantão.
+ * ausência de uma verificação recente apareça no plantão (o registro em si é
+ * feito por scripts/backup-offsite.sh, depois de a cópia estar guardada).
  *
  * Uso:
  *   npm run backup:verify -- --dump caminho/do/arquivo.dump --target postgres://...
@@ -38,8 +39,6 @@ const IDENTIFICADOR_SIMPLES = /^[a-z_][a-z0-9_]*$/;
 interface Argumentos {
   dump: string;
   target: string;
-  apiUrl: string | undefined;
-  opsToken: string | undefined;
   /** Grava o resultado em JSON (o workflow registra na API só depois de enviar o dump). */
   reportFile: string | undefined;
   /** Aceita dump com migrations atrás do repositório (deploy pendente); o relatório marca `schemaAtras`. */
@@ -112,8 +111,6 @@ function lerArgumentos(): Argumentos {
   return {
     dump,
     target,
-    apiUrl: valor('api') ?? process.env['API_BASE_URL'],
-    opsToken: process.env['OPS_BACKUP_TOKEN'] ?? process.env['OPS_TOKEN'],
     reportFile: valor('report-file'),
     schemaAtrasOk: process.argv.includes('--schema-atras-ok'),
   };
@@ -194,7 +191,7 @@ interface Conferencia {
   migracao: number;
 }
 
-async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean }> {
+async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean; migracoesAtras: number }> {
   const client = new pg.Client({ connectionString: target });
   await client.connect();
 
@@ -291,9 +288,10 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
     // Dump atrás do repositório: normal entre o merge de uma migration e o
     // deploy. Com --schema-atras-ok o backup vale (é o estado real da
     // produção) e o relatório avisa; sem, é erro como antes.
-    // Atraso aceito é de no máximo 2 migrations: mais que isso não é deploy
-    // pendente, é banco errado (ou parado há muito tempo).
-    if (ultimaRestaurada < ultimaEsperada && (!schemaAtrasOk || ultimaEsperada - ultimaRestaurada > 2)) {
+    // Com --schema-atras-ok o dump é aceito em qualquer atraso (é o estado real
+    // da produção e precisa ser guardado); o relatório marca o atraso e o
+    // workflow falha no fim. A API compara com a própria migration e alerta.
+    if (ultimaRestaurada < ultimaEsperada && !schemaAtrasOk) {
       throw new Error(
         `O dump está na migration ${ultimaRestaurada} e o repositório está na ` +
           `${ultimaEsperada}. O backup não reconstrói o ambiente atual.`,
@@ -302,6 +300,7 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
 
     return {
       schemaAtras: ultimaRestaurada < ultimaEsperada,
+      migracoesAtras: Math.max(0, ultimaEsperada - ultimaRestaurada),
       tabelas: Number(tabelas.rows[0]?.total ?? 0),
       registros,
       politicas: Number(politicas.rows[0]?.total ?? 0),
@@ -313,28 +312,6 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
   }
 }
 
-async function registrar(
-  config: Argumentos,
-  resultado: { tabelas: number; registros: number; duracaoSegundos: number },
-): Promise<void> {
-  if (!config.apiUrl || !config.opsToken) {
-    console.log('API_BASE_URL ou OPS_TOKEN ausentes: resultado não registrado na API.');
-    return;
-  }
-
-  const resposta = await fetch(`${config.apiUrl}/ops/backup`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${config.opsToken}`,
-    },
-    body: JSON.stringify({ origem: config.dump, ...resultado }),
-  });
-
-  if (!resposta.ok) {
-    throw new Error(`Falha ao registrar a verificação: ${resposta.status}`);
-  }
-}
 
 async function main(): Promise<void> {
   const config = lerArgumentos();
@@ -345,7 +322,7 @@ async function main(): Promise<void> {
   await garantirPapeis(config.target, await papeisDoDump(config.dump));
   await restaurar(config.dump, config.target);
 
-  const { tabelas, registros, politicas, grants, migracao, schemaAtras } = await conferir(config.target, config.schemaAtrasOk);
+  const { tabelas, registros, politicas, grants, migracao, schemaAtras, migracoesAtras } = await conferir(config.target, config.schemaAtrasOk);
   const duracaoSegundos = Math.round((Date.now() - inicio) / 100) / 10;
 
   console.log(
@@ -355,9 +332,10 @@ async function main(): Promise<void> {
   );
 
   if (config.reportFile) {
-    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras }));
+    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras }));
   }
-  await registrar(config, { tabelas, registros, duracaoSegundos });
+  // O registro em /ops/backup é feito pelo workflow, só depois de guardar a cópia
+  // (scripts/backup-offsite.sh): verificar não é o mesmo que ter backup.
 }
 
 main().catch((error: unknown) => {

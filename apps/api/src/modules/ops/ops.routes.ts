@@ -268,8 +268,11 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
           /** Onde a cópia externa foi guardada e o SHA-256 do arquivo cifrado. */
           objeto: z.string().max(300).optional(),
           sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
-          migracao: z.number().int().nonnegative().optional(),
+          migracao: z.number().int().nonnegative().max(1_000_000).optional(),
           schemaAtras: z.boolean().optional(),
+          migracoesAtras: z.number().int().nonnegative().max(1_000_000).optional(),
+          /** Fotos no bucket de origem na noite do backup (espelhadas na cópia). */
+          fotos: z.number().int().nonnegative().max(1_000_000_000).optional(),
         }),
         response: { 200: z.object({ message: z.string() }), 401: errorSchema, 404: errorSchema },
       },

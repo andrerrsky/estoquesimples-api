@@ -2,25 +2,24 @@ name: Backup externo
 
 # Toda noite: cópia do Postgres e das fotos fora do Railway, com restauração
 # de teste do dump antes de guardá-lo. Liga quando a variável do repositório
-# BACKUP_OFFSITE_ENABLED for "true" e os segredos abaixo existirem — passo a
-# passo em docs/seguranca.md ("Backup e restauração").
+# BACKUP_OFFSITE_ENABLED for "true" — passo a passo em docs/seguranca.md
+# ("Backup e restauração"). A lógica está em scripts/backup-offsite.sh e é
+# exercitada a cada PR por backup-offsite-test.yml (MinIO).
 #
 # Segredos (Settings → Secrets and variables → Actions):
-#   BACKUP_DATABASE_URL      URL do Postgres de produção com um usuário SÓ DE LEITURA, terminando em ?sslmode=require
+#   BACKUP_DATABASE_URL      Postgres de produção, usuário SÓ DE LEITURA, terminando em ?sslmode=require
 #   BACKUP_AGE_RECIPIENT     chave pública `age` (a privada fica fora do GitHub e do Railway)
-#   BACKUP_S3_ENDPOINT       endpoint S3 dos buckets de backup (outro provedor: B2, R2, S3)
-#   BACKUP_S3_REGION         região (ou "auto")
+#   BACKUP_S3_ENDPOINT / BACKUP_S3_REGION   provedor dos buckets de backup (AWS S3 ou Backblaze B2)
 #   BACKUP_S3_BUCKET         bucket dos DUMPS, com Object Lock (retenção padrão 35 dias)
-#   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY  chave dos dumps: listar, ler e gravar, SEM apagar
-#   BACKUP_IMAGES_BUCKET     bucket da cópia das FOTOS, com versionamento (versões não atuais expiram em 35 dias)
-#   BACKUP_IMAGES_ACCESS_KEY_ID / BACKUP_IMAGES_SECRET_ACCESS_KEY  chave das fotos (o espelho precisa apagar a versão atual)
-#   BACKUP_IMAGES_VERSIONING_CONFIRMED  variável (não segredo) "true" quando o provedor não informa o versionamento pela API (B2)
+#   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY        chave dos dumps: listar, ler e gravar, SEM apagar
+#   BACKUP_IMAGES_BUCKET     bucket da cópia das FOTOS (versionamento; no B2, Object Lock)
+#   BACKUP_IMAGES_ACCESS_KEY_ID / BACKUP_IMAGES_SECRET_ACCESS_KEY  chave da cópia das fotos
 #   IMAGES_S3_ENDPOINT / IMAGES_S3_BUCKET / IMAGES_S3_ACCESS_KEY_ID / IMAGES_S3_SECRET_ACCESS_KEY  leitura do bucket das fotos
-#   API_BASE_URL / OPS_BACKUP_TOKEN registram o resultado em /ops/backup (token que só faz isso)
+#   API_BASE_URL / OPS_BACKUP_TOKEN   registram o resultado em /ops/backup (token que só faz isso)
+# Variável: BACKUP_IMAGES_VERSIONING_CONFIRMED=true quando o provedor não informa o versionamento pela API (B2).
 #
 # Credenciais ficam só no passo que as usa, e as dependências do npm são
-# instaladas sem scripts de instalação: nada de terceiros roda com acesso aos
-# buckets ou ao banco.
+# instaladas sem scripts de instalação.
 on:
   schedule:
     - cron: '30 5 * * *'
@@ -37,7 +36,7 @@ jobs:
   backup:
     if: vars.BACKUP_OFFSITE_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     services:
       postgres:
@@ -55,7 +54,10 @@ jobs:
           --health-retries 10
 
     env:
-      DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
+      WORKDIR: ${{ github.workspace }}/.backup-offsite
+      DUMPS_REMOTE: backup:${{ secrets.BACKUP_S3_BUCKET }}
+      IMAGES_SOURCE: imagens:${{ secrets.IMAGES_S3_BUCKET }}
+      IMAGES_DEST: backupimg:${{ secrets.BACKUP_IMAGES_BUCKET }}
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -68,80 +70,38 @@ jobs:
       # Sem scripts de instalação: a verificação só precisa de tsx e pg.
       - run: npm ci --ignore-scripts
 
+      - name: Ferramentas (cliente do Postgres 16, age, rclone)
+        run: bash scripts/install-backup-tools.sh
+
       - name: Conferir configuração
         env:
-          DB: ${{ secrets.BACKUP_DATABASE_URL }}
-          AGE: ${{ secrets.BACKUP_AGE_RECIPIENT }}
-          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-        run: |
-          missing=""
-          [ -n "$DB" ] || missing="$missing BACKUP_DATABASE_URL"
-          [ -n "$AGE" ] || missing="$missing BACKUP_AGE_RECIPIENT"
-          [ -n "$BUCKET" ] || missing="$missing BACKUP_S3_BUCKET"
-          if [ -n "$missing" ]; then echo "::error::Segredos ausentes:$missing"; exit 1; fi
-          # TLS obrigatório: o banco é alcançado pelo proxy público do Railway.
-          case "$DB" in
-            *sslmode=require*|*sslmode=verify-full*|*sslmode=verify-ca*) ;;
-            *) echo "::error::BACKUP_DATABASE_URL precisa terminar em ?sslmode=require (ou verify-full)"; exit 1 ;;
-          esac
-
-      - name: Ferramentas (cliente do Postgres 16, age, rclone)
-        run: |
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-16 age rclone
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: bash scripts/backup-offsite.sh check
 
       - name: Dump do Postgres de produção (somente leitura)
         env:
           BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-        run: |
-          umask 077
-          pg_dump --format=custom --no-owner --file=backup.dump "$BACKUP_DATABASE_URL"
-          ls -l backup.dump
+        run: bash scripts/backup-offsite.sh dump
 
-      # Backup que nunca foi restaurado é suposição: o dump só vai para o
-      # bucket depois de restaurado e conferido aqui. O registro em
-      # /ops/backup fica para o fim, depois do envio dar certo.
       - name: Restaurar e conferir
-        # --schema-atras-ok: com uma migration já no main e o deploy pendente, o
-        # dump (estado real da produção) ainda é guardado; o job falha no fim.
-        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO" --report-file "$GITHUB_WORKSPACE/verificacao.json" --schema-atras-ok
+        env:
+          DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
+        run: bash scripts/backup-offsite.sh verify
 
-      - name: Cifrar e enviar o dump
-        id: envio
+      - name: Cifrar, enviar e conferir o dump
         env:
           AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
-          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
           RCLONE_CONFIG_BACKUP_TYPE: s3
           RCLONE_CONFIG_BACKUP_PROVIDER: Other
           RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
           RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
           RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
           RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-        run: |
-          umask 077
-          stamp="$(date -u +%Y/%m/%d/estoquesimples-%Y%m%dT%H%M%SZ)"
-          age --recipient "$AGE_RECIPIENT" --output backup.dump.age backup.dump
-          sha="$(sha256sum backup.dump.age | cut -d' ' -f1)"
-          echo "$sha" > backup.dump.age.sha256
-          rclone copyto backup.dump.age "backup:$BUCKET/db/$stamp.dump.age" --s3-no-check-bucket
-          rclone copyto backup.dump.age.sha256 "backup:$BUCKET/db/$stamp.dump.age.sha256" --s3-no-check-bucket
-          # Confere que o objeto chegou inteiro (tamanho e hash calculado de volta).
-          remoto="$(rclone cat "backup:$BUCKET/db/$stamp.dump.age" | sha256sum | cut -d' ' -f1)"
-          [ "$remoto" = "$sha" ] || { echo "::error::O arquivo no bucket não confere com o enviado"; exit 1; }
-          echo "objeto=db/$stamp.dump.age" >> "$GITHUB_OUTPUT"
-          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+        run: bash scripts/backup-offsite.sh upload
 
-      # Cópia das fotos: `sync` espelha o bucket das fotos num bucket próprio
-      # com versionamento. Uma foto apagada (por engano, por um invasor ou pelo
-      # expurgo de uma conta) vira versão não atual e some depois de 35 dias,
-      # a mesma retenção dos dumps (docs/seguranca.md). A chave daqui não
-      # alcança o bucket dos dumps.
-      - name: Copiar fotos dos produtos
+      - name: Espelhar as fotos dos produtos
         env:
-          IMAGES_BUCKET: ${{ secrets.IMAGES_S3_BUCKET }}
-          BUCKET: ${{ secrets.BACKUP_IMAGES_BUCKET }}
           VERSIONING_CONFIRMED: ${{ vars.BACKUP_IMAGES_VERSIONING_CONFIRMED }}
           RCLONE_CONFIG_BACKUPIMG_TYPE: s3
           RCLONE_CONFIG_BACKUPIMG_PROVIDER: Other
@@ -154,42 +114,19 @@ jobs:
           RCLONE_CONFIG_IMAGENS_ENDPOINT: ${{ secrets.IMAGES_S3_ENDPOINT }}
           RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
           RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
-        if: env.IMAGES_BUCKET != ''
-        run: |
-          # O espelho apaga no destino o que sumiu na origem: só roda se o
-          # destino guarda versões (senão apagaria a cópia de verdade) e se a
-          # origem não está vazia (bucket errado ou esvaziado por alguém).
-          versioning="$(rclone backend versioning "backupimg:$BUCKET" 2>/dev/null || true)"
-          if [ "$versioning" != "Enabled" ] && [ "$VERSIONING_CONFIRMED" != "true" ]; then
-            echo "::error::O bucket das fotos não informa versionamento ativo ($versioning). Ative o versionamento (ou, no B2, defina a variável BACKUP_IMAGES_VERSIONING_CONFIRMED=true)."
-            exit 1
-          fi
-          total="$(rclone size "imagens:$IMAGES_BUCKET" --json | jq '.count')"
-          if [ "${total:-0}" -eq 0 ]; then echo "::error::O bucket das fotos está vazio; espelho não executado."; exit 1; fi
-          # Mais de 200 fotos sumindo numa noite não é rotina: o rclone para e o job fica vermelho.
-          rclone sync "imagens:$IMAGES_BUCKET" "backupimg:$BUCKET" --s3-no-check-bucket --transfers 8 --max-delete 200 --stats-one-line --stats 60s
+        run: bash scripts/backup-offsite.sh photos
 
-      # Só agora: banco restaurado e conferido, cópia cifrada no bucket e
-      # conferida, fotos copiadas. É isto que zera o alerta backup_desatualizado.
       - name: Registrar em /ops/backup
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           OPS_BACKUP_TOKEN: ${{ secrets.OPS_BACKUP_TOKEN }}
-          OBJETO: ${{ steps.envio.outputs.objeto }}
-          SHA256: ${{ steps.envio.outputs.sha256 }}
-        run: |
-          body="$(jq -c --arg objeto "$OBJETO" --arg sha "$SHA256" '{origem: "backup-offsite", tabelas, registros, duracaoSegundos, migracao, schemaAtras, objeto: $objeto, sha256: $sha}' verificacao.json)"
-          curl -fsS -X POST "$API_BASE_URL/ops/backup" -H "authorization: Bearer $OPS_BACKUP_TOKEN" -H 'content-type: application/json' --data "$body"
+        run: bash scripts/backup-offsite.sh register
 
-      # O backup foi guardado e registrado, mas a produção está atrás do main
-      # (migration sem deploy): o job fica vermelho para alguém olhar o deploy.
+      # Backup guardado e registrado; se a produção está atrás do main
+      # (migration sem deploy), o job fica vermelho para alguém olhar o deploy.
       - name: Produção atrás do repositório?
-        run: |
-          if [ "$(jq -r '.schemaAtras' verificacao.json)" = "true" ]; then
-            echo "::error::O banco de produção está numa migration anterior à do main. Backup guardado; confira o deploy no Railway."
-            exit 1
-          fi
+        run: bash scripts/backup-offsite.sh finish
 
       - name: Apagar cópias locais
         if: always()
-        run: rm -f backup.dump backup.dump.age backup.dump.age.sha256 verificacao.json
+        run: bash scripts/backup-offsite.sh cleanup
