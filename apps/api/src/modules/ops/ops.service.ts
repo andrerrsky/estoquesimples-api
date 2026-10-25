@@ -24,6 +24,10 @@ export interface OpsSnapshot extends Record<string, number> {
   operacoesSync24h: number;
   /** Horas desde a última restauração de teste registrada em /ops/backup; -1 quando nunca houve. */
   backupHoras: number;
+  /** Migration do último dump registrado (-1: sem registro ou sem a informação). */
+  backupMigracao: number;
+  /** Migration que esta API roda. */
+  migracaoAtual: number;
 }
 
 const ATRASO_TOLERADO = "interval '15 minutes'";
@@ -66,7 +70,10 @@ export class OpsService {
         (SELECT count(*) FROM sync_operations
           WHERE created_at > now() - interval '24 hours') AS operacoes_sync,
         COALESCE((SELECT extract(epoch FROM now() - updated_at) / 3600 FROM app_config WHERE key = 'backup_verificado'), -1)
-          AS backup_horas
+          AS backup_horas,
+        COALESCE((SELECT (value->>'migracao')::int FROM app_config WHERE key = 'backup_verificado' AND value ? 'migracao'), -1)
+          AS backup_migracao,
+        COALESCE((SELECT max(version) FROM schema_migrations), 0) AS migracao_atual
     `);
 
     const linha = resultado.rows[0] ?? {};
@@ -84,6 +91,8 @@ export class OpsService {
       dispositivosAtivos7d: numero('dispositivos_ativos'),
       operacoesSync24h: numero('operacoes_sync'),
       backupHoras: Math.round(numero('backup_horas')),
+      backupMigracao: numero('backup_migracao'),
+      migracaoAtual: numero('migracao_atual'),
     };
   }
 
@@ -163,6 +172,14 @@ export class OpsService {
           estado.backupHoras < 0
             ? 'Nenhuma restauração de teste de backup foi registrada. Configure o backup externo (docs/seguranca.md).'
             : `A última restauração de teste de backup foi há ${estado.backupHoras} h (limite: ${limite} h). Confira o workflow backup-offsite.`,
+      });
+    }
+    // Dump guardado numa migration diferente da que a API roda: banco errado
+    // em BACKUP_DATABASE_URL, ou deploy que não subiu.
+    if (estado.backupMigracao >= 0 && estado.backupMigracao !== estado.migracaoAtual) {
+      encontrados.push({
+        nome: 'backup_schema_divergente',
+        detalhe: `O último backup guardado está na migration ${estado.backupMigracao} e a API roda a ${estado.migracaoAtual}. Confira BACKUP_DATABASE_URL e o último deploy.`,
       });
     }
     if (estado.conflitosAntigos > 0) {

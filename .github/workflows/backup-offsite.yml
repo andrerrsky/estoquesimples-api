@@ -8,10 +8,13 @@ name: Backup externo
 # Segredos (Settings → Secrets and variables → Actions):
 #   BACKUP_DATABASE_URL      URL do Postgres de produção com um usuário SÓ DE LEITURA, terminando em ?sslmode=require
 #   BACKUP_AGE_RECIPIENT     chave pública `age` (a privada fica fora do GitHub e do Railway)
-#   BACKUP_S3_ENDPOINT       endpoint S3 do bucket de backup (outro provedor: B2, R2, S3)
-#   BACKUP_S3_BUCKET         nome do bucket (com versionamento ou object lock e regra de expiração)
+#   BACKUP_S3_ENDPOINT       endpoint S3 dos buckets de backup (outro provedor: B2, R2, S3)
 #   BACKUP_S3_REGION         região (ou "auto")
-#   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY  credencial que só grava nesse bucket
+#   BACKUP_S3_BUCKET         bucket dos DUMPS, com Object Lock (retenção padrão 35 dias)
+#   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY  chave dos dumps: listar, ler e gravar, SEM apagar
+#   BACKUP_IMAGES_BUCKET     bucket da cópia das FOTOS, com versionamento (versões não atuais expiram em 35 dias)
+#   BACKUP_IMAGES_ACCESS_KEY_ID / BACKUP_IMAGES_SECRET_ACCESS_KEY  chave das fotos (o espelho precisa apagar a versão atual)
+#   BACKUP_IMAGES_VERSIONING_CONFIRMED  variável (não segredo) "true" quando o provedor não informa o versionamento pela API (B2)
 #   IMAGES_S3_ENDPOINT / IMAGES_S3_BUCKET / IMAGES_S3_ACCESS_KEY_ID / IMAGES_S3_SECRET_ACCESS_KEY  leitura do bucket das fotos
 #   API_BASE_URL / OPS_BACKUP_TOKEN registram o resultado em /ops/backup (token que só faz isso)
 #
@@ -76,6 +79,11 @@ jobs:
           [ -n "$AGE" ] || missing="$missing BACKUP_AGE_RECIPIENT"
           [ -n "$BUCKET" ] || missing="$missing BACKUP_S3_BUCKET"
           if [ -n "$missing" ]; then echo "::error::Segredos ausentes:$missing"; exit 1; fi
+          # TLS obrigatório: o banco é alcançado pelo proxy público do Railway.
+          case "$DB" in
+            *sslmode=require*|*sslmode=verify-full*|*sslmode=verify-ca*) ;;
+            *) echo "::error::BACKUP_DATABASE_URL precisa terminar em ?sslmode=require (ou verify-full)"; exit 1 ;;
+          esac
 
       - name: Ferramentas (cliente do Postgres 16, age, rclone)
         run: |
@@ -125,27 +133,41 @@ jobs:
           echo "objeto=db/$stamp.dump.age" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
 
-      # Cópia das fotos: `sync` espelha o bucket das fotos num bucket com
-      # versionamento. Uma foto apagada (por engano, por um invasor ou pelo
+      # Cópia das fotos: `sync` espelha o bucket das fotos num bucket próprio
+      # com versionamento. Uma foto apagada (por engano, por um invasor ou pelo
       # expurgo de uma conta) vira versão não atual e some depois de 35 dias,
-      # a mesma retenção dos dumps (docs/seguranca.md).
+      # a mesma retenção dos dumps (docs/seguranca.md). A chave daqui não
+      # alcança o bucket dos dumps.
       - name: Copiar fotos dos produtos
         env:
           IMAGES_BUCKET: ${{ secrets.IMAGES_S3_BUCKET }}
-          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-          RCLONE_CONFIG_BACKUP_TYPE: s3
-          RCLONE_CONFIG_BACKUP_PROVIDER: Other
-          RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
-          RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
-          RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BUCKET: ${{ secrets.BACKUP_IMAGES_BUCKET }}
+          VERSIONING_CONFIRMED: ${{ vars.BACKUP_IMAGES_VERSIONING_CONFIRMED }}
+          RCLONE_CONFIG_BACKUPIMG_TYPE: s3
+          RCLONE_CONFIG_BACKUPIMG_PROVIDER: Other
+          RCLONE_CONFIG_BACKUPIMG_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          RCLONE_CONFIG_BACKUPIMG_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          RCLONE_CONFIG_BACKUPIMG_ACCESS_KEY_ID: ${{ secrets.BACKUP_IMAGES_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_BACKUPIMG_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_IMAGES_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_IMAGENS_TYPE: s3
           RCLONE_CONFIG_IMAGENS_PROVIDER: Other
           RCLONE_CONFIG_IMAGENS_ENDPOINT: ${{ secrets.IMAGES_S3_ENDPOINT }}
           RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
           RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
         if: env.IMAGES_BUCKET != ''
-        run: rclone sync "imagens:$IMAGES_BUCKET" "backup:$BUCKET/imagens" --s3-no-check-bucket --transfers 8 --max-delete 5000 --stats-one-line --stats 60s
+        run: |
+          # O espelho apaga no destino o que sumiu na origem: só roda se o
+          # destino guarda versões (senão apagaria a cópia de verdade) e se a
+          # origem não está vazia (bucket errado ou esvaziado por alguém).
+          versioning="$(rclone backend versioning "backupimg:$BUCKET" 2>/dev/null || true)"
+          if [ "$versioning" != "Enabled" ] && [ "$VERSIONING_CONFIRMED" != "true" ]; then
+            echo "::error::O bucket das fotos não informa versionamento ativo ($versioning). Ative o versionamento (ou, no B2, defina a variável BACKUP_IMAGES_VERSIONING_CONFIRMED=true)."
+            exit 1
+          fi
+          total="$(rclone size "imagens:$IMAGES_BUCKET" --json | jq '.count')"
+          if [ "${total:-0}" -eq 0 ]; then echo "::error::O bucket das fotos está vazio; espelho não executado."; exit 1; fi
+          # Mais de 200 fotos sumindo numa noite não é rotina: o rclone para e o job fica vermelho.
+          rclone sync "imagens:$IMAGES_BUCKET" "backupimg:$BUCKET" --s3-no-check-bucket --transfers 8 --max-delete 200 --stats-one-line --stats 60s
 
       # Só agora: banco restaurado e conferido, cópia cifrada no bucket e
       # conferida, fotos copiadas. É isto que zera o alerta backup_desatualizado.

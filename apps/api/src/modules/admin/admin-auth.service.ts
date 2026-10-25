@@ -273,7 +273,6 @@ export class AdminAuthService {
     return { enabled: Boolean(row?.totpEnabledAt), required: adminMfaRequired(this.env), recoveryCodesLeft: row?.recoveryCodes.length ?? 0 };
   }
 
-  /** Gera um segredo novo (ainda inativo) e devolve o que o autenticador precisa ler. */
   /**
    * Códigos de confirmação do cadastro do autenticador, enviados por e-mail:
    * só a senha não basta para alguém cadastrar o próprio celular num acesso
@@ -282,6 +281,7 @@ export class AdminAuthService {
    */
   private readonly enrollCodes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
 
+  /** Gera um segredo novo (ainda inativo), manda o código de confirmação por e-mail e devolve o que o autenticador precisa ler. */
   async startMfaSetup(context: AdminContext): Promise<{ secret: string; otpauthUri: string }> {
     const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
     if (row?.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo. Desative antes de cadastrar outro aparelho.');
@@ -300,6 +300,7 @@ export class AdminAuthService {
     return { secret, otpauthUri: otpauthUri(secret, context.email) };
   }
 
+  /** Confere o código do e-mail (conta tentativa); só é consumido quando o cadastro inteiro dá certo. */
   private checkEnrollCode(adminId: string, code: string): boolean {
     const entry = this.enrollCodes.get(adminId);
     if (!entry || entry.expiresAt < Date.now() || entry.attempts >= 5) {
@@ -307,9 +308,7 @@ export class AdminAuthService {
       return false;
     }
     entry.attempts += 1;
-    const ok = safeEquals(hashToken(code.trim()), entry.hash);
-    if (ok) this.enrollCodes.delete(adminId);
-    return ok;
+    return safeEquals(hashToken(code.trim()), entry.hash);
   }
 
   /** Confirma o cadastro com um código do autenticador e devolve os códigos de recuperação (uma vez só). */
@@ -322,6 +321,7 @@ export class AdminAuthService {
     if (row.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo.');
     const step = verifyTotp(this.services.purchaseTokens.decrypt(row.totpSecret, totpAad(row.id), { requireCurrentFormat: true }), code);
     if (step === null) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Código inválido. Confira a hora do celular e tente de novo.');
+    this.enrollCodes.delete(context.adminId);
     const recoveryCodes = generateRecoveryCodes();
     // Sessão nova ao ativar: a sessão aberta só com a senha (inclusive outras,
     // de outro navegador) não herda o acesso completo.

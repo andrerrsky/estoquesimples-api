@@ -306,6 +306,13 @@ describe('token de backup (OPS_BACKUP_TOKEN)', () => {
     expect(status.json().detalhes.objeto).toBe(payload.objeto);
   });
 
+  it('avisa quando o dump guardado está numa migration diferente da que a API roda', async () => {
+    const payload = { origem: 'backup-offsite', tabelas: 1, registros: 1, duracaoSegundos: 1, migracao: 1 };
+    expect((await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload })).statusCode).toBe(200);
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/status', headers: auth });
+    expect(status.json().alertas.map((alerta: { nome: string }) => alerta.nome)).toContain('backup_schema_divergente');
+  });
+
   it('não abre mais nada além do registro de backup', async () => {
     for (const [method, url, payload] of [
       ['GET', '/ops/backup', undefined],

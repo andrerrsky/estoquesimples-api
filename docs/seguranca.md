@@ -20,45 +20,55 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    agendados (diário; semanal se o plano permitir) com retenção de pelo menos
    14 dias. É a restauração mais rápida (mesmo provedor, um clique).
 2. **Cópia externa noturna** (`.github/workflows/backup-offsite.yml`):
-   - `pg_dump` com um usuário **somente leitura**;
+   - `pg_dump` com um usuário **somente leitura**, por TLS (o workflow recusa
+     URL sem `sslmode=require`);
    - **restauração de teste** do próprio dump num Postgres descartável do
      runner, com conferência das tabelas essenciais e do histórico de
-     migrations (`backup:verify`), registrada em `/ops/backup`;
+     migrations (`backup:verify`);
    - só então o dump é cifrado com `age` (chave pública no GitHub; a privada
-     **nunca** fica no GitHub nem no Railway) e enviado para um bucket de
-     **outro provedor**, em `db/AAAA/MM/DD/…dump.age` com o SHA-256 ao lado;
-   - as fotos dos produtos são copiadas com `rclone copy` (nunca apaga no
-     destino) para `imagens/` no mesmo bucket.
-3. **Exercício de schema** (`backup-drill.yml`, segundas): restaura um banco
-   sintético para provar que o procedimento acompanha as migrations.
+     **nunca** fica no GitHub nem no Railway), enviado para o **bucket dos
+     dumps** em outro provedor (`db/AAAA/MM/DD/…dump.age`, com o SHA-256 ao
+     lado e conferido de volta) e o resultado registrado em `/ops/backup`;
+   - o bucket dos dumps tem **Object Lock**: nenhum dump pode ser apagado
+     ou trocado antes de 35 dias, nem com a chave do workflow;
+   - as fotos são **espelhadas** (`rclone sync`) num **segundo bucket**, com
+     versionamento: foto apagada na origem vira versão antiga e fica 35
+     dias. O espelho só roda se o versionamento estiver ativo e a origem não
+     estiver vazia, e para se mais de 200 fotos sumirem numa noite.
+3. **Exercício de schema** (`backup-drill.yml`, segundas e em todo PR que mexe
+   em migrations ou no backup): restaura um banco sintético, com o dump feito
+   pela mesma receita do usuário de leitura.
 4. **No aparelho**: o app Android funciona sem internet, guarda uma cópia do
    banco local antes da primeira sincronização e entra no backup do Android
    (só o banco do estoque; sessão e login lembrado ficam de fora).
-5. **Alerta**: `backup_desatualizado` (vigia de 15 em 15 minutos, painel e
-   métrica `backup_verified_age_hours`) dispara quando não há restauração de
-   teste registrada nas últimas `BACKUP_MAX_AGE_HOURS` horas (48 h).
+5. **Alertas**: `backup_desatualizado` quando não há restauração de teste
+   registrada nas últimas `BACKUP_MAX_AGE_HOURS` horas (48 h), e
+   `backup_schema_divergente` quando o último dump guardado está numa
+   migration diferente da que a API roda (banco errado ou deploy pendente).
 
 ### Ligar a cópia externa **[dono]**
 
-1. Crie um bucket em outro provedor (Backblaze B2, Cloudflare R2 ou AWS S3)
-   com **versionamento** (ou object lock em modo governança):
-   - em `db/` (os dumps): objetos atuais expiram em 35 dias **e** versões não
-     atuais são apagadas 1 dia depois (sem a segunda regra, a expiração só
-     esconde o arquivo e ele continua guardado);
-   - em `imagens/`: nenhuma expiração por idade (o workflow espelha o bucket
-     das fotos com `rclone sync`); **versões não atuais expiram em 35 dias** —
-     é assim que foto apagada, inclusive pelo expurgo de uma conta, sai do
-     backup;
-   - no Backblaze B2 as duas regras são `daysFromUploadingToHiding` e
-     `daysFromHidingToDeleting` por prefixo; no S3/R2, *Lifecycle* com
-     `Expiration` e `NoncurrentVersionExpiration`;
-   - credencial restrita a esse bucket com listar, ler, gravar e apagar a
-     versão atual (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`,
-     `s3:DeleteObject`; no B2: `listFiles`, `readFiles`, `writeFiles`,
-     `deleteFiles`), **sem** `s3:DeleteObjectVersion`/`PutLifecycleConfiguration`:
-     com o versionamento, apagar só cria uma versão não atual, que a regra do
-     bucket remove no prazo — a credencial vazada não consegue destruir as
-     cópias antes disso.
+1. Num provedor diferente do Railway (Backblaze B2, Cloudflare R2 ou AWS S3),
+   crie **dois buckets**:
+   - **dumps** (`BACKUP_S3_BUCKET`): **Object Lock** ligado, retenção padrão
+     de **35 dias** (modo *compliance*, ou *governance* se quiser poder
+     encurtar com a conta raiz) e regra de expiração de objetos atuais em 35
+     dias. Chave **só deste bucket**, com listar, ler e gravar (`s3:ListBucket`,
+     `s3:GetObject`, `s3:PutObject`; no B2 `listFiles`, `readFiles`,
+     `writeFiles`) e **sem apagar** — o workflow nunca apaga ali;
+   - **fotos** (`BACKUP_IMAGES_BUCKET`): **versionamento** ligado; nenhuma
+     expiração por idade dos objetos atuais e **versões não atuais expiram em
+     35 dias** (S3/R2: *Lifecycle* `NoncurrentVersionExpiration`; B2:
+     `daysFromHidingToDeleting: 35`). Chave **só deste bucket**, com listar,
+     ler, gravar e apagar a versão atual (o espelho precisa), **sem**
+     `s3:DeleteObjectVersion` nem permissão de mudar a regra do bucket. No B2,
+     que não informa o versionamento pela API, defina a variável do GitHub
+     `BACKUP_IMAGES_VERSIONING_CONFIRMED=true` depois de conferir a regra.
+
+   Com isso, uma chave vazada do GitHub não destrói nada antes do prazo: a
+   dos dumps não apaga e o Object Lock impediria; a das fotos só cria versões
+   antigas, que ficam 35 dias. O dado de uma conta expurgada sai das cópias
+   em até 35 dias.
 2. Gere o par de chaves `age` num computador confiável:
    `age-keygen -o estoque-backup.key` — guarde o arquivo **no gerenciador de
    senhas** (e uma cópia offline); a linha `public key: age1…` vai para o GitHub.
@@ -90,12 +100,15 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 
 ### Restaurar (roteiro de incidente)
 
+0. **Suspeita de exclusão ou adulteração?** Antes de tudo, no GitHub, mude
+   a variável `BACKUP_OFFSITE_ENABLED` para `false`: o espelho da noite
+   seguinte não pode levar o estrago para a cópia das fotos.
 1. **Decidir a origem**: perda recente e Railway de pé → backup do Railway
    (painel do Postgres → *Restore*). Railway indisponível, conta comprometida
    ou backup do Railway inválido → cópia externa.
 2. **Baixar e decifrar** a cópia externa mais recente:
    ```bash
-   rclone copy backup:<bucket>/db/AAAA/MM/DD/ ./restauracao/
+   rclone copy backup:<bucket-dos-dumps>/db/AAAA/MM/DD/ ./restauracao/
    sha256sum -c <(echo "$(cat arquivo.dump.age.sha256)  arquivo.dump.age")
    age --decrypt --identity estoque-backup.key --output backup.dump arquivo.dump.age
    ```
@@ -115,7 +128,15 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    (`backup:verify` faz o mesmo automaticamente no banco descartável do passo 3.)
 5. **Apontar a API**: troque `DATABASE_URL` do serviço da API para o banco
    novo; o deploy roda as migrations pendentes na subida. Confira `/ready`.
-6. **Fotos**: `rclone copy backup:<bucket>/imagens imagens:<bucket-das-fotos>`.
+6. **Fotos**: restaure o bucket como estava **antes** do incidente (as fotos
+   apagadas desde então existem como versões antigas):
+   ```bash
+   # S3/R2 (versões): estado no instante informado
+   rclone copy --s3-version-at "2026-10-20T00:00:00Z" backupimg:<bucket-das-fotos-backup> imagens:<bucket-das-fotos>
+   # Backblaze B2
+   rclone copy --b2-version-at "2026-10-20T00:00:00Z" backupimg:<bucket-das-fotos-backup> imagens:<bucket-das-fotos>
+   ```
+   Depois volte `BACKUP_OFFSITE_ENABLED=true`.
 7. **Chaves**: a API precisa das **mesmas** `PURCHASE_TOKEN_ENCRYPTION_KEY` /
    `SECRETS_ENCRYPTION_KEYS` e `JWT_*` de antes — sem elas os segredos
    cifrados (chave da OpenAI, segundo fator do painel, comprovantes do Google
@@ -169,6 +190,22 @@ outra linha não abre.
 segredo derivado do cookie do painel (se `ADMIN_COOKIE_SECRET` não estiver
 definido); as sessões de refresh continuam.
 
+### Acesso de emergência ao painel (sem e-mail ou sem celular)
+
+O cadastro do autenticador pede um código enviado por e-mail. Se o envio de
+e-mail estiver fora e um administrador precisar entrar, um owner com acesso
+ao Railway pode, pelo terminal do serviço:
+
+1. `railway run npm run admin:create -w @estoquesimples/api -- --email <owner> --role owner`
+   com `ADMIN_PASSWORD=<senha nova>` redefine a senha;
+2. `railway run -- psql "$DATABASE_URL" -c "UPDATE platform_admins SET totp_secret = NULL, totp_enabled_at = NULL, recovery_codes = '[]' WHERE lower(email) = '<email>'"`
+   zera o segundo fator;
+3. com `ADMIN_MFA_REQUIRED=false` temporariamente (deploy), a pessoa entra só
+   com a senha; volte para o padrão logo depois e cadastre o autenticador.
+
+Cada passo fica no histórico de deploys e variáveis do Railway; anote no
+histórico de incidentes.
+
 ## Contas e acesso
 
 - **Clientes**: argon2id, política de senha (10+ caracteres, lista de senhas
@@ -209,6 +246,8 @@ definido); as sessões de refresh continuam.
 | Dado | Prazo | Onde |
 | --- | --- | --- |
 | Conta excluída | 30 dias após o pedido | `privacy.daily` |
+| Conversas de suporte de quem não tinha conta, com o e-mail da conta excluída | junto com a conta | `privacy.daily` |
+| Avisos do Google Play/Asaas já processados (`subscription_events`) | 400 dias | `privacy.daily` |
 | Sessões encerradas ou vencidas (IP, navegador) | 90 dias | `privacy.daily` |
 | Tokens de uso único vencidos | 30 dias | `privacy.daily` |
 | IP em registros de auditoria (cliente e painel) | 180 dias (o registro fica) | `privacy.daily` |
@@ -229,4 +268,6 @@ definido); as sessões de refresh continuam.
 | Zod 3 sem correção para GHSA-mrhx-c7xc-m3w5 | corpo limitado (1 MB; 5 MB na sincronização), listas com `.max()`; aceite com prazo em `scripts/audit-gate.mjs` | 2027-01-31 (migrar para Zod 4) |
 | Cadastro responde 409 para e-mail já usado | limite por IP e por e-mail (5/h); o cadastro devolve sessão na hora, então trocar por resposta neutra muda o fluxo dos apps | próxima revisão do cadastro |
 | Google Analytics no painel (`script-src` com googletagmanager.com) | pedido do produto (medir o uso do painel); só carrega depois do aceite no aviso de cookies; o cookie de sessão é httpOnly e as mutações exigem cabeçalho anti-CSRF; segundo fator obrigatório. Para tirar: remover `lib/ga.ts` do painel e o domínio da CSP em `admin-static.ts` | se o painel ganhar ações mais sensíveis |
+| Texto livre (motivo, nota) na trilha do painel pode citar dado pessoal | o expurgo tira e-mail e nome dos campos estruturados; o painel orienta a não escrever dado pessoal no motivo | revisão anual |
+| Dados do pagador da empresa (`billing_customers`) ficam enquanto a empresa existir | ligados à empresa, não à pessoa; saem com a empresa (decisão de produto pendente em AGENTS.md §13) | com a decisão de purga de empresas |
 | Freio de tentativas em memória | instância única; um deploy só devolve tentativas a quem já estava bloqueado | se houver mais de uma instância |

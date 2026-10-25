@@ -30,6 +30,8 @@ export const RETENTION = {
   closedInvites: 90,
   /** Lista de e-mails do público de campanhas encerradas há mais de N dias. */
   campaignEmails: 180,
+  /** Avisos do Google Play e do Asaas já processados. */
+  billingEvents: 400,
 } as const;
 
 type Counted = {
@@ -89,7 +91,7 @@ export class PrivacyService {
         await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE lower(metadata->>'email') = ${email}`);
         // Empresas já excluídas que a pessoa possuía: saem inteiras (estoque, fotos, assinatura).
         await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
-        await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id}`);
+        await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id} OR (user_id IS NULL AND lower(contact_email) = ${email})`);
         await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
         await tx.execute(sql`UPDATE audit_log SET ip_address = NULL WHERE actor_user_id = ${id}`);
         // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
@@ -149,6 +151,7 @@ export class PrivacyService {
       pushTokens: sql`DELETE FROM push_tokens WHERE (revoked_at IS NOT NULL AND revoked_at < ${days(RETENTION.endedSessions)}) OR last_seen_at < ${days(RETENTION.stalePushTokens)}`,
       supportTickets: sql`DELETE FROM support_tickets WHERE status = 'resolved' AND last_message_at < ${days(RETENTION.closedSupport)}`,
       campaignEmails: sql`UPDATE push_campaigns SET audience = jsonb_set(audience, '{emails}', '[]'::jsonb) WHERE audience->>'type' = 'users' AND jsonb_array_length(audience->'emails') > 0 AND COALESCE(completed_at, created_at) < ${days(RETENTION.campaignEmails)}`,
+      billingEvents: sql`DELETE FROM subscription_events WHERE processed_at IS NOT NULL AND processed_at < ${days(RETENTION.billingEvents)}`,
       invites: sql`DELETE FROM invites WHERE (accepted_at IS NOT NULL OR cancelled_at IS NOT NULL OR expires_at < now()) AND COALESCE(accepted_at, cancelled_at, expires_at) < ${days(RETENTION.closedInvites)}`,
       jobs: sql`DELETE FROM jobs WHERE (completed_at IS NOT NULL AND completed_at < ${days(RETENTION.finishedJobs)}) OR (failed_at IS NOT NULL AND failed_at < ${days(RETENTION.finishedJobs)})`,
     };

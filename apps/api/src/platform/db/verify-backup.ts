@@ -291,7 +291,9 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
     // Dump atrás do repositório: normal entre o merge de uma migration e o
     // deploy. Com --schema-atras-ok o backup vale (é o estado real da
     // produção) e o relatório avisa; sem, é erro como antes.
-    if (ultimaRestaurada < ultimaEsperada && !schemaAtrasOk) {
+    // Atraso aceito é de no máximo 2 migrations: mais que isso não é deploy
+    // pendente, é banco errado (ou parado há muito tempo).
+    if (ultimaRestaurada < ultimaEsperada && (!schemaAtrasOk || ultimaEsperada - ultimaRestaurada > 2)) {
       throw new Error(
         `O dump está na migration ${ultimaRestaurada} e o repositório está na ` +
           `${ultimaEsperada}. O backup não reconstrói o ambiente atual.`,
