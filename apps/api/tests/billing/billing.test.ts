@@ -211,7 +211,7 @@ describe('vinculação de compra', () => {
     for (const row of rows) {
       expect(row.purchaseTokenEnc).not.toContain('token-antigo');
       expect(row.purchaseTokenEnc).not.toContain('token-novo');
-      expect(row.purchaseTokenEnc?.startsWith('v1:')).toBe(true);
+      expect(row.purchaseTokenEnc?.startsWith('v2:k1:')).toBe(true);
       expect(cipher.decrypt(row.purchaseTokenEnc ?? '').startsWith('token-')).toBe(true);
     }
 
@@ -614,7 +614,7 @@ describe('isolamento', () => {
     const stored = await context.services.db.select().from(subscriptions);
     expect(stored).toHaveLength(1);
     expect(JSON.stringify(stored[0])).not.toContain('token-secreto-nao-vazar');
-    expect(stored[0]?.purchaseTokenEnc?.startsWith('v1:')).toBe(true);
+    expect(stored[0]?.purchaseTokenEnc?.startsWith('v2:k1:')).toBe(true);
     expect(stored[0]?.raw).not.toHaveProperty('linkedPurchaseToken');
   });
 });

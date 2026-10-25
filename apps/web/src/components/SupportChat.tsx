@@ -82,7 +82,7 @@ export function SupportChat({ initialOpen = false }: { initialOpen?: boolean } =
     queryKey: chatKeys.unread,
     queryFn: () =>
       api
-        .get<{ tickets: Ticket[] }>('/v1/support/tickets', { installId: installId() }, { optionalAuth: true })
+        .get<{ tickets: Ticket[] }>('/v1/support/tickets', undefined, { optionalAuth: true, headers: { 'x-install-id': installId() } })
         .then((response) => response.tickets.filter((ticket) => ticket.unread).length),
     enabled: !hidden && !open && status !== 'loading' && (authed || readChatTicket() !== null),
     refetchInterval: 60_000,

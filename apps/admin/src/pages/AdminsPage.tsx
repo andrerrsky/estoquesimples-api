@@ -16,9 +16,10 @@ interface Admin {
   status: 'active' | 'disabled';
   lastLoginAt: string | null;
   createdAt: string;
+  mfaEnabled: boolean;
 }
 
-type Dialog = null | 'create' | { kind: 'role'; admin: Admin } | { kind: 'disable'; admin: Admin } | { kind: 'enable'; admin: Admin } | { kind: 'password'; admin: Admin } | { kind: 'sessions'; admin: Admin };
+type Dialog = null | 'create' | { kind: 'role'; admin: Admin } | { kind: 'disable'; admin: Admin } | { kind: 'enable'; admin: Admin } | { kind: 'password'; admin: Admin } | { kind: 'sessions'; admin: Admin } | { kind: 'mfa'; admin: Admin };
 
 export function AdminsPage() {
   const { admin: me, can } = useAuth();
@@ -51,13 +52,14 @@ export function AdminsPage() {
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Administrador</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th>Criado</th><th></th></tr></thead>
+              <thead><tr><th>Administrador</th><th>Papel</th><th>Situação</th><th>2º fator</th><th>Último acesso</th><th>Criado</th><th></th></tr></thead>
               <tbody>
                 {query.data?.items.map((admin) => (
                   <tr key={admin.id}>
                     <td><div className="cell-main">{admin.name}{admin.id === me?.id && <span className="caption"> (você)</span>}</div><div className="cell-sub">{admin.email}</div></td>
                     <td><Badge tone={admin.role === 'owner' ? 'brand' : 'neutral'} plain>{ADMIN_ROLE[admin.role]?.label}</Badge></td>
                     <td><Badge tone={admin.status === 'active' ? 'success' : 'error'}>{admin.status === 'active' ? 'ativo' : 'desativado'}</Badge></td>
+                    <td>{admin.mfaEnabled ? <Badge tone="success">ativo</Badge> : <Badge tone="warning">pendente</Badge>}</td>
                     <td><Time value={admin.lastLoginAt} /></td>
                     <td><Time value={admin.createdAt} /></td>
                     <td>
@@ -66,6 +68,7 @@ export function AdminsPage() {
                           { label: 'Alterar papel', icon: 'edit', disabled: admin.id === me?.id, onClick: () => { setRole(admin.role); setDialog({ kind: 'role', admin }); } },
                           { label: 'Redefinir senha', icon: 'key', onClick: () => { setPassword(''); setDialog({ kind: 'password', admin }); } },
                           { label: 'Encerrar sessões', icon: 'logout', onClick: () => setDialog({ kind: 'sessions', admin }) },
+                          { label: 'Zerar segundo fator', icon: 'lock', disabled: admin.id === me?.id || !admin.mfaEnabled, onClick: () => setDialog({ kind: 'mfa', admin }) },
                           'sep',
                           admin.status === 'active'
                             ? { label: 'Desativar acesso', icon: 'pause', danger: true, disabled: admin.id === me?.id, onClick: () => setDialog({ kind: 'disable', admin }) }
@@ -97,6 +100,12 @@ export function AdminsPage() {
         </label>
       </ConfirmDialog>
 
+      <ConfirmDialog open={typeof dialog === 'object' && dialog?.kind === 'mfa'} onClose={() => setDialog(null)} title="Zerar segundo fator" description="Use quando a pessoa perdeu o celular e os códigos de recuperação. As sessões dela são encerradas e ela cadastra o autenticador de novo no próximo acesso." requireReason={false} confirmLabel="Zerar" danger onConfirm={async () => {
+        if (typeof dialog !== 'object' || dialog?.kind !== 'mfa') return;
+        await api.post(`/admins/${dialog.admin.id}/mfa/reset`);
+        toast.push('Segundo fator zerado.', 'success');
+        refresh();
+      }} />
       <ConfirmDialog open={typeof dialog === 'object' && dialog?.kind === 'disable'} onClose={() => setDialog(null)} title="Desativar acesso" description="As sessões são encerradas e a pessoa não entra mais. Pode ser reativado." requireReason={false} confirmLabel="Desativar" danger onConfirm={async () => {
         if (typeof dialog !== 'object' || dialog?.kind !== 'disable') return;
         await api.patch(`/admins/${dialog.admin.id}`, { status: 'disabled' });

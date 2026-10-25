@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { settingAad } from '../../platform/crypto/purchase-token.js';
 import webpush from 'web-push';
 
 import { adminSettings } from '../../platform/db/schema/index.js';
@@ -101,7 +102,7 @@ export class WebPushClient {
     const read = async (): Promise<VapidKeys | null> => {
       const rows = await db.select({ valueEnc: adminSettings.valueEnc }).from(adminSettings).where(eq(adminSettings.key, SETTING_KEY)).limit(1);
       const row = rows[0];
-      return row ? (JSON.parse(purchaseTokens.decrypt(row.valueEnc)) as VapidKeys) : null;
+      return row ? (JSON.parse(purchaseTokens.decrypt(row.valueEnc, settingAad(SETTING_KEY))) as VapidKeys) : null;
     };
 
     const existing = await read();
@@ -110,7 +111,7 @@ export class WebPushClient {
     const generated = webpush.generateVAPIDKeys();
     await db
       .insert(adminSettings)
-      .values({ key: SETTING_KEY, valueEnc: purchaseTokens.encrypt(JSON.stringify(generated)) })
+      .values({ key: SETTING_KEY, valueEnc: purchaseTokens.encrypt(JSON.stringify(generated), settingAad(SETTING_KEY)) })
       .onConflictDoNothing();
     return (await read()) ?? generated;
   }

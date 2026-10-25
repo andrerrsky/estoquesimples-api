@@ -13,7 +13,12 @@ export const MESSAGE_MAX_LENGTH = 4000;
 /** Quantas solicitações não resolvidas uma mesma identidade pode ter. */
 export const MAX_OPEN_TICKETS = 10;
 
-const installIdSchema = z.string().min(8).max(128);
+/**
+ * Sem conta, o installId é o que identifica a instalação (é ele que abre as
+ * conversas de suporte): precisa ser um valor aleatório longo, como o UUID v4
+ * que o app e a web geram, e não algo adivinhável.
+ */
+const installIdSchema = z.string().min(32).max(128);
 
 /** O que o app sabe de si mesmo: modelo, Android, versão. Sem dado pessoal. */
 export const deviceInfoSchema = z

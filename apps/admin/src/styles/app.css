@@ -2051,3 +2051,16 @@ code,
 .blog-preview__content th {
   background: var(--chip);
 }
+
+/* ---- Segurança: códigos de recuperação ---- */
+.recovery-codes {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 15px;
+  line-height: 1.8;
+  columns: 2;
+}

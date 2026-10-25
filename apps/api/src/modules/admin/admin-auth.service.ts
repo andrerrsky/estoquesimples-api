@@ -18,6 +18,8 @@ import {
   verifyPasswordDummy,
 } from '../../platform/auth/password.js';
 import { addDays, addHours, generateToken, hashToken } from '../../platform/auth/tokens.js';
+import { generateRecoveryCodes, generateTotpSecret, normalizeRecoveryCode, otpauthUri, verifyTotp } from '../../platform/auth/totp.js';
+import type { Env } from '../../platform/config/env.js';
 import type { RequestMeta } from '../auth/auth.service.js';
 import { AdminAction, recordAdminAudit, recordAdminAuditSafe, type AdminActor } from './admin-audit.service.js';
 import { ADMIN_ROLE_RANK, type AdminPublic, type AdminRole } from './admin.schemas.js';
@@ -29,12 +31,22 @@ export interface AdminContext {
   email: string;
   name: string;
   role: AdminRole;
+  /** Segundo fator (TOTP) ativo. */
+  mfaEnabled: boolean;
+}
+
+/** AAD do segredo TOTP: o blob só decifra na linha do próprio administrador. */
+function totpAad(adminId: string): string {
+  return `platform_admins.totp_secret:${adminId}`;
+}
+
+/** O painel exige segundo fator? Ver ADMIN_MFA_REQUIRED em env.ts. */
+export function adminMfaRequired(env: Env): boolean {
+  if (env.ADMIN_MFA_REQUIRED) return env.ADMIN_MFA_REQUIRED === 'true';
+  return env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
 }
 
 /** Bloqueio progressivo com os mesmos parâmetros das contas de cliente. */
-const LOGIN_MAX_ATTEMPTS = 5;
-const LOCK_BASE_SECONDS = 60;
-const LOCK_MAX_SECONDS = 3600;
 
 /** Renova `last_used_at` no máximo a cada 5 minutos: uma escrita por clique seria desperdício. */
 const TOUCH_INTERVAL_MS = 5 * 60_000;
@@ -55,7 +67,7 @@ export class AdminAuthService {
   // -------------------------------------------------------------------------
 
   async login(
-    input: { email: string; password: string },
+    input: { email: string; password: string; code?: string | undefined },
     meta: RequestMeta,
   ): Promise<{ token: string; expiresAt: Date; admin: AdminPublic }> {
     const found = await this.db
@@ -65,21 +77,19 @@ export class AdminAuthService {
       .limit(1);
 
     const admin = found[0];
+    const ip = meta.ipAddress ?? 'desconhecido';
+
+    // Bloqueio por (e-mail, IP), igual para conta existente ou não (ver login-throttle.ts).
+    const retryAfterSeconds = this.services.throttle.retryAfter('admin', input.email, ip);
+    if (retryAfterSeconds > 0) {
+      throw new AppError(429, ErrorCode.AUTH_ACCOUNT_LOCKED, 'Muitas tentativas. Tente novamente mais tarde.', { extra: { retryAfterSeconds } });
+    }
 
     // Mesmo tempo e mesma mensagem para conta inexistente e senha errada.
     if (!admin) {
       await verifyPasswordDummy(input.password);
+      this.services.throttle.fail('admin', input.email, ip);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
-    }
-
-    if (admin.lockedUntil && admin.lockedUntil.getTime() > Date.now()) {
-      const retryAfterSeconds = Math.ceil((admin.lockedUntil.getTime() - Date.now()) / 1000);
-      throw new AppError(
-        429,
-        ErrorCode.AUTH_ACCOUNT_LOCKED,
-        'Muitas tentativas. Tente novamente mais tarde.',
-        { extra: { retryAfterSeconds } },
-      );
     }
 
     if (admin.status !== 'active') {
@@ -88,9 +98,24 @@ export class AdminAuthService {
 
     const ok = await verifyPassword(admin.passwordHash, input.password);
     if (!ok) {
-      await this.registerFailedLogin(admin, meta);
+      const lockSeconds = this.services.throttle.fail('admin', input.email, ip);
+      await this.registerFailedLogin(admin, lockSeconds, meta);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
+    // Segundo fator: senha certa sem código pede o código (sem contar erro);
+    // código errado conta como tentativa falha, igual à senha.
+    if (admin.totpEnabledAt && admin.totpSecret) {
+      if (!input.code) {
+        throw unauthorized(ErrorCode.ADMIN_MFA_REQUIRED, 'Digite o código do aplicativo autenticador.');
+      }
+      const accepted = await this.consumeSecondFactor(admin, input.code, meta);
+      if (!accepted) {
+        const lockSeconds = this.services.throttle.fail('admin', input.email, ip);
+        await this.registerFailedLogin(admin, lockSeconds, meta);
+        throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Código inválido ou já usado.');
+      }
+    }
+    this.services.throttle.succeed('admin', input.email, ip);
 
     const token = generateToken();
     const expiresAt = this.idleExpiry(new Date());
@@ -122,19 +147,15 @@ export class AdminAuthService {
 
   private async registerFailedLogin(
     admin: typeof platformAdmins.$inferSelect,
+    lockSeconds: number,
     meta: RequestMeta,
   ): Promise<void> {
     const attempts = admin.failedLoginAttempts + 1;
-    let lockedUntil: Date | null = null;
-    if (attempts >= LOGIN_MAX_ATTEMPTS) {
-      const excess = attempts - LOGIN_MAX_ATTEMPTS;
-      const seconds = Math.min(LOCK_BASE_SECONDS * 2 ** excess, LOCK_MAX_SECONDS);
-      lockedUntil = new Date(Date.now() + seconds * 1000);
-    }
+    const lockedUntil = lockSeconds > 0 ? new Date(Date.now() + lockSeconds * 1000) : null;
 
     await this.db
       .update(platformAdmins)
-      .set({ failedLoginAttempts: attempts, lockedUntil })
+      .set({ failedLoginAttempts: attempts })
       .where(eq(platformAdmins.id, admin.id));
 
     await recordAdminAuditSafe(this.db, {
@@ -166,6 +187,7 @@ export class AdminAuthService {
         name: platformAdmins.name,
         role: platformAdmins.role,
         status: platformAdmins.status,
+        totpEnabledAt: platformAdmins.totpEnabledAt,
       })
       .from(adminSessions)
       .innerJoin(platformAdmins, eq(platformAdmins.id, adminSessions.adminId))
@@ -202,7 +224,106 @@ export class AdminAuthService {
       email: row.email,
       name: row.name,
       role: row.role as AdminRole,
+      mfaEnabled: row.totpEnabledAt !== null,
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Segundo fator (TOTP)
+  // -------------------------------------------------------------------------
+
+  /** Confere um código TOTP (sem replay) ou consome um código de recuperação. */
+  private async consumeSecondFactor(admin: typeof platformAdmins.$inferSelect, code: string, meta: RequestMeta): Promise<boolean> {
+    const secret = this.services.purchaseTokens.decrypt(admin.totpSecret!, totpAad(admin.id));
+    const step = verifyTotp(secret, code, { afterStep: admin.totpLastStep });
+    if (step !== null) {
+      // Condicional no banco: dois logins simultâneos com o mesmo código não passam os dois.
+      const updated = await this.db
+        .update(platformAdmins)
+        .set({ totpLastStep: step })
+        .where(and(eq(platformAdmins.id, admin.id), sql`coalesce(${platformAdmins.totpLastStep}, -1) < ${step}`))
+        .returning({ id: platformAdmins.id });
+      return updated.length > 0;
+    }
+    const hashed = hashToken(normalizeRecoveryCode(code));
+    if (!admin.recoveryCodes.includes(hashed)) return false;
+    const remaining = admin.recoveryCodes.filter((item) => item !== hashed);
+    await this.db.update(platformAdmins).set({ recoveryCodes: remaining }).where(eq(platformAdmins.id, admin.id));
+    await recordAdminAuditSafe(this.db, {
+      actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress },
+      action: AdminAction.ADMIN_MFA_RECOVERY_USED,
+      targetType: 'admin',
+      targetId: admin.id,
+      metadata: { remaining: remaining.length },
+    });
+    return true;
+  }
+
+  async mfaStatus(context: AdminContext): Promise<{ enabled: boolean; required: boolean; recoveryCodesLeft: number }> {
+    const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
+    return { enabled: Boolean(row?.totpEnabledAt), required: adminMfaRequired(this.env), recoveryCodesLeft: row?.recoveryCodes.length ?? 0 };
+  }
+
+  /** Gera um segredo novo (ainda inativo) e devolve o que o autenticador precisa ler. */
+  async startMfaSetup(context: AdminContext): Promise<{ secret: string; otpauthUri: string }> {
+    const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
+    if (row?.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo. Desative antes de cadastrar outro aparelho.');
+    const secret = generateTotpSecret();
+    await this.db.update(platformAdmins).set({ totpSecret: this.services.purchaseTokens.encrypt(secret, totpAad(context.adminId)), totpLastStep: null }).where(eq(platformAdmins.id, context.adminId));
+    return { secret, otpauthUri: otpauthUri(secret, context.email) };
+  }
+
+  /** Confirma o cadastro com um código do autenticador e devolve os códigos de recuperação (uma vez só). */
+  async enableMfa(context: AdminContext, code: string, meta: RequestMeta): Promise<{ recoveryCodes: string[] }> {
+    const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
+    if (!row?.totpSecret) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Comece o cadastro do autenticador primeiro.');
+    if (row.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo.');
+    const step = verifyTotp(this.services.purchaseTokens.decrypt(row.totpSecret, totpAad(row.id)), code);
+    if (step === null) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Código inválido. Confira a hora do celular e tente de novo.');
+    const recoveryCodes = generateRecoveryCodes();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(platformAdmins)
+        .set({ totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: recoveryCodes.map((item) => hashToken(normalizeRecoveryCode(item))) })
+        .where(eq(platformAdmins.id, context.adminId));
+      await recordAdminAudit(tx, {
+        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress },
+        action: AdminAction.ADMIN_MFA_ENABLED,
+        targetType: 'admin',
+        targetId: context.adminId,
+      });
+    });
+    return { recoveryCodes };
+  }
+
+  /** O próprio administrador desliga (senha + código). Com o segundo fator obrigatório, cai de volta na tela de cadastro. */
+  async disableMfa(context: AdminContext, input: { password: string; code: string }, meta: RequestMeta): Promise<void> {
+    const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
+    if (!row?.totpEnabledAt) return;
+    const passwordOk = await verifyPassword(row.passwordHash, input.password);
+    const codeOk = passwordOk && (await this.consumeSecondFactor(row, input.code, meta));
+    if (!codeOk) throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha ou código incorretos.');
+    await this.clearMfa(context.adminId, { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress }, AdminAction.ADMIN_MFA_DISABLED);
+  }
+
+  /** Owner zera o segundo fator de outro administrador (celular perdido sem códigos de recuperação). */
+  async resetMfa(actor: AdminActor, targetId: string): Promise<void> {
+    if (actor.adminId === targetId) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Para o seu próprio acesso, use "Desativar" na tela de segurança.');
+    const [row] = await this.db.select({ id: platformAdmins.id }).from(platformAdmins).where(eq(platformAdmins.id, targetId)).limit(1);
+    if (!row) throw notFound('Administrador não encontrado.');
+    await this.clearMfa(targetId, actor, AdminAction.ADMIN_MFA_RESET);
+  }
+
+  private async clearMfa(targetId: string, actor: AdminActor, action: typeof AdminAction.ADMIN_MFA_DISABLED | typeof AdminAction.ADMIN_MFA_RESET): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(platformAdmins)
+        .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: [] })
+        .where(eq(platformAdmins.id, targetId));
+      // Sessões abertas do alvo caem: quem zerou o fator pode estar respondendo a um acesso indevido.
+      await tx.update(adminSessions).set({ revokedAt: new Date() }).where(and(eq(adminSessions.adminId, targetId), isNull(adminSessions.revokedAt)));
+      await recordAdminAudit(tx, { actor, action, targetType: 'admin', targetId });
+    });
   }
 
   async logout(context: AdminContext, meta: RequestMeta): Promise<void> {
@@ -432,6 +553,7 @@ export class AdminAuthService {
       status: admin.status as 'active' | 'disabled',
       lastLoginAt: admin.lastLoginAt?.toISOString() ?? null,
       createdAt: admin.createdAt.toISOString(),
+      mfaEnabled: admin.totpEnabledAt !== null,
     };
   }
 }

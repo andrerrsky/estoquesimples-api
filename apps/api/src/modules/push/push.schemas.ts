@@ -48,7 +48,7 @@ export const registerTokenBodySchema = z
   .object({
     /** Token FCM (app) ou endpoint da inscrição Web Push (navegador). */
     token: z.string().min(20).max(4096),
-    installId: z.string().min(8).max(128),
+    installId: z.string().min(32).max(128),
     platform: z.enum(['android', 'ios', 'web']).default('android'),
     appVersionCode: z.number().int().nonnegative().optional(),
     locale: z.string().max(16).optional(),
@@ -68,14 +68,14 @@ export const registerTokenBodySchema = z
 export const revokeTokenBodySchema = z
   .object({
     token: z.string().min(20).max(4096),
-    installId: z.string().min(8).max(128),
+    installId: z.string().min(32).max(128),
   })
   .strict();
 
 export const pushEventBodySchema = z
   .object({
     campaignId: z.string().uuid(),
-    installId: z.string().min(8).max(128),
+    installId: z.string().min(32).max(128),
     event: z.enum(['delivered', 'opened']),
   })
   .strict();

@@ -33,7 +33,8 @@ export function registerErrorHandler(app: FastifyInstance): void {
     const body: ErrorBody = {
       error: {
         code: ErrorCode.NOT_FOUND,
-        message: `Rota não encontrada: ${request.method} ${request.url}`,
+        // Só o caminho: a query string pode trazer tokens, que não voltam na resposta nem vão para logs.
+        message: `Rota não encontrada: ${request.method} ${request.url.split('?')[0]}`,
         correlationId: request.id,
       },
     };

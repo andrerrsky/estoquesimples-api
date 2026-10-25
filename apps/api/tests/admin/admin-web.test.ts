@@ -244,7 +244,7 @@ describe('painel: preço da web nos planos', () => {
 
 describe('painel: assinaturas por provedor', () => {
   it('lista, filtra e conta Google Play e Asaas na mesma tela', async () => {
-    const appOwner = await registerUser(context, { installId: 'aparelho-do-google-1' });
+    const appOwner = await registerUser(context, { installId: 'aparelho-do-google-1-000000000000000' });
     const appWs = await createWorkspace(appOwner, 'Loja do App');
     await subscribeOnPlay(appOwner, appWs);
 
@@ -340,7 +340,7 @@ describe('painel: assinaturas por provedor', () => {
   });
 
   it('detalhe do Google não tem bloco do Asaas nem expõe o comprovante', async () => {
-    const owner = await registerUser(context, { installId: 'aparelho-do-google-2' });
+    const owner = await registerUser(context, { installId: 'aparelho-do-google-2-000000000000000' });
     const ws = await createWorkspace(owner, 'Loja do App');
     await subscribeOnPlay(owner, ws);
     const { cookie } = await loginAs('viewer');
@@ -380,7 +380,7 @@ describe('painel: assinaturas por provedor', () => {
     expect(detail.json()).toMatchObject({ state: 'reembolsada', refreshable: false });
 
     // Google continua pelo mesmo botão.
-    const appOwner = await registerUser(context, { installId: 'aparelho-do-google-3' });
+    const appOwner = await registerUser(context, { installId: 'aparelho-do-google-3-000000000000000' });
     const appWs = await createWorkspace(appOwner, 'Loja do App');
     await subscribeOnPlay(appOwner, appWs);
     const play = await get(cookie, '/billing/subscriptions?provider=google_play');
@@ -429,13 +429,13 @@ describe('painel: assinaturas por provedor', () => {
 
 describe('painel: usuários por plataforma', () => {
   it('mostra as plataformas da conta, filtra a lista e marca aparelho e sessão', async () => {
-    const android = await registerUser(context, { installId: 'aparelho-android-0001' });
+    const android = await registerUser(context, { installId: 'aparelho-android-0001-00000000000000' });
     const web = await registerWebUser('navegador-chrome-0001');
-    const both = await registerUser(context, { installId: 'aparelho-android-0002' });
+    const both = await registerUser(context, { installId: 'aparelho-android-0002-00000000000000' });
     const bothWeb = await context.app.inject({
       method: 'POST',
       url: '/v1/auth/login',
-      payload: { email: both.email, password: both.password, device: { installId: 'navegador-chrome-0002', platform: 'web' } },
+      payload: { email: both.email, password: both.password, device: { installId: 'navegador-chrome-0002-00000000000000', platform: 'web' } },
     });
     expect(bothWeb.statusCode).toBe(200);
     const semAparelho = await registerUser(context);
@@ -479,7 +479,7 @@ describe('painel: usuários por plataforma', () => {
 
 describe('painel: analytics por plataforma', () => {
   it('recorta resumo, métricas, eventos e funil por plataforma e mostra o quadro por plataforma', async () => {
-    const android = await registerUser(context, { installId: 'instalacao-android-9001' });
+    const android = await registerUser(context, { installId: 'instalacao-android-9001-000000000000' });
     const web = await registerWebUser('navegador-web-9001');
     await createWorkspace(web, 'Loja Web');
     expect((await sendEvents(android, 'instalacao-android-9001', 'android', ['app.opened', 'screen.viewed', 'product.created'])).statusCode).toBe(202);
@@ -575,13 +575,13 @@ describe('painel: suporte e campanhas alcançando a web', () => {
       method: 'POST',
       url: '/v1/support/tickets',
       headers: web.authHeader,
-      payload: { installId: 'navegador-suporte-0001', subject: 'Não acho a importação', message: 'Onde importo a planilha?', device: { platform: 'web', model: 'Chrome 140', osVersion: 'macOS' } },
+      payload: { installId: 'navegador-suporte-0001-0000000000000', subject: 'Não acho a importação', message: 'Onde importo a planilha?', device: { platform: 'web', model: 'Chrome 140', osVersion: 'macOS' } },
     });
     expect(opened.statusCode).toBe(201);
     const app = await context.app.inject({
       method: 'POST',
       url: '/v1/support/tickets',
-      payload: { installId: 'aparelho-suporte-0001', subject: 'PDF não abre', message: 'O app fecha.', device: { model: 'Galaxy A54', osVersion: '14' } },
+      payload: { installId: 'aparelho-suporte-0001-00000000000000', subject: 'PDF não abre', message: 'O app fecha.', device: { model: 'Galaxy A54', osVersion: '14' } },
     });
     expect(app.statusCode).toBe(201);
 
@@ -595,13 +595,13 @@ describe('painel: suporte e campanhas alcançando a web', () => {
   });
 
   it('campanha estima e registra quem recebe pela caixa de notificações (web sem push)', async () => {
-    const app = await registerUser(context, { installId: 'instalacao-campanha-01' });
+    const app = await registerUser(context, { installId: 'instalacao-campanha-01-0000000000000' });
     const web = await registerWebUser('navegador-campanha-01');
     await context.app.inject({
       method: 'PUT',
       url: '/v1/push/tokens',
       headers: app.authHeader,
-      payload: { token: 'token-campanha-app-xxxxxxxxxxxx', installId: 'instalacao-campanha-01', platform: 'android', notificationsEnabled: true },
+      payload: { token: 'token-campanha-app-xxxxxxxxxxxx', installId: 'instalacao-campanha-01-0000000000000', platform: 'android', notificationsEnabled: true },
     });
     const { cookie } = await loginAs('support');
 

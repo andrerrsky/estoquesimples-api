@@ -103,8 +103,9 @@ HTTPS" ativado, para que `http://www…` também chegue à regra.
 As fotos dos produtos ficam num **bucket do Railway** (`estoquesimples-imagens`,
 região `iad`), configurado no serviço pelas variáveis `S3_*` — passo a passo,
 validação e custo em [docs/images.md](docs/images.md). Sem `S3_BUCKET` o envio
-de fotos responde 503 e o resto do sistema funciona normalmente. O bucket não
-está no backup do Postgres. Staging precisa do próprio bucket.
+de fotos responde 503 e o resto do sistema funciona normalmente. O bucket entra
+na cópia externa noturna (`backup-offsite.yml`, ver [docs/seguranca.md](docs/seguranca.md#backup-e-restauração)).
+Staging precisa do próprio bucket.
 
 ## Deploy
 
@@ -151,6 +152,7 @@ nesse campo, e não em texto da mensagem.
 | `fila_atrasada` | mais de 20 tarefas vencidas | conferir se alguma instância está viva com `JOBS_ENABLED=true` |
 | `assinaturas_sem_verificacao` | assinatura ativa sem confirmação do Google há 48h | verificar credenciais da service account |
 | `conflitos_esquecidos` | conflitos pendentes há mais de 7 dias | avisar os clientes envolvidos; os aparelhos seguem divergentes |
+| `backup_desatualizado` | nenhuma restauração de teste de backup real nas últimas `BACKUP_MAX_AGE_HOURS` horas | ver o último run de `backup-offsite.yml` no GitHub ([docs/seguranca.md](docs/seguranca.md#backup-e-restauração)) |
 
 Os mesmos alertas aparecem na visão geral e na tela Operação do painel, que
 também permite repetir tarefas falhas, reprocessar notificações do Google
@@ -163,17 +165,21 @@ despercebido junto.
 
 ## Backups
 
-O Railway faz o backup do Postgres; a garantia de que ele *serve* vem do
-exercício de restauração:
+Resumo (o roteiro completo, com RPO/RTO e restauração passo a passo, está em
+[docs/seguranca.md](docs/seguranca.md#backup-e-restauração)):
 
-- `.github/workflows/backup-drill.yml` roda toda segunda-feira, gera um dump,
-  restaura num banco descartável e confere que as tabelas essenciais têm
-  conteúdo e que o histórico de migrations veio junto.
-- Com um dump real: `npm run backup:verify -w @estoquesimples/api -- --dump /caminho/absoluto/arquivo.dump --target postgres://...`.
-  O alvo é apagado e recriado; nunca aponte para produção.
-- O resultado fica em `/ops/backup`. `dentroDoPrazo: false` significa que
-  ninguém verificou nas últimas `BACKUP_MAX_AGE_HOURS` horas — o backup voltou
-  a ser suposição.
+- **Railway**: backups agendados do Postgres no painel do serviço (diário,
+  retenção de pelo menos 14 dias) — ligar e conferir é tarefa do dono da conta.
+- **Cópia fora do Railway**: `.github/workflows/backup-offsite.yml`, toda noite,
+  faz `pg_dump` com um usuário só de leitura, **restaura o dump num banco
+  descartável e confere** (`backup:verify`, que registra em `/ops/backup`),
+  cifra com `age` e envia para um bucket de outro provedor; as fotos dos
+  produtos são copiadas (`rclone copy`, nunca apaga) para o mesmo bucket.
+- **Exercício de schema**: `.github/workflows/backup-drill.yml`, toda segunda,
+  restaura um banco sintético para provar que o procedimento acompanha as
+  migrations.
+- `/ops/backup` e o alerta `backup_desatualizado` dizem se houve restauração de
+  teste nas últimas `BACKUP_MAX_AGE_HOURS` horas.
 
 ## Lançamento gradual
 

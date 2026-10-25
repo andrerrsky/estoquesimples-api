@@ -12,7 +12,7 @@ describe('PurchaseTokenCipher', () => {
   it('cifra e recupera o token', () => {
     const token = 'purchase-token-secreto-do-google';
     const enc = cipher.encrypt(token);
-    expect(enc.startsWith('v1:')).toBe(true);
+    expect(enc.startsWith('v2:k1:')).toBe(true);
     expect(enc).not.toContain(token);
     expect(cipher.decrypt(enc)).toBe(token);
   });

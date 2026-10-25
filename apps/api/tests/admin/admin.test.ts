@@ -140,7 +140,7 @@ describe('painel administrativo: suporte a contas', () => {
   it('suspende a conta, derruba as sessões e registra nas duas trilhas', async () => {
     const support = await createAdmin('support');
     const { cookie } = await loginAdmin(support);
-    const user = await registerUser(context, { installId: 'aparelho-teste-123' });
+    const user = await registerUser(context, { installId: 'aparelho-teste-123-00000000000000000' });
 
     const suspend = await context.app.inject({
       method: 'POST',
@@ -201,10 +201,10 @@ describe('painel administrativo: suporte a contas', () => {
 
 describe('analytics', () => {
   it('aceita lote do app, deduplica e atribui ao usuário autenticado', async () => {
-    const user = await registerUser(context, { installId: 'instalacao-analytics-1' });
+    const user = await registerUser(context, { installId: 'instalacao-analytics-1-0000000000000' });
     const eventId = randomUUID();
     const payload = {
-      device: { installId: 'instalacao-analytics-1', platform: 'android', appVersionCode: 24 },
+      device: { installId: 'instalacao-analytics-1-0000000000000', platform: 'android', appVersionCode: 24 },
       events: [
         { id: eventId, name: 'app.opened', occurredAt: Date.now(), properties: { coldStart: true } },
         { id: randomUUID(), name: 'screen.viewed', occurredAt: Date.now(), properties: { screen: 'MainActivity' } },
@@ -249,7 +249,7 @@ describe('analytics', () => {
   });
 
   it('não atribui evento a empresa da qual o usuário não participa', async () => {
-    const user = await registerUser(context, { installId: 'instalacao-analytics-2' });
+    const user = await registerUser(context, { installId: 'instalacao-analytics-2-0000000000000' });
     const outro = await registerUser(context);
     const empresa = await context.app.inject({
       method: 'POST',
@@ -262,7 +262,7 @@ describe('analytics', () => {
       url: '/v1/analytics/events',
       headers: user.authHeader,
       payload: {
-        device: { installId: 'instalacao-analytics-2' },
+        device: { installId: 'instalacao-analytics-2-0000000000000' },
         events: [
           { id: randomUUID(), name: 'product.created', occurredAt: Date.now(), workspaceId: empresa.json().id },
         ],
@@ -285,7 +285,7 @@ describe('analytics', () => {
       method: 'POST',
       url: '/v1/analytics/events',
       payload: {
-        device: { installId: 'instalacao-analytics-3' },
+        device: { installId: 'instalacao-analytics-3-0000000000000' },
         events: [{ id: randomUUID(), name: 'Evento Inválido!', occurredAt: Date.now() }],
       },
     });
@@ -323,7 +323,7 @@ describe('painel administrativo: visão geral e operação', () => {
   });
 
   it('lista a auditoria das contas com filtros e junções', async () => {
-    const user = await registerUser(context, { installId: 'aparelho-auditoria' });
+    const user = await registerUser(context, { installId: 'aparelho-auditoria-00000000000000000' });
     const owner = await createAdmin('owner');
     const { cookie } = await loginAdmin(owner);
 
@@ -432,8 +432,8 @@ describe('avaliações da Play Store', () => {
 
 describe('push notifications', () => {
   it('registra token, envia campanha, revoga token morto e mede entrega e abertura', async () => {
-    const alice = await registerUser(context, { installId: 'instalacao-push-1' });
-    const bob = await registerUser(context, { installId: 'instalacao-push-2' });
+    const alice = await registerUser(context, { installId: 'instalacao-push-1-000000000000000000' });
+    const bob = await registerUser(context, { installId: 'instalacao-push-2-000000000000000000' });
 
     const registerToken = (token: string, installId: string, auth?: Record<string, string>) =>
       context.app.inject({
@@ -442,10 +442,10 @@ describe('push notifications', () => {
         headers: auth,
         payload: { token, installId, platform: 'android', appVersionCode: 24, notificationsEnabled: true },
       });
-    expect((await registerToken('token-alice-velho-xxxxxxxxxxxx', 'instalacao-push-1', alice.authHeader)).statusCode).toBe(200);
-    expect((await registerToken('token-alice-novo-xxxxxxxxxxxxx', 'instalacao-push-1', alice.authHeader)).statusCode).toBe(200);
-    expect((await registerToken('token-bob-xxxxxxxxxxxxxxxxxxxxx', 'instalacao-push-2', bob.authHeader)).statusCode).toBe(200);
-    expect((await registerToken('token-anonimo-xxxxxxxxxxxxxxxxx', 'instalacao-push-3')).statusCode).toBe(200);
+    expect((await registerToken('token-alice-velho-xxxxxxxxxxxx', 'instalacao-push-1-000000000000000000', alice.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-alice-novo-xxxxxxxxxxxxx', 'instalacao-push-1-000000000000000000', alice.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-bob-xxxxxxxxxxxxxxxxxxxxx', 'instalacao-push-2-000000000000000000', bob.authHeader)).statusCode).toBe(200);
+    expect((await registerToken('token-anonimo-xxxxxxxxxxxxxxxxx', 'instalacao-push-3-000000000000000000')).statusCode).toBe(200);
     context.fcm.unregistered.add('token-bob-xxxxxxxxxxxxxxxxxxxxx');
 
     const support = await createAdmin('support');
@@ -482,19 +482,19 @@ describe('push notifications', () => {
     const delivered = await context.app.inject({
       method: 'POST',
       url: '/v1/push/events',
-      payload: { campaignId, installId: 'instalacao-push-1', event: 'delivered' },
+      payload: { campaignId, installId: 'instalacao-push-1-000000000000000000', event: 'delivered' },
     });
     expect(delivered.json()).toEqual({ recorded: true });
     const opened = await context.app.inject({
       method: 'POST',
       url: '/v1/push/events',
-      payload: { campaignId, installId: 'instalacao-push-1', event: 'opened' },
+      payload: { campaignId, installId: 'instalacao-push-1-000000000000000000', event: 'opened' },
     });
     expect(opened.json()).toEqual({ recorded: true });
     const again = await context.app.inject({
       method: 'POST',
       url: '/v1/push/events',
-      payload: { campaignId, installId: 'instalacao-push-1', event: 'opened' },
+      payload: { campaignId, installId: 'instalacao-push-1-000000000000000000', event: 'opened' },
     });
     expect(again.json()).toEqual({ recorded: false });
 
@@ -516,7 +516,7 @@ describe('push notifications', () => {
   });
 
   it('teste para um e-mail envia na hora e exige aparelho registrado', async () => {
-    const user = await registerUser(context, { installId: 'instalacao-push-9' });
+    const user = await registerUser(context, { installId: 'instalacao-push-9-000000000000000000' });
     const support = await createAdmin('support');
     const { cookie } = await loginAdmin(support);
 
@@ -532,7 +532,7 @@ describe('push notifications', () => {
       method: 'PUT',
       url: '/v1/push/tokens',
       headers: user.authHeader,
-      payload: { token: 'token-teste-xxxxxxxxxxxxxxxxxxxx', installId: 'instalacao-push-9' },
+      payload: { token: 'token-teste-xxxxxxxxxxxxxxxxxxxx', installId: 'instalacao-push-9-000000000000000000' },
     });
     const sent = await context.app.inject({
       method: 'POST',
@@ -551,7 +551,7 @@ describe('push notifications', () => {
 });
 
 describe('suporte pelo app', () => {
-  const INSTALL = 'instalacao-suporte-0001';
+  const INSTALL = 'instalacao-suporte-0001-000000000000';
   const device = { model: 'Galaxy A54', manufacturer: 'samsung', osVersion: '14', sdkInt: 34, appVersionCode: 25, appVersionName: '25', locale: 'pt-BR' };
 
   it('abre sem conta, recebe resposta por push, reabre ao escrever e passa a ser do usuário após login', async () => {
@@ -581,7 +581,7 @@ describe('suporte pelo app', () => {
     expect(ticket.number).toBeGreaterThanOrEqual(1001);
 
     // Outra instalação não enxerga.
-    const foreign = await context.app.inject({ method: 'GET', url: `/v1/support/tickets/${ticket.id}?installId=outra-instalacao-9999` });
+    const foreign = await context.app.inject({ method: 'GET', url: `/v1/support/tickets/${ticket.id}?installId=outra-instalacao-9999-00000000000000` });
     expect(foreign.statusCode).toBe(404);
 
     const viewer = await createAdmin('viewer');
@@ -667,12 +667,12 @@ describe('suporte pelo app', () => {
   });
 
   it('sem aparelho registrado avisa por e-mail; usuário pode encerrar e prioridade é ajustável', async () => {
-    const user = await registerUser(context, { installId: 'instalacao-suporte-0002' });
+    const user = await registerUser(context, { installId: 'instalacao-suporte-0002-000000000000' });
     const created = await context.app.inject({
       method: 'POST',
       url: '/v1/support/tickets',
       headers: user.authHeader,
-      payload: { installId: 'instalacao-suporte-0002', subject: 'Como convido alguém?', message: 'Quero adicionar um funcionário.', category: 'question', device },
+      payload: { installId: 'instalacao-suporte-0002-000000000000', subject: 'Como convido alguém?', message: 'Quero adicionar um funcionário.', category: 'question', device },
     });
     expect(created.statusCode).toBe(201);
     const ticketId = created.json().id as string;
@@ -698,7 +698,7 @@ describe('suporte pelo app', () => {
     expect(mail?.to).toBe(user.email);
     expect(mail?.text).toContain('Convidar');
 
-    const done = await context.app.inject({ method: 'POST', url: `/v1/support/tickets/${ticketId}/resolve`, headers: user.authHeader, payload: { installId: 'instalacao-suporte-0002' } });
+    const done = await context.app.inject({ method: 'POST', url: `/v1/support/tickets/${ticketId}/resolve`, headers: user.authHeader, payload: { installId: 'instalacao-suporte-0002-000000000000' } });
     expect(done.json()).toMatchObject({ status: 'resolved' });
 
     const filtered = await context.app.inject({ method: 'GET', url: '/admin/api/support/tickets?assigned=me&status=resolved', headers: { cookie } });

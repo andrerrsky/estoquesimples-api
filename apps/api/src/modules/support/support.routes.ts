@@ -27,6 +27,14 @@ export async function registerSupportRoutes(app: FastifyInstance): Promise<void>
   const service = new SupportService(app.services);
   const { env } = app.services;
 
+  // A instalação pode vir no cabeçalho `x-install-id` (preferido: não fica em
+  // logs de proxy como a query string) ou, nos clientes antigos, na query.
+  app.addHook('preValidation', async (request) => {
+    const header = request.headers['x-install-id'];
+    const query = request.query as Record<string, unknown> | undefined;
+    if (typeof header === 'string' && query && query['installId'] === undefined) query['installId'] = header;
+  });
+
   const limit = (max: number) => ({
     config: {
       rateLimit: {

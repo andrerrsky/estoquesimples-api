@@ -2,11 +2,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { getEnv, type Env } from './platform/config/env.js';
 import { TokenService, loadJwtKeys } from './platform/auth/jwt.js';
-import {
-  PurchaseTokenCipher,
-  decodePurchaseTokenKey,
-  ephemeralDevPurchaseTokenKey,
-} from './platform/crypto/purchase-token.js';
+import { PurchaseTokenCipher, ephemeralDevPurchaseTokenKey, keyringFromEnv } from './platform/crypto/purchase-token.js';
 import { createDb } from './platform/db/client.js';
 import { createMailer } from './platform/email/create-mailer.js';
 import { LoggingMailer, type Mailer } from './platform/email/mailer.js';
@@ -20,12 +16,14 @@ import { FirebaseFcmClient, type FcmClient } from './modules/push/fcm-client.js'
 import { WebPushClient } from './modules/push/web-push-client.js';
 import { registerLowStockJobs } from './modules/push/low-stock.jobs.js';
 import { registerBlogJobs } from './modules/blog/blog.jobs.js';
+import { registerPrivacyJobs } from './modules/privacy/privacy.jobs.js';
 import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas-client.js';
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
 import { registerSupportJobs } from './modules/support/support.jobs.js';
 import { registerImageJobs } from './modules/images/images.jobs.js';
 import type { AppServices } from './platform/http/context.js';
+import { LoginThrottle } from './platform/http/login-throttle.js';
 import { buildServer } from './platform/http/server.js';
 import { createStorage, type ObjectStorage } from './platform/storage/object-storage.js';
 
@@ -50,10 +48,7 @@ export interface BuiltApp {
 }
 
 function createPurchaseTokenCipher(env: Env): PurchaseTokenCipher {
-  if (env.PURCHASE_TOKEN_ENCRYPTION_KEY) {
-    return new PurchaseTokenCipher(decodePurchaseTokenKey(env.PURCHASE_TOKEN_ENCRYPTION_KEY));
-  }
-  return new PurchaseTokenCipher(ephemeralDevPurchaseTokenKey());
+  return new PurchaseTokenCipher(keyringFromEnv(env, ephemeralDevPurchaseTokenKey()));
 }
 
 /**
@@ -83,6 +78,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
     fcm: options.fcm ?? new FirebaseFcmClient(env),
     asaas: options.asaas ?? new HttpAsaasClient(env, () => services.logger),
     storage: options.storage ?? createStorage(env),
+    throttle: new LoginThrottle({
+      maxAttempts: env.LOGIN_MAX_ATTEMPTS,
+      baseLockSeconds: env.LOGIN_LOCK_BASE_SECONDS,
+      maxLockSeconds: env.LOGIN_LOCK_MAX_SECONDS,
+      accountCeiling: env.LOGIN_ACCOUNT_CEILING,
+      accountWindowSeconds: 3600,
+      accountLockSeconds: 900,
+    }),
   } as AppServices;
   // Depende de `services` (banco e cifra das chaves guardadas).
   services.webPush = new WebPushClient(services);
@@ -101,6 +104,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerPushJobs(services);
   registerLowStockJobs(services);
   registerBlogJobs(services);
+  registerPrivacyJobs(services);
   registerAsaasJobs(services);
   registerSupportJobs(services);
   registerImageJobs(services);

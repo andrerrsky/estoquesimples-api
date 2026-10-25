@@ -60,6 +60,10 @@ export const ErrorCode = {
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',
 
   CONFLICT: 'CONFLICT',
+  /** Senha certa; falta o código do autenticador (painel). */
+  ADMIN_MFA_REQUIRED: 'ADMIN_MFA_REQUIRED',
+  /** O painel exige segundo fator e este administrador ainda não cadastrou. */
+  ADMIN_MFA_SETUP_REQUIRED: 'ADMIN_MFA_SETUP_REQUIRED',
   STALE_REVISION: 'STALE_REVISION',
   DUPLICATE_NAME: 'DUPLICATE_NAME',
 

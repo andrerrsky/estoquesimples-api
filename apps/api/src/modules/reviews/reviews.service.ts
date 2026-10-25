@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 
+import { settingAad } from '../../platform/crypto/purchase-token.js';
 import { adminSettings, playReviews } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, badRequest, notFound } from '../../platform/http/errors.js';
@@ -21,7 +22,7 @@ export async function readOpenAiKey(services: AppServices): Promise<string | nul
     .where(eq(adminSettings.key, SETTING_OPENAI_KEY))
     .limit(1);
   const row = rows[0];
-  return row ? services.purchaseTokens.decrypt(row.valueEnc) : null;
+  return row ? services.purchaseTokens.decrypt(row.valueEnc, settingAad(SETTING_OPENAI_KEY)) : null;
 }
 
 export interface ReviewListFilters extends PaginationQuery {
@@ -328,7 +329,7 @@ export class ReviewsService {
       .limit(1);
     const row = rows[0];
     if (!row) return { configured: false, hint: null, updatedAt: null, model: this.services.env.OPENAI_MODEL };
-    const key = this.services.purchaseTokens.decrypt(row.valueEnc);
+    const key = this.services.purchaseTokens.decrypt(row.valueEnc, settingAad(SETTING_OPENAI_KEY));
     return {
       configured: true,
       hint: `…${key.slice(-4)}`,
@@ -349,10 +350,10 @@ export class ReviewsService {
     await this.db.transaction(async (tx) => {
       await tx
         .insert(adminSettings)
-        .values({ key: SETTING_OPENAI_KEY, valueEnc: this.services.purchaseTokens.encrypt(cleaned), updatedBy: actor.adminId })
+        .values({ key: SETTING_OPENAI_KEY, valueEnc: this.services.purchaseTokens.encrypt(cleaned, settingAad(SETTING_OPENAI_KEY)), updatedBy: actor.adminId })
         .onConflictDoUpdate({
           target: adminSettings.key,
-          set: { valueEnc: this.services.purchaseTokens.encrypt(cleaned), updatedAt: new Date(), updatedBy: actor.adminId },
+          set: { valueEnc: this.services.purchaseTokens.encrypt(cleaned, settingAad(SETTING_OPENAI_KEY)), updatedAt: new Date(), updatedBy: actor.adminId },
         });
       await recordAdminAudit(tx, {
         actor,
@@ -379,7 +380,7 @@ export class ReviewsService {
       .where(eq(adminSettings.key, key))
       .limit(1);
     const row = rows[0];
-    return row ? this.services.purchaseTokens.decrypt(row.valueEnc) : null;
+    return row ? this.services.purchaseTokens.decrypt(row.valueEnc, settingAad(key)) : null;
   }
 }
 

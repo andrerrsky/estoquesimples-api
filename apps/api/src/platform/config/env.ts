@@ -47,6 +47,22 @@ const envSchema = z
     LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
     LOGIN_LOCK_BASE_SECONDS: z.coerce.number().int().positive().default(60),
     LOGIN_LOCK_MAX_SECONDS: z.coerce.number().int().positive().default(3600),
+    /** Erros de senha por conta em 1 hora, somando todos os IPs, que trancam a conta por 15 min (força bruta distribuída). */
+    LOGIN_ACCOUNT_CEILING: z.coerce.number().int().positive().default(50),
+    /** Pedidos por e-mail por hora em cadastro e "esqueci a senha" (além do limite por IP). */
+    EMAIL_ACTION_MAX_PER_HOUR: z.coerce.number().int().positive().default(5),
+    /**
+     * Proxies confiáveis à frente da API para descobrir o IP real do cliente
+     * (X-Forwarded-For): "false", "private" (faixas de rede privada, como a
+     * borda do Railway) ou uma lista de IPs/CIDRs separada por vírgula.
+     * Padrão: "private" em produção, "false" fora dela.
+     */
+    TRUST_PROXY: z.string().optional(),
+    /** Publica /docs (documentação interativa da API) em produção. Desligado por padrão. */
+    DOCS_PUBLIC: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
 
     PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
     EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(48),
@@ -72,6 +88,13 @@ const envSchema = z
     GOOGLE_PLAY_PACKAGE_NAME: z.string().default('br.com.gameloop.estoquesimples'),
     GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
     GOOGLE_PUBSUB_VERIFICATION_TOKEN: z.string().optional(),
+    /**
+     * Autenticação de push do Pub/Sub (OIDC). Com os dois valores, além do
+     * token da query o webhook exige o JWT do Google com este `aud` e o
+     * `email` desta service account. Configurar na assinatura push do tópico.
+     */
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: z.string().optional(),
+    GOOGLE_PUBSUB_OIDC_EMAIL: z.string().email().optional(),
     BILLING_RECONCILE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),
 
     /**
@@ -88,6 +111,14 @@ const envSchema = z
      * ausente, usa uma chave determinística só para o ambiente local.
      */
     PURCHASE_TOKEN_ENCRYPTION_KEY: z.string().optional(),
+    /**
+     * Chaveiro de cifra em repouso para rotação: "k2:base64,k3:base64". A
+     * PURCHASE_TOKEN_ENCRYPTION_KEY continua sendo a `k1` (formato antigo).
+     * Ver docs/seguranca.md, seção "Rotação da chave de cifra".
+     */
+    SECRETS_ENCRYPTION_KEYS: z.string().optional(),
+    /** Kid que cifra o que é gravado de novo. Padrão: o último de SECRETS_ENCRYPTION_KEYS, ou k1. */
+    SECRETS_ACTIVE_KID: z.string().optional(),
 
     // Feature flag remota: permite desligar a sincronização sem novo release do app.
     FEATURE_SYNC_ENABLED: z
@@ -119,6 +150,12 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((value) => value === 'true'),
+    /**
+     * Exige segundo fator (TOTP) de todo administrador do painel. Sem valor:
+     * ligado em produção e staging, desligado fora delas. Quem ainda não
+     * cadastrou o autenticador entra e só consegue abrir a tela de cadastro.
+     */
+    ADMIN_MFA_REQUIRED: z.enum(['true', 'false']).optional(),
     /**
      * Primeiro administrador. Criado na subida se ainda não existir nenhum
      * com este e-mail; depois disso as variáveis podem ser removidas. Sem

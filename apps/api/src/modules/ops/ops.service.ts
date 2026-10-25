@@ -22,6 +22,8 @@ export interface OpsSnapshot extends Record<string, number> {
   empresasAtivas: number;
   dispositivosAtivos7d: number;
   operacoesSync24h: number;
+  /** Horas desde a última restauração de teste registrada em /ops/backup; -1 quando nunca houve. */
+  backupHoras: number;
 }
 
 const ATRASO_TOLERADO = "interval '15 minutes'";
@@ -62,7 +64,9 @@ export class OpsService {
           WHERE revoked_at IS NULL AND last_seen_at > now() - interval '7 days')
           AS dispositivos_ativos,
         (SELECT count(*) FROM sync_operations
-          WHERE created_at > now() - interval '24 hours') AS operacoes_sync
+          WHERE created_at > now() - interval '24 hours') AS operacoes_sync,
+        COALESCE((SELECT extract(epoch FROM now() - updated_at) / 3600 FROM app_config WHERE key = 'backup_verificado'), -1)
+          AS backup_horas
     `);
 
     const linha = resultado.rows[0] ?? {};
@@ -79,6 +83,7 @@ export class OpsService {
       empresasAtivas: numero('empresas_ativas'),
       dispositivosAtivos7d: numero('dispositivos_ativos'),
       operacoesSync24h: numero('operacoes_sync'),
+      backupHoras: Math.round(numero('backup_horas')),
     };
   }
 
@@ -105,6 +110,11 @@ export class OpsService {
         name: 'devices_active_7d',
         help: 'Aparelhos que sincronizaram nos últimos sete dias',
         value: estado.dispositivosAtivos7d,
+      },
+      {
+        name: 'backup_verified_age_hours',
+        help: 'Horas desde a última restauração de teste de um backup real (-1: nunca)',
+        value: estado.backupHoras,
       },
       {
         name: 'sync_operations_24h',
@@ -142,6 +152,17 @@ export class OpsService {
         detalhe:
           `${estado.assinaturasDesatualizadas} assinatura(s) ativas sem confirmação do Google Play ` +
           'há mais de 48 horas. Acesso pode estar sendo concedido indevidamente.',
+      });
+    }
+    // Backup que ninguém restaurou recentemente voltou a ser suposição.
+    const limite = this.services.env.BACKUP_MAX_AGE_HOURS;
+    if (estado.backupHoras < 0 || estado.backupHoras > limite) {
+      encontrados.push({
+        nome: 'backup_desatualizado',
+        detalhe:
+          estado.backupHoras < 0
+            ? 'Nenhuma restauração de teste de backup foi registrada. Configure o backup externo (docs/seguranca.md).'
+            : `A última restauração de teste de backup foi há ${estado.backupHoras} h (limite: ${limite} h). Confira o workflow backup-offsite.`,
       });
     }
     if (estado.conflitosAntigos > 0) {

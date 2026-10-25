@@ -12,6 +12,7 @@ import { bootstrapOpsJobs } from './modules/ops/ops.jobs.js';
 import { bootstrapSyncJobs } from './modules/sync/sync.jobs.js';
 import { bootstrapLowStockJobs } from './modules/push/low-stock.jobs.js';
 import { bootstrapBlogJobs } from './modules/blog/blog.jobs.js';
+import { bootstrapPrivacyJobs } from './modules/privacy/privacy.jobs.js';
 
 /**
  * Ponto de entrada de produção.
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
     await bootstrapSyncJobs(services);
     await bootstrapLowStockJobs(services);
     await bootstrapBlogJobs(services);
+    await bootstrapPrivacyJobs(services);
     await bootstrapOpsJobs(services);
     await bootstrapAnalyticsJobs(services);
     await bootstrapReviewsJobs(services);

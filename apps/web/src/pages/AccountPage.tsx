@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { api, ApiError, errorMessage } from '../api/client';
+import { api, ApiError, errorMessage, fetchBlob } from '../api/client';
 import type { DeviceSummary, SessionSummary, User } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
@@ -32,6 +32,7 @@ export function AccountPage() {
       <OpenInBrowserCard />
       <PasswordCard />
       <SessionsCard />
+      <MyDataCard />
       <DeleteAccountCard />
       <Card title="Sobre">
         <div className="stack stack--tight">
@@ -416,6 +417,38 @@ function SessionsCard() {
  * recusa enquanto a pessoa for proprietária de alguma empresa, bloqueia o
  * acesso na hora e abre um prazo de recuperação.
  */
+/** LGPD: a pessoa baixa tudo o que o sistema guarda sobre ela, num JSON. */
+function MyDataCard() {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const blob = await fetchBlob('/v1/me/export');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `estoque-simples-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (caught) {
+      toast.error(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title="Meus dados" subtitle="Um arquivo com o que guardamos sobre você: perfil, empresas, sessões, aparelhos, notificações, conversas com o suporte e registros de uso.">
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn--secondary" onClick={() => void download()} disabled={busy}>
+          <Icon name="download" size={16} /> {busy ? 'Preparando…' : 'Baixar meus dados'}
+        </button>
+        <Link to="/privacidade" className="btn btn--ghost">Política de Privacidade</Link>
+      </div>
+    </Card>
+  );
+}
+
 function DeleteAccountCard() {
   const { logout } = useAuth();
   const { workspaces } = useWorkspace();
