@@ -46,7 +46,7 @@ jobs:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_DEFAULT_REGION: us-east-1
-      S3: http://127.0.0.1:4566
+      S3_URL: http://127.0.0.1:4566
       # Um único S3 local faz o papel dos três: origem das fotos, cópia das fotos e dumps.
       RCLONE_CONFIG_MINIO_TYPE: s3
       RCLONE_CONFIG_MINIO_PROVIDER: Other
@@ -78,20 +78,20 @@ jobs:
       - name: S3 local, buckets e fotos de exemplo
         run: |
           docker run -d --name s3local -p 4566:4566 -e SERVICES=s3 localstack/localstack:3.8.1
-          for i in $(seq 1 60); do curl -fsS "$S/_localstack/health" | grep -q '"s3": "\(available\|running\)"' && break; sleep 2; done
-          curl -fsS "$S/_localstack/health"
-          aws --endpoint-url "$S" s3api create-bucket --bucket dumps --object-lock-enabled-for-bucket
-          aws --endpoint-url "$S" s3api put-bucket-versioning --bucket dumps --versioning-configuration Status=Enabled
-          aws --endpoint-url "$S" s3api put-object-lock-configuration --bucket dumps \
+          for i in $(seq 1 60); do curl -fsS "$S3_URL/_localstack/health" | grep -q '"s3": "\(available\|running\)"' && break; sleep 2; done
+          curl -fsS "$S3_URL/_localstack/health"
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket dumps --object-lock-enabled-for-bucket
+          aws --endpoint-url "$S3_URL" s3api put-bucket-versioning --bucket dumps --versioning-configuration Status=Enabled
+          aws --endpoint-url "$S3_URL" s3api put-object-lock-configuration --bucket dumps \
             --object-lock-configuration '{"ObjectLockEnabled":"Enabled","Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":35}}}'
-          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-origem
-          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-copia
-          aws --endpoint-url "$S" s3api put-bucket-versioning --bucket fotos-copia --versioning-configuration Status=Enabled
-          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-sem-versao
-          aws --endpoint-url "$S" s3api create-bucket --bucket fotos-vazio
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-origem
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-copia
+          aws --endpoint-url "$S3_URL" s3api put-bucket-versioning --bucket fotos-copia --versioning-configuration Status=Enabled
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-sem-versao
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-vazio
           for n in 1 2 3; do
             head -c 2048 /dev/urandom > foto$n.webp
-            aws --endpoint-url "$S" s3 cp foto$n.webp "s3://fotos-origem/workspaces/teste/images/foto$n.webp"
+            aws --endpoint-url "$S3_URL" s3 cp foto$n.webp "s3://fotos-origem/workspaces/teste/images/foto$n.webp"
           done
 
       - name: Banco de origem e usuário de leitura (receita de docs/seguranca.md)
@@ -146,16 +146,16 @@ jobs:
       - name: Object Lock impede apagar o dump
         run: |
           objeto="$(jq -r '.objeto' registro.json)"
-          versao="$(aws --endpoint-url "$S" s3api list-object-versions --bucket dumps --prefix "$objeto" --query 'Versions[0].VersionId' --output text)"
-          if aws --endpoint-url "$S" s3api delete-object --bucket dumps --key "$objeto" --version-id "$versao"; then
+          versao="$(aws --endpoint-url "$S3_URL" s3api list-object-versions --bucket dumps --prefix "$objeto" --query 'Versions[0].VersionId' --output text)"
+          if aws --endpoint-url "$S3_URL" s3api delete-object --bucket dumps --key "$objeto" --version-id "$versao"; then
             echo "::error::a versão travada do dump foi apagada"; exit 1
           fi
 
       - name: Foto apagada na origem continua como versão antiga na cópia
         run: |
-          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto1.webp"
+          aws --endpoint-url "$S3_URL" s3 rm "s3://fotos-origem/workspaces/teste/images/foto1.webp"
           bash scripts/backup-offsite.sh photos
-          versoes="$(aws --endpoint-url "$S" s3api list-object-versions --bucket fotos-copia --prefix workspaces/teste/images/foto1.webp --query 'length(Versions)' --output text)"
+          versoes="$(aws --endpoint-url "$S3_URL" s3api list-object-versions --bucket fotos-copia --prefix workspaces/teste/images/foto1.webp --query 'length(Versions)' --output text)"
           [ "$versoes" -ge 1 ] || { echo "::error::a versão antiga da foto apagada sumiu"; exit 1; }
           # Restauração no ponto anterior (roteiro, passo 6) traz a foto de volta.
           rclone copy --s3-version-at "$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)" minio:fotos-copia minio:fotos-restauradas --s3-no-check-bucket
@@ -177,10 +177,10 @@ jobs:
         env:
           MAX_DELETE: '1'
         run: |
-          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto2.webp"
-          aws --endpoint-url "$S" s3 rm "s3://fotos-origem/workspaces/teste/images/foto3.webp"
+          aws --endpoint-url "$S3_URL" s3 rm "s3://fotos-origem/workspaces/teste/images/foto2.webp"
+          aws --endpoint-url "$S3_URL" s3 rm "s3://fotos-origem/workspaces/teste/images/foto3.webp"
           head -c 2048 /dev/urandom > foto4.webp
-          aws --endpoint-url "$S" s3 cp foto4.webp "s3://fotos-origem/workspaces/teste/images/foto4.webp"
+          aws --endpoint-url "$S3_URL" s3 cp foto4.webp "s3://fotos-origem/workspaces/teste/images/foto4.webp"
           if bash scripts/backup-offsite.sh photos; then echo "::error::apagou mais que MAX_DELETE"; exit 1; fi
 
       - name: 'Trava: registro sem a fase das fotos'
