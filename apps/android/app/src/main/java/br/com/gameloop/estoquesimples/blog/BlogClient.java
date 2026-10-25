@@ -25,6 +25,9 @@ public final class BlogClient {
         public final int readingMinutes;
         public final String url;
         public final String coverUrl;
+        public final boolean membersOnly;
+        /** Só o começo veio: o resto pede conta. */
+        public final boolean locked;
 
         Post(JSONObject json) {
             id = json.optString("id");
@@ -40,6 +43,8 @@ public final class BlogClient {
             readingMinutes = json.optInt("readingMinutes", 1);
             url = json.optString("url");
             coverUrl = json.isNull("coverUrl") ? null : json.optString("coverUrl", null);
+            membersOnly = json.optBoolean("membersOnly", false);
+            locked = json.optBoolean("locked", false);
         }
     }
 
@@ -74,8 +79,9 @@ public final class BlogClient {
         return new Page(api.get(path, null).body);
     }
 
-    public Post get(String slug) throws ApiException {
-        JSONObject body = api.get("/v1/blog/posts/" + slug, null).body;
+    /** @param accessToken token da sessão, ou null: com ele um post exclusivo vem inteiro. */
+    public Post get(String slug, String accessToken) throws ApiException {
+        JSONObject body = api.get("/v1/blog/posts/" + slug, accessToken).body;
         JSONObject post = body.optJSONObject("post");
         return new Post(post != null ? post : body);
     }

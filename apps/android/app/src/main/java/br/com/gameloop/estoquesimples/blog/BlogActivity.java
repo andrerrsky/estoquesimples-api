@@ -190,7 +190,7 @@ public class BlogActivity extends BaseActivity {
             View view = convertView != null ? convertView
                     : LayoutInflater.from(BlogActivity.this).inflate(R.layout.item_blog_post, parent, false);
             BlogClient.Post post = posts.get(position);
-            ((TextView) view.findViewById(R.id.postCategory)).setText(post.categoryLabel);
+            ((TextView) view.findViewById(R.id.postCategory)).setText(post.membersOnly ? post.categoryLabel + "  ·  🔒 Exclusivo" : post.categoryLabel);
             ((TextView) view.findViewById(R.id.postTitle)).setText(post.title);
             ((TextView) view.findViewById(R.id.postExcerpt)).setText(post.excerpt);
             ((TextView) view.findViewById(R.id.postMeta)).setText(formatDate(post.publishedAt)

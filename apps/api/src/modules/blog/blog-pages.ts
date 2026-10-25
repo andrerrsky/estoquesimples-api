@@ -81,7 +81,9 @@ export class BlogPages {
       const post = await this.blog.getPublished(slug);
       if (!post) return null;
       const related = await this.blog.related(post);
-      return { body: renderBlogPost(template, post, related), contentType: 'text/html; charset=utf-8', status: 200, cacheControl: htmlCache };
+      // O HTML do servidor é sempre o de quem não tem conta (o cookie de sessão
+      // não chega aqui); a aplicação troca pelo post inteiro quando há sessão.
+      return { body: renderBlogPost(template, this.blog.forReader(post, false), related), contentType: 'text/html; charset=utf-8', status: 200, cacheControl: htmlCache };
     } catch (error) {
       // Banco fora não é "post não existe": 503 pede ao buscador para voltar depois sem tirar a página do índice.
       this.services.logger?.error({ err: error, path }, 'página do blog não renderizada');

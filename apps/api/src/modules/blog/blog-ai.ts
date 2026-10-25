@@ -96,6 +96,13 @@ const PRODUCT_FACTS = `FATOS SOBRE O ESTOQUE SIMPLES (só afirme o que está aqu
 - Não cite preços. Não prometa recursos futuros.`;
 
 const DEFAULT_TARGET_WORDS = 950;
+/** O post exclusivo tem mais a oferecer: uma parte prática a mais. */
+const MEMBERS_EXTRA_WORDS = 350;
+const MEMBERS_ONLY_BRIEF = `POST EXCLUSIVO PARA QUEM TEM CONTA: no site público só o começo (abertura e primeira seção) fica visível, com um convite para criar conta grátis. Por isso:
+- A abertura e a primeira seção ("## ") precisam valer por si: responda a dúvida principal de forma útil já ali, para quem não tem conta sair com algo.
+- A partir da segunda seção entra o conteúdo a mais, que justifica a conta: um passo a passo detalhado, um modelo pronto (checklist, planilha descrita em tabela Markdown, roteiro), erros comuns com a correção, ou um exemplo completo com números.
+- Inclua uma seção "## Checklist" ou "## Modelo pronto" (além do "## Resumo") com esse material prático.
+- Não mencione que o post é exclusivo nem peça cadastro no texto: o site cuida disso.`;
 
 const STYLE_RULES = `ESTILO E SEO:
 - Português do Brasil, tom de uma pessoa da equipe conversando com quem empreende: direto, útil, sem jargão, sem emojis, sem "neste artigo vamos", sem frases de preenchimento.
@@ -238,12 +245,14 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
 }`;
   }
 
-  private userPrompt(topic: AiTopic, published: Array<{ slug: string; title: string }>, problems: string[] = []): string {
+  private userPrompt(topic: AiTopic, published: Array<{ slug: string; title: string }>, problems: string[] = [], membersOnly = false): string {
+    const target = (topic.targetWords ?? DEFAULT_TARGET_WORDS) + (membersOnly ? MEMBERS_EXTRA_WORDS : 0);
     return [
       `PAUTA: ${topic.brief}`,
       `PALAVRA-CHAVE: ${topic.keyword}`,
       `CATEGORIA SUGERIDA: ${topic.category}`,
-      `META DE PALAVRAS: ${topic.targetWords ?? DEFAULT_TARGET_WORDS}`,
+      `META DE PALAVRAS: ${target}`,
+      membersOnly ? MEMBERS_ONLY_BRIEF : '',
       '',
       'TRECHOS DA CENTRAL DE AJUDA RELACIONADOS (use como base do que o app faz; não copie literalmente):',
       groundingFor(topic),
@@ -263,11 +272,19 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
    * links para eles são exigidos quando existem, e um título que disputa a
    * mesma palavra-chave de um post publicado é recusado (canibalização).
    */
-  static check(draft: AiDraft, topic: AiTopic, published: Array<{ slug: string; title: string }> = []): string[] {
+  static check(draft: AiDraft, topic: AiTopic, published: Array<{ slug: string; title: string }> = [], options: { membersOnly?: boolean } = {}): string[] {
     const problems: string[] = [];
     const md = draft.contentMd ?? '';
     const rendered = renderMarkdown(md);
-    const target = topic.targetWords ?? DEFAULT_TARGET_WORDS;
+    const target = (topic.targetWords ?? DEFAULT_TARGET_WORDS) + (options.membersOnly ? MEMBERS_EXTRA_WORDS : 0);
+    if (options.membersOnly) {
+      const h2s = rendered.headings.filter((heading) => heading.level === 2);
+      if (h2s.length < 4) problems.push('Post exclusivo: use pelo menos 4 seções com "## " (a primeira responde a dúvida; as seguintes trazem o conteúdo a mais).');
+      if (!h2s.some((heading) => /checklist|modelo pronto|passo a passo|exemplo completo/i.test(heading.text))) {
+        problems.push('Post exclusivo: inclua uma seção "## Checklist", "## Modelo pronto", "## Passo a passo" ou "## Exemplo completo".');
+      }
+      if (/exclusiv|cadastre-se|crie sua conta para (ler|continuar)/i.test(md)) problems.push('Não mencione que o post é exclusivo nem peça cadastro no texto.');
+    }
     const minWords = Math.round(target * 0.75);
     const maxWords = Math.round(target * 1.3);
     if (rendered.words < minWords) problems.push(`O texto tem ${rendered.words} palavras; escreva por volta de ${target} (no mínimo ${minWords}).`);
@@ -314,7 +331,7 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
    * Escreve e grava um post (rascunho ou publicado, conforme a configuração).
    * @returns o post, ou `null` quando a geração está desligada ou sem chave.
    */
-  async writePost(options: { publish?: boolean; topic?: AiTopic } = {}) {
+  async writePost(options: { publish?: boolean; topic?: AiTopic; membersOnly?: boolean } = {}) {
     const settings = await this.blog.settings();
     const apiKey = await readOpenAiKey(this.services);
     if (!apiKey) throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (Avaliações › OpenAI) para a IA escrever posts.');
@@ -326,9 +343,9 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
     let problems: string[] = [];
     let body: BlogPostBody | null = null;
     for (let attempt = 0; attempt < 2 && !body; attempt += 1) {
-      const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems), 3600, 0.7)) as AiDraft;
+      const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems, options.membersOnly ?? false), options.membersOnly ? 4800 : 3600, 0.7)) as AiDraft;
       const draft: AiDraft = { ...raw, tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [], faq: Array.isArray(raw.faq) ? raw.faq : [] };
-      problems = BlogAiWriter.check(draft, topic, published);
+      problems = BlogAiWriter.check(draft, topic, published, { membersOnly: options.membersOnly ?? false });
       const parsed = blogPostBodySchema.safeParse({
         title: draft.title,
         seoTitle: draft.seoTitle?.slice(0, 70) ?? null,
@@ -336,6 +353,7 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
         contentMd: draft.contentMd,
         category: BLOG_CATEGORY_SLUGS.includes(draft.category) ? draft.category : topic.category,
         coverAlt: typeof draft.coverAlt === 'string' && draft.coverAlt.trim() ? draft.coverAlt.trim().slice(0, 200) : null,
+        membersOnly: options.membersOnly ?? false,
         tags: draft.tags.slice(0, 6).map((tag) => tag.toLowerCase().slice(0, 40)),
         faq: draft.faq.slice(0, 4).map((item) => ({ question: String(item.question ?? '').slice(0, 200), answer: String(item.answer ?? '').slice(0, 1000) })),
       });

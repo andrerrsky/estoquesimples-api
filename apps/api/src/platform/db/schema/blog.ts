@@ -30,6 +30,8 @@ export const blogPosts = pgTable(
     authorName: text('author_name').notNull().default('Equipe Estoque Simples'),
     readingMinutes: integer('reading_minutes').notNull().default(3),
     aiGenerated: boolean('ai_generated').notNull().default(false),
+    /** Só quem tem conta lê inteiro; no site público aparece o começo e um convite para se cadastrar. */
+    membersOnly: boolean('members_only').notNull().default(false),
     aiModel: text('ai_model'),
     aiTopic: text('ai_topic'),
     notifiedAt: timestamp('notified_at', tz),

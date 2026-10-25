@@ -19,9 +19,10 @@ interface Draft {
   faq: Array<{ question: string; answer: string }>;
   coverAlt: string;
   authorName: string;
+  membersOnly: boolean;
 }
 
-const EMPTY: Draft = { title: '', seoTitle: '', slug: '', excerpt: '', contentMd: '', category: 'controle-de-estoque', tags: '', faq: [], coverAlt: '', authorName: 'Equipe Estoque Simples' };
+const EMPTY: Draft = { title: '', seoTitle: '', slug: '', excerpt: '', contentMd: '', category: 'controle-de-estoque', tags: '', faq: [], coverAlt: '', authorName: 'Equipe Estoque Simples', membersOnly: false };
 
 function fromPost(post: BlogPostRow): Draft {
   return {
@@ -35,6 +36,7 @@ function fromPost(post: BlogPostRow): Draft {
     faq: post.faq,
     coverAlt: post.coverAlt ?? '',
     authorName: post.authorName,
+    membersOnly: post.membersOnly,
   };
 }
 
@@ -87,6 +89,7 @@ export function BlogEditorPage() {
       faq: draft.faq.filter((item) => item.question.trim() && item.answer.trim()),
       coverAlt: draft.coverAlt.trim() || null,
       authorName: draft.authorName.trim() || 'Equipe Estoque Simples',
+      membersOnly: draft.membersOnly,
     }),
     [draft],
   );
@@ -180,6 +183,7 @@ export function BlogEditorPage() {
             <span className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               {current.status === 'published' ? <Badge tone="success">publicado</Badge> : <Badge tone="warning">rascunho</Badge>}
               {current.aiGenerated && <Badge tone="info"><Icon name="sparkle" size={12} /> gerado por IA{current.aiModel ? ` · ${current.aiModel}` : ''}</Badge>}
+              {current.membersOnly && <Badge plain><Icon name="lock" size={12} /> exclusivo para quem tem conta</Badge>}
               {current.publishedAt && <span className="muted">publicado <Time value={current.publishedAt} /></span>}
               {current.notifiedAt && <span className="muted">· push enviado <Time value={current.notifiedAt} /></span>}
               {current.status === 'published' && <a href={current.url} target="_blank" rel="noopener noreferrer">ver no site</a>}
@@ -282,6 +286,10 @@ export function BlogEditorPage() {
               <label className="field">
                 <span className="field__label">Tags (separadas por vírgula)</span>
                 <input className="input" value={draft.tags} onChange={field('tags')} disabled={!editable} placeholder="estoque mínimo, reposição" />
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={draft.membersOnly} onChange={(event) => setDraft((d) => ({ ...d, membersOnly: event.target.checked }))} disabled={!editable} />
+                Exclusivo para quem tem conta (no site público aparece só o começo, com cadeado e convite para se cadastrar)
               </label>
               <label className="field">
                 <span className="field__label">Autor</span>
