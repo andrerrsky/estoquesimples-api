@@ -9,6 +9,28 @@
  * para http(s) ou caminhos do próprio site.
  */
 
+/**
+ * Começo de um post exclusivo para o site público: a abertura e a primeira
+ * seção inteira (até o segundo "h2"), no máximo 40% dos blocos. O corte é
+ * entre blocos (parágrafo, lista, título...), nunca no meio de uma tag.
+ */
+export function previewHtml(html: string): string {
+  const blocks = html.match(/<(h2|h3|p|ul|ol|blockquote|pre|hr|div)\b[\s\S]*?(?:<\/\1>|(?<=<hr>))/g) ?? [];
+  if (blocks.length === 0) return html.slice(0, 1200);
+  const limit = Math.max(1, Math.floor(blocks.length * 0.4));
+  const kept: string[] = [];
+  let h2Seen = 0;
+  for (const block of blocks) {
+    if (/^<h2\b/.test(block)) {
+      h2Seen += 1;
+      if (h2Seen >= 2) break;
+    }
+    kept.push(block);
+    if (kept.length >= limit && h2Seen >= 1) break;
+  }
+  return kept.join('\n');
+}
+
 export interface RenderedMarkdown {
   html: string;
   /** Títulos (h2/h3) com id, para o sumário e os links âncora. */

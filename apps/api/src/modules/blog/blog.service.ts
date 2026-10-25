@@ -11,7 +11,7 @@ import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 import { BLOG_CATEGORIES, blogCategory } from './blog.categories.js';
 import { DEFAULT_BLOG_SETTINGS, blogSettingsSchema, type BlogListQuery, type BlogPostBody, type BlogSettings } from './blog.schemas.js';
 import { fontsKnownMissing } from './blog-cover.js';
-import { readingMinutes, renderMarkdown, slugify } from './markdown.js';
+import { previewHtml, readingMinutes, renderMarkdown, slugify } from './markdown.js';
 
 export const BLOG_NOTIFY_JOB = 'blog.notify_post';
 const SETTINGS_KEY = 'blog_settings';
@@ -44,6 +44,10 @@ export interface BlogPostView {
   authorName: string;
   readingMinutes: number;
   aiGenerated: boolean;
+  /** Exclusivo para quem tem conta. */
+  membersOnly: boolean;
+  /** `true` quando `contentHtml` é só o começo (leitor sem conta num post exclusivo). */
+  locked: boolean;
   aiModel?: string | null;
   aiTopic?: string | null;
   notifiedAt?: string | null;
@@ -85,6 +89,8 @@ export class BlogService {
       authorName: row.authorName,
       readingMinutes: row.readingMinutes,
       aiGenerated: row.aiGenerated,
+      membersOnly: row.membersOnly,
+      locked: false,
       url: `${this.siteUrl()}/blog/${row.slug}`,
     };
   }
@@ -150,6 +156,15 @@ export class BlogService {
       .where(and(eq(blogPosts.slug, slug), eq(blogPosts.status, 'published')))
       .limit(1);
     return rows[0] ? this.toView(rows[0]) : null;
+  }
+
+  /**
+   * O post como um leitor o vê: quem tem conta lê tudo; sem conta, um post
+   * exclusivo mostra só o começo (`locked`), com o resto por trás do cadastro.
+   */
+  forReader(post: BlogPostView, signedIn: boolean): BlogPostView {
+    if (!post.membersOnly || signedIn) return post;
+    return { ...post, contentHtml: previewHtml(post.contentHtml), faq: [], locked: true };
   }
 
   /** Posts da mesma categoria para "leia também"; faltando, os mais novos das outras. */
@@ -232,6 +247,7 @@ export class BlogService {
       faq: body.faq,
       coverAlt: body.coverAlt?.trim() || null,
       readingMinutes: readingMinutes(rendered.words),
+      membersOnly: body.membersOnly,
       ...(body.authorName ? { authorName: body.authorName } : {}),
     };
   }

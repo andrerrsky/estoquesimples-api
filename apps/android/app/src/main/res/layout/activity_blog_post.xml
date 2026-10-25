@@ -82,6 +82,48 @@
                 android:lineSpacingMultiplier="1.35"
                 android:textAppearance="@style/TextAppearance.Estoque.Body"
                 android:textColorLink="@color/color_accent" />
+
+            <LinearLayout
+                android:id="@+id/postLocked"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/section_gap"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_surface"
+                android:padding="@dimen/group_padding"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔒"
+                    android:textSize="28sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="Continue lendo com uma conta grátis"
+                    android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Este post é exclusivo para quem usa o Estoque Simples com conta. A conta é gratuita; com ela você lê todos os posts inteiros."
+                    android:textAppearance="@style/TextAppearance.Estoque.Body.Muted" />
+
+                <Button
+                    android:id="@+id/postLockedButton"
+                    style="@style/Widget.Estoque.Button.Primary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:text="Criar conta ou entrar" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

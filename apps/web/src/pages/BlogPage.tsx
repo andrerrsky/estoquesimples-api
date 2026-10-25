@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client';
 import { Icon, Logo } from '../components/Icon';
+import { useAuthOptional } from '../auth/context';
 import { PublicShell } from '../components/PublicShell';
 import { Empty, Spinner, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
@@ -23,6 +24,8 @@ export interface BlogPost {
   faq: Array<{ question: string; answer: string }>;
   publishedAt: string | null;
   updatedAt: string;
+  membersOnly?: boolean;
+  locked?: boolean;
   coverUrl: string | null;
   coverAuto?: boolean;
   coverAlt: string | null;
@@ -113,7 +116,7 @@ function PostCard({ post }: { post: BlogPost }) {
         )}
         <div className="blog-card__body">
           <div className="blog-card__meta">
-            <span className="blog-card__category">{post.category.label}</span>
+            <span className="blog-card__category">{post.category.label}</span>{post.membersOnly && <span className="blog-card__lock" title="Exclusivo para quem tem conta"><Icon name="lock" size={11} /> Exclusivo</span>}
             <time dateTime={post.publishedAt ?? ''}>{fmtShort(post.publishedAt)}</time>
             <span>{post.readingMinutes} min de leitura</span>
           </div>
@@ -254,11 +257,15 @@ export function BlogPostPage() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const auth = useAuthOptional();
+  const authed = auth?.status === 'authed';
   const initial = useMemo(() => ssrData<{ post: BlogPost; related: BlogPost[] }>('post'), []);
+  // O HTML do servidor é o de quem não tem conta; com sessão, um post exclusivo é pedido de novo, inteiro.
+  const useInitial = Boolean(initial && initial.post.slug === slug && !(authed && initial.post.locked));
   const query = useQuery({
-    queryKey: ['blog', 'post', slug],
-    queryFn: () => api.get<{ post: BlogPost; related: BlogPost[] }>(`/v1/blog/posts/${encodeURIComponent(slug)}`, undefined, { auth: false }),
-    ...(initial && initial.post.slug === slug ? { initialData: initial } : {}),
+    queryKey: ['blog', 'post', slug, authed],
+    queryFn: () => api.get<{ post: BlogPost; related: BlogPost[] }>(`/v1/blog/posts/${encodeURIComponent(slug)}`, undefined, authed ? { optionalAuth: true } : { auth: false }),
+    ...(useInitial && initial ? { initialData: initial } : {}),
     retry: false,
   });
   const post = query.data?.post ?? null;
@@ -343,7 +350,18 @@ export function BlogPostPage() {
           </header>
           {post.coverUrl && <img className="blog-post__cover" src={post.coverUrl} alt={post.coverAlt ?? post.title} width={1200} height={630} decoding="async" fetchPriority="high" />}
           {/* HTML gerado e limpo pela API a partir do Markdown (só as tags do blog). */}
-          <div className="blog-post__content" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
+          <div className={`blog-post__content${post.locked ? ' blog-post__content--locked' : ''}`} dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
+          {post.locked && (
+            <aside className="blog-post__locked" aria-label="Conteúdo exclusivo">
+              <div className="blog-post__locked-icon" aria-hidden="true"><Icon name="lock" size={22} /></div>
+              <h2>Continue lendo com uma conta grátis</h2>
+              <p>Este post é exclusivo para quem usa o Estoque Simples. A conta é gratuita e leva um minuto; com ela você lê todos os posts do blog, inteiros.</p>
+              <p className="blog-post__locked-actions">
+                <Link className="btn btn--primary" to={`/criar-conta?next=${encodeURIComponent(`/blog/${post.slug}`)}`}>Criar conta grátis</Link>{' '}
+                <Link className="btn btn--secondary" to={`/entrar?next=${encodeURIComponent(`/blog/${post.slug}`)}`}>Já tenho conta</Link>
+              </p>
+            </aside>
+          )}
           {post.tags.length > 0 && (
             <ul className="blog-post__tags" aria-label="Assuntos">
               {post.tags.map((tag) => <li key={tag}>{tag}</li>)}

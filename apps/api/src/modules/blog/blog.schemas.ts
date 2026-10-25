@@ -32,6 +32,8 @@ export const blogPostBodySchema = z
     faq: blogFaqSchema.default([]),
     coverAlt: z.string().trim().max(200).nullish(),
     authorName: z.string().trim().min(2).max(80).optional(),
+    /** Exclusivo para quem tem conta (cadeado no site público). */
+    membersOnly: z.boolean().default(false),
   })
   .strict();
 
@@ -57,6 +59,8 @@ export const blogSettingsSchema = z
     aiEnabled: z.boolean(),
     /** Publica o post da IA na hora; desligado, ele fica como rascunho para revisão. */
     aiAutoPublish: z.boolean(),
+    /** Terceiro post semanal, exclusivo para quem tem conta (quarta-feira). */
+    aiMembersOnlyWeekly: z.boolean().default(true),
     /** Avisa todo mundo (push e caixa de notificações) a cada post publicado. */
     notifyOnPublish: z.boolean(),
   })
@@ -64,4 +68,4 @@ export const blogSettingsSchema = z
 
 export type BlogSettings = z.infer<typeof blogSettingsSchema>;
 
-export const DEFAULT_BLOG_SETTINGS: BlogSettings = { aiEnabled: true, aiAutoPublish: true, notifyOnPublish: true };
+export const DEFAULT_BLOG_SETTINGS: BlogSettings = { aiEnabled: true, aiAutoPublish: true, aiMembersOnlyWeekly: true, notifyOnPublish: true };

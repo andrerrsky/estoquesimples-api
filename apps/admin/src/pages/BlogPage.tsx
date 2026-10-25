@@ -28,6 +28,7 @@ export interface BlogPostRow {
   authorName: string;
   readingMinutes: number;
   aiGenerated: boolean;
+  membersOnly: boolean;
   aiModel?: string | null;
   aiTopic?: string | null;
   notifiedAt?: string | null;
@@ -36,7 +37,7 @@ export interface BlogPostRow {
 
 export interface BlogMeta {
   categories: Array<{ slug: string; label: string; description: string }>;
-  settings: { aiEnabled: boolean; aiAutoPublish: boolean; notifyOnPublish: boolean };
+  settings: { aiEnabled: boolean; aiAutoPublish: boolean; aiMembersOnlyWeekly: boolean; notifyOnPublish: boolean };
   openAiConfigured: boolean;
   nextAiRun: string;
   topics: Array<{ key: string; category: string; brief: string; keyword: string; used: boolean }>;
@@ -136,6 +137,7 @@ export function BlogPage() {
                       <td style={{ maxWidth: 480 }}>
                         <Link to={`/blog/${post.id}`} className="strong">{post.title}</Link>
                         {post.aiGenerated && <Badge tone="info"> <Icon name="sparkle" size={12} /> IA</Badge>}
+                        {post.membersOnly && <Badge plain> <Icon name="lock" size={12} /> Exclusivo</Badge>}
                         <div className="cell-sub">/blog/{post.slug} · {post.readingMinutes} min</div>
                       </td>
                       <td>{post.category.label}</td>
@@ -157,7 +159,7 @@ export function BlogPage() {
       ) : (
         <div className="grid grid--2-1">
           <div className="stack">
-            <Card title="Geração por IA" subtitle="Duas vezes por semana (terça e sexta, 9h de Brasília) a OpenAI escreve um post a partir de uma pauta do banco, dos fatos do produto e da central de ajuda. O post sai marcado como gerado por IA.">
+            <Card title="Geração por IA" subtitle="Terça e sexta (9h de Brasília) a OpenAI escreve um post público a partir de uma pauta do banco, dos fatos do produto e da central de ajuda; quinta, um post exclusivo para quem tem conta. O post sai marcado como gerado por IA.">
               {!meta.data ? (
                 <Skeleton />
               ) : (
@@ -167,7 +169,11 @@ export function BlogPage() {
                   )}
                   <label className="checkbox">
                     <input type="checkbox" checked={settings?.aiEnabled ?? false} onChange={() => toggle('aiEnabled')} disabled={!can('support') || saveSettings.isPending} />
-                    A IA escreve posts sozinha (2× por semana)
+                    A IA escreve posts sozinha (terça e sexta)
+                  </label>
+                  <label className="checkbox">
+                    <input type="checkbox" checked={settings?.aiMembersOnlyWeekly ?? false} onChange={() => toggle('aiMembersOnlyWeekly')} disabled={!can('support') || saveSettings.isPending} />
+                    Terceiro post por semana (quinta), exclusivo para quem tem conta, com conteúdo a mais
                   </label>
                   <label className="checkbox">
                     <input type="checkbox" checked={settings?.aiAutoPublish ?? false} onChange={() => toggle('aiAutoPublish')} disabled={!can('support') || saveSettings.isPending} />

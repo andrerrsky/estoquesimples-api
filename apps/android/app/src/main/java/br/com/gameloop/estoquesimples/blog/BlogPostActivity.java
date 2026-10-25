@@ -16,7 +16,9 @@ import java.util.concurrent.Executors;
 import br.com.gameloop.estoquesimples.BaseActivity;
 import br.com.gameloop.estoquesimples.ConnectivityPrompt;
 import br.com.gameloop.estoquesimples.R;
+import br.com.gameloop.estoquesimples.AccountActivity;
 import br.com.gameloop.estoquesimples.analytics.Analytics;
+import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.ApiException;
 
 /** Um post do blog, lido da API e mostrado como texto formatado. */
@@ -44,7 +46,15 @@ public class BlogPostActivity extends BaseActivity {
             if (post != null) startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(post.url)));
         });
         findViewById(R.id.postRetry).setOnClickListener(v -> load());
+        findViewById(R.id.postLockedButton).setOnClickListener(v -> startActivity(new Intent(this, AccountActivity.class)));
         load();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Voltou da tela de conta já logado: o post exclusivo vem inteiro.
+        if (post != null && post.locked && SessionManager.get(this).isSignedIn()) load();
     }
 
     private void load() {
@@ -61,7 +71,16 @@ public class BlogPostActivity extends BaseActivity {
         content.setVisibility(View.GONE);
         executor.execute(() -> {
             try {
-                BlogClient.Post loaded = new BlogClient().get(slug);
+                String token = null;
+                SessionManager session = SessionManager.get(this);
+                if (session.isSignedIn()) {
+                    try {
+                        token = session.accessToken();
+                    } catch (ApiException ignored) {
+                        // sem token válido o post vem como para quem não tem conta
+                    }
+                }
+                BlogClient.Post loaded = new BlogClient().get(slug, token);
                 runOnUiThread(() -> {
                     if (isFinishing()) return;
                     post = loaded;
@@ -75,6 +94,7 @@ public class BlogPostActivity extends BaseActivity {
                     TextView body = findViewById(R.id.postBody);
                     body.setText(BlogHtml.render(loaded.contentHtml));
                     body.setMovementMethod(LinkMovementMethod.getInstance());
+                    findViewById(R.id.postLocked).setVisibility(loaded.locked ? View.VISIBLE : View.GONE);
                     Analytics.track(this, "blog.post_viewed", Analytics.props("slug", loaded.slug, "category", loaded.categorySlug));
                 });
             } catch (ApiException e) {

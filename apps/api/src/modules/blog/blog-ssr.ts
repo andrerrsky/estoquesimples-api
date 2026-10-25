@@ -1,7 +1,7 @@
 import { BLOG_CATEGORIES, blogCategory } from './blog.categories.js';
 import type { BlogPostView } from './blog.service.js';
 import { fontsKnownMissing } from './blog-cover.js';
-import { escapeHtml } from './markdown.js';
+import { escapeHtml, previewHtml } from './markdown.js';
 
 /**
  * Páginas do blog já renderizadas para quem não executa JavaScript: o Google
@@ -147,12 +147,23 @@ function postCard(post: BlogPostView, heading: 'h2' | 'h3' = 'h2', options: { ea
   <a class="blog-card__link" href="/blog/${e(post.slug)}">
     ${post.coverUrl && !(post.coverAuto && fontsKnownMissing()) ? `<img class="blog-card__cover" src="${e(post.coverUrl)}" alt="${e(post.coverAlt ?? '')}" ${loading} decoding="async" width="1200" height="630">` : `<div class="blog-card__cover blog-card__cover--placeholder" aria-hidden="true"><span>${e(post.category.label)}</span></div>`}
     <div class="blog-card__body">
-      <div class="blog-card__meta"><span class="blog-card__category">${e(post.category.label)}</span><time datetime="${e(post.publishedAt ?? '')}">${e(dateShort(post.publishedAt))}</time><span>${post.readingMinutes} min de leitura</span></div>
+      <div class="blog-card__meta"><span class="blog-card__category">${e(post.category.label)}</span>${post.membersOnly ? '<span class="blog-card__lock" title="Exclusivo para quem tem conta">🔒 Exclusivo</span>' : ''}<time datetime="${e(post.publishedAt ?? '')}">${e(dateShort(post.publishedAt))}</time><span>${post.readingMinutes} min de leitura</span></div>
       <${heading} class="blog-card__title">${e(post.title)}</${heading}>
       <p class="blog-card__excerpt">${e(post.excerpt)}</p>
     </div>
   </a>
 </article>`;
+}
+
+/** Convite para quem não tem conta, no lugar do resto de um post exclusivo. */
+function paywall(post: BlogPostView): string {
+  const next = encodeURIComponent(`/blog/${post.slug}`);
+  return `<aside class="blog-post__locked" aria-label="Conteúdo exclusivo">
+      <div class="blog-post__locked-icon" aria-hidden="true">🔒</div>
+      <h2>Continue lendo com uma conta grátis</h2>
+      <p>Este post é exclusivo para quem usa o Estoque Simples. A conta é gratuita e leva um minuto; com ela você lê todos os posts do blog, inteiros.</p>
+      <p class="blog-post__locked-actions"><a class="btn btn--primary" href="/criar-conta?next=${next}">Criar conta grátis</a> <a class="btn btn--secondary" href="/entrar?next=${next}">Já tenho conta</a></p>
+    </aside>`;
 }
 
 function shell(inner: string, authedHint = false): string {
@@ -307,7 +318,9 @@ export function renderBlogPost(template: string, post: BlogPostView, related: Bl
         keywords: post.tags.join(', '),
         wordCount: post.contentHtml.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length,
         inLanguage: 'pt-BR',
-        isAccessibleForFree: true,
+        // Post exclusivo: o Google indexa o começo e sabe que o resto pede conta (markup de conteúdo com acesso restrito).
+        isAccessibleForFree: !post.membersOnly,
+        ...(post.membersOnly ? { hasPart: { '@type': 'WebPageElement', isAccessibleForFree: false, cssSelector: '.blog-post__locked' } } : {}),
       },
       breadcrumb([
         { name: 'Início', url: `${SITE}/` },
@@ -342,7 +355,8 @@ export function renderBlogPost(template: string, post: BlogPostView, related: Bl
       <div class="blog-post__meta"><a class="blog-post__author" href="/" rel="author"><img src="/icon.svg" alt="" width="28" height="28"> ${e(post.authorName)}</a><time datetime="${e(publishedAt)}">${e(dateLong(publishedAt))}</time>${updatedVisible ? `<span>Atualizado em <time datetime="${e(post.updatedAt)}">${e(dateLong(post.updatedAt))}</time></span>` : ''}<span>${post.readingMinutes} min de leitura</span></div>
     </header>
     ${post.coverUrl && !(post.coverAuto && fontsKnownMissing()) ? `<img class="blog-post__cover" src="${e(post.coverUrl)}" alt="${e(post.coverAlt ?? post.title)}" width="1200" height="630" decoding="async" fetchpriority="high">` : ''}
-    <div class="blog-post__content">${post.contentHtml}</div>
+    <div class="blog-post__content${post.locked ? ' blog-post__content--locked' : ''}">${post.contentHtml}</div>
+    ${post.locked ? paywall(post) : ''}
     ${post.tags.length > 0 ? `<ul class="blog-post__tags" aria-label="Assuntos">${post.tags.map((tag) => `<li>${e(tag)}</li>`).join('')}</ul>` : ''}
     ${faq}
     <aside class="blog-cta" aria-label="Experimente o Estoque Simples"><p class="blog-cta__title">Controle o seu estoque pelo celular e pelo computador</p><p>O Estoque Simples é grátis para uma pessoa. Cadastre produtos, lance entradas e saídas e saiba o que está acabando.</p><a class="btn btn--primary" href="/criar-conta">Criar conta grátis</a> <a class="btn btn--secondary" href="/plataformas">Onde usar</a></aside>
@@ -390,7 +404,7 @@ export function feedXml(posts: BlogPostView[]): string {
     <dc:creator>${e(post.authorName)}</dc:creator>
     <category>${e(post.category.label)}</category>
     <description>${e(post.excerpt)}</description>
-    <content:encoded><![CDATA[${absolute(post.contentHtml)}]]></content:encoded>
+    <content:encoded><![CDATA[${absolute(post.membersOnly ? `${previewHtml(post.contentHtml)}<p><a href="${postUrl(post)}">Continue lendo com uma conta grátis no Estoque Simples.</a></p>` : post.contentHtml)}]]></content:encoded>
   </item>`,
     )
     .join('\n');

@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { resolveAuth } from '../../platform/http/authenticate.js';
 import { notFound } from '../../platform/http/errors.js';
 import { errorSchema } from '../auth/auth.schemas.js';
 import { blogListQuerySchema, blogSlugSchema } from './blog.schemas.js';
@@ -46,7 +47,12 @@ export async function registerBlogRoutes(app: FastifyInstance): Promise<void> {
       const post = await service.getPublished(request.params.slug);
       if (!post) throw notFound('Post não encontrado.');
       const related = await service.related(post);
-      return reply.headers(cache).send({ post, related });
+      // Sessão opcional: um post exclusivo sai inteiro para quem tem conta e só o começo para o resto.
+      let signedIn = false;
+      if (post.membersOnly && request.headers.authorization) {
+        signedIn = await resolveAuth(app.services, request.headers.authorization).then(() => true, () => false);
+      }
+      return reply.headers({ ...cache, ...(post.membersOnly ? { 'Cache-Control': 'private, max-age=0', Vary: 'Authorization' } : {}) }).send({ post: service.forReader(post, signedIn), related });
     },
   );
 

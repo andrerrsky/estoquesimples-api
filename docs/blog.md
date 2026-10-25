@@ -39,6 +39,18 @@ na memória. Onde o servidor não tem fonte, a rota redireciona para
 `author_name` começa em "Equipe Estoque Simples". `reading_minutes` sai
 da contagem de palavras.
 
+**Exclusivo para quem tem conta** (`members_only`, checkbox no editor):
+no site público e para quem não está logado só aparece o começo
+(`previewHtml`: abertura e primeira seção, até 40% dos blocos) com um
+cadeado e o convite para criar conta; `GET /v1/blog/posts/:slug` devolve
+o post inteiro quando vem um Bearer válido (sessão opcional) e marca
+`locked: true` quando cortou. Toda conta (gratuita ou não) lê tudo. O
+HTML do servidor é sempre o de quem não tem conta (o cookie de sessão
+não chega às páginas); o web app pede o post de novo quando há sessão.
+No JSON-LD o post sai com `isAccessibleForFree: false` e `hasPart`
+apontando para o trecho restrito, o markup que o Google pede para
+conteúdo com acesso restrito; o RSS leva só o começo.
+
 Estados: `draft` → `published` (com `published_at`) → de volta a `draft`
 ("despublicar"). O `slug` é fixo depois de publicado: links já
 compartilhados continuam valendo. Apagar é definitivo (a página passa a
@@ -67,10 +79,17 @@ publicados (`lastmod`);
 `/blog/feed.xml` é RSS 2.0. `Cache-Control: public, max-age=120,
 stale-while-revalidate=600`.
 
-## IA: duas vezes por semana
+## IA: três vezes por semana
 
-Job `blog.ai_write`, terça e sexta às 12:00 UTC (9h em Brasília), único
-por data. Usa a mesma chave da OpenAI configurada em Avaliações › OpenAI
+Job `blog.ai_write`, terça e sexta às 12:00 UTC (9h em Brasília) para os
+posts públicos e quinta para o **post exclusivo** (`aiMembersOnlyWeekly`;
+desligado, ficam só terça e sexta), único por data. O exclusivo recebe
+um briefing a mais (`MEMBERS_ONLY_BRIEF`): a abertura e a primeira seção
+precisam valer por si (é o que o site público mostra), e a partir da
+segunda seção entra o material prático que justifica a conta (checklist,
+modelo pronto, passo a passo ou exemplo completo), com ~350 palavras a
+mais; a validação exige 4+ seções e uma dessas seções práticas, e recusa
+texto que peça cadastro. Usa a mesma chave da OpenAI configurada em Avaliações › OpenAI
 (`openai-client.ts`, `completeJson` com `response_format: json_object`).
 Sem chave, o job registra e sai.
 
