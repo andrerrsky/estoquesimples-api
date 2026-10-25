@@ -4,7 +4,7 @@ name: Backup externo
 # de teste do dump antes de guardá-lo. Liga quando a variável do repositório
 # BACKUP_OFFSITE_ENABLED for "true" — passo a passo em docs/seguranca.md
 # ("Backup e restauração"). A lógica está em scripts/backup-offsite.sh e é
-# exercitada a cada PR por backup-offsite-test.yml (MinIO).
+# exercitada a cada PR por backup-offsite-test.yml (S3 local, LocalStack).
 #
 # Segredos (Settings → Secrets and variables → Actions):
 #   BACKUP_DATABASE_URL      Postgres de produção, usuário SÓ DE LEITURA, terminando em ?sslmode=require

@@ -32,7 +32,7 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    - o bucket dos dumps tem **Object Lock**: nenhum dump pode ser apagado
      ou trocado antes de 35 dias, nem com a chave do workflow;
    - a lógica fica em `scripts/backup-offsite.sh`, exercitada em todo PR que
-     mexe no backup por `backup-offsite-test.yml` (MinIO com Object Lock e
+     mexe no backup por `backup-offsite-test.yml` (S3 local com Object Lock e
      versionamento: fluxo completo, decifrar e restaurar, restauração de foto
      no ponto anterior e cada trava);
    - as fotos são **espelhadas** (`rclone sync`) num **segundo bucket**, com
