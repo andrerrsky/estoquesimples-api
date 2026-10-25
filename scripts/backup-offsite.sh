@@ -90,7 +90,8 @@ case "$fase" in
     # roda se o destino guarda versões (senão apagaria a cópia de verdade) e
     # se a origem não está vazia (bucket errado ou esvaziado por alguém).
     precisa IMAGES_SOURCE IMAGES_DEST
-    versioning="$(rclone backend versioning "$IMAGES_DEST" 2>/dev/null || true)"
+    # O rclone responde em JSON (`"Enabled"`): tira aspas e espaços antes de comparar.
+    versioning="$(rclone backend versioning "$IMAGES_DEST" 2>/dev/null | tr -d '"[:space:]' || true)"
     if [ "$versioning" != "Enabled" ] && [ "${VERSIONING_CONFIRMED:-}" != "true" ]; then
       erro "O bucket da cópia das fotos não informa versionamento ativo (${versioning:-sem resposta}). Ative o versionamento (no B2, Object Lock) ou, se o provedor não informa, defina BACKUP_IMAGES_VERSIONING_CONFIRMED=true."
     fi
