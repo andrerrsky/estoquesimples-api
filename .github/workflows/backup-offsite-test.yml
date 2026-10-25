@@ -152,12 +152,14 @@ jobs:
 
       - name: Foto apagada na origem continua como versão antiga na cópia
         run: |
+          sleep 2; antes="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; sleep 2
           aws --endpoint-url "$S3_URL" s3 rm "s3://fotos-origem/workspaces/teste/images/foto1.webp"
           bash scripts/backup-offsite.sh photos
           versoes="$(aws --endpoint-url "$S3_URL" s3api list-object-versions --bucket fotos-copia --prefix workspaces/teste/images/foto1.webp --query 'length(Versions)' --output text)"
           [ "$versoes" -ge 1 ] || { echo "::error::a versão antiga da foto apagada sumiu"; exit 1; }
           # Restauração no ponto anterior (roteiro, passo 6) traz a foto de volta.
-          rclone copy --s3-version-at "$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)" minio:fotos-copia minio:fotos-restauradas --s3-no-check-bucket
+          aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-restauradas
+          rclone copy --s3-version-at "$antes" minio:fotos-copia minio:fotos-restauradas --s3-no-check-bucket
           rclone lsf minio:fotos-restauradas --recursive | grep -q foto1.webp || { echo "::error::restauração no ponto anterior não trouxe a foto"; exit 1; }
 
       - name: 'Trava: destino sem versionamento'
