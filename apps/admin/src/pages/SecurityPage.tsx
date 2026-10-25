@@ -25,6 +25,7 @@ export function SecurityPage({ forced = false }: { forced?: boolean }) {
   const [setup, setSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState('');
@@ -41,12 +42,13 @@ export function SecurityPage({ forced = false }: { forced?: boolean }) {
     onSuccess: (data) => {
       setSetup(data);
       setCode('');
+      setEmailCode('');
     },
     onError: (error) => toast.push(errorMessage(error), 'error'),
   });
 
   const enable = useMutation({
-    mutationFn: () => api.post<{ recoveryCodes: string[] }>('/auth/mfa/enable', { code: code.trim() }),
+    mutationFn: () => api.post<{ recoveryCodes: string[] }>('/auth/mfa/enable', { code: code.trim(), emailCode: emailCode.trim() }),
     onSuccess: (data) => {
       setRecoveryCodes(data.recoveryCodes);
       setSetup(null);
@@ -136,6 +138,10 @@ export function SecurityPage({ forced = false }: { forced?: boolean }) {
                 <span className="field__label">Sem câmera? Digite a chave no aplicativo:</span>
                 <code className="mono" style={{ wordBreak: 'break-all', fontSize: 15 }}>{setup.secret.replace(/(.{4})/g, '$1 ').trim()}</code>
                 <label className="field" style={{ marginTop: 12 }}>
+                  <span className="field__label">Código enviado para {admin?.email}</span>
+                  <input className="input" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" value={emailCode} onChange={(event) => setEmailCode(event.target.value)} maxLength={10} required />
+                </label>
+                <label className="field">
                   <span className="field__label">Código que o aplicativo mostra</span>
                   <input className="input" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" value={code} onChange={(event) => setCode(event.target.value)} maxLength={10} autoFocus required />
                 </label>

@@ -42,13 +42,23 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 
 1. Crie um bucket em outro provedor (Backblaze B2, Cloudflare R2 ou AWS S3)
    com **versionamento** (ou object lock em modo governança):
-   - regra de expiração de 35 dias **só no prefixo `db/`** (os dumps);
-   - em `imagens/`, nenhuma expiração por idade (a foto de hoje pode ter sido
-     copiada há meses); só "versões não atuais expiram em 35 dias";
-   - credencial restrita a esse bucket com listar, ler cabeçalho, ler e
-     gravar objetos (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`; no B2:
-     `listFiles`, `readFiles`, `writeFiles`), **sem apagar**. Ler é preciso
-     para o `rclone copy` comparar e para conferir o hash do dump enviado.
+   - em `db/` (os dumps): objetos atuais expiram em 35 dias **e** versões não
+     atuais são apagadas 1 dia depois (sem a segunda regra, a expiração só
+     esconde o arquivo e ele continua guardado);
+   - em `imagens/`: nenhuma expiração por idade (o workflow espelha o bucket
+     das fotos com `rclone sync`); **versões não atuais expiram em 35 dias** —
+     é assim que foto apagada, inclusive pelo expurgo de uma conta, sai do
+     backup;
+   - no Backblaze B2 as duas regras são `daysFromUploadingToHiding` e
+     `daysFromHidingToDeleting` por prefixo; no S3/R2, *Lifecycle* com
+     `Expiration` e `NoncurrentVersionExpiration`;
+   - credencial restrita a esse bucket com listar, ler, gravar e apagar a
+     versão atual (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`,
+     `s3:DeleteObject`; no B2: `listFiles`, `readFiles`, `writeFiles`,
+     `deleteFiles`), **sem** `s3:DeleteObjectVersion`/`PutLifecycleConfiguration`:
+     com o versionamento, apagar só cria uma versão não atual, que a regra do
+     bucket remove no prazo — a credencial vazada não consegue destruir as
+     cópias antes disso.
 2. Gere o par de chaves `age` num computador confiável:
    `age-keygen -o estoque-backup.key` — guarde o arquivo **no gerenciador de
    senhas** (e uma cópia offline); a linha `public key: age1…` vai para o GitHub.
@@ -62,7 +72,13 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    GRANT pg_read_all_data TO backup_reader;
    ALTER ROLE backup_reader BYPASSRLS; -- o dump precisa ver todas as empresas
    ALTER ROLE backup_reader SET default_transaction_read_only = on;
+   ALTER ROLE backup_reader CONNECTION LIMIT 2;
    ```
+   O GitHub alcança o banco pelo **proxy TCP público** do Railway (a porta
+   fica aberta à internet, protegida pela senha): use uma senha longa e
+   gerada, e monte `BACKUP_DATABASE_URL` com **`?sslmode=require`** no fim —
+   sem isso o cliente aceita conexão sem TLS e o dump inteiro (e a senha)
+   podem passar em claro.
 4. No Railway, crie `OPS_BACKUP_TOKEN` (`openssl rand -hex 32`): ele só
    registra restaurações de teste em `/ops/backup` — o `OPS_TOKEN` não vai
    para o GitHub.
@@ -106,6 +122,14 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    Play) não abrem e todas as sessões caem. Elas vêm do cofre (ver abaixo).
 8. Registre data, origem, duração e perda de dados no histórico abaixo.
 
+### Exercício a partir do bucket (trimestral) **[dono]**
+
+O workflow prova toda noite que o dump restaura, mas não que a chave
+privada `age` está guardada e funciona. A cada trimestre, siga os passos 2 e
+3 do roteiro acima num computador confiável (baixar o dump mais recente,
+conferir o SHA-256, decifrar com a chave do cofre, `backup:verify` num banco
+descartável) e registre na tabela abaixo.
+
 ### Histórico de restaurações reais
 
 | Data | Origem | Duração | Observações |
@@ -135,6 +159,9 @@ outra linha não abre.
    usa a `k2`; o antigo continua abrindo com a `k1`.
 3. Recifre o que já existe: `railway run npm run secrets:reencrypt -w @estoquesimples/api`
    (simulação) e depois com `-- --apply`. Rodar de novo deve mostrar 0.
+   Na primeira vez, depois disso defina **`SECRETS_ALLOW_LEGACY=false`** e
+   faça o deploy: a partir daí valor em formato antigo (inclusive texto em
+   claro plantado por quem tenha escrita no banco) é recusado.
 4. Só então a `k1` pode sair do chaveiro (guarde-a no cofre até o próximo
    backup externo expirar: dumps antigos ainda a usam).
 
@@ -171,8 +198,11 @@ definido); as sessões de refresh continuam.
   empresa sai pela exportação da empresa.
 - **Exclusão**: o pedido bloqueia a conta na hora; depois de 30 dias o job
   `privacy.daily` apaga a conta (sessões, tokens, aparelhos, vínculos e
-  notificações saem junto), as conversas de suporte dela, e desvincula
-  analytics, erros e auditoria (sem IP). Cópias de backup expiram em 35 dias.
+  notificações saem junto), as conversas de suporte dela, as fotos das
+  empresas já excluídas que ela possuía, o e-mail dela em públicos de
+  campanha e na trilha do painel, e desvincula analytics, erros e auditoria
+  (sem IP). Nas cópias de backup (dumps e fotos), o dado some em até 35 dias
+  pelas regras de versão do bucket.
 
 ### Retenção
 
@@ -187,6 +217,7 @@ definido); as sessões de refresh continuam.
 | Conversas de suporte resolvidas | 2 anos sem mensagem nova | `privacy.daily` |
 | Tarefas da fila concluídas | 30 dias | `privacy.daily` |
 | Convites aceitos, cancelados ou vencidos | 90 dias | `privacy.daily` |
+| E-mails do público de campanhas (tipo "usuários") | 180 dias após o envio | `privacy.daily` |
 | Erros registrados | 30 dias | `ops` (`error_events`) |
 | Eventos de uso (analytics) | `ANALYTICS_RETENTION_DAYS` (400) | `analytics.retention` |
 | Backups | 35 dias | regra do bucket / Railway |

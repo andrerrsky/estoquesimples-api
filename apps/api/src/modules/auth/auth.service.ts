@@ -222,15 +222,16 @@ export class AuthService {
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
 
-    if (user.status === 'suspended') {
-      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
-    }
-
     const passwordOk = await verifyPassword(user.passwordHash, input.password);
     if (!passwordOk) {
       const lockSeconds = this.services.throttle.fail('login', input.email, ip);
       await this.registerFailedLogin(user.id, user.failedLoginAttempts + 1, lockSeconds, meta);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
+    }
+
+    // Depois da senha: quem não a sabe não descobre que a conta existe e está suspensa.
+    if (user.status === 'suspended') {
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
     }
     this.services.throttle.succeed('login', input.email, ip);
 

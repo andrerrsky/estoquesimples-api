@@ -28,6 +28,8 @@ export const RETENTION = {
   finishedJobs: 30,
   /** Convites aceitos, cancelados ou vencidos (e-mail de quem foi convidado). */
   closedInvites: 90,
+  /** Lista de e-mails do público de campanhas encerradas há mais de N dias. */
+  campaignEmails: 180,
 } as const;
 
 type Counted = {
@@ -75,7 +77,16 @@ export class PrivacyService {
       // as linhas de `workspace_images`, a coleta de lixo não acharia mais os
       // arquivos. Falha aqui adia o expurgo para a próxima execução.
       await this.deleteWorkspaceObjects(id);
+      const [account] = (await this.services.db.execute<{ email: string }>(sql`SELECT lower(email) AS email FROM users WHERE id = ${id}`)).rows;
+      const email = account?.email ?? '';
       await this.services.db.transaction(async (tx) => {
+        // E-mail da pessoa em públicos de campanha (tipo "users") e em detalhes da trilha do painel que não apontam para ela.
+        await tx.execute(sql`
+          UPDATE push_campaigns
+          SET audience = jsonb_set(audience, '{emails}', COALESCE((SELECT jsonb_agg(item) FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) <> ${email}), '[]'::jsonb))
+          WHERE audience->>'type' = 'users' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) = ${email})
+        `);
+        await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE lower(metadata->>'email') = ${email}`);
         // Empresas já excluídas que a pessoa possuía: saem inteiras (estoque, fotos, assinatura).
         await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
         await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id}`);
@@ -137,6 +148,7 @@ export class PrivacyService {
       notifications: sql`DELETE FROM notifications WHERE created_at < ${days(RETENTION.notifications)}`,
       pushTokens: sql`DELETE FROM push_tokens WHERE (revoked_at IS NOT NULL AND revoked_at < ${days(RETENTION.endedSessions)}) OR last_seen_at < ${days(RETENTION.stalePushTokens)}`,
       supportTickets: sql`DELETE FROM support_tickets WHERE status = 'resolved' AND last_message_at < ${days(RETENTION.closedSupport)}`,
+      campaignEmails: sql`UPDATE push_campaigns SET audience = jsonb_set(audience, '{emails}', '[]'::jsonb) WHERE audience->>'type' = 'users' AND jsonb_array_length(audience->'emails') > 0 AND COALESCE(completed_at, created_at) < ${days(RETENTION.campaignEmails)}`,
       invites: sql`DELETE FROM invites WHERE (accepted_at IS NOT NULL OR cancelled_at IS NOT NULL OR expires_at < now()) AND COALESCE(accepted_at, cancelled_at, expires_at) < ${days(RETENTION.closedInvites)}`,
       jobs: sql`DELETE FROM jobs WHERE (completed_at IS NOT NULL AND completed_at < ${days(RETENTION.finishedJobs)}) OR (failed_at IS NOT NULL AND failed_at < ${days(RETENTION.finishedJobs)})`,
     };

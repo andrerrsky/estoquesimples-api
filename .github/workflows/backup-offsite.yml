@@ -6,7 +6,7 @@ name: Backup externo
 # passo em docs/seguranca.md ("Backup e restauração").
 #
 # Segredos (Settings → Secrets and variables → Actions):
-#   BACKUP_DATABASE_URL      URL do Postgres de produção com um usuário SÓ DE LEITURA
+#   BACKUP_DATABASE_URL      URL do Postgres de produção com um usuário SÓ DE LEITURA, terminando em ?sslmode=require
 #   BACKUP_AGE_RECIPIENT     chave pública `age` (a privada fica fora do GitHub e do Railway)
 #   BACKUP_S3_ENDPOINT       endpoint S3 do bucket de backup (outro provedor: B2, R2, S3)
 #   BACKUP_S3_BUCKET         nome do bucket (com versionamento ou object lock e regra de expiração)
@@ -96,7 +96,9 @@ jobs:
       # bucket depois de restaurado e conferido aqui. O registro em
       # /ops/backup fica para o fim, depois do envio dar certo.
       - name: Restaurar e conferir
-        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO" --report-file "$GITHUB_WORKSPACE/verificacao.json"
+        # --schema-atras-ok: com uma migration já no main e o deploy pendente, o
+        # dump (estado real da produção) ainda é guardado; o job falha no fim.
+        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO" --report-file "$GITHUB_WORKSPACE/verificacao.json" --schema-atras-ok
 
       - name: Cifrar e enviar o dump
         id: envio
@@ -123,9 +125,10 @@ jobs:
           echo "objeto=db/$stamp.dump.age" >> "$GITHUB_OUTPUT"
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
 
-      # Cópia das fotos: `copy` nunca apaga no destino, então uma foto apagada
-      # por engano (ou por um invasor) continua na cópia até a regra de
-      # expiração do bucket de backup.
+      # Cópia das fotos: `sync` espelha o bucket das fotos num bucket com
+      # versionamento. Uma foto apagada (por engano, por um invasor ou pelo
+      # expurgo de uma conta) vira versão não atual e some depois de 35 dias,
+      # a mesma retenção dos dumps (docs/seguranca.md).
       - name: Copiar fotos dos produtos
         env:
           IMAGES_BUCKET: ${{ secrets.IMAGES_S3_BUCKET }}
@@ -142,7 +145,7 @@ jobs:
           RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
           RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
         if: env.IMAGES_BUCKET != ''
-        run: rclone copy "imagens:$IMAGES_BUCKET" "backup:$BUCKET/imagens" --s3-no-check-bucket --transfers 8 --stats-one-line --stats 60s
+        run: rclone sync "imagens:$IMAGES_BUCKET" "backup:$BUCKET/imagens" --s3-no-check-bucket --transfers 8 --max-delete 5000 --stats-one-line --stats 60s
 
       # Só agora: banco restaurado e conferido, cópia cifrada no bucket e
       # conferida, fotos copiadas. É isto que zera o alerta backup_desatualizado.
@@ -153,8 +156,17 @@ jobs:
           OBJETO: ${{ steps.envio.outputs.objeto }}
           SHA256: ${{ steps.envio.outputs.sha256 }}
         run: |
-          body="$(jq -c --arg objeto "$OBJETO" --arg sha "$SHA256" '{origem: "backup-offsite", tabelas, registros, duracaoSegundos, migracao, objeto: $objeto, sha256: $sha}' verificacao.json)"
+          body="$(jq -c --arg objeto "$OBJETO" --arg sha "$SHA256" '{origem: "backup-offsite", tabelas, registros, duracaoSegundos, migracao, schemaAtras, objeto: $objeto, sha256: $sha}' verificacao.json)"
           curl -fsS -X POST "$API_BASE_URL/ops/backup" -H "authorization: Bearer $OPS_BACKUP_TOKEN" -H 'content-type: application/json' --data "$body"
+
+      # O backup foi guardado e registrado, mas a produção está atrás do main
+      # (migration sem deploy): o job fica vermelho para alguém olhar o deploy.
+      - name: Produção atrás do repositório?
+        run: |
+          if [ "$(jq -r '.schemaAtras' verificacao.json)" = "true" ]; then
+            echo "::error::O banco de produção está numa migration anterior à do main. Backup guardado; confira o deploy no Railway."
+            exit 1
+          fi
 
       - name: Apagar cópias locais
         if: always()

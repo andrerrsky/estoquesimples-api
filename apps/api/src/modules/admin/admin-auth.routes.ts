@@ -141,13 +141,13 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
         tags: ['admin'],
         summary: 'Ativa o segundo fator com um código e devolve os códigos de recuperação',
         hide: true,
-        body: z.object({ code: z.string().trim().min(6).max(10) }).strict(),
+        body: z.object({ code: z.string().trim().min(6).max(10), emailCode: z.string().trim().min(6).max(10) }).strict(),
         response: { 200: z.object({ recoveryCodes: z.array(z.string()) }), ...commonAdminErrors },
       },
     },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
-      const result = await service.enableMfa(requireAdminContext(request), request.body.code, requestMeta(request));
+      const result = await service.enableMfa(requireAdminContext(request), request.body.code, request.body.emailCode, requestMeta(request));
       reply.setCookie(env.ADMIN_COOKIE_NAME, result.token, adminCookieOptions(env));
       return { recoveryCodes: result.recoveryCodes };
     },

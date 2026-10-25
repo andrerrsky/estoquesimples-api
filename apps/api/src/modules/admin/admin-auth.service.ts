@@ -1,3 +1,5 @@
+import { randomInt } from 'node:crypto';
+
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { clientKey } from '../../platform/http/login-throttle.js';
@@ -18,7 +20,7 @@ import {
   verifyPassword,
   verifyPasswordDummy,
 } from '../../platform/auth/password.js';
-import { addDays, addHours, generateToken, hashToken } from '../../platform/auth/tokens.js';
+import { addDays, addHours, generateToken, hashToken, safeEquals } from '../../platform/auth/tokens.js';
 import { generateRecoveryCodes, generateTotpSecret, normalizeRecoveryCode, otpauthUri, verifyTotp } from '../../platform/auth/totp.js';
 import type { Env } from '../../platform/config/env.js';
 import type { RequestMeta } from '../auth/auth.service.js';
@@ -272,16 +274,49 @@ export class AdminAuthService {
   }
 
   /** Gera um segredo novo (ainda inativo) e devolve o que o autenticador precisa ler. */
+  /**
+   * Códigos de confirmação do cadastro do autenticador, enviados por e-mail:
+   * só a senha não basta para alguém cadastrar o próprio celular num acesso
+   * alheio (novo ou recém-zerado). Em memória (instância única), 15 minutos,
+   * 5 tentativas.
+   */
+  private readonly enrollCodes = new Map<string, { hash: string; expiresAt: number; attempts: number }>();
+
   async startMfaSetup(context: AdminContext): Promise<{ secret: string; otpauthUri: string }> {
     const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
     if (row?.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo. Desative antes de cadastrar outro aparelho.');
     const secret = generateTotpSecret();
     await this.db.update(platformAdmins).set({ totpSecret: this.services.purchaseTokens.encrypt(secret, totpAad(context.adminId)), totpLastStep: null }).where(eq(platformAdmins.id, context.adminId));
+    const emailCode = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    this.enrollCodes.set(context.adminId, { hash: hashToken(emailCode), expiresAt: Date.now() + 15 * 60_000, attempts: 0 });
+    await this.services.mailer.send({
+      to: context.email,
+      kind: 'security_alert',
+      subject: 'Código para cadastrar o autenticador - Estoque Simples',
+      text:
+        `Código para confirmar o cadastro do aplicativo autenticador no seu acesso ao painel: ${emailCode}\n\n` +
+        'Vale por 15 minutos. Se não foi você, troque a senha e avise um owner do painel.',
+    });
     return { secret, otpauthUri: otpauthUri(secret, context.email) };
   }
 
+  private checkEnrollCode(adminId: string, code: string): boolean {
+    const entry = this.enrollCodes.get(adminId);
+    if (!entry || entry.expiresAt < Date.now() || entry.attempts >= 5) {
+      this.enrollCodes.delete(adminId);
+      return false;
+    }
+    entry.attempts += 1;
+    const ok = safeEquals(hashToken(code.trim()), entry.hash);
+    if (ok) this.enrollCodes.delete(adminId);
+    return ok;
+  }
+
   /** Confirma o cadastro com um código do autenticador e devolve os códigos de recuperação (uma vez só). */
-  async enableMfa(context: AdminContext, code: string, meta: RequestMeta): Promise<{ recoveryCodes: string[]; token: string; expiresAt: Date }> {
+  async enableMfa(context: AdminContext, code: string, emailCode: string, meta: RequestMeta): Promise<{ recoveryCodes: string[]; token: string; expiresAt: Date }> {
+    if (!this.checkEnrollCode(context.adminId, emailCode)) {
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Código do e-mail inválido ou vencido. Comece o cadastro de novo para receber outro.');
+    }
     const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
     if (!row?.totpSecret) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Comece o cadastro do autenticador primeiro.');
     if (row.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo.');

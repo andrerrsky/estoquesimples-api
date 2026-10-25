@@ -57,6 +57,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/metrics',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       // Fora do rate limit global: o coletor chega a cada 15 segundos e não
       // pode ser barrado junto com o tráfego dos aplicativos.
       config: { rateLimit: false },
@@ -85,6 +87,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/status',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -118,6 +122,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.put(
     '/ops/config/sync',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -149,6 +155,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/config/sync',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -193,6 +201,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/backup',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -243,6 +253,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.post(
     '/ops/backup',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request, { alsoBackupToken: true }),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -257,6 +269,7 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
           objeto: z.string().max(300).optional(),
           sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
           migracao: z.number().int().nonnegative().optional(),
+          schemaAtras: z.boolean().optional(),
         }),
         response: { 200: z.object({ message: z.string() }), 401: errorSchema, 404: errorSchema },
       },

@@ -7,6 +7,14 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+  # Mudanças que podem quebrar a restauração rodam o exercício no próprio PR.
+  pull_request:
+    paths:
+      - 'apps/api/src/platform/db/migrations/**'
+      - 'apps/api/src/platform/db/verify-backup.ts'
+      - 'apps/api/src/platform/db/migrate.ts'
+      - 'apps/api/scripts/seed-drill.ts'
+      - '.github/workflows/backup-*.yml'
 
 permissions:
   contents: read

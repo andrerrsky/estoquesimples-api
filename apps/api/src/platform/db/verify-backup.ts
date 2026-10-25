@@ -42,6 +42,8 @@ interface Argumentos {
   opsToken: string | undefined;
   /** Grava o resultado em JSON (o workflow registra na API só depois de enviar o dump). */
   reportFile: string | undefined;
+  /** Aceita dump com migrations atrás do repositório (deploy pendente); o relatório marca `schemaAtras`. */
+  schemaAtrasOk: boolean;
 }
 
 interface Endereco {
@@ -113,6 +115,7 @@ function lerArgumentos(): Argumentos {
     apiUrl: valor('api') ?? process.env['API_BASE_URL'],
     opsToken: process.env['OPS_BACKUP_TOKEN'] ?? process.env['OPS_TOKEN'],
     reportFile: valor('report-file'),
+    schemaAtrasOk: process.argv.includes('--schema-atras-ok'),
   };
 }
 
@@ -191,7 +194,7 @@ interface Conferencia {
   migracao: number;
 }
 
-async function conferir(target: string): Promise<Conferencia> {
+async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean }> {
   const client = new pg.Client({ connectionString: target });
   await client.connect();
 
@@ -281,7 +284,14 @@ async function conferir(target: string): Promise<Conferencia> {
     );
     const ultimaRestaurada = Number(migracao.rows[0]?.maior ?? 0);
 
-    if (ultimaRestaurada !== ultimaEsperada) {
+    // Dump mais novo que o código: algo está muito errado (outro banco?).
+    if (ultimaRestaurada > ultimaEsperada) {
+      throw new Error(`O dump está na migration ${ultimaRestaurada}, à frente do repositório (${ultimaEsperada}).`);
+    }
+    // Dump atrás do repositório: normal entre o merge de uma migration e o
+    // deploy. Com --schema-atras-ok o backup vale (é o estado real da
+    // produção) e o relatório avisa; sem, é erro como antes.
+    if (ultimaRestaurada < ultimaEsperada && !schemaAtrasOk) {
       throw new Error(
         `O dump está na migration ${ultimaRestaurada} e o repositório está na ` +
           `${ultimaEsperada}. O backup não reconstrói o ambiente atual.`,
@@ -289,6 +299,7 @@ async function conferir(target: string): Promise<Conferencia> {
     }
 
     return {
+      schemaAtras: ultimaRestaurada < ultimaEsperada,
       tabelas: Number(tabelas.rows[0]?.total ?? 0),
       registros,
       politicas: Number(politicas.rows[0]?.total ?? 0),
@@ -332,7 +343,7 @@ async function main(): Promise<void> {
   await garantirPapeis(config.target, await papeisDoDump(config.dump));
   await restaurar(config.dump, config.target);
 
-  const { tabelas, registros, politicas, grants, migracao } = await conferir(config.target);
+  const { tabelas, registros, politicas, grants, migracao, schemaAtras } = await conferir(config.target, config.schemaAtrasOk);
   const duracaoSegundos = Math.round((Date.now() - inicio) / 100) / 10;
 
   console.log(
@@ -342,7 +353,7 @@ async function main(): Promise<void> {
   );
 
   if (config.reportFile) {
-    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao }));
+    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras }));
   }
   await registrar(config, { tabelas, registros, duracaoSegundos });
 }
