@@ -2,7 +2,7 @@
 # Ferramentas do backup externo no runner do GitHub: cliente do Postgres 16
 # (precisa acompanhar o servidor; pg_restore antigo recusa dump novo), age e
 # rclone. O rclone vem do release oficial fixado, com o SHA-256 conferido: o
-# pacote do Ubuntu é antigo para --s3-version-at/--b2-version-at e para
+# pacote do Ubuntu é antigo para restaurar versões (version_at) e para
 # enviar a buckets com Object Lock (Content-MD5).
 set -euo pipefail
 

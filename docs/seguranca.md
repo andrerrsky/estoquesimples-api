@@ -120,7 +120,7 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    ou backup do Railway inválido → cópia externa.
 2. **Baixar e decifrar** a cópia externa mais recente. No computador de quem
    restaura: rclone 1.66 ou mais novo (o do apt é antigo para
-   `--s3-version-at`/`--b2-version-at`) e um `rclone.conf` com os três remotos
+   `version_at`) e um `rclone.conf` com os três remotos
    usados abaixo — `backup` (bucket dos dumps), `backupimg` (cópia das fotos)
    e `imagens` (bucket das fotos de produção, com a chave de **escrita** da
    API, `S3_*` do Railway):
@@ -170,11 +170,13 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 6. **Fotos**: restaure o bucket como estava **antes** do incidente (as fotos
    apagadas desde então existem como versões antigas):
    ```bash
-   # S3/R2 (versões): estado no instante informado
-   rclone copy --s3-version-at "2026-10-20T00:00:00Z" backupimg:<bucket-das-fotos-backup> imagens:<bucket-das-fotos>
-   # Backblaze B2
-   rclone copy --b2-version-at "2026-10-20T00:00:00Z" backupimg:<bucket-das-fotos-backup> imagens:<bucket-das-fotos>
+   # Estado da cópia no instante informado. O `version_at` vai só no remoto
+   # de origem (como flag global --s3-version-at valeria também para o
+   # destino, que então não aceitaria escrita). Exercitado no CI.
+   rclone copy "backupimg,version_at=2026-10-20T00:00:00Z:<bucket-copia-das-fotos>" imagens:<bucket-das-fotos>
    ```
+   (No B2 via API S3 o parâmetro é o mesmo; com o backend nativo `b2`, use
+   `backupimg,version_at=…` igualmente.)
    Depois volte `BACKUP_OFFSITE_ENABLED=true`.
 7. **Chaves**: a API precisa das **mesmas** `PURCHASE_TOKEN_ENCRYPTION_KEY` /
    `SECRETS_ENCRYPTION_KEYS` e `JWT_*` de antes — sem elas os segredos
