@@ -128,7 +128,7 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request) => {
-      requireOpsToken(request, { alsoBackupToken: true });
+      requireOpsToken(request);
 
       await app.services.db
         .insert(appConfig)
@@ -256,13 +256,13 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
           /** Onde a cópia externa foi guardada e o SHA-256 do arquivo cifrado. */
           objeto: z.string().max(300).optional(),
           sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
-          migracao: z.string().max(100).optional(),
+          migracao: z.number().int().nonnegative().optional(),
         }),
         response: { 200: z.object({ message: z.string() }), 401: errorSchema, 404: errorSchema },
       },
     },
     async (request) => {
-      requireOpsToken(request);
+      requireOpsToken(request, { alsoBackupToken: true });
 
       await app.services.db
         .insert(appConfig)

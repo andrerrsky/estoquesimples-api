@@ -280,3 +280,41 @@ describe('verificação de backup', () => {
     expect(consulta.json().horasDesdeVerificacao).toBe(0);
   });
 });
+
+describe('token de backup (OPS_BACKUP_TOKEN)', () => {
+  const BACKUP_TOKEN = 'token-so-de-backup-com-tamanho-suficiente';
+  let backupContext: TestContext;
+  const backupAuth = { authorization: `Bearer ${BACKUP_TOKEN}` };
+
+  beforeAll(async () => {
+    backupContext = await createTestApp({ OPS_TOKEN, OPS_BACKUP_TOKEN: BACKUP_TOKEN });
+  });
+
+  afterAll(async () => {
+    await backupContext.close();
+  });
+
+  it('registra a restauração com o corpo exato que o workflow monta', async () => {
+    // Mesmo formato do --report-file do verify-backup + objeto e hash do envio (backup-offsite.yml).
+    const report = { tabelas: 48, registros: 5, duracaoSegundos: 0.9, migracao: 23 };
+    const payload = { origem: 'backup-offsite', ...report, objeto: 'db/2026/10/25/estoquesimples-20261025T053000Z.dump.age', sha256: 'a'.repeat(64) };
+    const response = await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload });
+    expect(response.statusCode).toBe(200);
+
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/backup', headers: auth });
+    expect(status.json().dentroDoPrazo).toBe(true);
+    expect(status.json().detalhes.objeto).toBe(payload.objeto);
+  });
+
+  it('não abre mais nada além do registro de backup', async () => {
+    for (const [method, url, payload] of [
+      ['GET', '/ops/backup', undefined],
+      ['GET', '/ops/status', undefined],
+      ['GET', '/metrics', undefined],
+      ['PUT', '/ops/config/sync', { enabled: false, minAppVersionCode: 999999 }],
+    ] as const) {
+      const response = await backupContext.app.inject({ method, url, headers: backupAuth, ...(payload ? { payload } : {}) });
+      expect(response.statusCode, `${method} ${url}`).toBe(401);
+    }
+  });
+});

@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 /**
  * Freio de tentativas de login e de pedidos por e-mail, em memória.
  *
@@ -19,6 +21,9 @@ interface Entry {
 }
 
 const MAX_ENTRIES = 50_000;
+/** Endereços onde a conta entrou com sucesso: mapa separado (falhas não o esvaziam) e com validade. */
+const MAX_KNOWN = 20_000;
+const KNOWN_TTL_MS = 30 * 86_400_000;
 
 /**
  * Chave de cliente para limites: IPv4 inteiro; IPv6 pelo prefixo /64 (um
@@ -27,13 +32,16 @@ const MAX_ENTRIES = 50_000;
  */
 export function clientKey(ip: string | null | undefined): string {
   if (!ip) return 'desconhecido';
-  const plain = ip.replace(/^::ffff:/i, '');
-  if (!plain.includes(':')) return plain;
-  const [head = ''] = plain.split('::');
-  const full = plain.includes('::')
-    ? [...head.split(':').filter(Boolean), ...Array(8).fill('0')].slice(0, 4)
-    : plain.split(':').slice(0, 4);
-  return `${full.map((part) => part.toLowerCase().padStart(4, '0')).join(':')}::/64`;
+  const plain = ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, '');
+  if (isIP(plain) === 4) return plain;
+  if (isIP(plain) !== 6) return plain;
+  // Expande "::" contando os grupos dos dois lados, para que todo endereço do
+  // mesmo /64 dê a mesma chave.
+  const [left = '', right] = plain.toLowerCase().split('::');
+  const head = left ? left.split(':') : [];
+  const tail = right === undefined ? [] : right ? right.split(':') : [];
+  const groups = right === undefined ? head : [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail];
+  return `${groups.slice(0, 4).map((part) => part.padStart(4, '0')).join(':')}::/64`;
 }
 
 export interface ThrottleConfig {
@@ -49,6 +57,7 @@ export interface ThrottleConfig {
 
 export class LoginThrottle {
   private readonly entries = new Map<string, Entry>();
+  private readonly known = new Map<string, number>();
 
   constructor(private readonly config: ThrottleConfig) {}
 
@@ -78,7 +87,8 @@ export class LoginThrottle {
    */
   retryAfter(scope: string, account: string, ip: string, now = Date.now()): number {
     const pair = this.get(`${scope}:p:${account}:${ip}`);
-    const known = this.entries.has(`${scope}:g:${account}:${ip}`);
+    const seenAt = this.known.get(`${scope}:${account}:${ip}`);
+    const known = seenAt !== undefined && now - seenAt < KNOWN_TTL_MS;
     const whole = known ? undefined : this.get(`${scope}:a:${account}`);
     const until = Math.max(pair?.lockedUntil ?? 0, whole?.lockedUntil ?? 0);
     return until > now ? Math.ceil((until - now) / 1000) : 0;
@@ -112,7 +122,13 @@ export class LoginThrottle {
   /** Login certo: zera o par (conta, IP) e lembra o endereço como conhecido. O teto da conta segue a própria janela. */
   succeed(scope: string, account: string, ip: string, now = Date.now()): void {
     this.entries.delete(`${scope}:p:${account}:${ip}`);
-    this.set(`${scope}:g:${account}:${ip}`, { failures: 0, firstAt: now, lockedUntil: 0 });
+    const key = `${scope}:${account}:${ip}`;
+    this.known.delete(key);
+    this.known.set(key, now);
+    if (this.known.size > MAX_KNOWN) {
+      const oldest = this.known.keys().next().value;
+      if (oldest !== undefined) this.known.delete(oldest);
+    }
   }
 
   /**

@@ -82,7 +82,11 @@ export class PrivacyService {
         await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
         await tx.execute(sql`UPDATE audit_log SET ip_address = NULL WHERE actor_user_id = ${id}`);
         // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
-        await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE target_id = ${id} AND metadata ? 'email'`);
+        await tx.execute(sql`
+          UPDATE admin_audit_log
+          SET metadata = (metadata - 'email') #- '{changes,email}' #- '{changes,name}'
+          WHERE target_id = ${id} AND (metadata ? 'email' OR metadata #> '{changes,email}' IS NOT NULL OR metadata #> '{changes,name}' IS NOT NULL)
+        `);
         await tx.execute(sql`DELETE FROM invites WHERE accepted_by = ${id}`);
         await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
         // O registro do expurgo não guarda nada que identifique a pessoa além do id, que já não aponta para ninguém.

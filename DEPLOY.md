@@ -175,9 +175,10 @@ Resumo (o roteiro completo, com RPO/RTO e restauração passo a passo, está em
   retenção de pelo menos 14 dias) — ligar e conferir é tarefa do dono da conta.
 - **Cópia fora do Railway**: `.github/workflows/backup-offsite.yml`, toda noite,
   faz `pg_dump` com um usuário só de leitura, **restaura o dump num banco
-  descartável e confere** (`backup:verify`, que registra em `/ops/backup`),
-  cifra com `age` e envia para um bucket de outro provedor; as fotos dos
-  produtos são copiadas (`rclone copy`, nunca apaga) para o mesmo bucket.
+  descartável e confere** (`backup:verify`), cifra com `age`, envia para um
+  bucket de outro provedor e confere o hash de volta; as fotos dos produtos
+  são copiadas (`rclone copy`, nunca apaga) para o mesmo bucket. Só então o
+  workflow registra em `/ops/backup` (com `OPS_BACKUP_TOKEN`, que só faz isso).
 - **Exercício de schema**: `.github/workflows/backup-drill.yml`, toda segunda,
   restaura um banco sintético para provar que o procedimento acompanha as
   migrations.

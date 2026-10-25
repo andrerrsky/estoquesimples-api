@@ -345,9 +345,10 @@ export class AdminAuthService {
   /** Owner zera o segundo fator de outro administrador (celular perdido sem códigos de recuperação). */
   async resetMfa(actor: AdminActor, targetId: string): Promise<void> {
     if (actor.adminId === targetId) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Para o seu próprio acesso, use "Desativar" na tela de segurança.');
-    const [row] = await this.db.select({ id: platformAdmins.id }).from(platformAdmins).where(eq(platformAdmins.id, targetId)).limit(1);
+    const [row] = await this.db.select({ id: platformAdmins.id, email: platformAdmins.email }).from(platformAdmins).where(eq(platformAdmins.id, targetId)).limit(1);
     if (!row) throw notFound('Administrador não encontrado.');
     await this.clearMfa(targetId, actor, AdminAction.ADMIN_MFA_RESET);
+    await this.notifySecurity(row.email, 'Segundo fator zerado no painel', `${actor.email} zerou o segundo fator do seu acesso ao painel do Estoque Simples e encerrou suas sessões. No próximo acesso você cadastra o autenticador de novo.`);
   }
 
   private async clearMfa(targetId: string, actor: AdminActor, action: typeof AdminAction.ADMIN_MFA_DISABLED | typeof AdminAction.ADMIN_MFA_RESET): Promise<void> {

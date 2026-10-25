@@ -197,4 +197,5 @@ definido); as sessões de refresh continuam.
 | --- | --- | --- |
 | Zod 3 sem correção para GHSA-mrhx-c7xc-m3w5 | corpo limitado (1 MB; 5 MB na sincronização), listas com `.max()`; aceite com prazo em `scripts/audit-gate.mjs` | 2027-01-31 (migrar para Zod 4) |
 | Cadastro responde 409 para e-mail já usado | limite por IP e por e-mail (5/h); o cadastro devolve sessão na hora, então trocar por resposta neutra muda o fluxo dos apps | próxima revisão do cadastro |
+| Google Analytics no painel (`script-src` com googletagmanager.com) | pedido do produto (medir o uso do painel); só carrega depois do aceite no aviso de cookies; o cookie de sessão é httpOnly e as mutações exigem cabeçalho anti-CSRF; segundo fator obrigatório. Para tirar: remover `lib/ga.ts` do painel e o domínio da CSP em `admin-static.ts` | se o painel ganhar ações mais sensíveis |
 | Freio de tentativas em memória | instância única; um deploy só devolve tentativas a quem já estava bloqueado | se houver mais de uma instância |
