@@ -81,7 +81,6 @@ jobs:
           for i in $(seq 1 60); do curl -fsS "$S3_URL/_localstack/health" | grep -q '"s3": "\(available\|running\)"' && break; sleep 2; done
           curl -fsS "$S3_URL/_localstack/health"
           aws --endpoint-url "$S3_URL" s3api create-bucket --bucket dumps --object-lock-enabled-for-bucket
-          aws --endpoint-url "$S3_URL" s3api put-bucket-versioning --bucket dumps --versioning-configuration Status=Enabled
           aws --endpoint-url "$S3_URL" s3api put-object-lock-configuration --bucket dumps \
             --object-lock-configuration '{"ObjectLockEnabled":"Enabled","Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":35}}}'
           aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-origem
