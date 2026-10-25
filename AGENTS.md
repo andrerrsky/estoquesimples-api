@@ -113,7 +113,7 @@ workspace na transação). Consequências:
 
 | Tabela | Papel | Observações |
 | --- | --- | --- |
-| `users` | conta (e-mail único entre vivas, case-insensitive) | `status` ∈ active/suspended/pending_deletion; `permission_version` invalida access tokens quando muda; bloqueio progressivo por `failed_login_attempts`/`locked_until`; `deleted_at` (não existe hoje rotina que purgue `pending_deletion`) |
+| `users` | conta (e-mail único entre vivas, case-insensitive) | `status` ∈ active/suspended/pending_deletion; `permission_version` invalida access tokens quando muda; erros de senha contados em `failed_login_attempts` (o bloqueio é do freio por e-mail+IP em `platform/http/login-throttle.ts`); `pending_deletion` é apagada 30 dias depois pelo job `privacy.daily` (`modules/privacy`) |
 | `devices` | instalação do app por usuário (`install_id`) | o app envia `device` no register/login/aceite de convite; `last_seen_at` atualiza no refresh |
 | `sessions` / `refresh_tokens` | login = sessão; refresh rotaciona com detecção de reuso | revogar sessão = logout imediato; só o hash do token é gravado |
 | `workspaces` | empresa (tenant) | `owner_user_id`; `change_seq` é o cursor de sync (monotônico por tenant via `next_change_seq()`); `seeded_at` marca a carga inicial; `tombstone_horizon_seq`; `deleted_at` (exclusão lógica só pelo painel) |
@@ -141,7 +141,10 @@ token opaco (60 dias, rotação, reuso derruba a sessão). Cada requisição
 confirma no banco que a sessão está viva e que `permission_version` bate
 (`authenticate.ts`), o que torna revogação imediata. Login bloqueia
 progressivamente; e-mail inexistente gasta o mesmo tempo (argon2 dummy).
-Senha: argon2id (OWASP), política mínima de 10 caracteres.
+Senha: argon2id (OWASP), política mínima de 10 caracteres. Bloqueio
+progressivo por (e-mail, IP) e teto por conta em memória
+(`services.throttle`); IP real lido de `X-Forwarded-For` só de proxies em
+rede privada (`TRUST_PROXY`).
 
 **Web (cookie só para o refresh)**: as rotas `/v1/auth/web/*`
 (`modules/auth/web-session.routes.ts`) fazem o mesmo login do app, mas
@@ -165,7 +168,10 @@ support > viewer). Cookie httpOnly, `SameSite=Strict`, assinado
 `admin_sessions`; expira por inatividade (12h) e teto absoluto (7 dias). Toda
 mutação exige o cabeçalho `x-requested-with: estoquesimples-admin` e
 `Sec-Fetch-Site` same-origin (anti-CSRF). Rate limit estrito no login e
-bloqueio progressivo. Nunca aceita o Bearer do app. Ver
+bloqueio progressivo. **Segundo fator TOTP** (`platform/auth/totp.ts`,
+`ADMIN_MFA_REQUIRED`, padrão ligado em produção): sem cadastro, só
+`auth/me`, `auth/logout` e `auth/mfa/*` respondem (`requireAdmin(papel,
+{ mfaSetup: true })`). Nunca aceita o Bearer do app. Ver
 `src/modules/admin/admin-auth.plugin.ts`.
 
 **Ops (`OPS_TOKEN`)**: `/metrics`, `/ops/*` — usados por coletor e scripts;
@@ -441,6 +447,8 @@ Como estender a web: rota nova na API (seção 10) → contrato em
 ## 12. Operação
 
 Deploy, alertas, backups, lançamento gradual e rollback: [DEPLOY.md](DEPLOY.md).
+Segurança, LGPD (exportação, exclusão, retenção), backup externo e
+restauração, rotação de chaves: [docs/seguranca.md](docs/seguranca.md).
 Suporte: `SUPPORT_NOTIFY_EMAILS`, `ADMIN_PANEL_URL`.
 Imagens: `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `IMAGE_FS_DIR`, `IMAGE_MAX_UPLOAD_BYTES`, `IMAGE_MAX_EDGE`, `IMAGE_GC_GRACE_DAYS`.
 Web e pagamento: `WEB_APP_HOSTS`, `WEB_APP_URL`, `WEB_SESSION_COOKIE_NAME`,
@@ -455,8 +463,6 @@ Painel/analytics: `ADMIN_PANEL_ENABLED`,
 
 ## 13. Pendências conhecidas (não são bugs a "corrigir" sem decidir)
 
-- Não existe rotina que apague definitivamente contas em `pending_deletion`
-  após os 30 dias prometidos na resposta de `DELETE /v1/me`.
 - A versão do app Android com analytics, push, suporte pelo app e o botão
   "Gerenciar em estoquesimples.com.br" (assinatura feita pela web) ainda não
   foi publicada na Play Store; até lá o painel mostra, do app, só o que a
@@ -471,6 +477,6 @@ Painel/analytics: `ADMIN_PANEL_ENABLED`,
   de notificações (conta que só usa a web).
 - O cursor de `GET /v1/notifications` é só `created_at`; dois avisos da mesma
   pessoa no mesmo milissegundo, na fronteira de uma página, podem pular um.
-- `trustProxy: false` no Fastify: atrás da borda do Railway, o rate limit por
-  IP de rotas anônimas agrupa clientes; trocar por `trustProxy: '<cidr>'`
-  quando o endereço da borda for conhecido.
+- Empresas excluídas (lógicas) ficam guardadas indefinidamente; só saem quando
+  a conta do proprietário é apagada (`privacy.daily`). Decidir prazo de purga
+  e exclusão pelo próprio cliente (ver o item sobre `LAST_OWNER`).

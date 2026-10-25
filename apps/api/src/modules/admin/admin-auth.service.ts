@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
+import { clientKey } from '../../platform/http/login-throttle.js';
 import { adminSessions, platformAdmins } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
@@ -77,7 +78,7 @@ export class AdminAuthService {
       .limit(1);
 
     const admin = found[0];
-    const ip = meta.ipAddress ?? 'desconhecido';
+    const ip = clientKey(meta.ipAddress);
 
     // Bloqueio por (e-mail, IP), igual para conta existente ou não (ver login-throttle.ts).
     const retryAfterSeconds = this.services.throttle.retryAfter('admin', input.email, ip);
@@ -92,15 +93,16 @@ export class AdminAuthService {
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
 
-    if (admin.status !== 'active') {
-      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Acesso desativado.');
-    }
-
     const ok = await verifyPassword(admin.passwordHash, input.password);
     if (!ok) {
       const lockSeconds = this.services.throttle.fail('admin', input.email, ip);
       await this.registerFailedLogin(admin, lockSeconds, meta);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
+    }
+
+    // Depois da senha: quem não a sabe não descobre que o acesso existe e está desativado.
+    if (admin.status !== 'active') {
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Acesso desativado.');
     }
     // Segundo fator: senha certa sem código pede o código (sem contar erro);
     // código errado conta como tentativa falha, igual à senha.
@@ -234,7 +236,7 @@ export class AdminAuthService {
 
   /** Confere um código TOTP (sem replay) ou consome um código de recuperação. */
   private async consumeSecondFactor(admin: typeof platformAdmins.$inferSelect, code: string, meta: RequestMeta): Promise<boolean> {
-    const secret = this.services.purchaseTokens.decrypt(admin.totpSecret!, totpAad(admin.id));
+    const secret = this.services.purchaseTokens.decrypt(admin.totpSecret!, totpAad(admin.id), { requireCurrentFormat: true });
     const step = verifyTotp(secret, code, { afterStep: admin.totpLastStep });
     if (step !== null) {
       // Condicional no banco: dois logins simultâneos com o mesmo código não passam os dois.
@@ -246,9 +248,14 @@ export class AdminAuthService {
       return updated.length > 0;
     }
     const hashed = hashToken(normalizeRecoveryCode(code));
-    if (!admin.recoveryCodes.includes(hashed)) return false;
-    const remaining = admin.recoveryCodes.filter((item) => item !== hashed);
-    await this.db.update(platformAdmins).set({ recoveryCodes: remaining }).where(eq(platformAdmins.id, admin.id));
+    // Remoção condicional no banco: dois logins simultâneos com o mesmo código não passam os dois.
+    const consumed = await this.db
+      .update(platformAdmins)
+      .set({ recoveryCodes: sql`${platformAdmins.recoveryCodes} - ${hashed}::text` })
+      .where(and(eq(platformAdmins.id, admin.id), sql`${platformAdmins.recoveryCodes} ? ${hashed}::text`))
+      .returning({ recoveryCodes: platformAdmins.recoveryCodes });
+    if (consumed.length === 0) return false;
+    const remaining = consumed[0]!.recoveryCodes;
     await recordAdminAuditSafe(this.db, {
       actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress },
       action: AdminAction.ADMIN_MFA_RECOVERY_USED,
@@ -274,18 +281,24 @@ export class AdminAuthService {
   }
 
   /** Confirma o cadastro com um código do autenticador e devolve os códigos de recuperação (uma vez só). */
-  async enableMfa(context: AdminContext, code: string, meta: RequestMeta): Promise<{ recoveryCodes: string[] }> {
+  async enableMfa(context: AdminContext, code: string, meta: RequestMeta): Promise<{ recoveryCodes: string[]; token: string; expiresAt: Date }> {
     const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
     if (!row?.totpSecret) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Comece o cadastro do autenticador primeiro.');
     if (row.totpEnabledAt) throw conflict(ErrorCode.CONFLICT, 'O segundo fator já está ativo.');
-    const step = verifyTotp(this.services.purchaseTokens.decrypt(row.totpSecret, totpAad(row.id)), code);
+    const step = verifyTotp(this.services.purchaseTokens.decrypt(row.totpSecret, totpAad(row.id), { requireCurrentFormat: true }), code);
     if (step === null) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Código inválido. Confira a hora do celular e tente de novo.');
     const recoveryCodes = generateRecoveryCodes();
+    // Sessão nova ao ativar: a sessão aberta só com a senha (inclusive outras,
+    // de outro navegador) não herda o acesso completo.
+    const token = generateToken();
+    const expiresAt = this.idleExpiry(new Date());
     await this.db.transaction(async (tx) => {
       await tx
         .update(platformAdmins)
         .set({ totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: recoveryCodes.map((item) => hashToken(normalizeRecoveryCode(item))) })
         .where(eq(platformAdmins.id, context.adminId));
+      await tx.update(adminSessions).set({ revokedAt: new Date() }).where(and(eq(adminSessions.adminId, context.adminId), isNull(adminSessions.revokedAt)));
+      await tx.insert(adminSessions).values({ adminId: context.adminId, tokenHash: hashToken(token), ipAddress: meta.ipAddress, userAgent: meta.userAgent, expiresAt });
       await recordAdminAudit(tx, {
         actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress },
         action: AdminAction.ADMIN_MFA_ENABLED,
@@ -293,17 +306,40 @@ export class AdminAuthService {
         targetId: context.adminId,
       });
     });
-    return { recoveryCodes };
+    await this.notifySecurity(context.email, 'Segundo fator ativado no painel', 'O aplicativo autenticador foi cadastrado no seu acesso ao painel do Estoque Simples. As outras sessões abertas foram encerradas.');
+    return { recoveryCodes, token, expiresAt };
+  }
+
+  /** Aviso por e-mail de mudança de segurança no acesso ao painel (nunca bloqueia a ação). */
+  private async notifySecurity(to: string, subject: string, body: string): Promise<void> {
+    try {
+      await this.services.mailer.send({
+        to,
+        kind: 'security_alert',
+        subject: `${subject} - Estoque Simples`,
+        text: `${body}\n\nSe não foi você, fale agora com um owner do painel para zerar o segundo fator e trocar a senha.`,
+      });
+    } catch (error) {
+      this.services.logger?.warn({ err: error }, 'aviso de segurança do painel não enviado');
+    }
   }
 
   /** O próprio administrador desliga (senha + código). Com o segundo fator obrigatório, cai de volta na tela de cadastro. */
   async disableMfa(context: AdminContext, input: { password: string; code: string }, meta: RequestMeta): Promise<void> {
     const [row] = await this.db.select().from(platformAdmins).where(eq(platformAdmins.id, context.adminId)).limit(1);
     if (!row?.totpEnabledAt) return;
+    // Mesmo freio do login: senha e código aqui também são alvo de tentativa e erro.
+    const ip = clientKey(meta.ipAddress);
+    const retryAfterSeconds = this.services.throttle.retryAfter('admin', row.email.toLowerCase(), ip);
+    if (retryAfterSeconds > 0) throw new AppError(429, ErrorCode.AUTH_ACCOUNT_LOCKED, 'Muitas tentativas. Tente novamente mais tarde.', { extra: { retryAfterSeconds } });
     const passwordOk = await verifyPassword(row.passwordHash, input.password);
     const codeOk = passwordOk && (await this.consumeSecondFactor(row, input.code, meta));
-    if (!codeOk) throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha ou código incorretos.');
+    if (!codeOk) {
+      this.services.throttle.fail('admin', row.email.toLowerCase(), ip);
+      throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha ou código incorretos.');
+    }
     await this.clearMfa(context.adminId, { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress }, AdminAction.ADMIN_MFA_DISABLED);
+    await this.notifySecurity(context.email, 'Segundo fator desativado no painel', 'O segundo fator do seu acesso ao painel do Estoque Simples foi desativado.');
   }
 
   /** Owner zera o segundo fator de outro administrador (celular perdido sem códigos de recuperação). */

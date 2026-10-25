@@ -4,6 +4,8 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="database" path="estoque" />
+        <include domain="database" path="estoque-wal" />
+        <include domain="database" path="estoque-shm" />
         <exclude domain="sharedpref" path="estoque_sessao.xml" />
         <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
         <exclude domain="sharedpref" path="estoque_direitos.xml" />
@@ -11,6 +13,8 @@
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="estoque" />
+        <include domain="database" path="estoque-wal" />
+        <include domain="database" path="estoque-shm" />
         <exclude domain="sharedpref" path="estoque_sessao.xml" />
         <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
         <exclude domain="sharedpref" path="estoque_direitos.xml" />

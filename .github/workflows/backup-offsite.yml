@@ -13,7 +13,11 @@ name: Backup externo
 #   BACKUP_S3_REGION         região (ou "auto")
 #   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY  credencial que só grava nesse bucket
 #   IMAGES_S3_ENDPOINT / IMAGES_S3_BUCKET / IMAGES_S3_ACCESS_KEY_ID / IMAGES_S3_SECRET_ACCESS_KEY  leitura do bucket das fotos
-#   API_BASE_URL / OPS_TOKEN registram o resultado em /ops/backup
+#   API_BASE_URL / OPS_BACKUP_TOKEN registram o resultado em /ops/backup (token que só faz isso)
+#
+# Credenciais ficam só no passo que as usa, e as dependências do npm são
+# instaladas sem scripts de instalação: nada de terceiros roda com acesso aos
+# buckets ou ao banco.
 on:
   schedule:
     - cron: '30 5 * * *'
@@ -49,17 +53,6 @@ jobs:
 
     env:
       DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
-      RCLONE_CONFIG_BACKUP_TYPE: s3
-      RCLONE_CONFIG_BACKUP_PROVIDER: Other
-      RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
-      RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
-      RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-      RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-      RCLONE_CONFIG_IMAGENS_TYPE: s3
-      RCLONE_CONFIG_IMAGENS_PROVIDER: Other
-      RCLONE_CONFIG_IMAGENS_ENDPOINT: ${{ secrets.IMAGES_S3_ENDPOINT }}
-      RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
-      RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -69,7 +62,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Sem scripts de instalação: a verificação só precisa de tsx e pg.
+      - run: npm ci --ignore-scripts
 
       - name: Conferir configuração
         env:
@@ -99,26 +93,35 @@ jobs:
           ls -l backup.dump
 
       # Backup que nunca foi restaurado é suposição: o dump só vai para o
-      # bucket depois de restaurado e conferido aqui. O resultado vai para
-      # /ops/backup e zera o alerta backup_desatualizado.
+      # bucket depois de restaurado e conferido aqui. O registro em
+      # /ops/backup fica para o fim, depois do envio dar certo.
       - name: Restaurar e conferir
-        env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
-          OPS_TOKEN: ${{ secrets.OPS_TOKEN }}
-        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO"
+        run: npm run backup:verify --workspace @estoquesimples/api -- --dump "$GITHUB_WORKSPACE/backup.dump" --target "$DESTINO" --report-file "$GITHUB_WORKSPACE/verificacao.json"
 
       - name: Cifrar e enviar o dump
+        id: envio
         env:
           AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
           BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          RCLONE_CONFIG_BACKUP_TYPE: s3
+          RCLONE_CONFIG_BACKUP_PROVIDER: Other
+          RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
         run: |
           umask 077
           stamp="$(date -u +%Y/%m/%d/estoquesimples-%Y%m%dT%H%M%SZ)"
           age --recipient "$AGE_RECIPIENT" --output backup.dump.age backup.dump
-          sha256sum backup.dump.age | cut -d' ' -f1 > backup.dump.age.sha256
+          sha="$(sha256sum backup.dump.age | cut -d' ' -f1)"
+          echo "$sha" > backup.dump.age.sha256
           rclone copyto backup.dump.age "backup:$BUCKET/db/$stamp.dump.age" --s3-no-check-bucket
           rclone copyto backup.dump.age.sha256 "backup:$BUCKET/db/$stamp.dump.age.sha256" --s3-no-check-bucket
-          echo "Enviado: db/$stamp.dump.age"
+          # Confere que o objeto chegou inteiro (tamanho e hash calculado de volta).
+          remoto="$(rclone cat "backup:$BUCKET/db/$stamp.dump.age" | sha256sum | cut -d' ' -f1)"
+          [ "$remoto" = "$sha" ] || { echo "::error::O arquivo no bucket não confere com o enviado"; exit 1; }
+          echo "objeto=db/$stamp.dump.age" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
 
       # Cópia das fotos: `copy` nunca apaga no destino, então uma foto apagada
       # por engano (ou por um invasor) continua na cópia até a regra de
@@ -127,9 +130,32 @@ jobs:
         env:
           IMAGES_BUCKET: ${{ secrets.IMAGES_S3_BUCKET }}
           BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          RCLONE_CONFIG_BACKUP_TYPE: s3
+          RCLONE_CONFIG_BACKUP_PROVIDER: Other
+          RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_IMAGENS_TYPE: s3
+          RCLONE_CONFIG_IMAGENS_PROVIDER: Other
+          RCLONE_CONFIG_IMAGENS_ENDPOINT: ${{ secrets.IMAGES_S3_ENDPOINT }}
+          RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
         if: env.IMAGES_BUCKET != ''
         run: rclone copy "imagens:$IMAGES_BUCKET" "backup:$BUCKET/imagens" --s3-no-check-bucket --transfers 8 --stats-one-line --stats 60s
 
+      # Só agora: banco restaurado e conferido, cópia cifrada no bucket e
+      # conferida, fotos copiadas. É isto que zera o alerta backup_desatualizado.
+      - name: Registrar em /ops/backup
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          OPS_BACKUP_TOKEN: ${{ secrets.OPS_BACKUP_TOKEN }}
+          OBJETO: ${{ steps.envio.outputs.objeto }}
+          SHA256: ${{ steps.envio.outputs.sha256 }}
+        run: |
+          body="$(jq -c --arg objeto "$OBJETO" --arg sha "$SHA256" '{origem: "backup-offsite", tabelas, registros, duracaoSegundos, migracao, objeto: $objeto, sha256: $sha}' verificacao.json)"
+          curl -fsS -X POST "$API_BASE_URL/ops/backup" -H "authorization: Bearer $OPS_BACKUP_TOKEN" -H 'content-type: application/json' --data "$body"
+
       - name: Apagar cópias locais
         if: always()
-        run: rm -f backup.dump backup.dump.age backup.dump.age.sha256
+        run: rm -f backup.dump backup.dump.age backup.dump.age.sha256 verificacao.json

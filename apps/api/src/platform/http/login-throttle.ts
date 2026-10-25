@@ -20,6 +20,22 @@ interface Entry {
 
 const MAX_ENTRIES = 50_000;
 
+/**
+ * Chave de cliente para limites: IPv4 inteiro; IPv6 pelo prefixo /64 (um
+ * único acesso residencial ou servidor recebe um /64 inteiro, então trocar o
+ * endereço dentro dele não pode render tentativas novas).
+ */
+export function clientKey(ip: string | null | undefined): string {
+  if (!ip) return 'desconhecido';
+  const plain = ip.replace(/^::ffff:/i, '');
+  if (!plain.includes(':')) return plain;
+  const [head = ''] = plain.split('::');
+  const full = plain.includes('::')
+    ? [...head.split(':').filter(Boolean), ...Array(8).fill('0')].slice(0, 4)
+    : plain.split(':').slice(0, 4);
+  return `${full.map((part) => part.toLowerCase().padStart(4, '0')).join(':')}::/64`;
+}
+
 export interface ThrottleConfig {
   /** Erros seguidos por (conta, IP) antes do primeiro bloqueio. */
   maxAttempts: number;
@@ -55,10 +71,15 @@ export class LoginThrottle {
     }
   }
 
-  /** Segundos de espera, ou 0 se pode tentar. */
+  /**
+   * Segundos de espera, ou 0 se pode tentar. O teto por conta não vale para
+   * um endereço de onde a conta já entrou com sucesso: quem ataca de fora não
+   * consegue, com ele, trancar o dono no próprio aparelho ou rede.
+   */
   retryAfter(scope: string, account: string, ip: string, now = Date.now()): number {
     const pair = this.get(`${scope}:p:${account}:${ip}`);
-    const whole = this.get(`${scope}:a:${account}`);
+    const known = this.entries.has(`${scope}:g:${account}:${ip}`);
+    const whole = known ? undefined : this.get(`${scope}:a:${account}`);
     const until = Math.max(pair?.lockedUntil ?? 0, whole?.lockedUntil ?? 0);
     return until > now ? Math.ceil((until - now) / 1000) : 0;
   }
@@ -88,9 +109,10 @@ export class LoginThrottle {
     return lockSeconds;
   }
 
-  /** Login certo: zera o par (conta, IP). O teto da conta segue a própria janela. */
-  succeed(scope: string, account: string, ip: string): void {
+  /** Login certo: zera o par (conta, IP) e lembra o endereço como conhecido. O teto da conta segue a própria janela. */
+  succeed(scope: string, account: string, ip: string, now = Date.now()): void {
     this.entries.delete(`${scope}:p:${account}:${ip}`);
+    this.set(`${scope}:g:${account}:${ip}`, { failures: 0, firstAt: now, lockedUntil: 0 });
   }
 
   /**

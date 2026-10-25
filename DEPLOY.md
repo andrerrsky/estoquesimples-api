@@ -32,7 +32,10 @@ build` (workspace `apps/admin` → `apps/admin/dist`). Para ele funcionar em pro
 
 | Variável | Para quê |
 | --- | --- |
-| `ADMIN_COOKIE_SECRET` | assina o cookie de sessão (`openssl rand -base64 48`). Sem ela a API sobe com um segredo efêmero e avisa no log: todo restart derruba as sessões do painel |
+| `ADMIN_COOKIE_SECRET` | assina o cookie de sessão (`openssl rand -base64 48`). Sem ela, em produção o segredo é derivado (HKDF) da `JWT_PRIVATE_KEY` — estável entre restarts, muda junto com a chave; fora de produção é efêmero |
+| `ADMIN_MFA_REQUIRED` | segundo fator (TOTP) no painel; padrão ligado em produção/staging. Quem não cadastrou só vê a tela de cadastro ([docs/seguranca.md](docs/seguranca.md#contas-e-acesso)) |
+| `OPS_BACKUP_TOKEN` | token só para o workflow de backup registrar a restauração de teste em `/ops/backup` |
+| `SECRETS_ENCRYPTION_KEYS` / `SECRETS_ACTIVE_KID` / `SECRETS_ALLOW_LEGACY` | chaveiro da cifra em repouso e rotação ([docs/seguranca.md](docs/seguranca.md#rotação-da-chave-de-cifra)) |
 | `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` | cria o primeiro administrador (owner) na subida, se ainda não existir. Idempotente; remova após o primeiro acesso. Senha com no mínimo 12 caracteres |
 | `ADMIN_PANEL_ENABLED=false` | desliga o painel inteiro (`/admin` e `/admin/api` respondem 404) |
 

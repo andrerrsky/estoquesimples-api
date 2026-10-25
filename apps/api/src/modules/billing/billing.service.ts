@@ -1,6 +1,6 @@
 import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
 
-import { scrubPurchasePayload } from '../../platform/crypto/purchase-token.js';
+import { scrubPurchasePayload, purchaseTokenAad } from '../../platform/crypto/purchase-token.js';
 import type { Transaction } from '../../platform/db/client.js';
 import {
   planFeatures,
@@ -152,7 +152,13 @@ export class BillingService {
   }
 
   private sealToken(token: string): { hash: string; enc: string } {
-    return { hash: this.cipher.hash(token), enc: this.cipher.encrypt(token) };
+    const hash = this.cipher.hash(token);
+    return { hash, enc: this.cipher.encrypt(token, purchaseTokenAad(hash)) };
+  }
+
+  /** Abre um purchase token guardado; o hash ao lado é o AAD (ver `purchaseTokenAad`). */
+  private openToken(enc: string, hash: string | null): string {
+    return this.cipher.decrypt(enc, hash ? purchaseTokenAad(hash) : undefined);
   }
 
   private sealLinked(token: string | null): {
@@ -650,7 +656,7 @@ export class BillingService {
           linkedPurchaseTokenHash: linked.hash,
           linkedPurchaseTokenEnc: linked.enc,
           // Regrava o ciphertext: promove legado `v0:` para AES-GCM.
-          purchaseTokenEnc: this.cipher.encrypt(purchaseToken),
+          purchaseTokenEnc: this.cipher.encrypt(purchaseToken, purchaseTokenAad(this.cipher.hash(purchaseToken))),
           latestNotificationType: notificationType,
           lastVerifiedAt: new Date(),
           raw: scrubPurchasePayload(purchase),
@@ -745,7 +751,7 @@ export class BillingService {
       try {
         const before = candidate.state;
         if (!candidate.purchaseTokenEnc || !candidate.purchaseTokenHash) continue;
-        const plaintext = this.cipher.decrypt(candidate.purchaseTokenEnc);
+        const plaintext = this.openToken(candidate.purchaseTokenEnc, candidate.purchaseTokenHash);
         await this.refreshFromGoogle(plaintext);
         const after = await this.db
           .select({ state: subscriptions.state })
@@ -776,6 +782,7 @@ export class BillingService {
         id: subscriptions.id,
         provider: subscriptions.provider,
         purchaseTokenEnc: subscriptions.purchaseTokenEnc,
+        purchaseTokenHash: subscriptions.purchaseTokenHash,
       })
       .from(subscriptions)
       .where(
@@ -790,7 +797,7 @@ export class BillingService {
     if (live?.provider === 'asaas') {
       await new AsaasBillingService(this.services).refreshSubscription(live.id);
     } else if (live?.purchaseTokenEnc) {
-      await this.refreshFromGoogle(this.cipher.decrypt(live.purchaseTokenEnc));
+      await this.refreshFromGoogle(this.openToken(live.purchaseTokenEnc, live.purchaseTokenHash));
     }
 
     return this.getEntitlement(workspaceId);
@@ -802,6 +809,7 @@ export class BillingService {
       .select({
         id: subscriptionEvents.id,
         purchaseTokenEnc: subscriptionEvents.purchaseTokenEnc,
+        purchaseTokenHash: subscriptionEvents.purchaseTokenHash,
         notificationType: subscriptionEvents.notificationType,
       })
       .from(subscriptionEvents)
@@ -814,7 +822,7 @@ export class BillingService {
     for (const event of pending) {
       if (!event.purchaseTokenEnc) continue;
       try {
-        const plaintext = this.cipher.decrypt(event.purchaseTokenEnc);
+        const plaintext = this.openToken(event.purchaseTokenEnc, event.purchaseTokenHash);
         const subscriptionId = await this.refreshFromGoogle(
           plaintext,
           event.notificationType,
@@ -825,7 +833,7 @@ export class BillingService {
             processedAt: new Date(),
             subscriptionId,
             processError: null,
-            purchaseTokenEnc: this.cipher.encrypt(plaintext),
+            purchaseTokenEnc: this.cipher.encrypt(plaintext, purchaseTokenAad(this.cipher.hash(plaintext))),
           })
           .where(eq(subscriptionEvents.id, event.id));
         processed += 1;

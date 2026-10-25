@@ -6,6 +6,8 @@
      não abririam) e não devem sair do aparelho de qualquer forma. -->
 <full-backup-content>
     <include domain="database" path="estoque" />
+    <include domain="database" path="estoque-wal" />
+    <include domain="database" path="estoque-shm" />
     <exclude domain="sharedpref" path="estoque_sessao.xml" />
     <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
     <exclude domain="sharedpref" path="estoque_direitos.xml" />

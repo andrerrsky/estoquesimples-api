@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 
 import { getEnv } from '../src/platform/config/env.js';
-import { ephemeralDevPurchaseTokenKey, keyringFromEnv, PurchaseTokenCipher, settingAad } from '../src/platform/crypto/purchase-token.js';
+import { ephemeralDevPurchaseTokenKey, keyringFromEnv, purchaseTokenAad, PurchaseTokenCipher, settingAad } from '../src/platform/crypto/purchase-token.js';
 import { createDb } from '../src/platform/db/client.js';
 
 /**
@@ -26,6 +26,7 @@ async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const env = getEnv();
   const cipher = new PurchaseTokenCipher(keyringFromEnv(env, ephemeralDevPurchaseTokenKey()));
+  const legacyReader = new PurchaseTokenCipher({ ...keyringFromEnv(env, ephemeralDevPurchaseTokenKey()), allowLegacy: true });
   const { db, close } = createDb(env);
 
   const targets: Target[] = [
@@ -46,23 +47,23 @@ async function main(): Promise<void> {
     {
       label: 'subscriptions.purchase_token_enc',
       column: 'purchase_token_enc',
-      select: sql`SELECT id::text AS id, purchase_token_enc FROM subscriptions WHERE purchase_token_enc IS NOT NULL`,
+      select: sql`SELECT id::text AS id, purchase_token_hash, purchase_token_enc FROM subscriptions WHERE purchase_token_enc IS NOT NULL`,
       update: (id, value) => sql`UPDATE subscriptions SET purchase_token_enc = ${value} WHERE id = ${id}::uuid`,
-      aad: () => undefined,
+      aad: (row) => (row['purchase_token_hash'] ? purchaseTokenAad(String(row['purchase_token_hash'])) : undefined),
     },
     {
       label: 'subscriptions.linked_purchase_token_enc',
       column: 'linked_purchase_token_enc',
-      select: sql`SELECT id::text AS id, linked_purchase_token_enc FROM subscriptions WHERE linked_purchase_token_enc IS NOT NULL`,
+      select: sql`SELECT id::text AS id, linked_purchase_token_hash AS purchase_token_hash, linked_purchase_token_enc FROM subscriptions WHERE linked_purchase_token_enc IS NOT NULL`,
       update: (id, value) => sql`UPDATE subscriptions SET linked_purchase_token_enc = ${value} WHERE id = ${id}::uuid`,
-      aad: () => undefined,
+      aad: (row) => (row['purchase_token_hash'] ? purchaseTokenAad(String(row['purchase_token_hash'])) : undefined),
     },
     {
       label: 'subscription_events.purchase_token_enc',
       column: 'purchase_token_enc',
-      select: sql`SELECT id::text AS id, purchase_token_enc FROM subscription_events WHERE purchase_token_enc IS NOT NULL`,
+      select: sql`SELECT id::text AS id, purchase_token_hash, purchase_token_enc FROM subscription_events WHERE purchase_token_enc IS NOT NULL`,
       update: (id, value) => sql`UPDATE subscription_events SET purchase_token_enc = ${value} WHERE id = ${id}`,
-      aad: () => undefined,
+      aad: (row) => (row['purchase_token_hash'] ? purchaseTokenAad(String(row['purchase_token_hash'])) : undefined),
     },
   ];
 
@@ -76,7 +77,8 @@ async function main(): Promise<void> {
       if (!cipher.needsReencrypt(blob)) continue;
       try {
         const aad = target.aad(row);
-        const plain = cipher.decrypt(blob, aad);
+        // Recifrar exige poder ler o formato antigo, mesmo com SECRETS_ALLOW_LEGACY=false.
+        const plain = legacyReader.decrypt(blob, aad);
         if (apply) await db.execute(target.update(String(row['id']), cipher.encrypt(plain, aad)));
         count += 1;
       } catch (error) {

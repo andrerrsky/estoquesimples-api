@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { purchaseTokenAad } from '../../src/platform/crypto/purchase-token.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { subscriptionEvents, subscriptions } from '../../src/platform/db/schema/index.js';
@@ -212,7 +213,9 @@ describe('vinculação de compra', () => {
       expect(row.purchaseTokenEnc).not.toContain('token-antigo');
       expect(row.purchaseTokenEnc).not.toContain('token-novo');
       expect(row.purchaseTokenEnc?.startsWith('v2:k1:')).toBe(true);
-      expect(cipher.decrypt(row.purchaseTokenEnc ?? '').startsWith('token-')).toBe(true);
+      // O valor só abre com o AAD do próprio hash (amarrado à linha).
+      expect(cipher.decrypt(row.purchaseTokenEnc ?? '', purchaseTokenAad(row.purchaseTokenHash ?? '')).startsWith('token-')).toBe(true);
+      expect(() => cipher.decrypt(row.purchaseTokenEnc ?? '', purchaseTokenAad('outro-hash'))).toThrow();
     }
 
     // Uma única assinatura viva: nada de cobrar ou contar duas vezes.

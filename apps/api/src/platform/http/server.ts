@@ -13,6 +13,7 @@ import {
 import { hkdfSync, randomUUID } from 'node:crypto';
 
 import type { Env } from '../config/env.js';
+import { clientKey } from './login-throttle.js';
 
 import { registerAdminRoutes } from '../../modules/admin/admin.routes.js';
 import { adminAuthPlugin } from '../../modules/admin/admin-auth.plugin.js';
@@ -131,7 +132,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
     hook: 'preHandler',
     // Usuário autenticado é limitado por conta; anônimo, por IP. Sem isso,
     // uma empresa inteira atrás de um NAT compartilharia a mesma cota.
-    keyGenerator: (request) => request.auth?.userId ?? request.ip,
+    keyGenerator: (request) => request.auth?.userId ?? clientKey(request.ip),
     // O plugin lança o retorno deste builder. Devolvendo um AppError, o
     // estouro de limite passa pelo mesmo formatador de erros de todo o resto
     // e o cliente recebe sempre o mesmo envelope.
@@ -149,7 +150,9 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   // sessão web (opaco, não assinado, só nas rotas /v1/auth/web).
   if (!env.ADMIN_COOKIE_SECRET && env.ADMIN_PANEL_ENABLED && env.NODE_ENV !== 'test') {
     app.log.warn(
-      'ADMIN_COOKIE_SECRET ausente: usando segredo efêmero; as sessões do painel não sobrevivem a um restart',
+      env.JWT_PRIVATE_KEY
+        ? 'ADMIN_COOKIE_SECRET ausente: segredo do cookie do painel derivado da JWT_PRIVATE_KEY'
+        : 'ADMIN_COOKIE_SECRET ausente: usando segredo efêmero; as sessões do painel não sobrevivem a um restart',
     );
   }
   await app.register(cookie, {

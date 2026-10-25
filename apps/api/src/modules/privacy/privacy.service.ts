@@ -1,14 +1,15 @@
 import { sql } from 'drizzle-orm';
 
 import type { AppServices } from '../../platform/http/context.js';
+import { brandLogoKey, imageKey } from '../../platform/storage/object-storage.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
 
 /** Dias entre o pedido de exclusão e o expurgo (o que a resposta do pedido promete). */
 export const ACCOUNT_RECOVERY_DAYS = 30;
 
 /**
- * Janelas de retenção (ver docs/retencao.md, que precisa contar a mesma
- * história da Política de Privacidade). Valores em dias.
+ * Janelas de retenção (tabela em docs/seguranca.md, que precisa contar a
+ * mesma história da Política de Privacidade). Valores em dias.
  */
 export const RETENTION = {
   /** Sessões encerradas ou vencidas (IP e navegador de quem entrou). */
@@ -25,6 +26,8 @@ export const RETENTION = {
   closedSupport: 730,
   /** Tarefas da fila já concluídas ou que falharam de vez. */
   finishedJobs: 30,
+  /** Convites aceitos, cancelados ou vencidos (e-mail de quem foi convidado). */
+  closedInvites: 90,
 } as const;
 
 type Counted = {
@@ -68,12 +71,19 @@ export class PrivacyService {
         this.services.logger?.warn({ userId: id }, 'expurgo de conta adiado: ainda é dona de empresa ativa');
         continue;
       }
+      // Fotos e logotipos dessas empresas saem do bucket antes das linhas: sem
+      // as linhas de `workspace_images`, a coleta de lixo não acharia mais os
+      // arquivos. Falha aqui adia o expurgo para a próxima execução.
+      await this.deleteWorkspaceObjects(id);
       await this.services.db.transaction(async (tx) => {
         // Empresas já excluídas que a pessoa possuía: saem inteiras (estoque, fotos, assinatura).
         await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
         await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id}`);
         await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
         await tx.execute(sql`UPDATE audit_log SET ip_address = NULL WHERE actor_user_id = ${id}`);
+        // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
+        await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE target_id = ${id} AND metadata ? 'email'`);
+        await tx.execute(sql`DELETE FROM invites WHERE accepted_by = ${id}`);
         await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
         // O registro do expurgo não guarda nada que identifique a pessoa além do id, que já não aponta para ninguém.
         await recordAudit(tx, {
@@ -90,6 +100,25 @@ export class PrivacyService {
     return { purged, skipped };
   }
 
+  /** Apaga do bucket as fotos e logotipos das empresas excluídas que pertencem à conta. */
+  private async deleteWorkspaceObjects(userId: string): Promise<void> {
+    const { storage } = this.services;
+    if (!storage.configured) return;
+    const images = await this.services.db.execute<{ workspace_id: string; hash: string }>(sql`
+      SELECT i.workspace_id, i.hash FROM workspace_images i JOIN workspaces w ON w.id = i.workspace_id
+      WHERE w.owner_user_id = ${userId} AND w.deleted_at IS NOT NULL
+    `);
+    const logos = await this.services.db.execute<{ workspace_id: string; logo_hash: string }>(sql`
+      SELECT b.workspace_id, b.logo_hash FROM workspace_brandings b JOIN workspaces w ON w.id = b.workspace_id
+      WHERE w.owner_user_id = ${userId} AND w.deleted_at IS NOT NULL AND b.logo_hash IS NOT NULL
+    `);
+    const keys = [
+      ...images.rows.map((row) => imageKey(row.workspace_id, row.hash)),
+      ...logos.rows.map((row) => brandLogoKey(row.workspace_id, row.logo_hash)),
+    ];
+    for (const key of keys) await storage.delete(key);
+  }
+
   /** Aplica as janelas de `RETENTION`. Cada passo é independente: um erro não segura os outros. */
   async applyRetention(now = new Date()): Promise<Record<string, number>> {
     const days = (n: number) => new Date(now.getTime() - n * 86_400_000);
@@ -104,6 +133,7 @@ export class PrivacyService {
       notifications: sql`DELETE FROM notifications WHERE created_at < ${days(RETENTION.notifications)}`,
       pushTokens: sql`DELETE FROM push_tokens WHERE (revoked_at IS NOT NULL AND revoked_at < ${days(RETENTION.endedSessions)}) OR last_seen_at < ${days(RETENTION.stalePushTokens)}`,
       supportTickets: sql`DELETE FROM support_tickets WHERE status = 'resolved' AND last_message_at < ${days(RETENTION.closedSupport)}`,
+      invites: sql`DELETE FROM invites WHERE (accepted_at IS NOT NULL OR cancelled_at IS NOT NULL OR expires_at < now()) AND COALESCE(accepted_at, cancelled_at, expires_at) < ${days(RETENTION.closedInvites)}`,
       jobs: sql`DELETE FROM jobs WHERE (completed_at IS NOT NULL AND completed_at < ${days(RETENTION.finishedJobs)}) OR (failed_at IS NOT NULL AND failed_at < ${days(RETENTION.finishedJobs)})`,
     };
     const removed: Record<string, number> = {};

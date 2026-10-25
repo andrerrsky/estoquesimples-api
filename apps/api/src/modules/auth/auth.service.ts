@@ -1,5 +1,6 @@
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 
+import { clientKey } from '../../platform/http/login-throttle.js';
 import {
   devices,
   emailVerificationTokens,
@@ -204,7 +205,7 @@ export class AuthService {
       .limit(1);
 
     const user = found[0];
-    const ip = meta.ipAddress ?? 'desconhecido';
+    const ip = clientKey(meta.ipAddress);
 
     // Bloqueio por (e-mail, IP), conferido antes de tudo e igual para conta
     // existente ou não: o 429 não revela se o e-mail tem conta.

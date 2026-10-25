@@ -11,7 +11,7 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 | | Valor | Como é cumprido |
 | --- | --- | --- |
 | **RPO** (quanto dado se pode perder) | 24 h | dump noturno externo (`backup-offsite.yml`) + backups diários do Railway |
-| **RTO** (quanto tempo para voltar) | 4 h | roteiro abaixo, exercitado toda semana pelo `backup-drill.yml` e toda noite pela restauração de teste do dump real |
+| **RTO** (quanto tempo para voltar) | 4 h | roteiro abaixo; o procedimento é exercitado toda semana pelo `backup-drill.yml` (com a mesma receita do usuário de leitura) e, depois de ligado o backup externo, toda noite pela restauração de teste do dump real |
 | Retenção das cópias | 35 dias (Railway: o que o plano permitir, mínimo 14) | regra de expiração no bucket de backup |
 
 ### Camadas
@@ -41,8 +41,14 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 ### Ligar a cópia externa **[dono]**
 
 1. Crie um bucket em outro provedor (Backblaze B2, Cloudflare R2 ou AWS S3)
-   com **versionamento ou object lock** e uma regra de expiração de 35 dias.
-   Crie uma credencial que só grava nesse bucket.
+   com **versionamento** (ou object lock em modo governança):
+   - regra de expiração de 35 dias **só no prefixo `db/`** (os dumps);
+   - em `imagens/`, nenhuma expiração por idade (a foto de hoje pode ter sido
+     copiada há meses); só "versões não atuais expiram em 35 dias";
+   - credencial restrita a esse bucket com listar, ler cabeçalho, ler e
+     gravar objetos (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`; no B2:
+     `listFiles`, `readFiles`, `writeFiles`), **sem apagar**. Ler é preciso
+     para o `rclone copy` comparar e para conferir o hash do dump enviado.
 2. Gere o par de chaves `age` num computador confiável:
    `age-keygen -o estoque-backup.key` — guarde o arquivo **no gerenciador de
    senhas** (e uma cópia offline); a linha `public key: age1…` vai para o GitHub.
@@ -50,17 +56,21 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    ```sql
    CREATE ROLE backup_reader LOGIN PASSWORD '<gerada>';
    GRANT CONNECT ON DATABASE railway TO backup_reader;
-   GRANT USAGE ON SCHEMA public TO backup_reader;
-   GRANT SELECT ON ALL TABLES IN SCHEMA public TO backup_reader;
-   GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO backup_reader;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO backup_reader;
-   ALTER ROLE backup_reader SET default_transaction_read_only = on;
+   -- Papel embutido do Postgres 14+: lê tudo sem GRANT por tabela, então o
+   -- dump não carrega permissões para backup_reader (que o banco restaurado
+   -- não teria). O exercício semanal usa exatamente esta receita.
+   GRANT pg_read_all_data TO backup_reader;
    ALTER ROLE backup_reader BYPASSRLS; -- o dump precisa ver todas as empresas
+   ALTER ROLE backup_reader SET default_transaction_read_only = on;
    ```
-4. No GitHub (*Settings → Secrets and variables → Actions*), cadastre os
-   segredos listados no topo de `backup-offsite.yml` e a variável
-   `BACKUP_OFFSITE_ENABLED=true`. Rode o workflow manualmente uma vez e
-   confira `/ops/backup` (`dentroDoPrazo: true`).
+4. No Railway, crie `OPS_BACKUP_TOKEN` (`openssl rand -hex 32`): ele só
+   registra restaurações de teste em `/ops/backup` — o `OPS_TOKEN` não vai
+   para o GitHub.
+5. No GitHub (*Settings → Secrets and variables → Actions*), cadastre os
+   segredos listados no topo de `backup-offsite.yml` (com o mesmo
+   `OPS_BACKUP_TOKEN`) e a variável `BACKUP_OFFSITE_ENABLED=true`. Rode o
+   workflow manualmente uma vez e confira `/ops/backup` (`dentroDoPrazo:
+   true`, com `objeto` e `sha256` do arquivo enviado).
 
 ### Restaurar (roteiro de incidente)
 
@@ -76,11 +86,17 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 3. **Conferir antes de usar**, num banco descartável:
    `npm run backup:verify -w @estoquesimples/api -- --dump "$PWD/backup.dump" --target postgres://…/descartavel`
 4. **Restaurar no Postgres novo** (crie um serviço Postgres novo no Railway,
-   nunca sobre o banco suspeito):
+   nunca sobre o banco suspeito). Os GRANTs do dump citam papéis do cluster
+   (`app_user` e o dono das tabelas); crie os que faltarem antes:
    ```bash
-   psql "$NOVO" -c 'CREATE ROLE app_user NOLOGIN' # se ainda não existir
+   for papel in $(pg_restore --file=- --schema-only backup.dump \
+       | grep -E '^(GRANT|REVOKE|ALTER DEFAULT PRIVILEGES)' \
+       | grep -oE '(TO|FROM|FOR ROLE) [a-z_][a-z0-9_]*' | awk '{print $NF}' | sort -u); do
+     psql "$NOVO" -c "DO \$\$ BEGIN CREATE ROLE $papel NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END \$\$"
+   done
    pg_restore --no-owner --single-transaction --dbname "$NOVO" backup.dump
    ```
+   (`backup:verify` faz o mesmo automaticamente no banco descartável do passo 3.)
 5. **Apontar a API**: troque `DATABASE_URL` do serviço da API para o banco
    novo; o deploy roda as migrations pendentes na subida. Confira `/ready`.
 6. **Fotos**: `rclone copy backup:<bucket>/imagens imagens:<bucket-das-fotos>`.
@@ -170,6 +186,7 @@ definido); as sessões de refresh continuam.
 | Aparelhos para push sem uso | 180 dias | `privacy.daily` |
 | Conversas de suporte resolvidas | 2 anos sem mensagem nova | `privacy.daily` |
 | Tarefas da fila concluídas | 30 dias | `privacy.daily` |
+| Convites aceitos, cancelados ou vencidos | 90 dias | `privacy.daily` |
 | Erros registrados | 30 dias | `ops` (`error_events`) |
 | Eventos de uso (analytics) | `ANALYTICS_RETENTION_DAYS` (400) | `analytics.retention` |
 | Backups | 35 dias | regra do bucket / Railway |

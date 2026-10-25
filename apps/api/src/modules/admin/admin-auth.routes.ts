@@ -147,7 +147,9 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
     },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
-      return service.enableMfa(requireAdminContext(request), request.body.code, requestMeta(request));
+      const result = await service.enableMfa(requireAdminContext(request), request.body.code, requestMeta(request));
+      reply.setCookie(env.ADMIN_COOKIE_NAME, result.token, adminCookieOptions(env));
+      return { recoveryCodes: result.recoveryCodes };
     },
   );
 
@@ -294,5 +296,10 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
 function requireCsrfHeader(headers: Record<string, unknown>): void {
   if (headers[ADMIN_CSRF_HEADER] !== ADMIN_CSRF_VALUE) {
     throw forbidden(ErrorCode.FORBIDDEN, 'Requisição sem cabeçalho de proteção.');
+  }
+  // Mesma checagem de origem das demais mutações: o navegador informa e scripts não forjam.
+  const fetchSite = headers['sec-fetch-site'];
+  if (typeof fetchSite === 'string' && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    throw forbidden(ErrorCode.FORBIDDEN, 'Requisição de outra origem.');
   }
 }
