@@ -173,10 +173,10 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    # Estado da cópia no instante informado. O `version_at` vai só no remoto
    # de origem (como flag global --s3-version-at valeria também para o
    # destino, que então não aceitaria escrita). Exercitado no CI.
-   rclone copy "backupimg,version_at=2026-10-20T00:00:00Z:<bucket-copia-das-fotos>" imagens:<bucket-das-fotos>
+   rclone copy "backupimg,version_at='2026-10-20T00:00:00Z':<bucket-copia-das-fotos>" imagens:<bucket-das-fotos>
    ```
    (No B2 via API S3 o parâmetro é o mesmo; com o backend nativo `b2`, use
-   `backupimg,version_at=…` igualmente.)
+   `backupimg,version_at='…'` igualmente; as aspas simples protegem os `:` da data.)
    Depois volte `BACKUP_OFFSITE_ENABLED=true`.
 7. **Chaves**: a API precisa das **mesmas** `PURCHASE_TOKEN_ENCRYPTION_KEY` /
    `SECRETS_ENCRYPTION_KEYS` e `JWT_*` de antes — sem elas os segredos

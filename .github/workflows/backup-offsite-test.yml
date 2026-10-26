@@ -160,7 +160,7 @@ jobs:
           # Restauração no ponto anterior (roteiro, passo 6) traz a foto de volta.
           aws --endpoint-url "$S3_URL" s3api create-bucket --bucket fotos-restauradas
           # version_at só no remoto de origem: como flag global, valeria também para o destino, que não aceita escrita.
-          rclone copy "minio,version_at=$antes:fotos-copia" minio:fotos-restauradas --s3-no-check-bucket
+          rclone copy "minio,version_at='$antes':fotos-copia" minio:fotos-restauradas --s3-no-check-bucket
           rclone lsf minio:fotos-restauradas --recursive | grep -q foto1.webp || { echo "::error::restauração no ponto anterior não trouxe a foto"; exit 1; }
 
       - name: 'Trava: destino sem versionamento'
