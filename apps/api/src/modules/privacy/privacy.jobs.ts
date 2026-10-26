@@ -13,8 +13,9 @@ export function registerPrivacyJobs(_services: AppServices): void {
     await scheduleNext(context.services);
     const service = new PrivacyService(context.services);
     const accounts = await service.purgeDeletedAccounts();
+    const workspaces = await service.purgeDeletedWorkspaces();
     const retention = await service.applyRetention();
-    context.logger.info({ accounts, retention }, 'expurgo de contas e retenção concluídos');
+    context.logger.info({ accounts, workspaces, retention }, 'expurgo de contas e empresas e retenção concluídos');
   });
 }
 

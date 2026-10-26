@@ -220,6 +220,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'workspace.created': { label: 'Empresa criada', tone: 'success' },
   'workspace.updated': { label: 'Empresa atualizada', tone: 'neutral' },
   'workspace.deleted': { label: 'Empresa excluída', tone: 'error' },
+  'workspace.purged': { label: 'Empresa apagada definitivamente (90 dias após a exclusão)', tone: 'error' },
   'workspace.ownership_transferred': { label: 'Propriedade transferida', tone: 'warning' },
   'member.role_changed': { label: 'Papel de membro alterado', tone: 'info' },
   'member.removed': { label: 'Membro removido', tone: 'warning' },

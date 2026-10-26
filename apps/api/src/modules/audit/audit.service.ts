@@ -26,6 +26,7 @@ export const AuditAction = {
   WORKSPACE_CREATED: 'workspace.created',
   WORKSPACE_UPDATED: 'workspace.updated',
   WORKSPACE_DELETED: 'workspace.deleted',
+  WORKSPACE_PURGED: 'workspace.purged',
   WORKSPACE_OWNERSHIP_TRANSFERRED: 'workspace.ownership_transferred',
   MEMBER_ROLE_CHANGED: 'member.role_changed',
   MEMBER_REMOVED: 'member.removed',

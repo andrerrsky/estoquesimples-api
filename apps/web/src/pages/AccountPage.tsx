@@ -449,23 +449,36 @@ function MyDataCard() {
   );
 }
 
+interface DeletionPreview {
+  workspaces: Array<{ id: string; name: string; otherMembers: number; subscription: { provider: 'google_play' | 'asaas'; state: string; renews: boolean } | null }>;
+  recoveryDays: number;
+}
+
 function DeleteAccountCard() {
   const { logout } = useAuth();
-  const { workspaces } = useWorkspace();
   const toast = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
+  const [closeWorkspaces, setCloseWorkspaces] = useState(false);
+  // O que sai junto com a conta: empresas de que a pessoa é dona, membros e assinatura.
+  const preview = useQuery({ queryKey: ['me', 'deletion-preview'], queryFn: () => api.get<DeletionPreview>('/v1/me/deletion-preview'), staleTime: 30_000 });
 
   useEffect(() => {
-    if (open) setPassword('');
+    if (open) {
+      setPassword('');
+      setCloseWorkspaces(false);
+    }
   }, [open]);
 
-  const owned = workspaces.filter((item) => item.isOwner);
+  const owned = preview.data?.workspaces ?? [];
+  const playRenewing = owned.filter((item) => item.subscription?.provider === 'google_play' && item.subscription.renews);
+  const others = owned.reduce((total, item) => total + item.otherMembers, 0);
 
   const remove = async () => {
     if (password === '') throw new Error('Digite sua senha para confirmar.');
-    const result = await api.delete<{ message: string; recoverableUntil: string }>('/v1/me', { password });
+    if (owned.length > 0 && !closeWorkspaces) throw new Error('Marque a caixa para excluir também as empresas.');
+    const result = await api.delete<{ message: string; recoverableUntil: string }>('/v1/me', { password, ...(owned.length > 0 ? { closeWorkspaces: true } : {}) });
     toast.push(`Conta marcada para exclusão. Se mudar de ideia, fale com o suporte até ${fmtDate(result.recoverableUntil)}.`, { duration: 15_000 });
     // A API já encerrou todas as sessões; isto limpa o que sobrou no navegador.
     await logout().catch(() => undefined);
@@ -477,43 +490,66 @@ function DeleteAccountCard() {
       <div className="stack">
         <ul className="plain-list">
           <li>A conta é bloqueada na hora e desconectada de todos os aparelhos.</li>
-          <li>Ela fica em recuperação por 30 dias: nesse prazo o suporte consegue reativá-la. Depois, a exclusão é definitiva.</li>
+          <li>Ela fica em recuperação por {preview.data?.recoveryDays ?? 30} dias: nesse prazo o suporte consegue reativá-la. Depois, a exclusão é definitiva.</li>
           <li>O que está gravado no aplicativo do celular não é apagado.</li>
         </ul>
 
-        {owned.length > 0 ? (
+        {owned.length > 0 && (
           <Notice tone="warning" title={owned.length === 1 ? 'Você é proprietário de uma empresa' : `Você é proprietário de ${owned.length} empresas`}>
+            <p>Ao excluir a conta, estas empresas são excluídas junto, com o estoque, o histórico e as fotos na nuvem:</p>
+            <ul className="plain-list" style={{ margin: '8px 0' }}>
+              {owned.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.name}</strong>
+                  {item.otherMembers > 0 && ` — ${item.otherMembers} ${item.otherMembers === 1 ? 'pessoa perde' : 'pessoas perdem'} o acesso`}
+                  {item.subscription?.provider === 'asaas' && item.subscription.renews && ' — a assinatura é cancelada'}
+                  {item.subscription?.provider === 'google_play' && item.subscription.renews && ' — cancele antes a assinatura no Google Play'}
+                </li>
+              ))}
+            </ul>
             <p>
-              Enquanto for proprietário de {owned.map((item) => item.name).join(', ')}, a conta não pode ser excluída: a empresa ficaria sem
-              ninguém para cuidar dela e da assinatura. Antes, transfira a propriedade para outra pessoa da equipe (em Equipe, no menu da
-              pessoa) ou peça ao suporte para excluir a empresa.
+              {others > 0 ? 'Se alguém da equipe deve continuar com a empresa, transfira a propriedade antes (em Equipe). ' : ''}
+              Se o suporte reativar sua conta dentro do prazo, as empresas voltam junto.
             </p>
+            {playRenewing.length > 0 && (
+              <p style={{ marginTop: 8 }}>
+                <strong>Antes de continuar:</strong> cancele a assinatura de {playRenewing.map((item) => item.name).join(', ')} na Play Store (Pagamentos e assinaturas). O Google continuaria cobrando.
+              </p>
+            )}
             <div className="row row--wrap" style={{ marginTop: 10 }}>
               <Link to="/app/equipe" className="btn btn--secondary btn--sm">Abrir Equipe</Link>
-              <Link to="/app/suporte" className="btn btn--ghost btn--sm">Falar com o suporte</Link>
             </div>
           </Notice>
-        ) : (
-          <div className="row">
-            <button type="button" className="btn btn--danger" onClick={() => setOpen(true)}>
-              Excluir minha conta
-            </button>
-          </div>
         )}
+
+        <div className="row">
+          <button type="button" className="btn btn--danger" onClick={() => setOpen(true)} disabled={preview.isLoading || playRenewing.length > 0}>
+            {owned.length > 0 ? 'Excluir minha conta e as empresas' : 'Excluir minha conta'}
+          </button>
+        </div>
       </div>
 
       <ConfirmDialog
         open={open}
         onClose={() => setOpen(false)}
-        title="Excluir sua conta?"
+        title={owned.length > 0 ? 'Excluir sua conta e suas empresas?' : 'Excluir sua conta?'}
         description="Você perde o acesso agora, em todos os aparelhos. Para desistir, será preciso falar com o suporte dentro do prazo de recuperação."
-        confirmLabel="Excluir conta"
+        confirmLabel="Excluir"
         danger
         onConfirm={remove}
       >
-        <Field label="Sua senha" hint="Pedimos a senha para ter certeza de que é você.">
-          <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" maxLength={200} />
-        </Field>
+        <div className="stack">
+          {owned.length > 0 && (
+            <label className="checkbox">
+              <input type="checkbox" checked={closeWorkspaces} onChange={(event) => setCloseWorkspaces(event.target.checked)} />
+              Entendo que {owned.length === 1 ? `a empresa ${owned[0]!.name} será excluída` : `as empresas ${owned.map((item) => item.name).join(', ')} serão excluídas`}
+              {others > 0 ? ` e ${others} ${others === 1 ? 'pessoa perde' : 'pessoas perdem'} o acesso` : ''}.
+            </label>
+          )}
+          <Field label="Sua senha" hint="Pedimos a senha para ter certeza de que é você.">
+            <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" maxLength={200} />
+          </Field>
+        </div>
       </ConfirmDialog>
     </Card>
   );

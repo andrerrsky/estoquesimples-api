@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
+import { AccountClosureService } from '../users/account-closure.service.js';
 import {
   adminAccountNotes,
   devices,
@@ -562,12 +563,14 @@ export class AdminUsersService {
         .update(users)
         .set({ status: 'active', deletionRequestedAt: null })
         .where(eq(users.id, userId));
+      // Empresas fechadas junto com a conta voltam com ela.
+      const restoredWorkspaces = await new AccountClosureService(this.services).restoreClosedWorkspaces(tx, userId);
       await recordAdminAudit(tx, {
         actor,
         action: AdminAction.USER_DELETION_CANCELLED,
         targetType: 'user',
         targetId: userId,
-        metadata: { reason, requestedAt: iso(user.deletionRequestedAt) },
+        metadata: { reason, requestedAt: iso(user.deletionRequestedAt), restoredWorkspaces },
       });
     });
   }
