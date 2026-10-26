@@ -31,6 +31,11 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      lado e conferido de volta) e o resultado registrado em `/ops/backup`;
    - o bucket dos dumps tem **Object Lock**: nenhum dump pode ser apagado
      ou trocado antes de 35 dias, nem com a chave do workflow;
+   - ordem dos passos: dump, envio e fotos (os que têm as chaves dos
+     buckets) rodam **antes** de qualquer código do npm entrar no runner; a
+     restauração de teste (tsx, pg) vem depois e o registro só acontece se ela
+     passar — um pacote do npm comprometido não alcança as chaves dos buckets
+     (no máximo o token de backup, que só registra);
    - a lógica fica em `scripts/backup-offsite.sh`, exercitada em todo PR que
      mexe no backup por `backup-offsite-test.yml` (S3 local com Object Lock e
      versionamento: fluxo completo, decifrar e restaurar, restauração de foto
@@ -67,9 +72,18 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      Lock garante que nada sai antes dos 35 dias. Chave **só deste bucket**,
      com listar, ler e gravar (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`;
      B2: `listFiles`, `readFiles`, `writeFiles`) e **sem apagar**. No S3,
-     acrescente à política da chave uma negação de `s3:PutObject` quando
-     `s3:if-none-match` não for `*` (gravação condicional): assim ela só
-     cria nomes novos e não consegue nem empilhar versões falsas;
+     acrescente à política da chave a exigência de gravação condicional (o
+     workflow já envia `If-None-Match: *`, em uma parte só, e o teste do CI
+     confere a recusa): assim ela só cria nomes novos e não consegue nem
+     empilhar versões falsas sobre um dump:
+     ```json
+     {
+       "Effect": "Deny",
+       "Action": "s3:PutObject",
+       "Resource": "arn:aws:s3:::<bucket-dos-dumps>/*",
+       "Condition": { "Null": { "s3:if-none-match": "true" } }
+     }
+     ```
    - **cópia das fotos** (`BACKUP_IMAGES_BUCKET`): **S3**: versionamento ligado,
      sem expiração dos objetos atuais e `NoncurrentVersionExpiration: 35`; chave
      só deste bucket com `s3:ListBucket`, `s3:GetBucketVersioning`,
@@ -107,7 +121,10 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 4. No Railway, crie `OPS_BACKUP_TOKEN` (`openssl rand -hex 32`): ele só
    registra restaurações de teste em `/ops/backup` — o `OPS_TOKEN` não vai
    para o GitHub.
-5. No GitHub, em *Watch → Custom → Actions*, ligue o aviso de runs que
+5. No GitHub, em *Settings → Actions → General → Artifact and log
+   retention*, deixe **90 dias** (o padrão; no mínimo 40): o SHA-256 de cada
+   dump fica no log do run e é com ele que se reconhece o dump verdadeiro
+   numa restauração. Em *Watch → Custom → Actions*, ligue o aviso de runs que
    falharam (ou uma regra de e-mail para os avisos do GitHub Actions): o
    alerta `backup_desatualizado` cobre a falta de registro, e o aviso do
    GitHub cobre um registro forjado com o token de backup.
@@ -131,6 +148,9 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    usados abaixo — `backup` (bucket dos dumps), `backupimg` (cópia das fotos)
    e `imagens` (bucket das fotos de produção, com a chave de **escrita** da
    API, `S3_*` do Railway):
+   Para listar e baixar versões use o AWS CLI (`aws configure --profile
+   backup` com a chave dos dumps; no B2, acrescente
+   `--endpoint-url https://s3.<região>.backblazeb2.com` aos comandos).
    ```ini
    [backup]
    type = s3

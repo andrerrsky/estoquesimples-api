@@ -21,6 +21,13 @@ export const backupRecordSchema = z.object({
   fotos: z.number().int().nonnegative().max(1_000_000_000).optional(),
   schemaAFrente: z.boolean().optional(),
   migracoesAFrente: z.number().int().nonnegative().max(1_000_000).optional(),
-}).strict();
+});
+
+/**
+ * Versão estrita, usada no CI contra o corpo que o script monta (pega
+ * desencontro entre os dois). A API aceita a versão acima, que descarta campo
+ * desconhecido: o script do main pode estar à frente da API publicada.
+ */
+export const backupRecordStrictSchema = backupRecordSchema.strict();
 
 export type BackupRecord = z.infer<typeof backupRecordSchema>;

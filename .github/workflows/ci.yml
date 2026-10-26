@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Postgres real no CI: RLS, índices únicos parciais e SKIP LOCKED não têm
     # como ser exercitados contra um substituto.

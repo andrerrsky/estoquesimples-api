@@ -11,9 +11,14 @@
 #   check     BACKUP_DATABASE_URL, AGE_RECIPIENT, DUMPS_REMOTE, IMAGES_SOURCE, IMAGES_DEST
 #             (ALLOW_INSECURE_DB=1 só no teste, onde o Postgres local não tem TLS)
 #   dump      BACKUP_DATABASE_URL                       -> $WORKDIR/backup.dump
-#   verify    DESTINO                                   -> $WORKDIR/verificacao.json
 #   upload    AGE_RECIPIENT, DUMPS_REMOTE (+ RCLONE_CONFIG_* do remoto dos dumps) -> $WORKDIR/envio.json
 #   photos    IMAGES_SOURCE, IMAGES_DEST, VERSIONING_CONFIRMED, MAX_DELETE (+ RCLONE_CONFIG_*) -> $WORKDIR/fotos.json
+#   verify    DESTINO                                   -> $WORKDIR/verificacao.json
+#
+# A ordem importa: dump, upload e photos (os passos com as chaves dos buckets)
+# rodam ANTES de qualquer código do npm. O verify (tsx, pg e dependências)
+# vem depois, e o register só registra um dump que passou na restauração de
+# teste. Um pacote do npm comprometido não alcança as chaves dos buckets.
 #   register  API_BASE_URL, OPS_BACKUP_TOKEN
 #   finish    falha se a produção está atrás do repositório (o backup já foi guardado)
 #   cleanup   apaga as cópias locais
@@ -63,8 +68,8 @@ case "$fase" in
     ;;
 
   verify)
-    # Backup que nunca foi restaurado é suposição: o dump só segue depois de
-    # restaurado e conferido. --schema-atras-ok: com uma migration já no
+    # Backup que nunca foi restaurado é suposição: o dump guardado só é
+    # registrado depois de restaurado e conferido. --schema-atras-ok: com uma migration já no
     # repositório e o deploy pendente, o dump (estado real) ainda é guardado.
     precisa DESTINO
     npm run backup:verify --workspace @estoquesimples/api -- \
@@ -79,8 +84,14 @@ case "$fase" in
     sha="$(sha256sum "$WORKDIR/backup.dump.age" | cut -d' ' -f1)"
     echo "$sha" > "$WORKDIR/backup.dump.age.sha256"
     objeto="db/$stamp.dump.age"
-    rclone copyto "$WORKDIR/backup.dump.age" "$DUMPS_REMOTE/$objeto" --s3-no-check-bucket
-    rclone copyto "$WORKDIR/backup.dump.age.sha256" "$DUMPS_REMOTE/$objeto.sha256" --s3-no-check-bucket
+    # Gravação condicional (If-None-Match: *): só cria nome novo, nunca empilha
+    # versão sobre um dump existente — e funciona com a política da chave que
+    # exige isso (docs/seguranca.md). Envio em uma parte só (até 5 GB): o
+    # cabeçalho condicional vale para PUT simples.
+    rclone copyto "$WORKDIR/backup.dump.age" "$DUMPS_REMOTE/$objeto" --s3-no-check-bucket \
+      --s3-upload-cutoff 5G --header-upload 'If-None-Match: *'
+    rclone copyto "$WORKDIR/backup.dump.age.sha256" "$DUMPS_REMOTE/$objeto.sha256" --s3-no-check-bucket \
+      --s3-upload-cutoff 5G --header-upload 'If-None-Match: *'
     # Confere que o objeto chegou inteiro (hash calculado de volta, do bucket).
     remoto="$(rclone cat "$DUMPS_REMOTE/$objeto" | sha256sum | cut -d' ' -f1)"
     [ "$remoto" = "$sha" ] || erro "O arquivo no bucket não confere com o enviado"

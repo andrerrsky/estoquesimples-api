@@ -118,12 +118,13 @@ jobs:
         run: |
           if bash scripts/backup-offsite.sh check; then echo "::error::check aceitou URL sem sslmode"; exit 1; fi
 
-      - name: Fluxo completo (check, dump, verify, upload, photos, register, finish)
+      - name: Fluxo completo (check, dump, upload, photos, verify, register, finish)
         env:
           BACKUP_DATABASE_URL: postgres://backup_reader:leitura@localhost:5432/origem
           DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
         run: |
-          for fase in check dump verify upload photos register finish; do
+          # Mesma ordem da produção: as fases com chaves dos buckets antes do código do npm (verify).
+          for fase in check dump upload photos verify register finish; do
             echo "::group::$fase"; bash scripts/backup-offsite.sh "$fase"; echo "::endgroup::"
           done
 
@@ -131,7 +132,7 @@ jobs:
         run: |
           cat registro.json; echo
           # O corpo precisa passar no mesmo schema que a API aplica em POST /ops/backup.
-          (cd apps/api && npx tsx -e "import { readFileSync } from 'node:fs'; import { backupRecordSchema } from './src/modules/ops/ops.schemas.ts'; backupRecordSchema.parse(JSON.parse(readFileSync('$GITHUB_WORKSPACE/registro.json', 'utf8'))); console.log('corpo aceito pelo schema da API')")
+          (cd apps/api && npx tsx -e "import { readFileSync } from 'node:fs'; import { backupRecordStrictSchema } from './src/modules/ops/ops.schemas.ts'; backupRecordStrictSchema.parse(JSON.parse(readFileSync('$GITHUB_WORKSPACE/registro.json', 'utf8'))); console.log('corpo aceito pelo schema da API')")
           [ "$(jq '.fotos' registro.json)" = "3" ] || { echo "::error::fotos != 3"; exit 1; }
           [ "$(jq -r '.schemaAtras' registro.json)" = "false" ] || { echo "::error::schemaAtras"; exit 1; }
           objeto="$(jq -r '.objeto' registro.json)"
@@ -143,6 +144,33 @@ jobs:
           psql "$ORIGEM" -c 'CREATE DATABASE restauracao2'
           npm run backup:verify --workspace @estoquesimples/api -- --dump "$PWD/restaurado.dump" --target postgres://estoque:estoque@localhost:5432/restauracao2
           [ "$(rclone lsf minio:fotos-copia --recursive --files-only | wc -l)" = "3" ] || { echo "::error::cópia das fotos incompleta"; exit 1; }
+
+      - name: Gravação condicional recusa sobrescrever um dump
+        run: |
+          objeto="$(jq -r '.objeto' registro.json)"
+          echo falso > falso.age
+          if rclone copyto falso.age "minio:dumps/$objeto" --s3-no-check-bucket --s3-upload-cutoff 5G --header-upload 'If-None-Match: *'; then
+            echo "::error::If-None-Match não impediu empilhar uma versão sobre o dump"; exit 1
+          fi
+
+      - name: Produção à frente e atrás do repositório (dump guardado, job falha)
+        env:
+          BACKUP_DATABASE_URL: postgres://backup_reader:leitura@localhost:5432/origem
+          DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
+        run: |
+          rodar() {
+            for fase in dump upload photos verify register; do bash scripts/backup-offsite.sh "$fase"; done
+            if bash scripts/backup-offsite.sh finish; then echo "::error::finish não falhou ($1)"; exit 1; fi
+          }
+          psql "$ORIGEM" -v ON_ERROR_STOP=1 -c "INSERT INTO schema_migrations (version, name, checksum) VALUES (999, 'futura', 'teste')"
+          rodar 'à frente'
+          [ "$(jq -r '.schemaAFrente' registro.json)" = "true" ] || { echo "::error::schemaAFrente não registrado"; exit 1; }
+          [ "$(jq -r '.objeto' registro.json)" != "null" ] || { echo "::error::dump à frente não foi guardado"; exit 1; }
+          psql "$ORIGEM" -v ON_ERROR_STOP=1 -c "DELETE FROM schema_migrations WHERE version = 999" \
+            -c "DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)"
+          rodar 'atrás'
+          [ "$(jq -r '.schemaAtras' registro.json)" = "true" ] || { echo "::error::schemaAtras não registrado"; exit 1; }
+          [ "$(jq -r '.migracoesAtras' registro.json)" = "1" ] || { echo "::error::migracoesAtras != 1"; exit 1; }
 
       - name: Object Lock impede apagar o dump
         run: |
