@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { appConfig, jobs } from '../../platform/db/schema/index.js';
 import { migrationStatus } from '../../platform/db/migrate.js';
-import { imageKey } from '../../platform/storage/object-storage.js';
+import { S3Storage, imageKey } from '../../platform/storage/object-storage.js';
 import { ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
 import { OpsService } from '../ops/ops.service.js';
 import { AdminAction, recordAdminAudit } from './admin-audit.service.js';
@@ -257,7 +257,36 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         await run('apagar', () => storage.delete(key));
       }
       const ok = steps.every((step) => step.ok);
-      return { ok, config, steps, message: ok ? 'Armazenamento funcionando: gravou, leu e apagou.' : 'Armazenamento com falha: veja a etapa e o erro.' };
+
+      // Assinatura recusada tem duas causas que o erro não distingue: par de
+      // chaves que não combina, ou bucket que exige o outro estilo de URL
+      // (buckets antigos do Railway usam path-style). Tenta o outro estilo.
+      let alternativa: { forcePathStyle: boolean; ok: boolean; error?: string } | null = null;
+      if (!ok && steps[0]?.error?.startsWith('SignatureDoesNotMatch') && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY) {
+        const other = new S3Storage(env.S3_BUCKET, {
+          endpoint: env.S3_ENDPOINT,
+          region: env.S3_REGION,
+          accessKeyId: env.S3_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+          forcePathStyle: !env.S3_FORCE_PATH_STYLE,
+        });
+        try {
+          await other.put(key, body, 'image/webp');
+          await other.delete(key);
+          alternativa = { forcePathStyle: !env.S3_FORCE_PATH_STYLE, ok: true };
+        } catch (error) {
+          const err = error as { name?: string; message?: string };
+          alternativa = { forcePathStyle: !env.S3_FORCE_PATH_STYLE, ok: false, error: `${err.name ?? 'Erro'}: ${err.message ?? String(error)}` };
+        }
+      }
+      const message = ok
+        ? 'Armazenamento funcionando: gravou, leu e apagou.'
+        : alternativa?.ok
+          ? `O bucket aceita o outro estilo de URL: defina S3_FORCE_PATH_STYLE=${alternativa.forcePathStyle} no Railway.`
+          : alternativa
+            ? 'O bucket recusou a assinatura nos dois estilos de URL: a chave secreta não corresponde à chave de acesso. Copie de novo as duas da aba Credentials do bucket no Railway.'
+            : 'Armazenamento com falha: veja a etapa e o erro.';
+      return { ok, config, steps, alternativa, message };
     },
   );
 
