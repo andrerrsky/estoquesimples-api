@@ -20,6 +20,7 @@
     "backup:verify": "tsx src/platform/db/verify-backup.ts",
     "openapi": "tsx src/platform/http/print-openapi.ts",
     "admin:create": "tsx scripts/admin-create.ts",
+    "secrets:reencrypt": "tsx scripts/reencrypt-secrets.ts",
     "seed:dev": "tsx scripts/seed-dev.ts"
   },
   "dependencies": {
@@ -28,12 +29,12 @@
     "@fastify/cors": "^10.0.1",
     "@fastify/helmet": "^12.0.1",
     "@fastify/rate-limit": "^10.2.1",
-    "@fastify/static": "^8.3.0",
+    "@fastify/static": "^10.1.7",
     "@fastify/swagger": "^9.4.0",
     "@node-rs/argon2": "^2.0.2",
     "@scalar/fastify-api-reference": "^1.25.117",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.12.4",
+    "fastify": "^5.12.7",
     "fastify-plugin": "^5.0.1",
     "fastify-type-provider-zod": "^4.0.2",
     "jose": "^5.9.6",

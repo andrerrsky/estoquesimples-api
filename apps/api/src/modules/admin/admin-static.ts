@@ -59,10 +59,11 @@ export async function registerAdminStatic(app: FastifyInstance): Promise<void> {
       wildcard: false,
       decorateReply: true,
       serve: true,
+      // Na versão 10 o callback recebe a resposta do Fastify (não mais a crua do Node).
       setHeaders: (reply, filePath) => {
-        reply.setHeader('Content-Security-Policy', CSP);
-        reply.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-        reply.setHeader(
+        reply.header('Content-Security-Policy', CSP);
+        reply.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        reply.header(
           'Cache-Control',
           filePath.includes(`${sep}assets${sep}`) ? 'public, max-age=2592000, immutable' : 'no-store',
         );

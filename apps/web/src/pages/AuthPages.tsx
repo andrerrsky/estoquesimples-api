@@ -103,13 +103,27 @@ function useRedirectIfAuthed(): ReactNode | null {
 /** Entrada pela URL da empresa: depois de entrar, abre a empresa de onde a pessoa veio (se participa dela). */
 export const BRAND_HINT_KEY = 'es_web_brand_hint';
 
+/**
+ * Tira o token do endereço assim que a página o lê: na URL ele ficaria no
+ * histórico do navegador e iria para o Google Analytics (page_location).
+ */
+function useStripTokenFromUrl(): void {
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('token')) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete('token');
+    const rest = params.toString();
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+  }, []);
+}
+
 export function LoginPage({ brandSlug }: { brandSlug?: string }) {
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
   const [saved] = useState(readRememberedLogin);
   const [email, setEmail] = useState(saved?.email ?? '');
-  const [password, setPassword] = useState(saved?.password ?? '');
+  const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(saved !== null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +137,7 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
     try {
       await login(email.trim(), password);
       // Só depois de entrar: um login recusado não guarda nem apaga nada.
-      applyRememberedLogin(remember, { email: email.trim(), password });
+      applyRememberedLogin(remember, { email: email.trim() });
       if (brandSlug) {
         try {
           sessionStorage.setItem(BRAND_HINT_KEY, brandSlug);
@@ -148,7 +162,7 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
         <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
         <label className="checkbox">
           <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-          Lembrar meus dados
+          Lembrar meu e-mail
         </label>
         <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
           {busy ? 'Entrando…' : 'Entrar'}
@@ -320,6 +334,7 @@ export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [token, setToken] = useState(params.get('token') ?? '');
+  useStripTokenFromUrl();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | Error | null>(null);
@@ -371,7 +386,8 @@ export function ResetPasswordPage() {
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const { status, reloadUser } = useAuth();
-  const token = params.get('token');
+  const [token] = useState(() => params.get('token'));
+  useStripTokenFromUrl();
   const [state, setState] = useState<'working' | 'done' | 'error'>('working');
   const [message, setMessage] = useState('');
   const sent = useRef(false);

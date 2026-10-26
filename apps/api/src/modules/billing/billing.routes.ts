@@ -1,4 +1,5 @@
 import { brandingViewSchema } from '../branding/branding.routes.js';
+import { verifyPubSubOidc } from './pubsub-oidc.js';
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -225,6 +226,15 @@ export async function registerBillingRoutes(app: FastifyInstance): Promise<void>
       const provided = request.query.token ?? '';
       if (!safeCompare(provided, expected)) {
         throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Origem não autorizada.');
+      }
+      // Com a autenticação de push do Pub/Sub configurada, o JWT do Google
+      // também precisa conferir (segundo fator do webhook; ver docs/seguranca.md).
+      if (env.GOOGLE_PUBSUB_OIDC_AUDIENCE && env.GOOGLE_PUBSUB_OIDC_EMAIL) {
+        const ok = await verifyPubSubOidc(request.headers.authorization, {
+          audience: env.GOOGLE_PUBSUB_OIDC_AUDIENCE,
+          serviceAccountEmail: env.GOOGLE_PUBSUB_OIDC_EMAIL,
+        });
+        if (!ok) throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Origem não autorizada.');
       }
 
       const message = request.body.message;

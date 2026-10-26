@@ -120,7 +120,7 @@ describe('sessão web (cookie httpOnly)', () => {
       method: 'POST',
       url: '/v1/auth/web/register',
       headers: WEB,
-      payload: { email, password: VALID_PASSWORD, name: 'Usuária Web', device: { installId: 'navegador-teste-0001', platform: 'android', model: 'Chrome 140' } },
+      payload: { email, password: VALID_PASSWORD, name: 'Usuária Web', device: { installId: 'navegador-teste-0001-000000000000000', platform: 'android', model: 'Chrome 140' } },
     });
     expect(registered.statusCode).toBe(201);
     expect(registered.json().refreshToken).toBeUndefined();
@@ -179,7 +179,7 @@ describe('estoque pela web', () => {
   const base = (workspaceId: string) => `/v1/workspaces/${workspaceId}`;
 
   it('cadastra, busca sem acento, movimenta, estorna e mantém o saldo igual ao que um aparelho recebe', async () => {
-    const user = await registerUser(context, { installId: 'aparelho-web-0001' });
+    const user = await registerUser(context, { installId: 'aparelho-web-0001-000000000000000000' });
     const ws = await criarEmpresa(user);
     const h = user.authHeader;
 
@@ -392,12 +392,12 @@ describe('estoque pela web', () => {
 
 describe('caixa de notificações', () => {
   it('resposta do suporte chega na caixa do usuário e pode ser marcada como lida', async () => {
-    const user = await registerUser(context, { installId: 'instalacao-caixa-0001' });
+    const user = await registerUser(context, { installId: 'instalacao-caixa-0001-00000000000000' });
     const ticket = await context.app.inject({
       method: 'POST',
       url: '/v1/support/tickets',
       headers: user.authHeader,
-      payload: { installId: 'instalacao-caixa-0001', subject: 'Dúvida pela web', message: 'Como exporto?', device: { platform: 'web', model: 'Chrome 140', osVersion: 'macOS' } },
+      payload: { installId: 'instalacao-caixa-0001-00000000000000', subject: 'Dúvida pela web', message: 'Como exporto?', device: { platform: 'web', model: 'Chrome 140', osVersion: 'macOS' } },
     });
     expect(ticket.statusCode).toBe(201);
 

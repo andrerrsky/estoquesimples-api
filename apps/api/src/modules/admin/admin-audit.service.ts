@@ -11,6 +11,10 @@ import type { Database, Transaction } from '../../platform/db/client.js';
 export const AdminAction = {
   ADMIN_LOGGED_IN: 'admin.logged_in',
   ADMIN_LOGIN_FAILED: 'admin.login_failed',
+  ADMIN_MFA_ENABLED: 'admin.mfa_enabled',
+  ADMIN_MFA_DISABLED: 'admin.mfa_disabled',
+  ADMIN_MFA_RESET: 'admin.mfa_reset',
+  ADMIN_MFA_RECOVERY_USED: 'admin.mfa_recovery_used',
   ADMIN_LOGGED_OUT: 'admin.logged_out',
   ADMIN_CREATED: 'admin.created',
   ADMIN_UPDATED: 'admin.updated',

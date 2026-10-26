@@ -1,32 +1,67 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 /**
- * Proteção dos purchase tokens do Google Play em repouso.
+ * Cifra de segredos em repouso (purchase tokens do Google Play, chave da
+ * OpenAI, chaves VAPID, segredo TOTP do painel, configurações do blog).
  *
  * - `hash`: SHA-256 hex para unicidade e busca (não reversível).
- * - `encrypt`/`decrypt`: AES-256-GCM; o blob guarda versão + IV + ciphertext + tag.
- *
- * Prefixo `v0:` é legado da migration 0008 (texto ainda em claro durante a
- * transição local). Em qualquer escrita nova grava-se só `v1:`.
+ * - `encrypt`/`decrypt`: AES-256-GCM com chaveiro. O blob é
+ *   `v2:<kid>:<iv|ciphertext|tag>`; `kid` diz qual chave cifrou, então dá
+ *   para trocar a chave ativa sem perder o que já estava gravado (ver
+ *   scripts/reencrypt-secrets.ts e docs/seguranca.md). `aad` (dados
+ *   associados) amarra o valor ao lugar onde ele mora: um blob copiado de
+ *   outra linha ou configuração não decifra.
+ * - `v1:` é o formato anterior (sem kid, sem AAD), decifrado com a chave
+ *   `k1`; `v0:` é legado da migration 0008 (texto em claro).
  */
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 const KEY_LENGTH = 32;
+const VERSION_V2 = 'v2';
 const VERSION_V1 = 'v1';
 const VERSION_V0_PLAIN = 'v0';
+/** Kid da chave do formato v1 (PURCHASE_TOKEN_ENCRYPTION_KEY). */
+export const LEGACY_KID = 'k1';
+
+export interface Keyring {
+  keys: Map<string, Buffer>;
+  activeKid: string;
+  /**
+   * Aceita os formatos antigos (`v0` em claro, `v1` sem AAD). Desligado
+   * (SECRETS_ALLOW_LEGACY=false) depois de `secrets:reencrypt`: quem tiver
+   * escrita no banco não consegue plantar um valor em claro.
+   */
+  allowLegacy?: boolean;
+}
+
+/** AAD de um purchase token do Google Play: amarrado ao hash dele (gravado ao lado). */
+export function purchaseTokenAad(hash: string): string {
+  return `purchase_token:${hash}`;
+}
+
+/** AAD de uma linha de `admin_settings`. */
+export function settingAad(key: string): string {
+  return `admin_settings:${key}`;
+}
 
 export class PurchaseTokenCipher {
-  private readonly key: Buffer;
+  private readonly keys: Map<string, Buffer>;
+  private readonly activeKid: string;
+  private readonly allowLegacy: boolean;
 
-  constructor(keyMaterial: Buffer) {
-    if (keyMaterial.length !== KEY_LENGTH) {
-      throw new Error(
-        `PURCHASE_TOKEN_ENCRYPTION_KEY deve ter ${KEY_LENGTH} bytes (recebeu ${keyMaterial.length}). ` +
-          'Gere com: openssl rand -base64 32',
-      );
+  constructor(material: Buffer | Keyring) {
+    const ring: Keyring = Buffer.isBuffer(material) ? { keys: new Map([[LEGACY_KID, material]]), activeKid: LEGACY_KID } : material;
+    for (const [kid, key] of ring.keys) {
+      if (key.length !== KEY_LENGTH) {
+        throw new Error(`Chave de cifra "${kid}" deve ter ${KEY_LENGTH} bytes (recebeu ${key.length}). Gere com: openssl rand -base64 32`);
+      }
+      if (!/^[a-z0-9]{1,16}$/i.test(kid)) throw new Error(`Identificador de chave inválido: "${kid}".`);
     }
-    this.key = keyMaterial;
+    if (!ring.keys.has(ring.activeKid)) throw new Error(`A chave ativa "${ring.activeKid}" não está no chaveiro.`);
+    this.keys = ring.keys;
+    this.activeKid = ring.activeKid;
+    this.allowLegacy = ring.allowLegacy ?? true;
   }
 
   /** Identificador estável para UNIQUE e lookups. */
@@ -34,41 +69,86 @@ export class PurchaseTokenCipher {
     return createHash('sha256').update(token, 'utf8').digest('hex');
   }
 
-  encrypt(token: string): string {
+  encrypt(plaintext: string, aad?: string): string {
     const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+    const cipher = createCipheriv(ALGORITHM, this.keys.get(this.activeKid)!, iv);
+    if (aad) cipher.setAAD(Buffer.from(aad, 'utf8'));
+    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
     const packed = Buffer.concat([iv, ciphertext, tag]);
-    return `${VERSION_V1}:${packed.toString('base64url')}`;
+    return `${VERSION_V2}:${this.activeKid}:${packed.toString('base64url')}`;
   }
 
-  decrypt(blob: string): string {
+  /**
+   * @param aad o mesmo do `encrypt`; valor v2 cifrado com AAD não abre sem ele.
+   * @param options.requireCurrentFormat recusa v0/v1 mesmo com o legado
+   *   permitido (segredos que nunca existiram no formato antigo, como o TOTP).
+   */
+  decrypt(blob: string, aad?: string, options: { requireCurrentFormat?: boolean } = {}): string {
+    const legacyOk = this.allowLegacy && !options.requireCurrentFormat;
+    if (!blob.startsWith(`${VERSION_V2}:`) && !legacyOk) {
+      throw new Error('Valor cifrado em formato antigo recusado (SECRETS_ALLOW_LEGACY=false ou segredo que só existe no formato atual).');
+    }
     if (blob.startsWith(`${VERSION_V0_PLAIN}:`)) {
       return blob.slice(VERSION_V0_PLAIN.length + 1);
     }
-
-    if (!blob.startsWith(`${VERSION_V1}:`)) {
-      throw new Error('Blob de purchase token com versão desconhecida.');
+    let kid: string;
+    let payload: string;
+    let useAad = false;
+    if (blob.startsWith(`${VERSION_V2}:`)) {
+      const rest = blob.slice(VERSION_V2.length + 1);
+      const sep = rest.indexOf(':');
+      if (sep <= 0) throw new Error('Blob cifrado inválido.');
+      kid = rest.slice(0, sep);
+      payload = rest.slice(sep + 1);
+      useAad = true;
+    } else if (blob.startsWith(`${VERSION_V1}:`)) {
+      kid = LEGACY_KID;
+      payload = blob.slice(VERSION_V1.length + 1);
+    } else {
+      throw new Error('Blob cifrado com versão desconhecida.');
     }
+    const key = this.keys.get(kid);
+    if (!key) throw new Error(`Chave "${kid}" ausente do chaveiro: não dá para decifrar.`);
 
-    const packed = Buffer.from(blob.slice(VERSION_V1.length + 1), 'base64url');
+    const packed = Buffer.from(payload, 'base64url');
     if (packed.length < IV_LENGTH + TAG_LENGTH + 1) {
-      throw new Error('Blob de purchase token inválido.');
+      throw new Error('Blob cifrado inválido.');
     }
-
     const iv = packed.subarray(0, IV_LENGTH);
     const tag = packed.subarray(packed.length - TAG_LENGTH);
     const ciphertext = packed.subarray(IV_LENGTH, packed.length - TAG_LENGTH);
-    const decipher = createDecipheriv(ALGORITHM, this.key, iv);
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    if (useAad && aad) decipher.setAAD(Buffer.from(aad, 'utf8'));
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
   }
 
-  /** True quando o valor ainda está no envelope legado da migration. */
+  /** True quando o valor não está no formato atual com a chave ativa (texto legado, v1 ou outra chave). */
   needsReencrypt(blob: string): boolean {
-    return blob.startsWith(`${VERSION_V0_PLAIN}:`);
+    return !blob.startsWith(`${VERSION_V2}:${this.activeKid}:`);
   }
+}
+
+/**
+ * Chaveiro a partir do ambiente: SECRETS_ENCRYPTION_KEYS ("k1:base64,k2:base64")
+ * com SECRETS_ACTIVE_KID; sem ele, só PURCHASE_TOKEN_ENCRYPTION_KEY como `k1`.
+ * A chave do formato v1 é sempre a `k1`.
+ */
+export function keyringFromEnv(
+  env: { SECRETS_ENCRYPTION_KEYS?: string | undefined; SECRETS_ACTIVE_KID?: string | undefined; PURCHASE_TOKEN_ENCRYPTION_KEY?: string | undefined; SECRETS_ALLOW_LEGACY?: boolean | undefined },
+  fallback: Buffer,
+): Keyring {
+  const keys = new Map<string, Buffer>();
+  if (env.PURCHASE_TOKEN_ENCRYPTION_KEY) keys.set(LEGACY_KID, decodePurchaseTokenKey(env.PURCHASE_TOKEN_ENCRYPTION_KEY));
+  for (const entry of (env.SECRETS_ENCRYPTION_KEYS ?? '').split(',').map((item) => item.trim()).filter(Boolean)) {
+    const sep = entry.indexOf(':');
+    if (sep <= 0) throw new Error('SECRETS_ENCRYPTION_KEYS: use o formato kid:base64,kid:base64');
+    keys.set(entry.slice(0, sep), decodePurchaseTokenKey(entry.slice(sep + 1)));
+  }
+  if (keys.size === 0) keys.set(LEGACY_KID, fallback);
+  const activeKid = env.SECRETS_ACTIVE_KID ?? (env.SECRETS_ENCRYPTION_KEYS ? [...keys.keys()].at(-1)! : LEGACY_KID);
+  return { keys, activeKid, allowLegacy: env.SECRETS_ALLOW_LEGACY ?? true };
 }
 
 /** Remove campos que espelhariam o token em JSON persistido. */

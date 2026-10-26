@@ -1,0 +1,144 @@
+name: Backup externo
+
+# Toda noite: cópia do Postgres e das fotos fora do Railway, com restauração
+# de teste do dump antes de guardá-lo. Liga quando a variável do repositório
+# BACKUP_OFFSITE_ENABLED for "true" — passo a passo em docs/seguranca.md
+# ("Backup e restauração"). A lógica está em scripts/backup-offsite.sh e é
+# exercitada a cada PR por backup-offsite-test.yml (S3 local, LocalStack).
+#
+# Segredos (Settings → Secrets and variables → Actions):
+#   BACKUP_DATABASE_URL      Postgres de produção, usuário SÓ DE LEITURA, terminando em ?sslmode=require
+#   BACKUP_AGE_RECIPIENT     chave pública `age` (a privada fica fora do GitHub e do Railway)
+#   BACKUP_S3_ENDPOINT / BACKUP_S3_REGION   provedor dos buckets de backup (AWS S3 ou Backblaze B2)
+#   BACKUP_S3_BUCKET         bucket dos DUMPS, com Object Lock (retenção padrão 35 dias)
+#   BACKUP_S3_ACCESS_KEY_ID / BACKUP_S3_SECRET_ACCESS_KEY        chave dos dumps: listar, ler e gravar, SEM apagar
+#   BACKUP_IMAGES_BUCKET     bucket da cópia das FOTOS (versionamento; no B2, Object Lock)
+#   BACKUP_IMAGES_ACCESS_KEY_ID / BACKUP_IMAGES_SECRET_ACCESS_KEY  chave da cópia das fotos
+#   IMAGES_S3_ENDPOINT / IMAGES_S3_BUCKET / IMAGES_S3_ACCESS_KEY_ID / IMAGES_S3_SECRET_ACCESS_KEY  leitura do bucket das fotos
+#   API_BASE_URL / OPS_BACKUP_TOKEN   registram o resultado em /ops/backup (token que só faz isso)
+# Variável: BACKUP_IMAGES_VERSIONING_CONFIRMED=true quando o provedor não informa o versionamento pela API (B2).
+#
+# Credenciais ficam só no passo que as usa. Os passos com as chaves dos
+# buckets (dump, envio, fotos) rodam antes de qualquer código do npm entrar
+# no runner; a restauração de teste e o registro vêm por último.
+on:
+  schedule:
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-offsite
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: vars.BACKUP_OFFSITE_ENABLED == 'true'
+    runs-on: ubuntu-24.04  # fixo: a instalação das ferramentas depende da versão do Ubuntu
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: estoque
+          POSTGRES_PASSWORD: estoque
+          POSTGRES_DB: restauracao
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U estoque"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      WORKDIR: ${{ github.workspace }}/.backup-offsite
+      DUMPS_REMOTE: backup:${{ secrets.BACKUP_S3_BUCKET }}
+      IMAGES_SOURCE: imagens:${{ secrets.IMAGES_S3_BUCKET }}
+      IMAGES_DEST: backupimg:${{ secrets.BACKUP_IMAGES_BUCKET }}
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # Cópia do script fora do workspace. A proteção de verdade é a ordem dos
+      # passos: dump, envio e fotos (com as chaves dos buckets) rodam antes de
+      # qualquer código do npm; só a restauração de teste e o registro (com o
+      # token de backup, que só registra) vêm depois.
+      - name: Guardar o script do backup
+        run: |
+          install -m 0555 scripts/backup-offsite.sh "$RUNNER_TEMP/backup-offsite.sh"
+          echo "BACKUP_SH=$RUNNER_TEMP/backup-offsite.sh" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Ferramentas (cliente do Postgres 16, age, rclone)
+        run: bash scripts/install-backup-tools.sh
+
+      - name: Conferir configuração
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: bash "$BACKUP_SH" check
+
+      - name: Dump do Postgres de produção (somente leitura)
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: bash "$BACKUP_SH" dump
+
+      - name: Cifrar, enviar e conferir o dump
+        env:
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+          RCLONE_CONFIG_BACKUP_TYPE: s3
+          RCLONE_CONFIG_BACKUP_PROVIDER: Other
+          RCLONE_CONFIG_BACKUP_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+        run: bash "$BACKUP_SH" upload
+
+      - name: Espelhar as fotos dos produtos
+        env:
+          VERSIONING_CONFIRMED: ${{ vars.BACKUP_IMAGES_VERSIONING_CONFIRMED }}
+          RCLONE_CONFIG_BACKUPIMG_TYPE: s3
+          RCLONE_CONFIG_BACKUPIMG_PROVIDER: Other
+          RCLONE_CONFIG_BACKUPIMG_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          RCLONE_CONFIG_BACKUPIMG_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          RCLONE_CONFIG_BACKUPIMG_ACCESS_KEY_ID: ${{ secrets.BACKUP_IMAGES_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_BACKUPIMG_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_IMAGES_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_IMAGENS_TYPE: s3
+          RCLONE_CONFIG_IMAGENS_PROVIDER: Other
+          RCLONE_CONFIG_IMAGENS_ENDPOINT: ${{ secrets.IMAGES_S3_ENDPOINT }}
+          RCLONE_CONFIG_IMAGENS_ACCESS_KEY_ID: ${{ secrets.IMAGES_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_IMAGENS_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_S3_SECRET_ACCESS_KEY }}
+        run: bash "$BACKUP_SH" photos
+
+      # Só agora o código do npm entra no runner (sem scripts de instalação).
+      - run: npm ci --ignore-scripts
+
+      - name: Restaurar e conferir (depois do envio; o registro só vem se passar)
+        env:
+          DESTINO: postgres://estoque:estoque@localhost:5432/restauracao
+        run: bash "$BACKUP_SH" verify
+
+      - name: Registrar em /ops/backup
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          OPS_BACKUP_TOKEN: ${{ secrets.OPS_BACKUP_TOKEN }}
+        run: bash "$BACKUP_SH" register
+
+      # Backup guardado e registrado; se a produção está atrás do main
+      # (migration sem deploy), o job fica vermelho para alguém olhar o deploy.
+      - name: Produção atrás do repositório?
+        run: bash "$BACKUP_SH" finish
+
+      - name: Apagar cópias locais
+        if: always()
+        run: bash "$BACKUP_SH" cleanup

@@ -296,7 +296,7 @@ describe('aceite por quem ainda não tem conta', () => {
       payload: {
         name: 'Pessoa Convidada',
         password: VALID_PASSWORD,
-        device: { installId: 'convidado-install-1', platform: 'android' },
+        device: { installId: 'convidado-install-1-0000000000000000', platform: 'android' },
       },
     });
 

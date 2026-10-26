@@ -11,6 +11,10 @@ export interface AdminMe {
   email: string;
   name: string;
   role: AdminRole;
+  /** Segundo fator (TOTP) ativo para este administrador. */
+  mfaEnabled: boolean;
+  /** O painel exige segundo fator: sem ele, só a tela de segurança abre. */
+  mfaRequired: boolean;
 }
 
 const RANK: Record<AdminRole, number> = { viewer: 10, support: 50, owner: 100 };
@@ -18,7 +22,9 @@ const RANK: Record<AdminRole, number> = { viewer: 10, support: 50, owner: 100 };
 interface AuthState {
   admin: AdminMe | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, code?: string) => Promise<void>;
+  /** Relê o administrador (depois de ativar ou desativar o segundo fator). */
+  refresh: () => Promise<void>;
   logout: () => Promise<void>;
   can: (minimum: AdminRole) => boolean;
 }
@@ -57,10 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await api.post<{ admin: AdminMe }>('/auth/login', { email, password });
-    setAdmin(result.admin);
-    gaEvent('login', { method: 'painel', role: result.admin.role });
+  const login = useCallback(async (email: string, password: string, code?: string) => {
+    await api.post('/auth/login', { email, password, ...(code ? { code } : {}) });
+    const me = await api.get<AdminMe>('/auth/me');
+    setAdmin(me);
+    gaEvent('login', { method: 'painel', role: me.role });
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setAdmin(await api.get<AdminMe>('/auth/me'));
   }, []);
 
   const logout = useCallback(async () => {
@@ -80,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [admin],
   );
 
-  const value = useMemo(() => ({ admin, loading, login, logout, can }), [admin, loading, login, logout, can]);
+  const value = useMemo(() => ({ admin, loading, login, logout, can, refresh }), [admin, loading, login, logout, can, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

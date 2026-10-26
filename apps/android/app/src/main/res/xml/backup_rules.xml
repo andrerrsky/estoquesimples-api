@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup do Android (até o 11). O estoque local (banco "estoque") entra:
+     é o que permite recuperar um aparelho perdido mesmo sem conta na nuvem.
+     Sessão, login lembrado e direitos do plano ficam de fora: são cifrados
+     com uma chave do Keystore que não viaja para outro aparelho (restaurados,
+     não abririam) e não devem sair do aparelho de qualquer forma. -->
+<full-backup-content>
+    <include domain="database" path="estoque" />
+    <include domain="database" path="estoque-wal" />
+    <include domain="database" path="estoque-shm" />
+    <exclude domain="sharedpref" path="estoque_sessao.xml" />
+    <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
+    <exclude domain="sharedpref" path="estoque_direitos.xml" />
+    <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />
+</full-backup-content>

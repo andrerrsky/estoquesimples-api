@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import { stat, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 import pg from 'pg';
@@ -13,7 +13,8 @@ import { loadMigrations } from './migrate.js';
  * hora de descobrir que o arquivo está truncado não é durante um incidente.
  * Este script restaura um dump num banco descartável, confere que as tabelas
  * essenciais vieram com conteúdo e registra o resultado na API, para que a
- * ausência de uma verificação recente apareça no plantão.
+ * ausência de uma verificação recente apareça no plantão (o registro em si é
+ * feito por scripts/backup-offsite.sh, depois de a cópia estar guardada).
  *
  * Uso:
  *   npm run backup:verify -- --dump caminho/do/arquivo.dump --target postgres://...
@@ -38,8 +39,10 @@ const IDENTIFICADOR_SIMPLES = /^[a-z_][a-z0-9_]*$/;
 interface Argumentos {
   dump: string;
   target: string;
-  apiUrl: string | undefined;
-  opsToken: string | undefined;
+  /** Grava o resultado em JSON (o workflow registra na API só depois de enviar o dump). */
+  reportFile: string | undefined;
+  /** Aceita dump com migrations atrás do repositório (deploy pendente); o relatório marca `schemaAtras`. */
+  schemaAtrasOk: boolean;
 }
 
 interface Endereco {
@@ -108,32 +111,44 @@ function lerArgumentos(): Argumentos {
   return {
     dump,
     target,
-    apiUrl: valor('api') ?? process.env['API_BASE_URL'],
-    opsToken: process.env['OPS_TOKEN'],
+    reportFile: valor('report-file'),
+    schemaAtrasOk: process.argv.includes('--schema-atras-ok'),
   };
 }
 
 /**
- * O dump traz GRANTs para `app_user`, e o papel é do cluster, não do banco.
- * Se ele não existir no alvo, cada GRANT falha e — com `--single-transaction` —
- * a restauração inteira é abortada.
+ * Papéis citados nos GRANTs e privilégios padrão do dump (`app_user`, o dono
+ * das tabelas em produção, eventuais usuários de leitura). Papel é do
+ * cluster, não do banco: se faltar no alvo, cada GRANT falha e — com
+ * `--single-transaction` — a restauração inteira é abortada.
  */
-async function garantirPapelApp(target: string): Promise<void> {
+export async function papeisDoDump(dump: string): Promise<string[]> {
+  const binario = process.env['PG_RESTORE_BIN'] ?? 'pg_restore';
+  const { stdout } = await executar(binario, ['--file=-', '--schema-only', dump], { maxBuffer: 256 * 1024 * 1024 });
+  const papeis = new Set<string>(['app_user']);
+  for (const linha of stdout.split('\n')) {
+    if (!/^(GRANT|REVOKE|ALTER DEFAULT PRIVILEGES)\b/.test(linha)) continue;
+    for (const m of linha.matchAll(/\b(?:TO|FROM|FOR ROLE)\s+((?:"[^"]+"|[a-zA-Z_][\w$]*)(?:\s*,\s*(?:"[^"]+"|[a-zA-Z_][\w$]*))*)/g)) {
+      for (const nome of m[1]!.split(',').map((item) => item.trim().replace(/^"|"$/g, ''))) {
+        if (nome && nome.toUpperCase() !== 'PUBLIC') papeis.add(nome);
+      }
+    }
+  }
+  return [...papeis].sort();
+}
+
+/** Cria, sem login, os papéis do dump que o alvo não tem (ver `papeisDoDump`). */
+async function garantirPapeis(target: string, papeis: string[]): Promise<void> {
   const client = new pg.Client({ connectionString: target });
   await client.connect();
   try {
-    await client.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
-          CREATE ROLE app_user NOLOGIN;
-        END IF;
-      END
-      $$
-    `);
+    for (const papel of papeis) {
+      const existe = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [papel]);
+      if (existe.rowCount === 0) await client.query(`CREATE ROLE "${papel.replace(/"/g, '""')}" NOLOGIN`);
+    }
   } catch (error) {
     throw new Error(
-      'Não foi possível garantir o papel app_user no alvo. Sem ele os GRANTs do dump ' +
+      'Não foi possível criar os papéis citados no dump. Sem eles os GRANTs ' +
         `falham e o exercício não prova nada: ${(error as Error).message}`,
     );
   } finally {
@@ -176,7 +191,7 @@ interface Conferencia {
   migracao: number;
 }
 
-async function conferir(target: string): Promise<Conferencia> {
+async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean; migracoesAtras: number; schemaAFrente: boolean; migracoesAFrente: number }> {
   const client = new pg.Client({ connectionString: target });
   await client.connect();
 
@@ -266,7 +281,20 @@ async function conferir(target: string): Promise<Conferencia> {
     );
     const ultimaRestaurada = Number(migracao.rows[0]?.maior ?? 0);
 
-    if (ultimaRestaurada !== ultimaEsperada) {
+    // Dump mais novo que o código: algo está muito errado (outro banco?).
+    // Dump à frente do repositório: migration aplicada antes do merge (hotfix
+    // de outra branch, revert no main) ou banco errado. Com --schema-atras-ok
+    // o dump também é guardado e o relatório marca; sem, é erro.
+    if (ultimaRestaurada > ultimaEsperada && !schemaAtrasOk) {
+      throw new Error(`O dump está na migration ${ultimaRestaurada}, à frente do repositório (${ultimaEsperada}).`);
+    }
+    // Dump atrás do repositório: normal entre o merge de uma migration e o
+    // deploy. Com --schema-atras-ok o backup vale (é o estado real da
+    // produção) e o relatório avisa; sem, é erro como antes.
+    // Com --schema-atras-ok o dump é aceito em qualquer atraso (é o estado real
+    // da produção e precisa ser guardado); o relatório marca o atraso e o
+    // workflow falha no fim. A API compara com a própria migration e alerta.
+    if (ultimaRestaurada < ultimaEsperada && !schemaAtrasOk) {
       throw new Error(
         `O dump está na migration ${ultimaRestaurada} e o repositório está na ` +
           `${ultimaEsperada}. O backup não reconstrói o ambiente atual.`,
@@ -274,6 +302,10 @@ async function conferir(target: string): Promise<Conferencia> {
     }
 
     return {
+      schemaAtras: ultimaRestaurada < ultimaEsperada,
+      migracoesAtras: Math.max(0, ultimaEsperada - ultimaRestaurada),
+      schemaAFrente: ultimaRestaurada > ultimaEsperada,
+      migracoesAFrente: Number((await client.query<{ total: string }>('SELECT count(*)::text AS total FROM schema_migrations WHERE version > $1', [ultimaEsperada])).rows[0]?.total ?? 0),
       tabelas: Number(tabelas.rows[0]?.total ?? 0),
       registros,
       politicas: Number(politicas.rows[0]?.total ?? 0),
@@ -285,28 +317,6 @@ async function conferir(target: string): Promise<Conferencia> {
   }
 }
 
-async function registrar(
-  config: Argumentos,
-  resultado: { tabelas: number; registros: number; duracaoSegundos: number },
-): Promise<void> {
-  if (!config.apiUrl || !config.opsToken) {
-    console.log('API_BASE_URL ou OPS_TOKEN ausentes: resultado não registrado na API.');
-    return;
-  }
-
-  const resposta = await fetch(`${config.apiUrl}/ops/backup`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${config.opsToken}`,
-    },
-    body: JSON.stringify({ origem: config.dump, ...resultado }),
-  });
-
-  if (!resposta.ok) {
-    throw new Error(`Falha ao registrar a verificação: ${resposta.status}`);
-  }
-}
 
 async function main(): Promise<void> {
   const config = lerArgumentos();
@@ -314,10 +324,10 @@ async function main(): Promise<void> {
   const inicio = Date.now();
 
   console.log(`Restaurando ${config.dump} (${Math.round(arquivo.size / 1024)} KiB)...`);
-  await garantirPapelApp(config.target);
+  await garantirPapeis(config.target, await papeisDoDump(config.dump));
   await restaurar(config.dump, config.target);
 
-  const { tabelas, registros, politicas, grants, migracao } = await conferir(config.target);
+  const { tabelas, registros, politicas, grants, migracao, schemaAtras, migracoesAtras, schemaAFrente, migracoesAFrente } = await conferir(config.target, config.schemaAtrasOk);
   const duracaoSegundos = Math.round((Date.now() - inicio) / 100) / 10;
 
   console.log(
@@ -326,7 +336,11 @@ async function main(): Promise<void> {
       `migration ${migracao}, ${duracaoSegundos}s de restauração.`,
   );
 
-  await registrar(config, { tabelas, registros, duracaoSegundos });
+  if (config.reportFile) {
+    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras, schemaAFrente, migracoesAFrente }));
+  }
+  // O registro em /ops/backup é feito pelo workflow, só depois de guardar a cópia
+  // (scripts/backup-offsite.sh): verificar não é o mesmo que ter backup.
 }
 
 main().catch((error: unknown) => {

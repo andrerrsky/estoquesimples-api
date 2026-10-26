@@ -9,6 +9,7 @@ import type { FcmClient } from '../../modules/push/fcm-client.js';
 import type { WebPushClient } from '../../modules/push/web-push-client.js';
 import type { AsaasClient } from '../../modules/billing/asaas/asaas-client.js';
 import type { ObjectStorage } from '../storage/object-storage.js';
+import type { LoginThrottle } from './login-throttle.js';
 
 /**
  * Container de dependências da aplicação.
@@ -34,6 +35,8 @@ export interface AppServices {
   asaas: AsaasClient;
   /** Armazenamento de objetos das imagens (bucket S3, disco em dev); `configured` diz se está disponível. */
   storage: ObjectStorage;
+  /** Freio de tentativas de login (por conta e IP) e de pedidos por e-mail; ver login-throttle.ts. */
+  throttle: LoginThrottle;
   /**
    * Logger de processos que rodam fora de uma requisição (fila de tarefas,
    * reconciliação). Dentro de uma rota, prefira `request.log`, que já carrega

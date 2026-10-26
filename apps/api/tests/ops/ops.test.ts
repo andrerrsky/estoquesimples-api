@@ -123,6 +123,8 @@ describe('métricas', () => {
 
 describe('retrato do sistema', () => {
   it('responde sem alertas num banco saudável', async () => {
+    // Banco saudável inclui backup restaurado recentemente (senão o alerta backup_desatualizado dispara).
+    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1, fotos: 3 } });
     const response = await context.app.inject({
       method: 'GET',
       url: '/ops/status',
@@ -189,6 +191,8 @@ describe('retrato do sistema', () => {
   });
 
   it('o vigia enxerga exatamente o que o endpoint mostra', async () => {
+    // Banco saudável inclui backup restaurado recentemente (senão o alerta backup_desatualizado dispara).
+    await context.app.inject({ method: 'POST', url: '/ops/backup', headers: auth, payload: { origem: 'teste', tabelas: 1, registros: 1, duracaoSegundos: 1, fotos: 3 } });
     const service = new OpsService(context.services);
     const snapshot = await service.snapshot();
     expect(service.alertas(snapshot)).toEqual([]);
@@ -274,5 +278,58 @@ describe('verificação de backup', () => {
     expect(consulta.json().dentroDoPrazo).toBe(true);
     expect(consulta.json().detalhes.registros).toBe(1200);
     expect(consulta.json().horasDesdeVerificacao).toBe(0);
+  });
+});
+
+describe('token de backup (OPS_BACKUP_TOKEN)', () => {
+  const BACKUP_TOKEN = 'token-so-de-backup-com-tamanho-suficiente';
+  let backupContext: TestContext;
+  const backupAuth = { authorization: `Bearer ${BACKUP_TOKEN}` };
+
+  beforeAll(async () => {
+    backupContext = await createTestApp({ OPS_TOKEN, OPS_BACKUP_TOKEN: BACKUP_TOKEN });
+  });
+
+  afterAll(async () => {
+    await backupContext.close();
+  });
+
+  it('registra a restauração com o corpo exato que o workflow monta', async () => {
+    // Mesmo formato do --report-file do verify-backup + objeto e hash do envio (backup-offsite.yml).
+    const report = { tabelas: 48, registros: 5, duracaoSegundos: 0.9, migracao: 23 };
+    const payload = { origem: 'backup-offsite', ...report, objeto: 'db/2026/10/25/estoquesimples-20261025T053000Z.dump.age', sha256: 'a'.repeat(64) };
+    const response = await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload });
+    expect(response.statusCode).toBe(200);
+
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/backup', headers: auth });
+    expect(status.json().dentroDoPrazo).toBe(true);
+    expect(status.json().detalhes.objeto).toBe(payload.objeto);
+  });
+
+  it('avisa quando o dump guardado está numa migration diferente da que a API roda', async () => {
+    const payload = { origem: 'backup-offsite', tabelas: 1, registros: 1, duracaoSegundos: 1, migracao: 1 };
+    expect((await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload })).statusCode).toBe(200);
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/status', headers: auth });
+    expect(status.json().alertas.map((alerta: { nome: string }) => alerta.nome)).toContain('backup_schema_divergente');
+  });
+
+  it('avisa quando o backup chega sem a contagem das fotos', async () => {
+    const payload = { origem: 'backup-offsite', tabelas: 1, registros: 1, duracaoSegundos: 1 };
+    expect((await backupContext.app.inject({ method: 'POST', url: '/ops/backup', headers: backupAuth, payload })).statusCode).toBe(200);
+    const status = await backupContext.app.inject({ method: 'GET', url: '/ops/status', headers: auth });
+    const nomes = status.json().alertas.map((alerta: { nome: string }) => alerta.nome);
+    expect(nomes).toContain('backup_sem_fotos');
+  });
+
+  it('não abre mais nada além do registro de backup', async () => {
+    for (const [method, url, payload] of [
+      ['GET', '/ops/backup', undefined],
+      ['GET', '/ops/status', undefined],
+      ['GET', '/metrics', undefined],
+      ['PUT', '/ops/config/sync', { enabled: false, minAppVersionCode: 999999 }],
+    ] as const) {
+      const response = await backupContext.app.inject({ method, url, headers: backupAuth, ...(payload ? { payload } : {}) });
+      expect(response.statusCode, `${method} ${url}`).toBe(401);
+    }
   });
 });

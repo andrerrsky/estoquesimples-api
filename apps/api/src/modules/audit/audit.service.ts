@@ -17,6 +17,8 @@ export const AuditAction = {
   USER_PASSWORD_RESET_COMPLETED: 'user.password_reset_completed',
   USER_EMAIL_VERIFIED: 'user.email_verified',
   USER_DELETION_REQUESTED: 'user.deletion_requested',
+  USER_PURGED: 'user.purged',
+  USER_DATA_EXPORTED: 'user.data_exported',
   USER_TOKEN_REUSE_DETECTED: 'user.token_reuse_detected',
   DEVICE_REGISTERED: 'device.registered',
   DEVICE_REVOKED: 'device.revoked',

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup na nuvem e transferência entre aparelhos (Android 12+): mesmas
+     regras de backup_rules.xml. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="estoque" />
+        <include domain="database" path="estoque-wal" />
+        <include domain="database" path="estoque-shm" />
+        <exclude domain="sharedpref" path="estoque_sessao.xml" />
+        <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
+        <exclude domain="sharedpref" path="estoque_direitos.xml" />
+        <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="estoque" />
+        <include domain="database" path="estoque-wal" />
+        <include domain="database" path="estoque-shm" />
+        <exclude domain="sharedpref" path="estoque_sessao.xml" />
+        <exclude domain="sharedpref" path="estoque_login_lembrado.xml" />
+        <exclude domain="sharedpref" path="estoque_direitos.xml" />
+        <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />
+    </device-transfer>
+</data-extraction-rules>

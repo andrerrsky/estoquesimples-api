@@ -10,6 +10,7 @@ import { EventsPage } from './pages/EventsPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
 import { BlogPage } from './pages/BlogPage';
 import { HelpPage } from './pages/HelpPage';
+import { SecurityPage } from './pages/SecurityPage';
 import { LoginPage } from './pages/LoginPage';
 import { OpsPage } from './pages/OpsPage';
 import { OverviewPage } from './pages/OverviewPage';
@@ -36,6 +37,8 @@ function RequireAuth() {
     );
   }
   if (!admin) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // Segundo fator obrigatório e ainda não cadastrado: só a tela de segurança.
+  if (admin.mfaRequired && !admin.mfaEnabled) return <SecurityPage forced />;
   return (
     <>
       <Shell>
@@ -85,6 +88,7 @@ export const router = createBrowserRouter(
         { path: '/blog/novo', element: <BlogEditorPage /> },
         { path: '/blog/:postId', element: <BlogEditorPage /> },
         { path: '/ajuda', element: <HelpPage /> },
+        { path: '/seguranca', element: <SecurityPage /> },
         { path: '*', element: <NotFound /> },
       ],
     },

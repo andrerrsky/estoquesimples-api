@@ -10,7 +10,10 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
-import { randomUUID } from 'node:crypto';
+import { hkdfSync, randomUUID } from 'node:crypto';
+
+import type { Env } from '../config/env.js';
+import { clientKey } from './login-throttle.js';
 
 import { registerAdminRoutes } from '../../modules/admin/admin.routes.js';
 import { adminAuthPlugin } from '../../modules/admin/admin-auth.plugin.js';
@@ -33,6 +36,7 @@ import { registerSyncRoutes } from '../../modules/sync/sync.routes.js';
 import { registerOpsRoutes } from '../../modules/ops/ops.routes.js';
 import { registerHealthRoutes } from '../../modules/platform-routes/health.routes.js';
 import { registerUserRoutes } from '../../modules/users/users.routes.js';
+import { registerPrivacyRoutes } from '../../modules/privacy/privacy.routes.js';
 import { registerWorkspaceRoutes } from '../../modules/workspaces/workspaces.routes.js';
 import { authenticatePlugin } from './authenticate.js';
 import { registerErrorHandler } from './error-handler.js';
@@ -42,29 +46,53 @@ import { metricsPlugin } from '../observability/metrics-plugin.js';
 import { AppError, ErrorCode } from './errors.js';
 import type { AppServices } from './context.js';
 
+/** Faixas de rede privada de onde vêm os proxies da hospedagem. */
+const PRIVATE_PROXY_RANGES = ['loopback', 'linklocal', 'uniquelocal', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10'];
+
+/**
+ * Proxies confiáveis (ver TRUST_PROXY em env.ts). Padrão: as faixas privadas
+ * em produção; nenhum fora dela. Sem isso, atrás da borda todo pedido
+ * anônimo pareceria vir do mesmo IP e o limite por IP viraria global.
+ */
+function resolveTrustProxy(env: Env): boolean | string[] {
+  const raw = env.TRUST_PROXY?.trim();
+  if (!raw) return env.NODE_ENV === 'production' ? PRIVATE_PROXY_RANGES : false;
+  if (raw === 'false') return false;
+  if (raw === 'private') return PRIVATE_PROXY_RANGES;
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+/**
+ * Segredo que assina o cookie do painel. Sem ADMIN_COOKIE_SECRET, em
+ * produção ele é derivado (HKDF) da chave privada do JWT, que é obrigatória
+ * ali: nunca é aleatório, então as sessões sobrevivem a um restart e o
+ * valor muda junto com a rotação da chave. Fora de produção, aleatório.
+ */
+function adminCookieSecret(env: Env): string {
+  if (env.ADMIN_COOKIE_SECRET) return env.ADMIN_COOKIE_SECRET;
+  if (env.JWT_PRIVATE_KEY) {
+    return Buffer.from(hkdfSync('sha256', env.JWT_PRIVATE_KEY, 'estoquesimples', 'admin-cookie-secret', 48)).toString('base64url');
+  }
+  return randomUUID() + randomUUID();
+}
+
 export async function buildServer(services: AppServices): Promise<FastifyInstance> {
   const { env } = services;
+  const production = env.NODE_ENV === 'production';
 
   const app = Fastify({
     logger: buildLoggerOptions(env),
     bodyLimit: env.BODY_LIMIT_BYTES,
-    // `trustProxy` numérico (contagem de hops) foi neutralizado pelo próprio
-    // Fastify a partir da correção de GHSA-3m5p-2c4r-xxw2: contagem de hops
-    // não consegue validar o peer imediato, então qualquer número agora
-    // resolve para "não confiar em X-Forwarded-*" (equivalente a `false`).
-    // `request.ip` passa a ser sempre o IP do socket — nunca aceita o que o
-    // cliente manda no cabeçalho, então não há mais risco de spoofing.
-    //
-    // Efeito colateral: se a borda de proxy da hospedagem (ex.: Railway) não
-    // preservar o IP real do cliente na conexão TCP, o rate limit por IP de
-    // requisições anônimas passa a agrupar todo mundo atrás dessa borda como
-    // se fosse um único IP. Para confiar de verdade num proxy específico,
-    // troque por `trustProxy: '<ip ou CIDR da borda>'` (string) quando esse
-    // endereço for conhecido — não é algo que dá para adivinhar daqui.
-    trustProxy: false,
+    // Quem pode informar o IP do cliente em X-Forwarded-For: só os pares de
+    // rede privada (a borda do Railway; o contêiner não recebe conexão direta
+    // da internet). O IP do pedido é o último endereço público da cadeia; o
+    // que o cliente escreve antes dele no cabeçalho é ignorado. `trustProxy`
+    // numérico não serve: o Fastify o neutraliza (GHSA-3m5p-2c4r-xxw2).
+    trustProxy: resolveTrustProxy(env),
     genReqId: (request) => {
       const header = request.headers['x-request-id'];
-      if (typeof header === 'string' && header.length > 0 && header.length <= 128) return header;
+      // Aceita o identificador de quem chama só num formato seguro; senão, gera um.
+      if (typeof header === 'string' && /^[A-Za-z0-9._-]{8,128}$/.test(header)) return header;
       return randomUUID();
     },
   });
@@ -81,9 +109,13 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await registerWebApp(app);
 
   await app.register(helmet, {
-    // A API serve JSON para um app nativo; a CSP padrão do helmet só
-    // atrapalharia a página de documentação.
-    contentSecurityPolicy: false,
+    // Em produção a API só responde JSON (a documentação fica desligada):
+    // nada ali deve carregar recurso nem ser embutido. O painel e a web têm
+    // a própria CSP, que substitui esta. Fora de produção fica sem CSP para a
+    // página de documentação funcionar.
+    contentSecurityPolicy: production
+      ? { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] } }
+      : false,
   });
 
   await app.register(cors, {
@@ -101,7 +133,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
     hook: 'preHandler',
     // Usuário autenticado é limitado por conta; anônimo, por IP. Sem isso,
     // uma empresa inteira atrás de um NAT compartilharia a mesma cota.
-    keyGenerator: (request) => request.auth?.userId ?? request.ip,
+    keyGenerator: (request) => request.auth?.userId ?? clientKey(request.ip),
     // O plugin lança o retorno deste builder. Devolvendo um AppError, o
     // estouro de limite passa pelo mesmo formatador de erros de todo o resto
     // e o cliente recebe sempre o mesmo envelope.
@@ -119,11 +151,13 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   // sessão web (opaco, não assinado, só nas rotas /v1/auth/web).
   if (!env.ADMIN_COOKIE_SECRET && env.ADMIN_PANEL_ENABLED && env.NODE_ENV !== 'test') {
     app.log.warn(
-      'ADMIN_COOKIE_SECRET ausente: usando segredo efêmero; as sessões do painel não sobrevivem a um restart',
+      env.JWT_PRIVATE_KEY
+        ? 'ADMIN_COOKIE_SECRET ausente: segredo do cookie do painel derivado da JWT_PRIVATE_KEY'
+        : 'ADMIN_COOKIE_SECRET ausente: usando segredo efêmero; as sessões do painel não sobrevivem a um restart',
     );
   }
   await app.register(cookie, {
-    secret: env.ADMIN_COOKIE_SECRET ?? randomUUID() + randomUUID(),
+    secret: adminCookieSecret(env),
     hook: 'onRequest',
   });
   await app.register(adminAuthPlugin);
@@ -164,10 +198,13 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
     transform: jsonSchemaTransform,
   });
 
-  await app.register(scalar, {
-    routePrefix: '/docs',
-    configuration: { title: 'Estoque Simples API' },
-  });
+  // Documentação interativa: fora de produção, ou em produção só com DOCS_PUBLIC=true.
+  if (!production || env.DOCS_PUBLIC) {
+    await app.register(scalar, {
+      routePrefix: '/docs',
+      configuration: { title: 'Estoque Simples API' },
+    });
+  }
 
   registerErrorHandler(app);
 
@@ -175,6 +212,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerOpsRoutes);
   await app.register(registerAuthRoutes, { prefix: '/v1/auth' });
   await app.register(registerUserRoutes, { prefix: '/v1' });
+  await app.register(registerPrivacyRoutes, { prefix: '/v1' });
   await app.register(registerWorkspaceRoutes, { prefix: '/v1' });
   await app.register(registerInviteRoutes, { prefix: '/v1' });
   await app.register(registerBillingRoutes, { prefix: '/v1' });

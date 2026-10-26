@@ -3,6 +3,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { backupRecordSchema } from './ops.schemas.js';
+
 import { appConfig } from '../../platform/db/schema/index.js';
 import { safeEquals } from '../../platform/auth/tokens.js';
 import { ErrorCode, notFound, unauthorized } from '../../platform/http/errors.js';
@@ -26,8 +28,16 @@ const syncConfigSchema = z.object({
   minAppVersionCode: z.number().int().nonnegative(),
 });
 
-function requireOpsToken(request: FastifyRequest): void {
+function requireOpsToken(request: FastifyRequest, options: { alsoBackupToken?: boolean } = {}): void {
   const esperado = request.server.services.env.OPS_TOKEN;
+  const backup = options.alsoBackupToken ? request.server.services.env.OPS_BACKUP_TOKEN : undefined;
+  // O token de backup (guardado no GitHub) só registra restaurações de teste:
+  // não abre métricas nem o interruptor da sincronização.
+  if (backup) {
+    const header = request.headers.authorization;
+    const recebido = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+    if (recebido && safeEquals(recebido, backup)) return;
+  }
 
   // Sem token configurado o recurso não existe, em vez de ficar aberto. Um
   // /metrics público entrega volume de clientes e ritmo de uso a qualquer um.
@@ -49,6 +59,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/metrics',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       // Fora do rate limit global: o coletor chega a cada 15 segundos e não
       // pode ser barrado junto com o tráfego dos aplicativos.
       config: { rateLimit: false },
@@ -77,6 +89,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/status',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -110,6 +124,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.put(
     '/ops/config/sync',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -141,6 +157,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/config/sync',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -185,6 +203,8 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.get(
     '/ops/backup',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
@@ -235,22 +255,19 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
   routes.post(
     '/ops/backup',
     {
+      // Token conferido antes da validação do corpo: sem ele, nem o formato do pedido aparece.
+      onRequest: async (request) => requireOpsToken(request, { alsoBackupToken: true }),
       config: { rateLimit: false },
       schema: {
         tags: ['infra'],
         summary: 'Registra o resultado de uma restauração de teste',
         hide: true,
-        body: z.object({
-          origem: z.string().max(200),
-          tabelas: z.number().int().nonnegative(),
-          registros: z.number().int().nonnegative(),
-          duracaoSegundos: z.number().nonnegative(),
-        }),
+        body: backupRecordSchema,
         response: { 200: z.object({ message: z.string() }), 401: errorSchema, 404: errorSchema },
       },
     },
     async (request) => {
-      requireOpsToken(request);
+      requireOpsToken(request, { alsoBackupToken: true });
 
       await app.services.db
         .insert(appConfig)

@@ -62,6 +62,7 @@ export const adminPublicSchema = z.object({
   status: z.enum(['active', 'disabled']),
   lastLoginAt: z.string().nullable(),
   createdAt: z.string(),
+  mfaEnabled: z.boolean(),
 });
 
 export type AdminPublic = z.infer<typeof adminPublicSchema>;
@@ -70,6 +71,8 @@ export const adminLoginBodySchema = z
   .object({
     email: z.string().trim().min(3).max(254).email().transform((v) => v.toLowerCase()),
     password: z.string().min(1).max(200),
+    /** Código do autenticador (6 dígitos) ou de recuperação, quando o segundo fator está ativo. */
+    code: z.string().trim().max(20).optional(),
   })
   .strict();
 

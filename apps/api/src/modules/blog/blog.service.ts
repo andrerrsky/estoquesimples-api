@@ -1,5 +1,6 @@
 import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 
+import { settingAad } from '../../platform/crypto/purchase-token.js';
 import { adminSettings, blogPosts, pushTokens } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
@@ -375,14 +376,14 @@ export class BlogService {
     const rows = await this.db.select({ valueEnc: adminSettings.valueEnc }).from(adminSettings).where(eq(adminSettings.key, SETTINGS_KEY)).limit(1);
     if (!rows[0]) return DEFAULT_BLOG_SETTINGS;
     try {
-      return blogSettingsSchema.parse(JSON.parse(this.services.purchaseTokens.decrypt(rows[0].valueEnc)));
+      return blogSettingsSchema.parse(JSON.parse(this.services.purchaseTokens.decrypt(rows[0].valueEnc, settingAad(SETTINGS_KEY))));
     } catch {
       return DEFAULT_BLOG_SETTINGS;
     }
   }
 
   async saveSettings(actor: AdminActor, settings: BlogSettings): Promise<BlogSettings> {
-    const valueEnc = this.services.purchaseTokens.encrypt(JSON.stringify(settings));
+    const valueEnc = this.services.purchaseTokens.encrypt(JSON.stringify(settings), settingAad(SETTINGS_KEY));
     await this.db
       .insert(adminSettings)
       .values({ key: SETTINGS_KEY, valueEnc })

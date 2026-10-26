@@ -1,5 +1,6 @@
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 
+import { clientKey } from '../../platform/http/login-throttle.js';
 import {
   devices,
   emailVerificationTokens,
@@ -61,10 +62,22 @@ export class AuthService {
   // Cadastro e login
   // -------------------------------------------------------------------------
 
+  /** Limite por e-mail (cadastro, reenvio): `EMAIL_ACTION_MAX_PER_HOUR` por hora. */
+  private limitEmailAction(scope: string, email: string): void {
+    const retryAfterSeconds = this.services.throttle.hit(scope, email.toLowerCase(), this.env.EMAIL_ACTION_MAX_PER_HOUR, 3600);
+    if (retryAfterSeconds > 0) {
+      throw new AppError(429, ErrorCode.RATE_LIMITED, 'Muitas tentativas com este e-mail. Tente novamente mais tarde.', { extra: { retryAfterSeconds } });
+    }
+  }
+
   async register(
     input: { email: string; password: string; name: string; device?: DeviceInfo },
     meta: RequestMeta,
   ): Promise<AuthSuccess> {
+    // Além do limite por IP: o mesmo e-mail não pode ser testado em sequência
+    // (o 409 de "e-mail em uso" revelaria contas a quem varre endereços).
+    this.limitEmailAction('register', input.email);
+
     const policy = checkPasswordPolicy(input.password, input.email);
     if (!policy.valid) {
       throw new AppError(400, ErrorCode.AUTH_WEAK_PASSWORD, 'Senha não atende à política.', {
@@ -192,33 +205,35 @@ export class AuthService {
       .limit(1);
 
     const user = found[0];
+    const ip = clientKey(meta.ipAddress);
+
+    // Bloqueio por (e-mail, IP), conferido antes de tudo e igual para conta
+    // existente ou não: o 429 não revela se o e-mail tem conta.
+    const retryAfterSeconds = this.services.throttle.retryAfter('login', input.email, ip);
+    if (retryAfterSeconds > 0) {
+      throw new AppError(429, ErrorCode.AUTH_ACCOUNT_LOCKED, 'Muitas tentativas. Tente novamente mais tarde.', { extra: { retryAfterSeconds } });
+    }
 
     // Conta inexistente gasta o mesmo tempo de CPU de uma verificação real,
     // e devolve a mesma mensagem, para não permitir enumerar e-mails.
     if (!user) {
       await verifyPasswordDummy(input.password);
+      this.services.throttle.fail('login', input.email, ip);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
-    }
-
-    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-      const retryAfterSeconds = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
-      throw new AppError(
-        429,
-        ErrorCode.AUTH_ACCOUNT_LOCKED,
-        'Muitas tentativas. Tente novamente mais tarde.',
-        { extra: { retryAfterSeconds } },
-      );
-    }
-
-    if (user.status === 'suspended') {
-      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
     }
 
     const passwordOk = await verifyPassword(user.passwordHash, input.password);
     if (!passwordOk) {
-      await this.registerFailedLogin(user.id, user.failedLoginAttempts + 1, meta);
+      const lockSeconds = this.services.throttle.fail('login', input.email, ip);
+      await this.registerFailedLogin(user.id, user.failedLoginAttempts + 1, lockSeconds, meta);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
+
+    // Depois da senha: quem não a sabe não descobre que a conta existe e está suspensa.
+    if (user.status === 'suspended') {
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
+    }
+    this.services.throttle.succeed('login', input.email, ip);
 
     // Só depois da senha conferida, para não revelar o estado da conta a quem
     // não é o dono. Sem esta recusa o login "funcionava" e toda chamada
@@ -333,29 +348,23 @@ export class AuthService {
   }
 
   /**
-   * Bloqueio progressivo: cada tentativa além do limite dobra o tempo de
-   * espera, até o teto configurado. Roda fora da transação de login porque
-   * precisa persistir mesmo quando a requisição termina em erro.
+   * Conta e audita o erro de senha. O bloqueio em si é do freio por
+   * (e-mail, IP) em `services.throttle` (ver login-throttle.ts): um bloqueio
+   * gravado na conta deixaria qualquer pessoa trancar a conta de outra.
+   * Roda fora da transação de login porque precisa persistir mesmo quando a
+   * requisição termina em erro.
    */
   private async registerFailedLogin(
     userId: string,
     attempts: number,
+    lockSeconds: number,
     meta: RequestMeta,
   ): Promise<void> {
-    let lockedUntil: Date | null = null;
-
-    if (attempts >= this.env.LOGIN_MAX_ATTEMPTS) {
-      const excess = attempts - this.env.LOGIN_MAX_ATTEMPTS;
-      const seconds = Math.min(
-        this.env.LOGIN_LOCK_BASE_SECONDS * 2 ** excess,
-        this.env.LOGIN_LOCK_MAX_SECONDS,
-      );
-      lockedUntil = new Date(Date.now() + seconds * 1000);
-    }
+    const lockedUntil = lockSeconds > 0 ? new Date(Date.now() + lockSeconds * 1000) : null;
 
     await this.db
       .update(users)
-      .set({ failedLoginAttempts: attempts, lockedUntil })
+      .set({ failedLoginAttempts: attempts })
       .where(eq(users.id, userId));
 
     await recordAuditSafe(this.db, {
@@ -599,6 +608,9 @@ export class AuthService {
    * está cadastrado transformaria este endpoint num verificador de contas.
    */
   async requestPasswordReset(email: string, meta: RequestMeta): Promise<void> {
+    // Sem erro visível: a resposta é a mesma com ou sem conta. Passou do
+    // limite por e-mail, só não manda outro link.
+    if (this.services.throttle.hit('reset', email, this.env.EMAIL_ACTION_MAX_PER_HOUR, 3600) > 0) return;
     const found = await this.db
       .select({ id: users.id, email: users.email, name: users.name })
       .from(users)

@@ -7,28 +7,29 @@ import { errorMessage } from '../components/ui';
 import { Icon } from '../components/Icon';
 
 /**
- * "Lembrar de mim" guarda e-mail e senha no armazenamento local deste
- * navegador, a pedido do administrador, para preencher o formulário nas
- * próximas visitas. Desmarcar apaga; sair do painel não apaga. Só o próprio
- * navegador lê o valor; ele nunca sai para a API além do login em si.
+ * "Lembrar de mim" guarda só o e-mail neste navegador. A senha nunca vai
+ * para o localStorage (texto aberto ao alcance de qualquer script ou
+ * extensão): o gerenciador de senhas do navegador cuida disso.
  */
 const REMEMBER_KEY = 'es_admin_remember';
 
-function readRemembered(): { email: string; password: string } | null {
+function readRemembered(): { email: string } | null {
   try {
     const raw = window.localStorage.getItem(REMEMBER_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { email?: unknown; password?: unknown };
-    if (typeof parsed.email !== 'string' || typeof parsed.password !== 'string') return null;
-    return { email: parsed.email, password: parsed.password };
+    if (typeof parsed.email !== 'string') return null;
+    // Versões antigas guardavam a senha também: regrava só o e-mail.
+    if ('password' in parsed) window.localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: parsed.email }));
+    return { email: parsed.email };
   } catch {
     return null;
   }
 }
 
-function writeRemembered(value: { email: string; password: string } | null): void {
+function writeRemembered(value: { email: string } | null): void {
   try {
-    if (value) window.localStorage.setItem(REMEMBER_KEY, JSON.stringify(value));
+    if (value) window.localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: value.email }));
     else window.localStorage.removeItem(REMEMBER_KEY);
   } catch {
     // Armazenamento indisponível (modo privado, cota): o login segue sem lembrar.
@@ -44,12 +45,14 @@ export function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Senha conferida; falta o código do autenticador. */
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     const saved = readRemembered();
     if (saved) {
       setEmail(saved.email);
-      setPassword(saved.password);
       setRemember(true);
     }
   }, []);
@@ -69,10 +72,12 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await login(email.trim(), password);
-      if (remember) writeRemembered({ email: email.trim(), password });
+      await login(email.trim(), password, needsCode ? code.trim() : undefined);
+      if (remember) writeRemembered({ email: email.trim() });
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'AUTH_ACCOUNT_LOCKED') {
+      if (caught instanceof ApiError && caught.code === 'ADMIN_MFA_REQUIRED') {
+        setNeedsCode(true);
+      } else if (caught instanceof ApiError && caught.code === 'AUTH_ACCOUNT_LOCKED') {
         const seconds = Number(caught.extra['retryAfterSeconds'] ?? 0);
         setError(`Muitas tentativas. Tente de novo em ${Math.ceil(seconds / 60) || 1} minuto(s).`);
       } else {
@@ -140,13 +145,30 @@ export function LoginPage() {
               </button>
             </div>
           </label>
+          {needsCode && (
+            <label className="field">
+              <span className="field__label">Código do autenticador</span>
+              <input
+                className="input"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6 dígitos ou código de recuperação"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                maxLength={20}
+                autoFocus
+                required
+              />
+              <span className="field__hint">Abra o aplicativo autenticador (Google Authenticator, 1Password…) e digite o código do Estoque Simples Painel.</span>
+            </label>
+          )}
           <label className="checkbox">
             <input type="checkbox" checked={remember} onChange={(event) => toggleRemember(event.target.checked)} />
-            Lembrar de mim neste navegador
+            Lembrar meu e-mail neste navegador
           </label>
           {error && <div className="notice notice--error">{error}</div>}
           <button type="submit" className="btn btn--primary btn--block" disabled={busy}>
-            {busy ? 'Entrando…' : 'Entrar'}
+            {busy ? 'Entrando…' : needsCode ? 'Confirmar código' : 'Entrar'}
           </button>
         </form>
       </main>

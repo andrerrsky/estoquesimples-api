@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastif
 import fp from 'fastify-plugin';
 
 import { ErrorCode, forbidden, notFound, unauthorized } from '../../platform/http/errors.js';
-import { AdminAuthService, hasAdminRole, type AdminContext } from './admin-auth.service.js';
+import { AdminAuthService, adminMfaRequired, hasAdminRole, type AdminContext } from './admin-auth.service.js';
 import type { AdminActor } from './admin-audit.service.js';
 import type { AdminRole } from './admin.schemas.js';
 
@@ -53,7 +53,7 @@ function assertSameOrigin(request: FastifyRequest): void {
  * preHandler que exige um administrador autenticado com, no mínimo, o papel
  * informado. `viewer` lê; `support` opera contas; `owner` administra o painel.
  */
-export function requireAdmin(minimum: AdminRole = 'viewer'): preHandlerHookHandler {
+export function requireAdmin(minimum: AdminRole = 'viewer', options: { mfaSetup?: boolean } = {}): preHandlerHookHandler {
   return async function adminGuard(request: FastifyRequest, _reply: FastifyReply) {
     const { env } = request.server.services;
     if (!env.ADMIN_PANEL_ENABLED) throw notFound('Recurso não encontrado');
@@ -69,6 +69,11 @@ export function requireAdmin(minimum: AdminRole = 'viewer'): preHandlerHookHandl
     }
 
     const context = await request.server.adminAuth.resolveSession(unsigned.value);
+    // Segundo fator obrigatório e ainda não cadastrado: só as rotas da sessão
+    // e do cadastro respondem; o painel leva a pessoa direto para a tela de cadastro.
+    if (!options.mfaSetup && !context.mfaEnabled && adminMfaRequired(env)) {
+      throw forbidden(ErrorCode.ADMIN_MFA_SETUP_REQUIRED, 'Cadastre o aplicativo autenticador para usar o painel.');
+    }
     if (!hasAdminRole(context, minimum)) {
       throw forbidden(ErrorCode.MISSING_PERMISSION, 'Seu papel não permite esta ação.', {
         requiredRole: minimum,

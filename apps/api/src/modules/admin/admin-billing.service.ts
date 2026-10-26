@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 
+import { purchaseTokenAad } from '../../platform/crypto/purchase-token.js';
 import {
   billingCustomers,
   billingPayments,
@@ -534,7 +535,7 @@ export class AdminBillingService {
     let outcome: 'processed' | 'failed' = 'processed';
     let error: string | null = null;
     try {
-      const plaintext = this.services.purchaseTokens.decrypt(event.purchaseTokenEnc);
+      const plaintext = this.services.purchaseTokens.decrypt(event.purchaseTokenEnc, event.purchaseTokenHash ? purchaseTokenAad(event.purchaseTokenHash) : undefined);
       const subscriptionId = await this.billing.refreshFromGoogle(plaintext, event.notificationType);
       await this.db
         .update(subscriptionEvents)

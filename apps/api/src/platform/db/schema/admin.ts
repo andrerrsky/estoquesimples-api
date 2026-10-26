@@ -1,16 +1,4 @@
-import {
-  bigserial,
-  index,
-  inet,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  type AnyPgColumn,
-} from 'drizzle-orm/pg-core';
+import { bigint, bigserial, index, inet, integer, jsonb, pgTable, text, timestamp, type AnyPgColumn, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { users } from './auth.js';
@@ -37,6 +25,13 @@ export const platformAdmins = pgTable(
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', tz),
     lastLoginAt: timestamp('last_login_at', tz),
+    /** Segredo TOTP cifrado (services.purchaseTokens); preenchido no cadastro, vale depois de `totpEnabledAt`. */
+    totpSecret: text('totp_secret'),
+    totpEnabledAt: timestamp('totp_enabled_at', tz),
+    /** Último passo de 30 s aceito: o mesmo código não entra duas vezes. */
+    totpLastStep: bigint('totp_last_step', { mode: 'number' }),
+    /** Hashes SHA-256 dos códigos de recuperação ainda não usados. */
+    recoveryCodes: jsonb('recovery_codes').$type<string[]>().notNull().default([]),
     createdBy: uuid('created_by').references((): AnyPgColumn => platformAdmins.id, {
       onDelete: 'set null',
     }),

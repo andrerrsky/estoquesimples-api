@@ -113,7 +113,7 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
   // Quem tem conta e já estava numa conversa em aberto continua nela.
   const open = useQuery({
     queryKey: chatKeys.list,
-    queryFn: () => api.get<{ tickets: Ticket[] }>('/v1/support/tickets', { installId: installId() }, { optionalAuth: true }),
+    queryFn: () => api.get<{ tickets: Ticket[] }>('/v1/support/tickets', undefined, { optionalAuth: true, headers: { 'x-install-id': installId() } }),
     enabled: authed && ticketId === null,
     staleTime: 30_000,
   });
@@ -125,7 +125,7 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
 
   const detail = useQuery({
     queryKey: chatKeys.ticket(ticketId ?? ''),
-    queryFn: () => api.get<TicketDetail>(`/v1/support/tickets/${ticketId}`, { installId: installId() }, { optionalAuth: true }),
+    queryFn: () => api.get<TicketDetail>(`/v1/support/tickets/${ticketId}`, undefined, { optionalAuth: true, headers: { 'x-install-id': installId() } }),
     enabled: ticketId !== null,
     // A resposta da equipe aparece sozinha; em segundo plano o navegador pausa.
     refetchInterval: 8_000,

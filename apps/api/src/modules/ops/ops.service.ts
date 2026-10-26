@@ -22,6 +22,16 @@ export interface OpsSnapshot extends Record<string, number> {
   empresasAtivas: number;
   dispositivosAtivos7d: number;
   operacoesSync24h: number;
+  /** Horas desde a última restauração de teste registrada em /ops/backup; -1 quando nunca houve. */
+  backupHoras: number;
+  /** Migration do último dump registrado (-1: sem registro ou sem a informação). */
+  backupMigracao: number;
+  /** Migration que esta API roda. */
+  migracaoAtual: number;
+  /** 1 quando o último backup foi registrado depois de a migration atual entrar em produção. */
+  backupDepoisDoDeploy: number;
+  /** Fotos espelhadas no último backup (-1: sem a informação). */
+  backupFotos: number;
 }
 
 const ATRASO_TOLERADO = "interval '15 minutes'";
@@ -62,7 +72,16 @@ export class OpsService {
           WHERE revoked_at IS NULL AND last_seen_at > now() - interval '7 days')
           AS dispositivos_ativos,
         (SELECT count(*) FROM sync_operations
-          WHERE created_at > now() - interval '24 hours') AS operacoes_sync
+          WHERE created_at > now() - interval '24 hours') AS operacoes_sync,
+        COALESCE((SELECT extract(epoch FROM now() - updated_at) / 3600 FROM app_config WHERE key = 'backup_verificado'), -1)
+          AS backup_horas,
+        COALESCE((SELECT CASE WHEN value->>'migracao' ~ '^[0-9]{1,9}$' THEN (value->>'migracao')::int END FROM app_config WHERE key = 'backup_verificado'), -1)
+          AS backup_migracao,
+        COALESCE((SELECT max(version) FROM schema_migrations), 0) AS migracao_atual,
+        COALESCE((SELECT (c.updated_at > (SELECT applied_at FROM schema_migrations ORDER BY version DESC LIMIT 1))::int FROM app_config c WHERE c.key = 'backup_verificado'), 0)
+          AS backup_depois_do_deploy,
+        COALESCE((SELECT CASE WHEN value->>'fotos' ~ '^[0-9]{1,12}$' THEN (value->>'fotos')::bigint END FROM app_config WHERE key = 'backup_verificado'), -1)
+          AS backup_fotos
     `);
 
     const linha = resultado.rows[0] ?? {};
@@ -79,6 +98,11 @@ export class OpsService {
       empresasAtivas: numero('empresas_ativas'),
       dispositivosAtivos7d: numero('dispositivos_ativos'),
       operacoesSync24h: numero('operacoes_sync'),
+      backupHoras: Math.round(numero('backup_horas')),
+      backupMigracao: numero('backup_migracao'),
+      migracaoAtual: numero('migracao_atual'),
+      backupDepoisDoDeploy: numero('backup_depois_do_deploy'),
+      backupFotos: numero('backup_fotos'),
     };
   }
 
@@ -105,6 +129,11 @@ export class OpsService {
         name: 'devices_active_7d',
         help: 'Aparelhos que sincronizaram nos últimos sete dias',
         value: estado.dispositivosAtivos7d,
+      },
+      {
+        name: 'backup_verified_age_hours',
+        help: 'Horas desde a última restauração de teste de um backup real (-1: nunca)',
+        value: estado.backupHoras,
       },
       {
         name: 'sync_operations_24h',
@@ -142,6 +171,37 @@ export class OpsService {
         detalhe:
           `${estado.assinaturasDesatualizadas} assinatura(s) ativas sem confirmação do Google Play ` +
           'há mais de 48 horas. Acesso pode estar sendo concedido indevidamente.',
+      });
+    }
+    // Backup que ninguém restaurou recentemente voltou a ser suposição.
+    const limite = this.services.env.BACKUP_MAX_AGE_HOURS;
+    if (estado.backupHoras < 0 || estado.backupHoras > limite) {
+      encontrados.push({
+        nome: 'backup_desatualizado',
+        detalhe:
+          estado.backupHoras < 0
+            ? 'Nenhuma restauração de teste de backup foi registrada. Configure o backup externo (docs/seguranca.md).'
+            : `A última restauração de teste de backup foi há ${estado.backupHoras} h (limite: ${limite} h). Confira o workflow backup-offsite.`,
+      });
+    }
+    // Dump numa migration diferente da que a API roda: à frente (banco errado),
+    // ou atrás mesmo tendo sido feito depois do deploy da migration atual
+    // (banco errado ou parado). Atrás e feito antes do deploy é só o backup
+    // da noite anterior: não alerta.
+    const divergente =
+      estado.backupMigracao >= 0 &&
+      (estado.backupMigracao > estado.migracaoAtual || (estado.backupMigracao < estado.migracaoAtual && estado.backupDepoisDoDeploy === 1));
+    if (divergente) {
+      encontrados.push({
+        nome: 'backup_schema_divergente',
+        detalhe: `O último backup guardado está na migration ${estado.backupMigracao} e a API roda a ${estado.migracaoAtual}. Confira BACKUP_DATABASE_URL e o último deploy.`,
+      });
+    }
+    // Backup registrado sem fotos com o armazenamento ligado: o espelho das fotos não rodou.
+    if (estado.backupHoras >= 0 && this.services.storage.configured && estado.backupFotos <= 0) {
+      encontrados.push({
+        nome: 'backup_sem_fotos',
+        detalhe: 'O último backup externo foi registrado sem a cópia das fotos. Confira o passo das fotos em backup-offsite.yml.',
       });
     }
     if (estado.conflitosAntigos > 0) {

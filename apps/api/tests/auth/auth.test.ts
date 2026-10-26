@@ -298,7 +298,7 @@ describe('logout', () => {
 
   it('logout-all derruba as sessões de todos os aparelhos', async () => {
     const email = uniqueEmail();
-    const first = await registerUser(context, { email, installId: 'aparelho-numero-1' });
+    const first = await registerUser(context, { email, installId: 'aparelho-numero-1-000000000000000000' });
 
     const secondLogin = await context.app.inject({
       method: 'POST',
@@ -306,7 +306,7 @@ describe('logout', () => {
       payload: {
         email,
         password: VALID_PASSWORD,
-        device: { installId: 'aparelho-numero-2', platform: 'android' },
+        device: { installId: 'aparelho-numero-2-000000000000000000', platform: 'android' },
       },
     });
     const second = secondLogin.json();
@@ -416,7 +416,7 @@ describe('recuperação de senha', () => {
 describe('troca de senha autenticada', () => {
   it('exige a senha atual e derruba as outras sessões', async () => {
     const email = uniqueEmail();
-    const user = await registerUser(context, { email, installId: 'aparelho-principal' });
+    const user = await registerUser(context, { email, installId: 'aparelho-principal-00000000000000000' });
 
     const otherLogin = await context.app.inject({
       method: 'POST',
@@ -538,7 +538,7 @@ describe('rate limiting', () => {
 describe('sessões e dispositivos', () => {
   it('lista as sessões marcando a atual', async () => {
     const email = uniqueEmail();
-    await registerUser(context, { email, installId: 'aparelho-numero-1' });
+    await registerUser(context, { email, installId: 'aparelho-numero-1-000000000000000000' });
 
     const secondLogin = await context.app.inject({
       method: 'POST',
@@ -546,7 +546,7 @@ describe('sessões e dispositivos', () => {
       payload: {
         email,
         password: VALID_PASSWORD,
-        device: { installId: 'aparelho-numero-2', platform: 'android', model: 'Moto G' },
+        device: { installId: 'aparelho-numero-2-000000000000000000', platform: 'android', model: 'Moto G' },
       },
     });
     const second = secondLogin.json();
@@ -564,7 +564,7 @@ describe('sessões e dispositivos', () => {
   });
 
   it('revogar um dispositivo encerra as sessões dele', async () => {
-    const user = await registerUser(context, { installId: 'aparelho-a-revogar' });
+    const user = await registerUser(context, { installId: 'aparelho-a-revogar-00000000000000000' });
     expect(user.deviceId).toBeTruthy();
 
     const response = await context.app.inject({
@@ -584,7 +584,7 @@ describe('sessões e dispositivos', () => {
 
   it('reconhece o mesmo aparelho pelo installId em vez de duplicar', async () => {
     const email = uniqueEmail();
-    const first = await registerUser(context, { email, installId: 'aparelho-estavel' });
+    const first = await registerUser(context, { email, installId: 'aparelho-estavel-0000000000000000000' });
 
     const again = await context.app.inject({
       method: 'POST',
@@ -592,7 +592,7 @@ describe('sessões e dispositivos', () => {
       payload: {
         email,
         password: VALID_PASSWORD,
-        device: { installId: 'aparelho-estavel', platform: 'android' },
+        device: { installId: 'aparelho-estavel-0000000000000000000', platform: 'android' },
       },
     });
 

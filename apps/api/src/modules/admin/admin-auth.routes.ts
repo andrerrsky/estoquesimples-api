@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { ErrorCode, forbidden } from '../../platform/http/errors.js';
+import { adminMfaRequired } from './admin-auth.service.js';
 import { requestMeta } from '../auth/auth.routes.js';
 import {
   ADMIN_CSRF_HEADER,
@@ -63,7 +64,7 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
   routes.post(
     '/auth/logout',
     {
-      preHandler: requireAdmin('viewer'),
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
       schema: {
         tags: ['admin'],
         summary: 'Encerra a sessão do painel',
@@ -81,7 +82,7 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
   routes.get(
     '/auth/me',
     {
-      preHandler: requireAdmin('viewer'),
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
       schema: {
         tags: ['admin'],
         summary: 'Administrador autenticado',
@@ -92,6 +93,8 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
             email: z.string(),
             name: z.string(),
             role: z.enum(ADMIN_ROLES),
+            mfaEnabled: z.boolean(),
+            mfaRequired: z.boolean(),
           }),
           ...commonAdminErrors,
         },
@@ -99,7 +102,91 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
     },
     async (request) => {
       const context = requireAdminContext(request);
-      return { id: context.adminId, email: context.email, name: context.name, role: context.role };
+      return { id: context.adminId, email: context.email, name: context.name, role: context.role, mfaEnabled: context.mfaEnabled, mfaRequired: adminMfaRequired(env) };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Segundo fator (TOTP)
+  // -------------------------------------------------------------------------
+
+  routes.get(
+    '/auth/mfa',
+    {
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: { tags: ['admin'], summary: 'Estado do segundo fator', hide: true, response: { 200: z.object({ enabled: z.boolean(), required: z.boolean(), recoveryCodesLeft: z.number() }), ...commonAdminErrors } },
+    },
+    async (request) => service.mfaStatus(requireAdminContext(request)),
+  );
+
+  routes.post(
+    '/auth/mfa/setup',
+    {
+      ...strictLimit,
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: { tags: ['admin'], summary: 'Gera o segredo do autenticador (ainda inativo)', hide: true, response: { 200: z.object({ secret: z.string(), otpauthUri: z.string() }), ...commonAdminErrors } },
+    },
+    async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      return service.startMfaSetup(requireAdminContext(request));
+    },
+  );
+
+  routes.post(
+    '/auth/mfa/enable',
+    {
+      ...strictLimit,
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: {
+        tags: ['admin'],
+        summary: 'Ativa o segundo fator com um código e devolve os códigos de recuperação',
+        hide: true,
+        body: z.object({ code: z.string().trim().min(6).max(10), emailCode: z.string().trim().min(6).max(10) }).strict(),
+        response: { 200: z.object({ recoveryCodes: z.array(z.string()) }), ...commonAdminErrors },
+      },
+    },
+    async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      const result = await service.enableMfa(requireAdminContext(request), request.body.code, request.body.emailCode, requestMeta(request));
+      reply.setCookie(env.ADMIN_COOKIE_NAME, result.token, adminCookieOptions(env));
+      return { recoveryCodes: result.recoveryCodes };
+    },
+  );
+
+  routes.post(
+    '/auth/mfa/disable',
+    {
+      ...strictLimit,
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: {
+        tags: ['admin'],
+        summary: 'Desativa o próprio segundo fator (senha + código)',
+        hide: true,
+        body: z.object({ password: z.string().min(1).max(200), code: z.string().trim().min(6).max(20) }).strict(),
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      await service.disableMfa(requireAdminContext(request), request.body, requestMeta(request));
+      return { message: 'Segundo fator desativado.' };
+    },
+  );
+
+  routes.post(
+    '/admins/:adminId/mfa/reset',
+    {
+      preHandler: requireAdmin('owner'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Zera o segundo fator de outro administrador',
+        hide: true,
+        params: z.object({ adminId: z.string().uuid() }),
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      await service.resetMfa(adminActor(request), request.params.adminId);
+      return { message: 'Segundo fator zerado. A pessoa cadastra o autenticador de novo no próximo acesso.' };
     },
   );
 
@@ -209,5 +296,10 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
 function requireCsrfHeader(headers: Record<string, unknown>): void {
   if (headers[ADMIN_CSRF_HEADER] !== ADMIN_CSRF_VALUE) {
     throw forbidden(ErrorCode.FORBIDDEN, 'Requisição sem cabeçalho de proteção.');
+  }
+  // Mesma checagem de origem das demais mutações: o navegador informa e scripts não forjam.
+  const fetchSite = headers['sec-fetch-site'];
+  if (typeof fetchSite === 'string' && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    throw forbidden(ErrorCode.FORBIDDEN, 'Requisição de outra origem.');
   }
 }

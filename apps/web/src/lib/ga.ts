@@ -73,6 +73,8 @@ export function loadGa(): void {
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
     app_version: __APP_VERSION__,
+    // Endereço sem query string: links de e-mail carregam tokens (?token=) que não podem ir para o Google.
+    page_location: `${window.location.origin}${window.location.pathname}`,
     platform: isStandalone() ? 'web_app' : 'navegador',
   });
   const script = document.createElement('script');
