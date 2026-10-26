@@ -17,6 +17,8 @@ import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { revokeUserSessions } from '../auth/auth.service.js';
 import { deviceInfoSchema, errorSchema, messageSchema } from '../auth/auth.schemas.js';
 import { requestMeta } from '../auth/auth.routes.js';
+import { ACCOUNT_RECOVERY_DAYS } from '../privacy/privacy.service.js';
+import { AccountClosureService } from './account-closure.service.js';
 
 const commonErrors = {
   400: errorSchema,
@@ -28,6 +30,7 @@ const commonErrors = {
 export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
   const routes = app.withTypeProvider<ZodTypeProvider>();
   const { db } = app.services;
+  const closure = new AccountClosureService(app.services);
 
   routes.get(
     '/me',
@@ -333,6 +336,33 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  routes.get(
+    '/me/deletion-preview',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        tags: ['usuário'],
+        summary: 'O que sai junto com a conta: empresas de que a pessoa é dona, membros e assinatura',
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: z.object({
+            workspaces: z.array(
+              z.object({
+                id: z.string().uuid(),
+                name: z.string(),
+                otherMembers: z.number(),
+                subscription: z.object({ provider: z.enum(['google_play', 'asaas']), state: z.string(), renews: z.boolean() }).nullable(),
+              }),
+            ),
+            recoveryDays: z.number(),
+          }),
+          401: errorSchema,
+        },
+      },
+    },
+    async (request) => ({ workspaces: await closure.ownedWorkspaces(requireAuth(request).userId), recoveryDays: ACCOUNT_RECOVERY_DAYS }),
+  );
+
   routes.delete(
     '/me',
     {
@@ -344,7 +374,13 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
           'A conta entra em período de recuperação antes da exclusão definitiva. ' +
           'Nenhum dado local do aplicativo é afetado.',
         security: [{ bearerAuth: [] }],
-        body: z.object({ password: z.string().min(1).max(200) }).strict(),
+        body: z
+          .object({
+            password: z.string().min(1).max(200),
+            /** Exclui também as empresas de que a pessoa é dona (ver GET /me/deletion-preview). */
+            closeWorkspaces: z.boolean().optional(),
+          })
+          .strict(),
         response: {
           200: z.object({ message: z.string(), recoverableUntil: z.string() }),
           ...commonErrors,
@@ -362,47 +398,10 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
       }
 
-      // Proprietário sem transferência: a conta entraria em pending_deletion,
-      // o authenticate barraria o usuário, e ninguém mais poderia transferir
-      // (só o papel proprietário tem workspace.transferir). O workspace ficaria
-      // sem dono capaz de agir e a assinatura encalhada.
-      const owned = await db
-        .select({ id: workspaces.id, name: workspaces.name })
-        .from(workspaces)
-        .where(and(eq(workspaces.ownerUserId, auth.userId), isNull(workspaces.deletedAt)));
-      if (owned.length > 0) {
-        throw new AppError(
-          409,
-          ErrorCode.LAST_OWNER,
-          'Transfira a propriedade ou exclua as empresas das quais você é o único proprietário antes de apagar a conta.',
-          {
-            extra: {
-              workspaces: owned.map((w) => ({ id: w.id, name: w.name })),
-            },
-          },
-        );
-      }
-
-      const requestedAt = new Date();
-      const recoverableUntil = new Date(requestedAt.getTime() + 30 * 86_400_000);
-
-      await db.transaction(async (tx) => {
-        await tx
-          .update(users)
-          .set({ status: 'pending_deletion', deletionRequestedAt: requestedAt })
-          .where(eq(users.id, auth.userId));
-
-        await revokeUserSessions(tx, auth.userId, { reason: 'account_deleted' });
-
-        await recordAudit(tx, {
-          actorUserId: auth.userId,
-          action: AuditAction.USER_DELETION_REQUESTED,
-          entityType: 'user',
-          entityId: auth.userId,
-          metadata: { recoverableUntil: recoverableUntil.toISOString() },
-          ipAddress: requestMeta(request).ipAddress,
-        });
-      });
+      // Dono de empresa: sem `closeWorkspaces` recebe 409 LAST_OWNER com a
+      // lista (a tela pergunta); com ele, as empresas saem junto com a conta.
+      const result = await closure.requestDeletion(auth.userId, { closeWorkspaces: request.body.closeWorkspaces ?? false }, requestMeta(request));
+      const recoverableUntil = result.recoverableUntil;
 
       await trackServerEvent(app.services, { name: 'user.deletion_requested', userId: auth.userId });
 

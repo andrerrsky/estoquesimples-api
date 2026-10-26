@@ -311,7 +311,12 @@ histórico de incidentes.
   (`GET /v1/me/export`): perfil, empresas, sessões, aparelhos, notificações,
   conversas de suporte, registros de atividade e de uso. O estoque de cada
   empresa sai pela exportação da empresa.
-- **Exclusão**: o pedido bloqueia a conta na hora; depois de 30 dias o job
+- **Exclusão**: quem é dono de empresas vê, antes, quais empresas saem
+  junto (membros que perdem o acesso, assinatura) e confirma; a assinatura do
+  Asaas é cancelada na hora e a do Google Play precisa ser cancelada antes na
+  Play Store. O pedido bloqueia a conta e exclui essas empresas na hora (o
+  suporte que reativar a conta em 30 dias traz as empresas de volta);
+  depois de 30 dias o job
   `privacy.daily` apaga a conta (sessões, tokens, aparelhos, vínculos e
   notificações saem junto), as conversas de suporte dela, as fotos das
   empresas já excluídas que ela possuía, o e-mail dela em públicos de
@@ -323,7 +328,8 @@ histórico de incidentes.
 
 | Dado | Prazo | Onde |
 | --- | --- | --- |
-| Conta excluída | 30 dias após o pedido | `privacy.daily` |
+| Conta excluída (e as empresas de que era dona) | 30 dias após o pedido | `privacy.daily` |
+| Empresa excluída (estoque, histórico, fotos, assinatura, pagador) | 90 dias após a exclusão | `privacy.daily` |
 | Conversas de suporte de quem não tinha conta, com o e-mail da conta excluída | junto com a conta | `privacy.daily` |
 | Avisos do Google Play/Asaas (`subscription_events`, processados ou não) | 400 dias do recebimento | `privacy.daily` |
 | Conversas de suporte de quem nunca teve conta (qualquer estado) | 2 anos sem mensagem nova | `privacy.daily` |
@@ -349,7 +355,6 @@ histórico de incidentes.
 | Cadastro responde 409 para e-mail já usado | limite por IP e por e-mail (5/h); o cadastro devolve sessão na hora, então trocar por resposta neutra muda o fluxo dos apps | próxima revisão do cadastro |
 | Google Analytics no painel (`script-src` com googletagmanager.com) | pedido do produto (medir o uso do painel); só carrega depois do aceite no aviso de cookies; o cookie de sessão é httpOnly e as mutações exigem cabeçalho anti-CSRF; segundo fator obrigatório. Para tirar: remover `lib/ga.ts` do painel e o domínio da CSP em `admin-static.ts` | se o painel ganhar ações mais sensíveis |
 | Texto livre (motivo, nota) na trilha do painel pode citar dado pessoal | o expurgo tira e-mail e nome dos campos estruturados; o painel orienta a não escrever dado pessoal no motivo | revisão anual |
-| Dados do pagador da empresa (`billing_customers`) ficam enquanto a empresa existir | ligados à empresa, não à pessoa; saem com a empresa (decisão de produto pendente em AGENTS.md §13) | com a decisão de purga de empresas |
 | Dump por `sslmode=require` sem conferir o certificado do proxy do Railway | o Railway não publica uma CA para `verify-full` no proxy TCP; o tráfego é cifrado, o usuário é só leitura com 2 conexões, e o dump já sai cifrado com `age` antes de ir para o bucket; trocar para `verify-full` se o Railway passar a oferecer | quando o Railway publicar a CA |
 | A restauração de teste roda código do npm (tsx, pg) com o dump em claro no runner | mesmo nível de confiança da própria API em produção; lockfile, `npm ci --ignore-scripts`, portão de `npm audit` e Dependabot; as chaves dos buckets já saíram do runner antes | se o verify passar a ser só `pg_restore` + `psql` |
 | No B2 não há política de gravação condicional | o roteiro reconhece o dump verdadeiro pela versão mais antiga (travada) e pelo SHA-256 do log do GitHub | ao trocar de provedor |

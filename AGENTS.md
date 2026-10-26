@@ -116,7 +116,7 @@ workspace na transação). Consequências:
 | `users` | conta (e-mail único entre vivas, case-insensitive) | `status` ∈ active/suspended/pending_deletion; `permission_version` invalida access tokens quando muda; erros de senha contados em `failed_login_attempts` (o bloqueio é do freio por e-mail+IP em `platform/http/login-throttle.ts`); `pending_deletion` é apagada 30 dias depois pelo job `privacy.daily` (`modules/privacy`) |
 | `devices` | instalação do app por usuário (`install_id`) | o app envia `device` no register/login/aceite de convite; `last_seen_at` atualiza no refresh |
 | `sessions` / `refresh_tokens` | login = sessão; refresh rotaciona com detecção de reuso | revogar sessão = logout imediato; só o hash do token é gravado |
-| `workspaces` | empresa (tenant) | `owner_user_id`; `change_seq` é o cursor de sync (monotônico por tenant via `next_change_seq()`); `seeded_at` marca a carga inicial; `tombstone_horizon_seq`; `deleted_at` (exclusão lógica só pelo painel) |
+| `workspaces` | empresa (tenant) | `owner_user_id`; `change_seq` é o cursor de sync (monotônico por tenant via `next_change_seq()`); `seeded_at` marca a carga inicial; `tombstone_horizon_seq`; `deleted_at` (exclusão lógica pelo painel ou junto com a conta do dono; apagada de vez 90 dias depois pelo `privacy.daily`) |
 | `roles` / `permissions` / `role_permissions` | RBAC como dados | papéis: proprietario(100) > administrador(80) > gerente(60) > operador(40) > consulta(20); cache por processo em `authorize.ts` |
 | `workspace_members` | participação | `status` active/suspended/removed; uma linha por (workspace, user), readmissão reativa |
 | `invites` | convite por e-mail com token `esinv_…` | um pendente por e-mail/empresa; aceite cria a conta se não existir |
@@ -173,6 +173,14 @@ bloqueio progressivo. **Segundo fator TOTP** (`platform/auth/totp.ts`,
 `auth/me`, `auth/logout` e `auth/mfa/*` respondem (`requireAdmin(papel,
 { mfaSetup: true })`). Nunca aceita o Bearer do app. Ver
 `src/modules/admin/admin-auth.plugin.ts`.
+
+**Exclusão de conta pelo cliente** (`modules/users/account-closure.service.ts`):
+`GET /v1/me/deletion-preview` mostra as empresas de que a pessoa é dona
+(membros, assinatura); `DELETE /v1/me` com `closeWorkspaces: true` exclui a
+conta e essas empresas juntas (sem a flag, 409 `LAST_OWNER` com a lista).
+Assinatura do Asaas é cancelada na hora; a do Google Play que ainda renova
+bloqueia (409 `WORKSPACE_SUBSCRIPTION_ACTIVE`: só a pessoa cancela na Play
+Store). O suporte que cancela a exclusão da conta restaura as empresas.
 
 **Ops (`OPS_TOKEN`)**: `/metrics`, `/ops/*` — usados por coletor e scripts;
 sem o token configurado respondem 404.
@@ -242,7 +250,8 @@ Princípios do painel:
   linha do tempo da conta continuar completa. Novas ações entram no
   `AdminAction` (lista fechada) e nos rótulos de `admin/src/lib/labels.ts`.
 - Operações de leitura de estoque são somente leitura; o estoque é do cliente.
-- Exclusão de empresa é lógica e reversível; não existe purga. Ações
+- Exclusão de empresa é lógica e reversível por 90 dias; depois o job
+  `privacy.daily` apaga de vez (fotos do bucket incluídas). Ações
   destrutivas na interface pedem palavra de confirmação (`ConfirmDialog`).
 - O purchase token nunca é exposto (nem cifrado, nem hash). "Forçar" estado de
   assinatura = reconsultar o provedor dela, Google ou Asaas
@@ -467,16 +476,9 @@ Painel/analytics: `ADMIN_PANEL_ENABLED`,
   "Gerenciar em estoquesimples.com.br" (assinatura feita pela web) ainda não
   foi publicada na Play Store; até lá o painel mostra, do app, só o que a
   API observa.
-- Excluir a conta (`DELETE /v1/me`) é recusado a quem é proprietário de
-  alguma empresa (409 `LAST_OWNER`), e não existe rota para o próprio cliente
-  excluir uma empresa: hoje isso passa pelo suporte (painel). Decidir se a
-  empresa de uma pessoa só deve ser encerrada junto com a conta.
 - Só papéis com `membros.remover` conseguem sair de uma empresa; não há rota
   de "sair" para gerente, operador e consulta.
 - Campanhas exigem o FCM configurado mesmo quando o alcance seria só a caixa
   de notificações (conta que só usa a web).
 - O cursor de `GET /v1/notifications` é só `created_at`; dois avisos da mesma
   pessoa no mesmo milissegundo, na fronteira de uma página, podem pular um.
-- Empresas excluídas (lógicas) ficam guardadas indefinidamente; só saem quando
-  a conta do proprietário é apagada (`privacy.daily`). Decidir prazo de purga
-  e exclusão pelo próprio cliente (ver o item sobre `LAST_OWNER`).

@@ -12,6 +12,8 @@ export const ACCOUNT_RECOVERY_DAYS = 30;
  * mesma história da Política de Privacidade). Valores em dias.
  */
 export const RETENTION = {
+  /** Empresas excluídas (pelo suporte ou junto com a conta do dono): apagadas de vez depois disso. */
+  deletedWorkspaces: 90,
   /** Sessões encerradas ou vencidas (IP e navegador de quem entrou). */
   endedSessions: 90,
   /** Tokens de uso único (redefinir senha, confirmar e-mail, abrir a web logada) depois de vencidos. */
@@ -119,21 +121,56 @@ export class PrivacyService {
 
   /** Apaga do bucket as fotos e logotipos das empresas excluídas que pertencem à conta. */
   private async deleteWorkspaceObjects(userId: string): Promise<void> {
+    const owned = await this.services.db.execute<{ id: string }>(sql`SELECT id FROM workspaces WHERE owner_user_id = ${userId} AND deleted_at IS NOT NULL`);
+    await this.deleteObjectsOf(owned.rows.map((row) => row.id));
+  }
+
+  /** Fotos e logotipos destas empresas saem do bucket (antes das linhas, que os localizam). */
+  private async deleteObjectsOf(workspaceIds: string[]): Promise<void> {
     const { storage } = this.services;
-    if (!storage.configured) return;
+    if (!storage.configured || workspaceIds.length === 0) return;
+    const ids = sql.join(workspaceIds.map((id) => sql`${id}::uuid`), sql`, `);
     const images = await this.services.db.execute<{ workspace_id: string; hash: string }>(sql`
-      SELECT i.workspace_id, i.hash FROM workspace_images i JOIN workspaces w ON w.id = i.workspace_id
-      WHERE w.owner_user_id = ${userId} AND w.deleted_at IS NOT NULL
+      SELECT workspace_id, hash FROM workspace_images WHERE workspace_id IN (${ids})
     `);
     const logos = await this.services.db.execute<{ workspace_id: string; logo_hash: string }>(sql`
-      SELECT b.workspace_id, b.logo_hash FROM workspace_brandings b JOIN workspaces w ON w.id = b.workspace_id
-      WHERE w.owner_user_id = ${userId} AND w.deleted_at IS NOT NULL AND b.logo_hash IS NOT NULL
+      SELECT workspace_id, logo_hash FROM workspace_brandings WHERE workspace_id IN (${ids}) AND logo_hash IS NOT NULL
     `);
     const keys = [
       ...images.rows.map((row) => imageKey(row.workspace_id, row.hash)),
       ...logos.rows.map((row) => brandLogoKey(row.workspace_id, row.logo_hash)),
     ];
     for (const key of keys) await storage.delete(key);
+  }
+
+  /**
+   * Apaga de vez as empresas excluídas há mais de `RETENTION.deletedWorkspaces`
+   * dias: estoque, histórico, fotos (bucket e linhas), assinatura e membros
+   * saem juntos (ON DELETE CASCADE); analytics e suporte ficam sem o vínculo.
+   * Até 50 por execução; o resto vai na próxima.
+   */
+  async purgeDeletedWorkspaces(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - RETENTION.deletedWorkspaces * 86_400_000);
+    const due = await this.services.db.execute<{ id: string; name: string }>(sql`
+      SELECT id, name FROM workspaces WHERE deleted_at IS NOT NULL AND deleted_at < ${cutoff} ORDER BY deleted_at LIMIT 50
+    `);
+    let purged = 0;
+    for (const { id } of due.rows) {
+      await this.deleteObjectsOf([id]);
+      await this.services.db.transaction(async (tx) => {
+        await tx.execute(sql`DELETE FROM workspaces WHERE id = ${id} AND deleted_at IS NOT NULL`);
+        await recordAudit(tx, {
+          actorUserId: null,
+          action: AuditAction.WORKSPACE_PURGED,
+          entityType: 'workspace',
+          entityId: id,
+          metadata: { retentionDays: RETENTION.deletedWorkspaces },
+          ipAddress: null,
+        });
+      });
+      purged += 1;
+    }
+    return purged;
   }
 
   /** Aplica as janelas de `RETENTION`. Cada passo é independente: um erro não segura os outros. */
