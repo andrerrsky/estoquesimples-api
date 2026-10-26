@@ -129,7 +129,7 @@ workspace na transação). Consequências:
 | `notifications` | caixa de entrada da conta (app e web) | uma linha por aviso; tabela de sistema, filtrada por `user_id` no serviço ([docs/notifications.md](docs/notifications.md)) |
 | `products` / `stock_movements` | estoque na nuvem | ids UUID gerados no aparelho; movimentações são fatos imutáveis com quantidade **com sinal**; cancelamento = movimento compensatório (`reverses_movement_id`); `quantity_cache` mantido por trigger (desligado na carga inicial); exclusão de produto é lógica (lápide) |
 | `sync_operations` / `sync_cursors` / `initial_uploads(_batches)` / `conflict_log` | infraestrutura de sync | idempotência de operação, posição de cada aparelho, sessão de carga inicial retomável, três lados de cada conflito |
-| `audit_log` | trilha dos clientes | `AuditAction` fechado em `modules/audit/audit.service.ts`; gravada na mesma transação da ação |
+| `audit_log` | trilha dos clientes | `AuditAction` fechado em `modules/audit/audit.service.ts`; gravada na mesma transação da ação, com `ipAddress` e `userAgent` de `requestMeta`. Ação nova de acesso/credenciais entra também em `SECURITY_USER_ACTIONS` (painel: `SECURITY_ADMIN_ACTIONS`), que alimentam o filtro "só segurança" |
 | `jobs` / `app_config` | fila e configuração dinâmica (`sync`, `backup_verificado`) | |
 | `platform_admins` / `admin_sessions` / `admin_audit_log` / `admin_account_notes` | painel administrativo | ver §7 |
 | `analytics_events` | eventos de uso | ver §8 |

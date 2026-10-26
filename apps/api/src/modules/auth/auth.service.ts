@@ -47,6 +47,19 @@ interface IssueSessionInput {
   meta: RequestMeta;
 }
 
+/** Último registro de "login bloqueado" por (conta, IP), para gravar no máximo um por minuto. */
+const blockedRecordedAt = new Map<string, number>();
+
+function shouldRecordBlocked(userId: string, ip: string): boolean {
+  const key = `${userId}|${ip}`;
+  const now = Date.now();
+  const last = blockedRecordedAt.get(key);
+  if (last !== undefined && now - last < 60_000) return false;
+  if (blockedRecordedAt.size > 10_000) blockedRecordedAt.clear();
+  blockedRecordedAt.set(key, now);
+  return true;
+}
+
 export class AuthService {
   constructor(private readonly services: AppServices) {}
 
@@ -106,7 +119,7 @@ export class AuthService {
       const user = inserted[0];
       if (!user) throw new Error('Falha ao criar usuário');
 
-      const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device) : null;
+      const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device, meta) : null;
       const session = await this.issueSession(tx, { userId: user.id, deviceId, meta });
 
       await recordAudit(tx, {
@@ -116,6 +129,7 @@ export class AuthService {
         entityType: 'user',
         entityId: user.id,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       const verificationToken = await this.sendEmailVerification(tx, user.id, user.email);
@@ -178,7 +192,7 @@ export class AuthService {
     const user = inserted[0];
     if (!user) throw new Error('Falha ao criar usuário convidado');
 
-    const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device) : null;
+    const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device, meta) : null;
     const issued = await this.issueSession(tx, { userId: user.id, deviceId, meta });
 
     await recordAudit(tx, {
@@ -189,6 +203,7 @@ export class AuthService {
       entityId: user.id,
       metadata: { origem: 'convite' },
       ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
     });
 
     return this.buildAuthSuccess(user, issued, deviceId);
@@ -211,6 +226,19 @@ export class AuthService {
     // existente ou não: o 429 não revela se o e-mail tem conta.
     const retryAfterSeconds = this.services.throttle.retryAfter('login', input.email, ip);
     if (retryAfterSeconds > 0) {
+      // Tentativa durante o bloqueio: fica na trilha da conta (se existe),
+      // uma vez por minuto por IP, para quem insiste não encher a auditoria.
+      if (user && shouldRecordBlocked(user.id, ip)) {
+        await recordAuditSafe(this.db, {
+          actorUserId: user.id,
+          action: AuditAction.USER_LOGIN_BLOCKED,
+          entityType: 'user',
+          entityId: user.id,
+          metadata: { retryAfterSeconds },
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+        });
+      }
       throw new AppError(429, ErrorCode.AUTH_ACCOUNT_LOCKED, 'Muitas tentativas. Tente novamente mais tarde.', { extra: { retryAfterSeconds } });
     }
 
@@ -231,6 +259,7 @@ export class AuthService {
 
     // Depois da senha: quem não a sabe não descobre que a conta existe e está suspensa.
     if (user.status === 'suspended') {
+      await this.recordLoginDenied(user.id, 'conta_suspensa', meta);
       throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
     }
     this.services.throttle.succeed('login', input.email, ip);
@@ -239,6 +268,7 @@ export class AuthService {
     // não é o dono. Sem esta recusa o login "funcionava" e toda chamada
     // seguinte voltava 401, sem explicação para a pessoa.
     if (user.status === 'pending_deletion') {
+      await this.recordLoginDenied(user.id, 'exclusao_pendente', meta);
       throw new AppError(
         403,
         ErrorCode.AUTH_ACCOUNT_DELETION_PENDING,
@@ -252,7 +282,7 @@ export class AuthService {
         .set({ failedLoginAttempts: 0, lockedUntil: null })
         .where(eq(users.id, user.id));
 
-      const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device) : null;
+      const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device, meta) : null;
       const session = await this.issueSession(tx, { userId: user.id, deviceId, meta });
 
       await recordAudit(tx, {
@@ -262,6 +292,7 @@ export class AuthService {
         entityType: 'user',
         entityId: user.id,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       return this.buildAuthSuccess(user, session, deviceId);
@@ -298,6 +329,14 @@ export class AuthService {
       expiresAt: new Date(Date.now() + expiresIn * 1000),
       requestedIp: meta.ipAddress,
     });
+    await recordAuditSafe(this.db, {
+      actorUserId: userId,
+      action: AuditAction.USER_WEB_HANDOFF_CREATED,
+      entityType: 'user',
+      entityId: userId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
     return { code, expiresIn };
   }
 
@@ -325,7 +364,7 @@ export class AuthService {
         .limit(1);
       if (!user || user.status !== 'active') throw invalid();
 
-      const deviceId = device ? await this.upsertDevice(tx, user.id, { ...device, platform: 'web' }) : null;
+      const deviceId = device ? await this.upsertDevice(tx, user.id, { ...device, platform: 'web' }, meta) : null;
       const session = await this.issueSession(tx, { userId: user.id, deviceId, meta });
       await recordAudit(tx, {
         actorUserId: user.id,
@@ -334,6 +373,7 @@ export class AuthService {
         entityType: 'user',
         entityId: user.id,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
         metadata: { via: 'app' },
       });
       return this.buildAuthSuccess(user, session, deviceId);
@@ -354,6 +394,19 @@ export class AuthService {
    * Roda fora da transação de login porque precisa persistir mesmo quando a
    * requisição termina em erro.
    */
+  /** Senha certa, acesso recusado pelo estado da conta (suspensa, exclusão pendente). */
+  private async recordLoginDenied(userId: string, reason: string, meta: RequestMeta): Promise<void> {
+    await recordAuditSafe(this.db, {
+      actorUserId: userId,
+      action: AuditAction.USER_LOGIN_DENIED,
+      entityType: 'user',
+      entityId: userId,
+      metadata: { reason },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+  }
+
   private async registerFailedLogin(
     userId: string,
     attempts: number,
@@ -374,6 +427,7 @@ export class AuthService {
       entityId: userId,
       metadata: { attempts, lockedUntil: lockedUntil?.toISOString() ?? null },
       ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
     });
   }
 
@@ -440,6 +494,7 @@ export class AuthService {
             entityType: 'session',
             entityId: stored.sessionId,
             ipAddress: meta.ipAddress,
+            userAgent: meta.userAgent,
           });
 
           return { reuse: true };
@@ -548,6 +603,7 @@ export class AuthService {
         entityType: 'session',
         entityId: sessionId,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -586,6 +642,7 @@ export class AuthService {
         entityId: userId,
         metadata: { revokedSessions: revoked },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       return revoked;
@@ -643,6 +700,7 @@ export class AuthService {
         entityType: 'user',
         entityId: user.id,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
 
@@ -715,6 +773,7 @@ export class AuthService {
         entityType: 'user',
         entityId: stored.userId,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -760,6 +819,7 @@ export class AuthService {
         entityId: userId,
         metadata: { revokedOtherSessions: input.revokeOtherSessions },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -873,6 +933,7 @@ export class AuthService {
         entityType: 'user',
         entityId: stored.userId,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
       return stored.userId;
     });
@@ -888,6 +949,7 @@ export class AuthService {
     tx: Transaction,
     userId: string,
     device: DeviceInfo,
+    meta: RequestMeta,
   ): Promise<string> {
     const values = {
       userId,
@@ -917,10 +979,23 @@ export class AuthService {
           revokedAt: null,
         },
       })
-      .returning({ id: devices.id });
+      // xmax = 0: a linha acabou de ser inserida (aparelho novo nesta conta).
+      .returning({ id: devices.id, inserted: sql<boolean>`(xmax = 0)` });
 
     const id = result[0]?.id;
     if (!id) throw new Error('Falha ao registrar dispositivo');
+    if (result[0]?.inserted) {
+      await recordAudit(tx, {
+        actorUserId: userId,
+        actorDeviceId: id,
+        action: AuditAction.DEVICE_REGISTERED,
+        entityType: 'device',
+        entityId: id,
+        metadata: { platform: device.platform, model: device.model ?? null },
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+    }
     return id;
   }
 

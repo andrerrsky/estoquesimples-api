@@ -12,10 +12,10 @@ import {
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
-import { AuditAction, recordAudit } from '../audit/audit.service.js';
+import { AuditAction, SECURITY_USER_ACTIONS, recordAudit } from '../audit/audit.service.js';
 import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
-import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
+import { AdminAction, SECURITY_ADMIN_ACTIONS, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
 import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
 
@@ -645,12 +645,17 @@ export class AdminUsersService {
   // Linha do tempo: auditoria do cliente + ações do suporte sobre ele
   // -------------------------------------------------------------------------
 
-  async timeline(userId: string, query: PaginationQuery) {
+  async timeline(userId: string, query: PaginationQuery & { security?: boolean }) {
     // Um único predicado para linhas e contagem: filtro novo entra num lugar só.
     const userAuditWhere = sql`
-      a.actor_user_id = ${userId}
+      (a.actor_user_id = ${userId}
       OR (a.entity_type = 'user' AND a.entity_id = ${userId})
-      OR (a.entity_type = 'workspace_member' AND a.metadata->>'targetUserId' = ${userId})
+      OR (a.entity_type = 'workspace_member' AND a.metadata->>'targetUserId' = ${userId}))
+      ${query.security ? sql`AND a.action IN ${sqlList(SECURITY_USER_ACTIONS)}` : sql``}
+    `;
+    const adminAuditWhere = sql`
+      l.target_type = 'user' AND l.target_id = ${userId}
+      ${query.security ? sql`AND l.action IN ${sqlList(SECURITY_ADMIN_ACTIONS)}` : sql``}
     `;
     const rowsQuery = this.db.execute<{
       source: 'user' | 'admin';
@@ -658,24 +663,28 @@ export class AdminUsersService {
       action: string;
       at: string;
       actor: string | null;
+      actor_user_id: string | null;
       workspace_id: string | null;
       workspace_name: string | null;
       entity_type: string | null;
       entity_id: string | null;
       metadata: Record<string, unknown>;
       ip: string | null;
+      user_agent: string | null;
     }>(sql`
       SELECT * FROM (
         SELECT 'user'::text AS source, a.id::text, a.action, a.created_at AS at,
-               NULL::text AS actor, a.workspace_id, w.name AS workspace_name,
-               a.entity_type, a.entity_id, a.metadata, host(a.ip_address) AS ip
-        FROM audit_log a LEFT JOIN workspaces w ON w.id = a.workspace_id
+               u.email AS actor, a.actor_user_id, a.workspace_id, w.name AS workspace_name,
+               a.entity_type, a.entity_id, a.metadata, host(a.ip_address) AS ip, a.user_agent
+        FROM audit_log a
+        LEFT JOIN workspaces w ON w.id = a.workspace_id
+        LEFT JOIN users u ON u.id = a.actor_user_id
         WHERE ${userAuditWhere}
         UNION ALL
-        SELECT 'admin'::text, l.id::text, l.action, l.created_at, l.admin_email,
-               NULL::uuid, NULL::text, l.target_type, l.target_id, l.metadata, host(l.ip_address)
+        SELECT 'admin'::text, l.id::text, l.action, l.created_at, l.admin_email, NULL::uuid,
+               NULL::uuid, NULL::text, l.target_type, l.target_id, l.metadata, host(l.ip_address), l.user_agent
         FROM admin_audit_log l
-        WHERE l.target_type = 'user' AND l.target_id = ${userId}
+        WHERE ${adminAuditWhere}
       ) t
       ORDER BY at DESC
       LIMIT ${query.pageSize} OFFSET ${offsetOf(query)}
@@ -683,7 +692,7 @@ export class AdminUsersService {
     const totalQuery = this.db.execute<{ total: number }>(sql`
       SELECT (
         (SELECT count(*) FROM audit_log a WHERE ${userAuditWhere})
-        + (SELECT count(*) FROM admin_audit_log l WHERE l.target_type = 'user' AND l.target_id = ${userId})
+        + (SELECT count(*) FROM admin_audit_log l WHERE ${adminAuditWhere})
       )::int AS total
     `);
     const [rows, total] = await Promise.all([rowsQuery, totalQuery]);
@@ -695,12 +704,14 @@ export class AdminUsersService {
         action: row.action,
         at: new Date(row.at).toISOString(),
         actor: row.actor,
+        actorUserId: row.actor_user_id,
         workspaceId: row.workspace_id,
         workspaceName: row.workspace_name,
         entityType: row.entity_type,
         entityId: row.entity_id,
         metadata: row.metadata ?? {},
         ip: row.ip,
+        userAgent: row.user_agent,
       })),
       page: query.page,
       pageSize: query.pageSize,

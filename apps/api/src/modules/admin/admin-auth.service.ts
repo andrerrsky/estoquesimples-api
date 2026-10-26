@@ -139,7 +139,7 @@ export class AdminAuthService {
       });
 
       await recordAdminAudit(tx, {
-        actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress },
+        actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
         action: AdminAction.ADMIN_LOGGED_IN,
         targetType: 'admin',
         targetId: admin.id,
@@ -163,7 +163,7 @@ export class AdminAuthService {
       .where(eq(platformAdmins.id, admin.id));
 
     await recordAdminAuditSafe(this.db, {
-      actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress },
+      actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
       action: AdminAction.ADMIN_LOGIN_FAILED,
       targetType: 'admin',
       targetId: admin.id,
@@ -259,7 +259,7 @@ export class AdminAuthService {
     if (consumed.length === 0) return false;
     const remaining = consumed[0]!.recoveryCodes;
     await recordAdminAuditSafe(this.db, {
-      actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress },
+      actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
       action: AdminAction.ADMIN_MFA_RECOVERY_USED,
       targetType: 'admin',
       targetId: admin.id,
@@ -335,7 +335,7 @@ export class AdminAuthService {
       await tx.update(adminSessions).set({ revokedAt: new Date() }).where(and(eq(adminSessions.adminId, context.adminId), isNull(adminSessions.revokedAt)));
       await tx.insert(adminSessions).values({ adminId: context.adminId, tokenHash: hashToken(token), ipAddress: meta.ipAddress, userAgent: meta.userAgent, expiresAt });
       await recordAdminAudit(tx, {
-        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress },
+        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
         action: AdminAction.ADMIN_MFA_ENABLED,
         targetType: 'admin',
         targetId: context.adminId,
@@ -373,7 +373,7 @@ export class AdminAuthService {
       this.services.throttle.fail('admin', row.email.toLowerCase(), ip);
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha ou código incorretos.');
     }
-    await this.clearMfa(context.adminId, { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress }, AdminAction.ADMIN_MFA_DISABLED);
+    await this.clearMfa(context.adminId, { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent }, AdminAction.ADMIN_MFA_DISABLED);
     await this.notifySecurity(context.email, 'Segundo fator desativado no painel', 'O segundo fator do seu acesso ao painel do Estoque Simples foi desativado.');
   }
 
@@ -406,7 +406,7 @@ export class AdminAuthService {
         .where(and(eq(adminSessions.id, context.sessionId), isNull(adminSessions.revokedAt)));
 
       await recordAdminAudit(tx, {
-        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress },
+        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
         action: AdminAction.ADMIN_LOGGED_OUT,
         targetType: 'admin',
         targetId: context.adminId,

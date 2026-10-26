@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
+import { describeUserAgent } from '../lib/format';
 import { auditLabel, PLATFORM_LABEL } from '../lib/labels';
 import { Icon, type IconName } from './Icon';
 import { Details, Empty, Pagination, Props, Skeleton, Time } from './ui';
@@ -13,12 +14,14 @@ export interface TimelineItem {
   action: string;
   at: string;
   actor: string | null;
+  actorUserId?: string | null;
   workspaceId: string | null;
   workspaceName: string | null;
   entityType: string | null;
   entityId: string | null;
   metadata: Record<string, unknown>;
   ip: string | null;
+  userAgent?: string | null;
 }
 
 const TONE_CLASS: Record<string, string> = {
@@ -44,7 +47,12 @@ const ICON_BY_PREFIX: Record<string, IconName> = {
   plan: 'tag',
 };
 
-export function TimelineList({ items }: { items: TimelineItem[] }) {
+/**
+ * `selfUserId`: na ficha de uma conta, quem fez é a própria pessoa na maioria
+ * das linhas; aí o nome é omitido e só aparece quando foi outra pessoa (o
+ * dono da empresa, por exemplo) ou o suporte.
+ */
+export function TimelineList({ items, selfUserId }: { items: TimelineItem[]; selfUserId?: string }) {
   if (items.length === 0) return <Empty icon="list" title="Nenhum registro" />;
   return (
     <div className="timeline">
@@ -65,13 +73,18 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
               </div>
               <div className="timeline__meta">
                 <Time value={item.at} relative={false} />
-                {item.actor && <> · {item.actor}</>}
+                {item.source === 'admin' && item.actor && <> · suporte: {item.actor}</>}
+                {item.source === 'user' && item.actorUserId && item.actorUserId !== selfUserId && (
+                  <> · por <Link to={`/usuarios/${item.actorUserId}`}>{item.actor ?? item.actorUserId.slice(0, 8)}</Link></>
+                )}
+                {item.source === 'user' && !item.actorUserId && <> · sistema</>}
                 {item.workspaceName && (
                   <>
                     {' '}· <Link to={`/empresas/${item.workspaceId}`}>{item.workspaceName}</Link>
                   </>
                 )}
-                {item.ip && <> · {item.ip}</>}
+                {item.ip && <> · <span className="mono">{item.ip}</span></>}
+                {item.userAgent && <> · <span title={item.userAgent}>{describeUserAgent(item.userAgent)}</span></>}
               </div>
               {typeof reason === 'string' && <div className="timeline__detail small">“{reason}”</div>}
               {Object.keys(rest).length > 0 && (
@@ -87,17 +100,24 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
   );
 }
 
-export function TimelinePanel({ path, queryKey }: { path: string; queryKey: unknown[] }) {
+export function TimelinePanel({ path, queryKey, selfUserId, securityFilter = false }: { path: string; queryKey: unknown[]; selfUserId?: string; securityFilter?: boolean }) {
   const [page, setPage] = useState(1);
+  const [security, setSecurity] = useState(false);
   const query = useQuery({
-    queryKey: [...queryKey, 'timeline', page],
-    queryFn: () => api.get<Paginated<TimelineItem>>(path, { page, pageSize: 50 }),
+    queryKey: [...queryKey, 'timeline', page, security],
+    queryFn: () => api.get<Paginated<TimelineItem>>(path, { page, pageSize: 50, security: security ? 'true' : undefined }),
     placeholderData: (previous) => previous,
   });
-  if (query.isLoading) return <Skeleton lines={6} />;
   return (
     <div>
-      <TimelineList items={query.data?.items ?? []} />
+      {securityFilter && (
+        <div className="filters" style={{ marginBottom: 12 }}>
+          <label className="checkbox">
+            <input type="checkbox" checked={security} onChange={(event) => { setSecurity(event.target.checked); setPage(1); }} /> só segurança (acessos, senha, sessões, aparelhos, exclusão)
+          </label>
+        </div>
+      )}
+      {query.isLoading ? <Skeleton lines={6} /> : <TimelineList items={query.data?.items ?? []} selfUserId={selfUserId} />}
       {query.data && query.data.total > 50 && (
         <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPage={setPage} />
       )}

@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
+import { useAuth } from '../auth/AuthProvider';
 import { Badge, Card, Details, Empty, PageHeader, Pagination, Props, Skeleton, Tabs, Time } from '../components/ui';
+import { describeUserAgent } from '../lib/format';
 import { useListParams } from '../lib/hooks';
 import { auditLabel } from '../lib/labels';
 
@@ -13,12 +15,14 @@ interface UserAudit {
   at: string;
   actorUserId: string | null;
   actorEmail: string | null;
+  actorName: string | null;
   workspaceId: string | null;
   workspaceName: string | null;
   entityType: string | null;
   entityId: string | null;
   metadata: Record<string, unknown>;
   ip: string | null;
+  userAgent: string | null;
   deviceModel: string | null;
 }
 
@@ -26,19 +30,41 @@ interface AdminAudit {
   id: string;
   adminId: string | null;
   adminEmail: string;
+  adminName: string | null;
   action: string;
   targetType: string | null;
   targetId: string | null;
   targetLabel: string | null;
   metadata: Record<string, unknown>;
   ip: string | null;
+  userAgent: string | null;
   at: string;
+}
+
+/** IP e navegador/app de quem fez a ação, numa linha só. */
+function Origin({ ip, userAgent }: { ip: string | null; userAgent: string | null }) {
+  const browser = describeUserAgent(userAgent);
+  if (!ip && !browser) return null;
+  return (
+    <div className="cell-sub">
+      {ip && <span className="mono">{ip}</span>}
+      {ip && browser && ' · '}
+      {browser && <span title={userAgent ?? undefined}>{browser}</span>}
+    </div>
+  );
 }
 
 const TARGET_PATH: Record<string, string> = { user: '/usuarios', workspace: '/empresas', subscription: '/assinaturas' };
 
 export function AuditPage() {
   const { values, set, page, pageSize } = useListParams();
+  const { can } = useAuth();
+  const security = values['security'] === 'true';
+  const adminList = useQuery({
+    queryKey: ['admins'],
+    queryFn: () => api.get<{ items: Array<{ id: string; name: string; email: string }> }>('/admins'),
+    enabled: can('owner'),
+  });
   const tab = (values['tab'] as 'users' | 'admins') ?? 'users';
   const [search, setSearch] = useState(values['q'] ?? '');
 
@@ -53,13 +79,13 @@ export function AuditPage() {
   const actions = useQuery({ queryKey: ['audit', 'actions'], queryFn: () => api.get<{ user: string[]; admin: string[] }>('/audit/actions') });
   const users = useQuery({
     queryKey: ['audit', 'users', values, page, pageSize],
-    queryFn: () => api.get<Paginated<UserAudit>>('/audit/users', { action: values['action'], q: values['q'], from: values['from'] ? new Date(values['from']) : undefined, to: values['to'] ? new Date(`${values['to']}T23:59:59`) : undefined, page, pageSize }),
+    queryFn: () => api.get<Paginated<UserAudit>>('/audit/users', { action: values['action'], q: values['q'], actorUserId: values['actorUserId'], security: security ? 'true' : undefined, from: values['from'] ? new Date(values['from']) : undefined, to: values['to'] ? new Date(`${values['to']}T23:59:59`) : undefined, page, pageSize }),
     placeholderData: (previous) => previous,
     enabled: tab === 'users',
   });
   const admins = useQuery({
     queryKey: ['audit', 'admins', values, page, pageSize],
-    queryFn: () => api.get<Paginated<AdminAudit>>('/audit/admins', { action: values['action'], includeLogins: values['includeLogins'], from: values['from'] ? new Date(values['from']) : undefined, to: values['to'] ? new Date(`${values['to']}T23:59:59`) : undefined, page, pageSize }),
+    queryFn: () => api.get<Paginated<AdminAudit>>('/audit/admins', { action: values['action'], includeLogins: values['includeLogins'], adminId: values['adminId'], security: security ? 'true' : undefined, from: values['from'] ? new Date(values['from']) : undefined, to: values['to'] ? new Date(`${values['to']}T23:59:59`) : undefined, page, pageSize }),
     placeholderData: (previous) => previous,
     enabled: tab === 'admins',
   });
@@ -70,7 +96,7 @@ export function AuditPage() {
   return (
     <div className="page">
       <PageHeader title="Auditoria" subtitle="O que aconteceu, quando e quem fez. A trilha dos clientes e a dos administradores ficam separadas." />
-      <Tabs value={tab} onChange={(next) => set({ tab: next, action: '', q: '' })} items={[{ key: 'users', label: 'Contas e empresas' }, { key: 'admins', label: 'Administradores' }]} />
+      <Tabs value={tab} onChange={(next) => set({ tab: next, action: '', q: '', actorUserId: '', adminId: '' })} items={[{ key: 'users', label: 'Contas e empresas' }, { key: 'admins', label: 'Administradores' }]} />
 
       <Card flush>
         <div className="filters" style={{ padding: '14px 18px' }}>
@@ -87,10 +113,27 @@ export function AuditPage() {
           </select>
           <input className="input input--sm" type="date" value={values['from'] ?? ''} onChange={(event) => set({ from: event.target.value })} aria-label="De" />
           <input className="input input--sm" type="date" value={values['to'] ?? ''} onChange={(event) => set({ to: event.target.value })} aria-label="Até" />
+          <label className="checkbox"><input type="checkbox" checked={security} onChange={(event) => set({ security: event.target.checked ? 'true' : '' })} /> só segurança</label>
+          {tab === 'users' && values['actorUserId'] && (
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => set({ actorUserId: '' })} title="Remover filtro">
+              {users.data?.items[0]?.actorEmail ?? 'uma conta'} ✕
+            </button>
+          )}
+          {tab === 'admins' && can('owner') && (
+            <select className="select select--sm" value={values['adminId'] ?? ''} onChange={(event) => set({ adminId: event.target.value })} aria-label="Administrador">
+              <option value="">Todos os administradores</option>
+              {adminList.data?.items.map((admin) => <option key={admin.id} value={admin.id}>{admin.name} ({admin.email})</option>)}
+            </select>
+          )}
+          {tab === 'admins' && !can('owner') && values['adminId'] && (
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => set({ adminId: '' })} title="Remover filtro">
+              {admins.data?.items[0]?.adminEmail ?? 'um administrador'} ✕
+            </button>
+          )}
           {tab === 'users' ? (
             <input className="input input--sm input--search" placeholder="E-mail, empresa ou ID de entidade" value={search} onChange={(event) => setSearch(event.target.value)} />
           ) : (
-            <label className="checkbox"><input type="checkbox" checked={values['includeLogins'] === 'true'} onChange={(event) => set({ includeLogins: event.target.checked ? 'true' : '' })} /> incluir logins</label>
+            <label className="checkbox"><input type="checkbox" disabled={security} checked={security || values['includeLogins'] === 'true'} onChange={(event) => set({ includeLogins: event.target.checked ? 'true' : '' })} /> incluir logins</label>
           )}
         </div>
 
@@ -111,7 +154,12 @@ export function AuditPage() {
                         <tr key={entry.id}>
                           <td className="nowrap"><Time value={entry.at} relative={false} /></td>
                           <td><Badge tone={info.tone}>{info.label}</Badge><div className="cell-sub"><code>{entry.action}</code></div></td>
-                          <td>{entry.actorEmail ? <Link to={`/usuarios/${entry.actorUserId}`}>{entry.actorEmail}</Link> : <span className="muted">sistema</span>}{entry.deviceModel && <div className="cell-sub">{entry.deviceModel}</div>}{entry.ip && <div className="cell-sub mono">{entry.ip}</div>}</td>
+                          <td>
+                            {entry.actorEmail ? <Link to={`/usuarios/${entry.actorUserId}`}>{entry.actorName ? `${entry.actorName}` : entry.actorEmail}</Link> : <span className="muted">sistema</span>}
+                            {entry.actorEmail && entry.actorName && <div className="cell-sub">{entry.actorEmail}</div>}
+                            {entry.deviceModel && <div className="cell-sub">{entry.deviceModel}</div>}
+                            <Origin ip={entry.ip} userAgent={entry.userAgent} />
+                          </td>
                           <td>{entry.workspaceName ? <Link to={`/empresas/${entry.workspaceId}`}>{entry.workspaceName}</Link> : <span className="muted">—</span>}</td>
                           <td className="muted small">{entry.entityType ? <>{entry.entityType} <span className="mono">{entry.entityId?.slice(0, 8)}</span></> : '—'}</td>
                           <td>{Object.keys(entry.metadata).length > 0 ? <Details summary="ver"><Props value={entry.metadata} /></Details> : <span className="muted">—</span>}</td>
@@ -143,7 +191,11 @@ export function AuditPage() {
                         <tr key={entry.id}>
                           <td className="nowrap"><Time value={entry.at} relative={false} /></td>
                           <td><Badge tone={info.tone}>{info.label}</Badge><div className="cell-sub"><code>{entry.action}</code></div></td>
-                          <td>{entry.adminEmail}{entry.ip && <div className="cell-sub mono">{entry.ip}</div>}</td>
+                          <td>
+                            {entry.adminId ? <Link to={`/auditoria?tab=admins&adminId=${entry.adminId}`}>{entry.adminName ?? entry.adminEmail}</Link> : (entry.adminName ?? entry.adminEmail)}
+                            {entry.adminName && <div className="cell-sub">{entry.adminEmail}</div>}
+                            <Origin ip={entry.ip} userAgent={entry.userAgent} />
+                          </td>
                           <td>{path && entry.targetId ? <Link to={`${path}/${entry.targetId}`}>{entry.targetLabel ?? entry.targetId.slice(0, 8)}</Link> : <span className="muted small">{entry.targetType ?? '—'} {entry.targetLabel ?? entry.targetId?.slice(0, 8) ?? ''}</span>}</td>
                           <td>
                             {typeof reason === 'string' && <div className="small">“{reason}”</div>}

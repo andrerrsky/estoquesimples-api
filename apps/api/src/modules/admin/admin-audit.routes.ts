@@ -3,8 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { AuditAction } from '../audit/audit.service.js';
-import { AdminAction } from './admin-audit.service.js';
+import { AuditAction, SECURITY_USER_ACTIONS } from '../audit/audit.service.js';
+import { AdminAction, SECURITY_ADMIN_ACTIONS } from './admin-audit.service.js';
 import { requireAdmin } from './admin-auth.plugin.js';
 import { commonAdminErrors, offsetOf, paginationQuerySchema } from './admin.schemas.js';
 
@@ -13,6 +13,8 @@ import { commonAdminErrors, offsetOf, paginationQuerySchema } from './admin.sche
  * administradores (`admin_audit_log`). Só leitura; a escrita acontece nos
  * serviços que executam cada ação.
  */
+const booleanFlag = z.enum(['true', 'false']).optional().transform((v) => v === 'true');
+
 export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<void> {
   const routes = app.withTypeProvider<ZodTypeProvider>();
   const { db } = app.services;
@@ -25,10 +27,21 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
         tags: ['admin'],
         summary: 'Catálogo de ações auditáveis (clientes e administradores)',
         hide: true,
-        response: { 200: z.object({ user: z.array(z.string()), admin: z.array(z.string()) }), ...commonAdminErrors },
+        response: {
+          200: z.object({
+            user: z.array(z.string()),
+            admin: z.array(z.string()),
+            security: z.object({ user: z.array(z.string()), admin: z.array(z.string()) }),
+          }),
+          ...commonAdminErrors,
+        },
       },
     },
-    async () => ({ user: Object.values(AuditAction), admin: Object.values(AdminAction) }),
+    async () => ({
+      user: Object.values(AuditAction),
+      admin: Object.values(AdminAction),
+      security: { user: [...SECURITY_USER_ACTIONS], admin: [...SECURITY_ADMIN_ACTIONS] },
+    }),
   );
 
   routes.get(
@@ -48,6 +61,7 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
           from: z.coerce.date().optional(),
           to: z.coerce.date().optional(),
           q: z.string().trim().max(200).optional(),
+          security: booleanFlag,
         }),
         response: { 200: z.any(), ...commonAdminErrors },
       },
@@ -57,6 +71,7 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
       const conditions = [sql`true`];
       if (f.action) conditions.push(f.action.endsWith('.') ? sql`a.action LIKE ${f.action + '%'}` : sql`a.action = ${f.action}`);
       if (f.actorUserId) conditions.push(sql`a.actor_user_id = ${f.actorUserId}`);
+      if (f.security) conditions.push(sql`a.action IN (${sql.join(SECURITY_USER_ACTIONS.map((action) => sql`${action}`), sql`, `)})`);
       if (f.workspaceId) conditions.push(sql`a.workspace_id = ${f.workspaceId}`);
       if (f.entityType) conditions.push(sql`a.entity_type = ${f.entityType}`);
       if (f.entityId) conditions.push(sql`a.entity_id = ${f.entityId}`);
@@ -79,11 +94,12 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
         db.execute<{
           id: string; action: string; created_at: string; actor_user_id: string | null; actor_email: string | null;
           workspace_id: string | null; workspace_name: string | null; entity_type: string | null; entity_id: string | null;
-          metadata: Record<string, unknown>; ip: string | null; device_model: string | null;
+          metadata: Record<string, unknown>; ip: string | null; device_model: string | null; user_agent: string | null;
+          actor_name: string | null;
         }>(sql`
-          SELECT a.id::text, a.action, a.created_at, a.actor_user_id, u.email AS actor_email,
+          SELECT a.id::text, a.action, a.created_at, a.actor_user_id, u.email AS actor_email, u.name AS actor_name,
                  a.workspace_id, w.name AS workspace_name, a.entity_type, a.entity_id, a.metadata,
-                 host(a.ip_address) AS ip, d.model AS device_model
+                 host(a.ip_address) AS ip, d.model AS device_model, a.user_agent
           ${base}
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT ${f.pageSize} OFFSET ${offsetOf(f)}
@@ -98,12 +114,14 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
           at: new Date(row.created_at).toISOString(),
           actorUserId: row.actor_user_id,
           actorEmail: row.actor_email,
+          actorName: row.actor_name,
           workspaceId: row.workspace_id,
           workspaceName: row.workspace_name,
           entityType: row.entity_type,
           entityId: row.entity_id,
           metadata: row.metadata ?? {},
           ip: row.ip,
+          userAgent: row.user_agent,
           deviceModel: row.device_model,
         })),
         page: f.page,
@@ -128,7 +146,8 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
           targetId: z.string().max(120).optional(),
           from: z.coerce.date().optional(),
           to: z.coerce.date().optional(),
-          includeLogins: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+          includeLogins: booleanFlag,
+          security: booleanFlag,
         }),
         response: { 200: z.any(), ...commonAdminErrors },
       },
@@ -142,7 +161,9 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
       if (f.targetId) conditions.push(sql`l.target_id = ${f.targetId}`);
       if (f.from) conditions.push(sql`l.created_at >= ${f.from}`);
       if (f.to) conditions.push(sql`l.created_at < ${f.to}`);
-      if (!f.includeLogins) {
+      if (f.security) conditions.push(sql`l.action IN (${sql.join(SECURITY_ADMIN_ACTIONS.map((action) => sql`${action}`), sql`, `)})`);
+      // Segurança inclui os logins (e as falhas); fora dela, só com "incluir logins".
+      if (!f.includeLogins && !f.security) {
         conditions.push(sql`l.action NOT IN ('admin.logged_in','admin.logged_out','admin.login_failed')`);
       }
       const where = sql.join(conditions, sql` AND `);
@@ -151,9 +172,11 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
         db.execute<{
           id: string; admin_id: string | null; admin_email: string; action: string; target_type: string | null;
           target_id: string | null; target_label: string | null; metadata: Record<string, unknown>; ip: string | null; created_at: string;
+          user_agent: string | null; admin_name: string | null;
         }>(sql`
           SELECT l.id::text, l.admin_id, l.admin_email, l.action, l.target_type, l.target_id, l.metadata,
-                 host(l.ip_address) AS ip, l.created_at,
+                 host(l.ip_address) AS ip, l.created_at, l.user_agent,
+                 (SELECT name FROM platform_admins WHERE id = l.admin_id) AS admin_name,
                  CASE l.target_type
                    WHEN 'user' THEN (SELECT email FROM users WHERE id::text = l.target_id)
                    WHEN 'workspace' THEN (SELECT name FROM workspaces WHERE id::text = l.target_id)
@@ -173,12 +196,14 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
           id: row.id,
           adminId: row.admin_id,
           adminEmail: row.admin_email,
+          adminName: row.admin_name,
           action: row.action,
           targetType: row.target_type,
           targetId: row.target_id,
           targetLabel: row.target_label,
           metadata: row.metadata ?? {},
           ip: row.ip,
+          userAgent: row.user_agent,
           at: new Date(row.created_at).toISOString(),
         })),
         page: f.page,

@@ -97,10 +97,51 @@ export const READ_ONLY_ADMIN_ACTIONS: ReadonlySet<AdminActionValue> = new Set([
   AdminAction.SUPPORT_DRAFT_GENERATED,
 ]);
 
+/**
+ * Ações de segurança no painel: acesso dos administradores, segundo fator,
+ * gestão de administradores e tudo que mexe em acesso ou credenciais de um
+ * cliente. É o filtro "segurança" da auditoria.
+ */
+export const SECURITY_ADMIN_ACTIONS: readonly AdminActionValue[] = [
+  AdminAction.ADMIN_LOGGED_IN,
+  AdminAction.ADMIN_LOGIN_FAILED,
+  AdminAction.ADMIN_LOGGED_OUT,
+  AdminAction.ADMIN_MFA_ENABLED,
+  AdminAction.ADMIN_MFA_DISABLED,
+  AdminAction.ADMIN_MFA_RESET,
+  AdminAction.ADMIN_MFA_RECOVERY_USED,
+  AdminAction.ADMIN_CREATED,
+  AdminAction.ADMIN_UPDATED,
+  AdminAction.ADMIN_PASSWORD_RESET,
+  AdminAction.ADMIN_DISABLED,
+  AdminAction.ADMIN_REACTIVATED,
+  AdminAction.ADMIN_SESSIONS_REVOKED,
+  AdminAction.USER_SUSPENDED,
+  AdminAction.USER_REACTIVATED,
+  AdminAction.USER_UNLOCKED,
+  AdminAction.USER_EMAIL_VERIFIED,
+  AdminAction.USER_SESSIONS_REVOKED,
+  AdminAction.USER_DEVICE_REVOKED,
+  AdminAction.USER_PASSWORD_RESET_SENT,
+  AdminAction.USER_DELETION_CANCELLED,
+  AdminAction.WORKSPACE_DELETED,
+  AdminAction.WORKSPACE_RESTORED,
+  AdminAction.WORKSPACE_OWNERSHIP_TRANSFERRED,
+  AdminAction.WORKSPACE_MEMBER_ROLE_CHANGED,
+  AdminAction.WORKSPACE_MEMBER_STATUS_CHANGED,
+  AdminAction.WORKSPACE_MEMBER_REMOVED,
+  AdminAction.OPS_SYNC_CONFIG_CHANGED,
+  AdminAction.SETTING_UPDATED,
+  AdminAction.SETTING_REMOVED,
+  AdminAction.DATA_EXPORTED,
+];
+
 export interface AdminActor {
   adminId: string;
   email: string;
   ipAddress: string | null;
+  /** Navegador de quem está no painel (cabeçalho User-Agent). */
+  userAgent?: string | null;
 }
 
 export interface AdminAuditInput {
@@ -130,6 +171,7 @@ export async function recordAdminAudit(
     targetId: entry.targetId ?? null,
     metadata: entry.metadata ?? {},
     ipAddress: entry.actor.ipAddress,
+    userAgent: entry.actor.userAgent?.slice(0, 500) ?? null,
   });
 }
 

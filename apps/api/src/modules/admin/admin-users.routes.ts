@@ -41,12 +41,15 @@ export const timelineItemSchema = z.object({
   action: z.string(),
   at: z.string(),
   actor: z.string().nullable(),
+  /** Conta que fez a ação (quando foi um cliente); nula para suporte e sistema. */
+  actorUserId: z.string().nullable().optional(),
   workspaceId: z.string().nullable(),
   workspaceName: z.string().nullable(),
   entityType: z.string().nullable(),
   entityId: z.string().nullable(),
   metadata: z.record(z.unknown()),
   ip: z.string().nullable(),
+  userAgent: z.string().nullable().optional(),
 });
 
 export const eventItemSchema = z.object({
@@ -117,7 +120,9 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
         summary: 'Linha do tempo: auditoria da conta e ações do suporte sobre ela',
         hide: true,
         params: userParams,
-        querystring: paginationQuerySchema,
+        querystring: paginationQuerySchema.extend({
+          security: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+        }),
         response: { 200: paginatedSchema(timelineItemSchema), ...commonAdminErrors },
       },
     },

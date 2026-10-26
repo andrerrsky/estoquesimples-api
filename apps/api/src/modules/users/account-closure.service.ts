@@ -119,6 +119,7 @@ export class AccountClosureService {
           entityId: item.id,
           metadata: { origem: 'conta_excluida', otherMembers: item.otherMembers },
           ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
         });
       }
       await revokeUserSessions(tx, userId, { reason: 'account_deleted' });
@@ -129,6 +130,7 @@ export class AccountClosureService {
         entityId: userId,
         metadata: { recoverableUntil: recoverableUntil.toISOString(), closedWorkspaces },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
     return { recoverableUntil, closedWorkspaces };

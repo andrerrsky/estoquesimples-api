@@ -213,6 +213,7 @@ export class BillingService {
           entityId: alreadyLinked.id,
           metadata: { reason: 'token_vinculado_a_outra_empresa' },
           ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
         });
         throw conflict(
           ErrorCode.PURCHASE_TOKEN_IN_USE,
@@ -304,6 +305,7 @@ export class BillingService {
         entityId: inserted[0]?.id ?? null,
         metadata: { planKey, state: parsed.state, productId: parsed.productId },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
 

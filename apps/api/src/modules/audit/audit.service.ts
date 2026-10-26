@@ -20,6 +20,11 @@ export const AuditAction = {
   USER_PURGED: 'user.purged',
   USER_DATA_EXPORTED: 'user.data_exported',
   USER_TOKEN_REUSE_DETECTED: 'user.token_reuse_detected',
+  USER_LOGIN_BLOCKED: 'user.login_blocked',
+  USER_LOGIN_DENIED: 'user.login_denied',
+  USER_PROFILE_UPDATED: 'user.profile_updated',
+  USER_SESSION_REVOKED: 'user.session_revoked',
+  USER_WEB_HANDOFF_CREATED: 'user.web_handoff_created',
   DEVICE_REGISTERED: 'device.registered',
   DEVICE_REVOKED: 'device.revoked',
 
@@ -62,6 +67,40 @@ export const AuditAction = {
   STOCK_ADJUSTED: 'stock.adjusted',
 } as const;
 
+/**
+ * Eventos de segurança da conta: acesso, credenciais, sessões e aparelhos,
+ * exclusão e exportação de dados. É o filtro "segurança" do painel.
+ */
+export const SECURITY_USER_ACTIONS: readonly AuditActionValue[] = [
+  AuditAction.USER_REGISTERED,
+  AuditAction.USER_LOGGED_IN,
+  AuditAction.USER_LOGIN_FAILED,
+  AuditAction.USER_ACCOUNT_LOCKED,
+  AuditAction.USER_LOGIN_BLOCKED,
+  AuditAction.USER_LOGIN_DENIED,
+  AuditAction.USER_LOGGED_OUT,
+  AuditAction.USER_LOGGED_OUT_ALL,
+  AuditAction.USER_SESSION_REVOKED,
+  AuditAction.USER_PASSWORD_CHANGED,
+  AuditAction.USER_PASSWORD_RESET_REQUESTED,
+  AuditAction.USER_PASSWORD_RESET_COMPLETED,
+  AuditAction.USER_EMAIL_VERIFIED,
+  AuditAction.USER_PROFILE_UPDATED,
+  AuditAction.USER_WEB_HANDOFF_CREATED,
+  AuditAction.USER_DELETION_REQUESTED,
+  AuditAction.USER_PURGED,
+  AuditAction.USER_DATA_EXPORTED,
+  AuditAction.USER_TOKEN_REUSE_DETECTED,
+  AuditAction.DEVICE_REGISTERED,
+  AuditAction.DEVICE_REVOKED,
+  AuditAction.WORKSPACE_DELETED,
+  AuditAction.WORKSPACE_OWNERSHIP_TRANSFERRED,
+  AuditAction.MEMBER_ROLE_CHANGED,
+  AuditAction.MEMBER_REMOVED,
+  AuditAction.MEMBER_SUSPENDED,
+  AuditAction.DATA_EXPORTED,
+];
+
 export type AuditActionValue = (typeof AuditAction)[keyof typeof AuditAction];
 
 export interface AuditEntryInput {
@@ -73,6 +112,8 @@ export interface AuditEntryInput {
   entityId?: string | null;
   metadata?: Record<string, unknown>;
   ipAddress?: string | null;
+  /** Navegador ou app de quem fez (cabeçalho User-Agent, até 500 caracteres). */
+  userAgent?: string | null;
 }
 
 /**
@@ -95,6 +136,7 @@ export async function recordAudit(
     entityId: entry.entityId ?? null,
     metadata: entry.metadata ?? {},
     ipAddress: entry.ipAddress ?? null,
+    userAgent: entry.userAgent?.slice(0, 500) ?? null,
   });
 }
 

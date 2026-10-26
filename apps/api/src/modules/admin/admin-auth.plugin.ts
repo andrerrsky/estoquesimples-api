@@ -92,7 +92,12 @@ export function requireAdminContext(request: FastifyRequest): AdminContext {
 
 export function adminActor(request: FastifyRequest): AdminActor {
   const context = requireAdminContext(request);
-  return { adminId: context.adminId, email: context.email, ipAddress: request.ip || null };
+  return {
+    adminId: context.adminId,
+    email: context.email,
+    ipAddress: request.ip || null,
+    userAgent: request.headers['user-agent']?.slice(0, 500) ?? null,
+  };
 }
 
 export function adminCookieOptions(env: { NODE_ENV: string; ADMIN_SESSION_MAX_DAYS: number }) {

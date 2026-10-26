@@ -300,6 +300,18 @@ histórico de incidentes.
   quem não cadastrou só vê a tela de cadastro (QR code + 10 códigos de
   recuperação de uso único). Um owner pode zerar o segundo fator de outro
   administrador (as sessões dele caem). Toda ação fica na auditoria.
+- **Logs de segurança**: toda ação de acesso e credenciais fica na
+  auditoria com quem fez (conta ou administrador), IP e navegador/app
+  (User-Agent). Clientes: cadastro, login, senha errada, bloqueio, tentativa
+  durante o bloqueio (no máximo uma por minuto por IP), login recusado por
+  conta suspensa ou em exclusão, logout, sessão encerrada, troca e
+  redefinição de senha, perfil alterado, aparelho novo, aparelho revogado,
+  web aberta pelo app, reuso de token, exportação e exclusão. Painel: login
+  e falhas, segundo fator, gestão de administradores e toda ação sobre
+  clientes. No painel: Auditoria (filtro "só segurança", por conta e por
+  administrador), aba Histórico de cada usuário e "Ver histórico" em
+  Administradores. Senha errada para e-mail sem conta não tem a quem ser
+  atribuída e fica só no freio de tentativas.
 - **Webhooks**: Asaas com token em comparação de tempo constante; Google
   Play com token e, se configurado, JWT OIDC do Pub/Sub
   (`GOOGLE_PUBSUB_OIDC_AUDIENCE`/`_EMAIL`) **[dono: ativar a autenticação na
@@ -335,7 +347,7 @@ histórico de incidentes.
 | Conversas de suporte de quem nunca teve conta (qualquer estado) | 2 anos sem mensagem nova | `privacy.daily` |
 | Sessões encerradas ou vencidas (IP, navegador) | 90 dias | `privacy.daily` |
 | Tokens de uso único vencidos | 30 dias | `privacy.daily` |
-| IP em registros de auditoria (cliente e painel) | 180 dias (o registro fica) | `privacy.daily` |
+| IP e navegador em registros de auditoria (cliente e painel) | 180 dias (o registro fica) | `privacy.daily` |
 | Caixa de notificações | 365 dias | `privacy.daily` |
 | Aparelhos para push sem uso | 180 dias | `privacy.daily` |
 | Conversas de suporte resolvidas | 2 anos sem mensagem nova | `privacy.daily` |

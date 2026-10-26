@@ -69,6 +69,7 @@ export class WorkspaceService {
         entityId: workspace.id,
         metadata: { name: workspace.name },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       return {
@@ -167,6 +168,7 @@ export class WorkspaceService {
         entityId: workspaceId,
         metadata: { fields: Object.keys(patch) },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -271,6 +273,7 @@ export class WorkspaceService {
         entityId: target.id,
         metadata: { targetUserId, from: target.roleKey, to: newRoleKey },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -325,6 +328,7 @@ export class WorkspaceService {
         entityId: target.id,
         metadata: { targetUserId, role: target.roleKey },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -393,6 +397,7 @@ export class WorkspaceService {
         entityId: target.id,
         metadata: { targetUserId },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -449,6 +454,7 @@ export class WorkspaceService {
         entityId: workspaceId,
         metadata: { from: currentOwnerId, to: newOwnerUserId },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
