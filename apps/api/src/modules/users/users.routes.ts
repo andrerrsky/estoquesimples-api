@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import {
 } from '../../platform/http/errors.js';
 import { verifyPassword } from '../../platform/auth/password.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
-import { AuditAction, recordAudit } from '../audit/audit.service.js';
+import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
 import { revokeUserSessions } from '../auth/auth.service.js';
 import { deviceInfoSchema, errorSchema, messageSchema } from '../auth/auth.schemas.js';
 import { requestMeta } from '../auth/auth.routes.js';
@@ -84,7 +84,19 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const auth = requireAuth(request);
-      await db.update(users).set({ name: request.body.name }).where(eq(users.id, auth.userId));
+      const meta = requestMeta(request);
+      await db.transaction(async (tx) => {
+        await tx.update(users).set({ name: request.body.name }).where(eq(users.id, auth.userId));
+        await recordAudit(tx, {
+          actorUserId: auth.userId,
+          action: AuditAction.USER_PROFILE_UPDATED,
+          entityType: 'user',
+          entityId: auth.userId,
+          metadata: { fields: ['name'] },
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+        });
+      });
       return { message: 'Perfil atualizado.' };
     },
   );
@@ -172,9 +184,19 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
             isNull(sessions.revokedAt),
           ),
         )
-        .returning({ id: sessions.id });
+        .returning({ id: sessions.id, deviceId: sessions.deviceId });
 
       if (revoked.length === 0) throw notFound('Sessão não encontrada.');
+      const meta = requestMeta(request);
+      await recordAuditSafe(db, {
+        actorUserId: auth.userId,
+        action: AuditAction.USER_SESSION_REVOKED,
+        entityType: 'session',
+        entityId: request.params.sessionId,
+        metadata: { deviceId: revoked[0]?.deviceId ?? null, current: request.params.sessionId === auth.sessionId },
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
       return { message: 'Sessão encerrada.' };
     },
   );
@@ -272,10 +294,24 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
             revokedAt: null,
           },
         })
-        .returning({ id: devices.id });
+        // xmax = 0: a linha acabou de ser inserida (aparelho novo nesta conta).
+        .returning({ id: devices.id, inserted: sql<boolean>`(xmax = 0)` });
 
       const deviceId = result[0]?.id;
       if (!deviceId) throw notFound('Falha ao registrar dispositivo.');
+      if (result[0]?.inserted) {
+        const meta = requestMeta(request);
+        await recordAuditSafe(db, {
+          actorUserId: auth.userId,
+          actorDeviceId: deviceId,
+          action: AuditAction.DEVICE_REGISTERED,
+          entityType: 'device',
+          entityId: deviceId,
+          metadata: { platform: body.platform, model: body.model ?? null },
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+        });
+      }
       return { deviceId };
     },
   );
@@ -329,6 +365,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
           entityType: 'device',
           entityId: request.params.deviceId,
           ipAddress: requestMeta(request).ipAddress,
+          userAgent: requestMeta(request).userAgent,
         });
       });
 

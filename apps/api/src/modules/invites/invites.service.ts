@@ -172,6 +172,7 @@ export class InvitesService {
         entityId: criado.id,
         metadata: { roleKey: body.roleKey },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       return criado;
@@ -238,6 +239,7 @@ export class InvitesService {
         entityType: 'invite',
         entityId: inviteId,
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
     });
   }
@@ -413,6 +415,7 @@ export class InvitesService {
         entityId: convite.id,
         metadata: { roleKey: convite.roleKey },
         ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
       });
 
       return { workspaceId: convite.workspaceId, roleKey: convite.roleKey, auth: sessao };

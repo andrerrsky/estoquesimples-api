@@ -71,6 +71,7 @@ export async function registerPrivacyRoutes(app: FastifyInstance): Promise<void>
         entityType: 'user',
         entityId: id,
         ipAddress: requestMeta(request).ipAddress,
+        userAgent: requestMeta(request).userAgent,
       });
 
       return reply

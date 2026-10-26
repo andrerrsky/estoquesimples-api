@@ -327,8 +327,12 @@ export function UserDetailPage() {
       )}
 
       {tab === 'historico' && (
-        <Card title="Histórico" subtitle="Auditoria da conta e ações do suporte sobre ela, mais recentes primeiro">
-          <TimelinePanel path={`/users/${userId}/timeline`} queryKey={queryKey} />
+        <Card
+          title="Histórico"
+          subtitle="O que esta conta fez e o que fizeram com ela (outras pessoas da empresa e o suporte), com IP e navegador ou app. Mais recentes primeiro."
+          actions={<Link className="btn btn--ghost btn--sm" to={`/auditoria?tab=users&actorUserId=${userId}`}>Abrir na auditoria</Link>}
+        >
+          <TimelinePanel path={`/users/${userId}/timeline`} queryKey={queryKey} selfUserId={userId} securityFilter />
         </Card>
       )}
 

@@ -73,6 +73,7 @@ export const adminAuditLog = pgTable(
     targetId: text('target_id'),
     metadata: jsonb('metadata').notNull().default({}),
     ipAddress: inet('ip_address'),
+    userAgent: text('user_agent'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   },
   (table) => [

@@ -312,6 +312,7 @@ export class AsaasBillingService {
             entityId: createdRow.id,
             metadata: { provider: 'asaas', planKey: WEB_PLAN_KEY, cycle: input.cycle, billingType: input.billingType },
             ipAddress: meta.ipAddress,
+            userAgent: meta.userAgent,
           });
         }
         return createdRow;
@@ -426,6 +427,7 @@ export class AsaasBillingService {
       entityId: live.id,
       metadata: { provider: 'asaas', event: 'cancelamento_solicitado' },
       ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
     });
     await this.refreshSubscription(live.id);
     await trackServerEvent(this.services, {

@@ -471,15 +471,16 @@ export class AdminWorkspacesService {
     const rowsQuery = this.db.execute<{
       source: 'user' | 'admin'; id: string; action: string; at: string; actor: string | null;
       entity_type: string | null; entity_id: string | null; metadata: Record<string, unknown>; ip: string | null;
+      actor_user_id: string | null; user_agent: string | null;
     }>(sql`
       SELECT * FROM (
         SELECT 'user'::text AS source, a.id::text, a.action, a.created_at AS at, u.email AS actor,
-               a.entity_type, a.entity_id, a.metadata, host(a.ip_address) AS ip
+               a.entity_type, a.entity_id, a.metadata, host(a.ip_address) AS ip, a.actor_user_id, a.user_agent
         FROM audit_log a LEFT JOIN users u ON u.id = a.actor_user_id
         WHERE a.workspace_id = ${workspaceId}
         UNION ALL
         SELECT 'admin'::text, l.id::text, l.action, l.created_at, l.admin_email,
-               l.target_type, l.target_id, l.metadata, host(l.ip_address)
+               l.target_type, l.target_id, l.metadata, host(l.ip_address), NULL::uuid, l.user_agent
         FROM admin_audit_log l
         WHERE l.target_type = 'workspace' AND l.target_id = ${workspaceId}
       ) t
@@ -500,12 +501,14 @@ export class AdminWorkspacesService {
         action: row.action,
         at: new Date(row.at).toISOString(),
         actor: row.actor,
+        actorUserId: row.actor_user_id,
         workspaceId,
         workspaceName: null,
         entityType: row.entity_type,
         entityId: row.entity_id,
         metadata: row.metadata ?? {},
         ip: row.ip,
+        userAgent: row.user_agent,
       })),
       page: query.page,
       pageSize: query.pageSize,

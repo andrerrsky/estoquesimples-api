@@ -165,3 +165,35 @@ export function initials(name: string): string {
 export function pluralize(count: number, singular: string, plural: string): string {
   return `${fmtNumber(count)} ${count === 1 ? singular : plural}`;
 }
+
+/**
+ * Resumo legível do User-Agent ("Chrome 130 · macOS", "App Android 2.4"),
+ * para a auditoria. O texto completo fica no título (passar o mouse).
+ */
+export function describeUserAgent(ua: string | null | undefined): string | null {
+  if (!ua) return null;
+  if (ua === 'painel-admin') return 'Painel (suporte)';
+  const app = /okhttp|Dalvik|EstoqueSimples/i.test(ua);
+  const os = /Android/i.test(ua)
+    ? 'Android'
+    : /iPhone|iPad|iOS/i.test(ua)
+      ? 'iOS'
+      : /Windows/i.test(ua)
+        ? 'Windows'
+        : /Mac OS X|Macintosh/i.test(ua)
+          ? 'macOS'
+          : /Linux/i.test(ua)
+            ? 'Linux'
+            : null;
+  if (app) return `App${os ? ` ${os}` : ''}`;
+  const browser =
+    /Edg\/(\d+)/.exec(ua) ? `Edge ${/Edg\/(\d+)/.exec(ua)?.[1]}`
+    : /OPR\/(\d+)/.exec(ua) ? `Opera ${/OPR\/(\d+)/.exec(ua)?.[1]}`
+    : /Firefox\/(\d+)/.exec(ua) ? `Firefox ${/Firefox\/(\d+)/.exec(ua)?.[1]}`
+    : /Chrome\/(\d+)/.exec(ua) ? `Chrome ${/Chrome\/(\d+)/.exec(ua)?.[1]}`
+    : /Version\/(\d+).*Safari/.exec(ua) ? `Safari ${/Version\/(\d+)/.exec(ua)?.[1]}`
+    : /curl|python|node|axios|Go-http/i.test(ua) ? 'Script/ferramenta'
+    : null;
+  if (!browser && !os) return ua.slice(0, 40);
+  return [browser, os].filter(Boolean).join(' · ');
+}

@@ -95,7 +95,7 @@ export class PrivacyService {
         await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
         await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id} OR (user_id IS NULL AND lower(contact_email) = ${email})`);
         await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
-        await tx.execute(sql`UPDATE audit_log SET ip_address = NULL WHERE actor_user_id = ${id}`);
+        await tx.execute(sql`UPDATE audit_log SET ip_address = NULL, user_agent = NULL WHERE actor_user_id = ${id}`);
         // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
         await tx.execute(sql`
           UPDATE admin_audit_log
@@ -182,8 +182,8 @@ export class PrivacyService {
       passwordResetTokens: sql`DELETE FROM password_reset_tokens WHERE expires_at < ${days(RETENTION.usedTokens)}`,
       emailVerificationTokens: sql`DELETE FROM email_verification_tokens WHERE expires_at < ${days(RETENTION.usedTokens)}`,
       webHandoffTokens: sql`DELETE FROM web_handoff_tokens WHERE expires_at < ${days(RETENTION.usedTokens)}`,
-      auditIp: sql`UPDATE audit_log SET ip_address = NULL WHERE ip_address IS NOT NULL AND created_at < ${days(RETENTION.auditIp)}`,
-      adminAuditIp: sql`UPDATE admin_audit_log SET ip_address = NULL WHERE ip_address IS NOT NULL AND created_at < ${days(RETENTION.auditIp)}`,
+      auditIp: sql`UPDATE audit_log SET ip_address = NULL, user_agent = NULL WHERE (ip_address IS NOT NULL OR user_agent IS NOT NULL) AND created_at < ${days(RETENTION.auditIp)}`,
+      adminAuditIp: sql`UPDATE admin_audit_log SET ip_address = NULL, user_agent = NULL WHERE (ip_address IS NOT NULL OR user_agent IS NOT NULL) AND created_at < ${days(RETENTION.auditIp)}`,
       notifications: sql`DELETE FROM notifications WHERE created_at < ${days(RETENTION.notifications)}`,
       pushTokens: sql`DELETE FROM push_tokens WHERE (revoked_at IS NOT NULL AND revoked_at < ${days(RETENTION.endedSessions)}) OR last_seen_at < ${days(RETENTION.stalePushTokens)}`,
       supportTickets: sql`DELETE FROM support_tickets WHERE status = 'resolved' AND last_message_at < ${days(RETENTION.closedSupport)}`,

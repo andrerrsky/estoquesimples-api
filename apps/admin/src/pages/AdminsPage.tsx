@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -23,6 +23,7 @@ type Dialog = null | 'create' | { kind: 'role'; admin: Admin } | { kind: 'disabl
 
 export function AdminsPage() {
   const { admin: me, can } = useAuth();
+  const navigate = useNavigate();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -65,6 +66,8 @@ export function AdminsPage() {
                     <td>
                       <ActionMenu
                         items={[
+                          { label: 'Ver histórico', icon: 'list', onClick: () => navigate(`/auditoria?tab=admins&adminId=${admin.id}&includeLogins=true`) },
+                          'sep',
                           { label: 'Alterar papel', icon: 'edit', disabled: admin.id === me?.id, onClick: () => { setRole(admin.role); setDialog({ kind: 'role', admin }); } },
                           { label: 'Redefinir senha', icon: 'key', onClick: () => { setPassword(''); setDialog({ kind: 'password', admin }); } },
                           { label: 'Encerrar sessões', icon: 'logout', onClick: () => setDialog({ kind: 'sessions', admin }) },
