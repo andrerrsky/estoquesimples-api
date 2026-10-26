@@ -159,3 +159,20 @@ describe('expurgo e retenção: suporte anônimo e avisos de cobrança', () => {
     expect(restantes.map((row) => row.notification_id)).toEqual(['evento-recente']);
   });
 });
+
+describe('retenção: conversas de quem nunca teve conta', () => {
+  it('apaga a conversa anônima parada há mais de 2 anos e mantém a recente e a de conta', async () => {
+    const user = await registerUser(context);
+    const old = new Date(Date.now() - (RETENTION.closedSupport + 5) * 86_400_000);
+    await context.services.db.execute(sql`
+      INSERT INTO support_tickets (install_id, subject, last_message_at, user_id) VALUES
+        ('instalacao-anonima-antiga-0000000000001', 'Antiga', ${old}, NULL),
+        ('instalacao-anonima-recente-000000000001', 'Recente', now(), NULL),
+        ('instalacao-da-conta-antiga-000000000001', 'De conta', ${old}, ${user.userId})
+    `);
+    const removed = await new PrivacyService(context.services).applyRetention();
+    expect(removed['anonymousSupport']).toBe(1);
+    const restantes = (await context.services.db.execute<{ subject: string }>(sql`SELECT subject FROM support_tickets ORDER BY subject`)).rows;
+    expect(restantes.map((row) => row.subject)).toEqual(['De conta', 'Recente']);
+  });
+});

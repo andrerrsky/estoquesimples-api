@@ -3,6 +3,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { backupRecordSchema } from './ops.schemas.js';
+
 import { appConfig } from '../../platform/db/schema/index.js';
 import { safeEquals } from '../../platform/auth/tokens.js';
 import { ErrorCode, notFound, unauthorized } from '../../platform/http/errors.js';
@@ -260,20 +262,7 @@ export async function registerOpsRoutes(app: FastifyInstance): Promise<void> {
         tags: ['infra'],
         summary: 'Registra o resultado de uma restauração de teste',
         hide: true,
-        body: z.object({
-          origem: z.string().max(200),
-          tabelas: z.number().int().nonnegative(),
-          registros: z.number().int().nonnegative(),
-          duracaoSegundos: z.number().nonnegative(),
-          /** Onde a cópia externa foi guardada e o SHA-256 do arquivo cifrado. */
-          objeto: z.string().max(300).optional(),
-          sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
-          migracao: z.number().int().nonnegative().max(1_000_000).optional(),
-          schemaAtras: z.boolean().optional(),
-          migracoesAtras: z.number().int().nonnegative().max(1_000_000).optional(),
-          /** Fotos no bucket de origem na noite do backup (espelhadas na cópia). */
-          fotos: z.number().int().nonnegative().max(1_000_000_000).optional(),
-        }),
+        body: backupRecordSchema,
         response: { 200: z.object({ message: z.string() }), 401: errorSchema, 404: errorSchema },
       },
     },

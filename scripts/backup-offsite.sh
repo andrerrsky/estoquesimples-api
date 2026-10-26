@@ -2,7 +2,7 @@
 # Backup externo do Estoque Simples, em fases (uma por passo do workflow, cada
 # uma só com as credenciais de que precisa). Usado por
 # .github/workflows/backup-offsite.yml (produção, toda noite) e por
-# .github/workflows/backup-offsite-test.yml (CI, contra MinIO), que exercita
+# .github/workflows/backup-offsite-test.yml (CI, contra um S3 local), que exercita
 # todas as fases e as travas.
 #
 #   scripts/backup-offsite.sh <fase>
@@ -43,6 +43,10 @@ precisa() {
 case "$fase" in
   check)
     precisa BACKUP_DATABASE_URL AGE_RECIPIENT DUMPS_REMOTE IMAGES_SOURCE IMAGES_DEST
+    # "remoto:bucket" completo: um segredo de bucket vazio deixaria só "remoto:".
+    for nome in DUMPS_REMOTE IMAGES_SOURCE IMAGES_DEST; do
+      [[ "${!nome}" =~ ^[a-z0-9]+:[A-Za-z0-9._-]+$ ]] || erro "$nome precisa ser remoto:bucket (recebido: '${!nome}')"
+    done
     if [ "${ALLOW_INSECURE_DB:-}" != "1" ]; then
       # O banco é alcançado pelo proxy público do Railway: TLS obrigatório.
       case "$BACKUP_DATABASE_URL" in
@@ -81,7 +85,10 @@ case "$fase" in
     remoto="$(rclone cat "$DUMPS_REMOTE/$objeto" | sha256sum | cut -d' ' -f1)"
     [ "$remoto" = "$sha" ] || erro "O arquivo no bucket não confere com o enviado"
     jq -n --arg objeto "$objeto" --arg sha "$sha" '{objeto: $objeto, sha256: $sha}' > "$WORKDIR/envio.json"
+    # Fica no log do GitHub, fora do banco de produção: na restauração, é com
+    # ele que se reconhece o dump verdadeiro (ver docs/seguranca.md, passo 2).
     echo "Enviado: $objeto"
+    echo "SHA-256: $sha"
     ;;
 
   photos)
@@ -110,7 +117,7 @@ case "$fase" in
     for arquivo in verificacao envio fotos; do
       [ -s "$WORKDIR/$arquivo.json" ] || erro "Falta $arquivo.json: alguma fase anterior não terminou."
     done
-    body="$(jq -c -s '{origem: "backup-offsite"} + .[0] + .[1] + .[2] | {origem, tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras, objeto, sha256, fotos}' \
+    body="$(jq -c -s '{origem: "backup-offsite"} + .[0] + .[1] + .[2] | {origem, tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras, schemaAFrente, migracoesAFrente, objeto, sha256, fotos}' \
       "$WORKDIR/verificacao.json" "$WORKDIR/envio.json" "$WORKDIR/fotos.json")"
     curl -fsS -X POST "$API_BASE_URL/ops/backup" \
       -H "authorization: Bearer $OPS_BACKUP_TOKEN" -H 'content-type: application/json' --data "$body"
@@ -118,6 +125,9 @@ case "$fase" in
     ;;
 
   finish)
+    if [ "$(jq -r '.schemaAFrente' "$WORKDIR/verificacao.json")" = "true" ]; then
+      erro "O banco de produção está $(jq -r '.migracoesAFrente' "$WORKDIR/verificacao.json") migration(s) à frente do repositório (deploy de outra branch, revert no main ou banco errado). Backup guardado; confira."
+    fi
     if [ "$(jq -r '.schemaAtras' "$WORKDIR/verificacao.json")" = "true" ]; then
       erro "O banco de produção está $(jq -r '.migracoesAtras' "$WORKDIR/verificacao.json") migration(s) atrás do repositório. Backup guardado; confira o deploy no Railway."
     fi

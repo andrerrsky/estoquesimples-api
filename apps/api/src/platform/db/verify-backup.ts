@@ -191,7 +191,7 @@ interface Conferencia {
   migracao: number;
 }
 
-async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean; migracoesAtras: number }> {
+async function conferir(target: string, schemaAtrasOk = false): Promise<Conferencia & { schemaAtras: boolean; migracoesAtras: number; schemaAFrente: boolean; migracoesAFrente: number }> {
   const client = new pg.Client({ connectionString: target });
   await client.connect();
 
@@ -282,7 +282,10 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
     const ultimaRestaurada = Number(migracao.rows[0]?.maior ?? 0);
 
     // Dump mais novo que o código: algo está muito errado (outro banco?).
-    if (ultimaRestaurada > ultimaEsperada) {
+    // Dump à frente do repositório: migration aplicada antes do merge (hotfix
+    // de outra branch, revert no main) ou banco errado. Com --schema-atras-ok
+    // o dump também é guardado e o relatório marca; sem, é erro.
+    if (ultimaRestaurada > ultimaEsperada && !schemaAtrasOk) {
       throw new Error(`O dump está na migration ${ultimaRestaurada}, à frente do repositório (${ultimaEsperada}).`);
     }
     // Dump atrás do repositório: normal entre o merge de uma migration e o
@@ -301,6 +304,8 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
     return {
       schemaAtras: ultimaRestaurada < ultimaEsperada,
       migracoesAtras: Math.max(0, ultimaEsperada - ultimaRestaurada),
+      schemaAFrente: ultimaRestaurada > ultimaEsperada,
+      migracoesAFrente: Math.max(0, ultimaRestaurada - ultimaEsperada),
       tabelas: Number(tabelas.rows[0]?.total ?? 0),
       registros,
       politicas: Number(politicas.rows[0]?.total ?? 0),
@@ -322,7 +327,7 @@ async function main(): Promise<void> {
   await garantirPapeis(config.target, await papeisDoDump(config.dump));
   await restaurar(config.dump, config.target);
 
-  const { tabelas, registros, politicas, grants, migracao, schemaAtras, migracoesAtras } = await conferir(config.target, config.schemaAtrasOk);
+  const { tabelas, registros, politicas, grants, migracao, schemaAtras, migracoesAtras, schemaAFrente, migracoesAFrente } = await conferir(config.target, config.schemaAtrasOk);
   const duracaoSegundos = Math.round((Date.now() - inicio) / 100) / 10;
 
   console.log(
@@ -332,7 +337,7 @@ async function main(): Promise<void> {
   );
 
   if (config.reportFile) {
-    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras }));
+    await writeFile(config.reportFile, JSON.stringify({ tabelas, registros, duracaoSegundos, migracao, schemaAtras, migracoesAtras, schemaAFrente, migracoesAFrente }));
   }
   // O registro em /ops/backup é feito pelo workflow, só depois de guardar a cópia
   // (scripts/backup-offsite.sh): verificar não é o mesmo que ter backup.

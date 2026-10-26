@@ -66,7 +66,10 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      segunda regra o arquivo expirado continua guardado para sempre. O Object
      Lock garante que nada sai antes dos 35 dias. Chave **só deste bucket**,
      com listar, ler e gravar (`s3:ListBucket`, `s3:GetObject`, `s3:PutObject`;
-     B2: `listFiles`, `readFiles`, `writeFiles`) e **sem apagar**;
+     B2: `listFiles`, `readFiles`, `writeFiles`) e **sem apagar**. No S3,
+     acrescente à política da chave uma negação de `s3:PutObject` quando
+     `s3:if-none-match` não for `*` (gravação condicional): assim ela só
+     cria nomes novos e não consegue nem empilhar versões falsas;
    - **cópia das fotos** (`BACKUP_IMAGES_BUCKET`): **S3**: versionamento ligado,
      sem expiração dos objetos atuais e `NoncurrentVersionExpiration: 35`; chave
      só deste bucket com `s3:ListBucket`, `s3:GetBucketVersioning`,
@@ -79,7 +82,7 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      versionamento pela API S3).
 
    Com isso, uma chave vazada do GitHub não destrói nada antes do prazo, e o
-   dado de uma conta expurgada sai das cópias em até 36 dias. **Trimestralmente**,
+   dado de uma conta expurgada sai das cópias em até 36 dias (35 de retenção + 1 de limpeza). **Trimestralmente**,
    confira que não há objeto com mais de 36 dias em `db/` (`rclone lsl`).
 2. Gere o par de chaves `age` num computador confiável:
    `age-keygen -o estoque-backup.key` — guarde o arquivo **no gerenciador de
@@ -104,7 +107,11 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 4. No Railway, crie `OPS_BACKUP_TOKEN` (`openssl rand -hex 32`): ele só
    registra restaurações de teste em `/ops/backup` — o `OPS_TOKEN` não vai
    para o GitHub.
-5. No GitHub (*Settings → Secrets and variables → Actions*), cadastre os
+5. No GitHub, em *Watch → Custom → Actions*, ligue o aviso de runs que
+   falharam (ou uma regra de e-mail para os avisos do GitHub Actions): o
+   alerta `backup_desatualizado` cobre a falta de registro, e o aviso do
+   GitHub cobre um registro forjado com o token de backup.
+6. No GitHub (*Settings → Secrets and variables → Actions*), cadastre os
    segredos listados no topo de `backup-offsite.yml` (com o mesmo
    `OPS_BACKUP_TOKEN`) e a variável `BACKUP_OFFSITE_ENABLED=true`. Rode o
    workflow manualmente uma vez e confira `/ops/backup` (`dentroDoPrazo:
@@ -145,8 +152,16 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    secret_access_key = <S3_SECRET_ACCESS_KEY>
    ```
    ```bash
-   rclone copy backup:<bucket-dos-dumps>/db/AAAA/MM/DD/ ./restauracao/
-   sha256sum -c <(echo "$(cat arquivo.dump.age.sha256)  arquivo.dump.age")
+   # Quem tem a chave dos dumps consegue gravar uma versão nova por cima do
+   # mesmo nome (a original, travada, vira versão antiga). Liste as versões:
+   aws s3api list-object-versions --bucket <bucket-dos-dumps> --prefix db/AAAA/MM/DD/ \
+     --query 'Versions[].[Key,VersionId,LastModified]' --output table
+   # Se um nome tiver mais de uma versão, use a MAIS ANTIGA (a travada) e
+   # confira o SHA-256 com o impresso no log do run do GitHub daquela noite
+   # ("SHA-256: …" no passo "Cifrar, enviar e conferir o dump") — não com o
+   # .sha256 do bucket nem com /ops/backup, que podem ter sido trocados.
+   aws s3api get-object --bucket <bucket-dos-dumps> --key <chave> --version-id <versao-mais-antiga> arquivo.dump.age
+   sha256sum arquivo.dump.age   # tem de bater com o log do GitHub
    age --decrypt --identity estoque-backup.key --output backup.dump arquivo.dump.age
    ```
 3. **Conferir antes de usar**, num banco descartável:
@@ -279,8 +294,8 @@ histórico de incidentes.
   notificações saem junto), as conversas de suporte dela, as fotos das
   empresas já excluídas que ela possuía, o e-mail dela em públicos de
   campanha e na trilha do painel, e desvincula analytics, erros e auditoria
-  (sem IP). Nas cópias de backup (dumps e fotos), o dado some em até 35 dias
-  pelas regras de versão do bucket.
+  (sem IP). Nas cópias de backup (dumps e fotos), o dado some em até 36 dias
+  (35 de retenção + 1 de limpeza) pelas regras de versão do bucket.
 
 ### Retenção
 
@@ -313,4 +328,5 @@ histórico de incidentes.
 | Google Analytics no painel (`script-src` com googletagmanager.com) | pedido do produto (medir o uso do painel); só carrega depois do aceite no aviso de cookies; o cookie de sessão é httpOnly e as mutações exigem cabeçalho anti-CSRF; segundo fator obrigatório. Para tirar: remover `lib/ga.ts` do painel e o domínio da CSP em `admin-static.ts` | se o painel ganhar ações mais sensíveis |
 | Texto livre (motivo, nota) na trilha do painel pode citar dado pessoal | o expurgo tira e-mail e nome dos campos estruturados; o painel orienta a não escrever dado pessoal no motivo | revisão anual |
 | Dados do pagador da empresa (`billing_customers`) ficam enquanto a empresa existir | ligados à empresa, não à pessoa; saem com a empresa (decisão de produto pendente em AGENTS.md §13) | com a decisão de purga de empresas |
+| Dump por `sslmode=require` sem conferir o certificado do proxy do Railway | o Railway não publica uma CA para `verify-full` no proxy TCP; o tráfego é cifrado, o usuário é só leitura com 2 conexões, e o dump já sai cifrado com `age` antes de ir para o bucket; trocar para `verify-full` se o Railway passar a oferecer | quando o Railway publicar a CA |
 | Freio de tentativas em memória | instância única; um deploy só devolve tentativas a quem já estava bloqueado | se houver mais de uma instância |

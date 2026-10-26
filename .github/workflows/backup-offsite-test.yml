@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   backup-offsite:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # fixo: a instalação das ferramentas depende da versão do Ubuntu
     timeout-minutes: 30
 
     services:
@@ -77,7 +77,7 @@ jobs:
 
       - name: S3 local, buckets e fotos de exemplo
         run: |
-          docker run -d --name s3local -p 4566:4566 -e SERVICES=s3 localstack/localstack:3.8.1
+          docker run -d --name s3local -p 4566:4566 -e SERVICES=s3 localstack/localstack:3.8.1@sha256:b279c01f4cfb8f985a482e4014cabc1e2697b9d7a6c8c8db2e40f4d9f93687c7
           for i in $(seq 1 60); do curl -fsS "$S3_URL/_localstack/health" | grep -q '"s3": "\(available\|running\)"' && break; sleep 2; done
           curl -fsS "$S3_URL/_localstack/health"
           aws --endpoint-url "$S3_URL" s3api create-bucket --bucket dumps --object-lock-enabled-for-bucket
@@ -130,6 +130,8 @@ jobs:
       - name: Conferir o que foi registrado e guardado
         run: |
           cat registro.json; echo
+          # O corpo precisa passar no mesmo schema que a API aplica em POST /ops/backup.
+          (cd apps/api && npx tsx -e "import { readFileSync } from 'node:fs'; import { backupRecordSchema } from './src/modules/ops/ops.schemas.ts'; backupRecordSchema.parse(JSON.parse(readFileSync('$GITHUB_WORKSPACE/registro.json', 'utf8'))); console.log('corpo aceito pelo schema da API')")
           [ "$(jq '.fotos' registro.json)" = "3" ] || { echo "::error::fotos != 3"; exit 1; }
           [ "$(jq -r '.schemaAtras' registro.json)" = "false" ] || { echo "::error::schemaAtras"; exit 1; }
           objeto="$(jq -r '.objeto' registro.json)"

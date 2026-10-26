@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   restore-drill:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # fixo: a instalação das ferramentas depende da versão do Ubuntu
 
     services:
       postgres:
