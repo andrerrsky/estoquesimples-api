@@ -305,7 +305,7 @@ async function conferir(target: string, schemaAtrasOk = false): Promise<Conferen
       schemaAtras: ultimaRestaurada < ultimaEsperada,
       migracoesAtras: Math.max(0, ultimaEsperada - ultimaRestaurada),
       schemaAFrente: ultimaRestaurada > ultimaEsperada,
-      migracoesAFrente: Math.max(0, ultimaRestaurada - ultimaEsperada),
+      migracoesAFrente: Number((await client.query<{ total: string }>('SELECT count(*)::text AS total FROM schema_migrations WHERE version > $1', [ultimaEsperada])).rows[0]?.total ?? 0),
       tabelas: Number(tabelas.rows[0]?.total ?? 0),
       registros,
       politicas: Number(politicas.rows[0]?.total ?? 0),

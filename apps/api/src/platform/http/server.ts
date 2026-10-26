@@ -91,7 +91,8 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
     trustProxy: resolveTrustProxy(env),
     genReqId: (request) => {
       const header = request.headers['x-request-id'];
-      if (typeof header === 'string' && header.length > 0 && header.length <= 128) return header;
+      // Aceita o identificador de quem chama só num formato seguro; senão, gera um.
+      if (typeof header === 'string' && /^[A-Za-z0-9._-]{8,128}$/.test(header)) return header;
       return randomUUID();
     },
   });

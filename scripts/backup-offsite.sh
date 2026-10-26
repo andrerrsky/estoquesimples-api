@@ -81,6 +81,9 @@ case "$fase" in
     precisa AGE_RECIPIENT DUMPS_REMOTE
     stamp="$(date -u +%Y/%m/%d/estoquesimples-%Y%m%dT%H%M%SZ)"
     age --recipient "$AGE_RECIPIENT" --output "$WORKDIR/backup.dump.age" "$WORKDIR/backup.dump"
+    # Envio em uma parte só (gravação condicional): limite de 5 GB do S3.
+    tamanho="$(stat -c %s "$WORKDIR/backup.dump.age" 2>/dev/null || stat -f %z "$WORKDIR/backup.dump.age")"
+    [ "$tamanho" -lt 4800000000 ] || erro "Dump cifrado com $tamanho bytes: perto do limite de 5 GB do envio em uma parte. Ver docs/seguranca.md (limite do dump)." 
     sha="$(sha256sum "$WORKDIR/backup.dump.age" | cut -d' ' -f1)"
     echo "$sha" > "$WORKDIR/backup.dump.age.sha256"
     objeto="db/$stamp.dump.age"

@@ -22,13 +22,15 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 2. **Cópia externa noturna** (`.github/workflows/backup-offsite.yml`):
    - `pg_dump` com um usuário **somente leitura**, por TLS (o workflow recusa
      URL sem `sslmode=require`);
-   - **restauração de teste** do próprio dump num Postgres descartável do
-     runner, com conferência das tabelas essenciais e do histórico de
-     migrations (`backup:verify`);
-   - só então o dump é cifrado com `age` (chave pública no GitHub; a privada
-     **nunca** fica no GitHub nem no Railway), enviado para o **bucket dos
-     dumps** em outro provedor (`db/AAAA/MM/DD/…dump.age`, com o SHA-256 ao
-     lado e conferido de volta) e o resultado registrado em `/ops/backup`;
+   - o dump é cifrado com `age` (chave pública no GitHub; a privada **nunca**
+     fica no GitHub nem no Railway) e enviado para o **bucket dos dumps** em
+     outro provedor (`db/AAAA/MM/DD/…dump.age`, com o SHA-256 ao lado,
+     conferido de volta e impresso no log do run), em uma parte só (limite
+     de 5 GB; o workflow falha antes disso com aviso);
+   - depois das fotos vem a restauração de teste; o registro em `/ops/backup`
+     só acontece se ela passar. Um dump no bucket cujo run ficou vermelho
+     pode não ter passado na restauração: prefira o de uma noite verde (e o
+     passo 3 do roteiro confere de novo antes de usar);
    - o bucket dos dumps tem **Object Lock**: nenhum dump pode ser apagado
      ou trocado antes de 35 dias, nem com a chave do workflow;
    - ordem dos passos: dump, envio e fotos (os que têm as chaves dos
@@ -349,4 +351,6 @@ histórico de incidentes.
 | Texto livre (motivo, nota) na trilha do painel pode citar dado pessoal | o expurgo tira e-mail e nome dos campos estruturados; o painel orienta a não escrever dado pessoal no motivo | revisão anual |
 | Dados do pagador da empresa (`billing_customers`) ficam enquanto a empresa existir | ligados à empresa, não à pessoa; saem com a empresa (decisão de produto pendente em AGENTS.md §13) | com a decisão de purga de empresas |
 | Dump por `sslmode=require` sem conferir o certificado do proxy do Railway | o Railway não publica uma CA para `verify-full` no proxy TCP; o tráfego é cifrado, o usuário é só leitura com 2 conexões, e o dump já sai cifrado com `age` antes de ir para o bucket; trocar para `verify-full` se o Railway passar a oferecer | quando o Railway publicar a CA |
+| A restauração de teste roda código do npm (tsx, pg) com o dump em claro no runner | mesmo nível de confiança da própria API em produção; lockfile, `npm ci --ignore-scripts`, portão de `npm audit` e Dependabot; as chaves dos buckets já saíram do runner antes | se o verify passar a ser só `pg_restore` + `psql` |
+| No B2 não há política de gravação condicional | o roteiro reconhece o dump verdadeiro pela versão mais antiga (travada) e pelo SHA-256 do log do GitHub | ao trocar de provedor |
 | Freio de tentativas em memória | instância única; um deploy só devolve tentativas a quem já estava bloqueado | se houver mais de uma instância |

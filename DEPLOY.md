@@ -176,11 +176,11 @@ Resumo (o roteiro completo, com RPO/RTO e restauração passo a passo, está em
 - **Railway**: backups agendados do Postgres no painel do serviço (diário,
   retenção de pelo menos 14 dias) — ligar e conferir é tarefa do dono da conta.
 - **Cópia fora do Railway**: `.github/workflows/backup-offsite.yml`, toda noite,
-  faz `pg_dump` com um usuário só de leitura, **restaura o dump num banco
-  descartável e confere** (`backup:verify`), cifra com `age`, envia para um
+  faz `pg_dump` com um usuário só de leitura, cifra com `age`, envia para um
   bucket de outro provedor com Object Lock e confere o hash de volta; as fotos
   são espelhadas (`rclone sync`) num segundo bucket com versionamento (foto
-  apagada fica 35 dias como versão antiga). Só então o workflow registra em
+  apagada fica 35 dias como versão antiga); por fim **restaura o dump num
+  banco descartável e confere** (`backup:verify`) e, só se passar, registra em
   `/ops/backup` (com `OPS_BACKUP_TOKEN`, que só faz isso).
 - **Exercício de schema**: `.github/workflows/backup-drill.yml`, toda segunda,
   restaura um banco sintético para provar que o procedimento acompanha as
