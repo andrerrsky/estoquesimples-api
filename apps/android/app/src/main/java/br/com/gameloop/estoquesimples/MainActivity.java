@@ -1391,18 +1391,16 @@ public class MainActivity extends BaseActivity {
     }
 
     public void showWelcomeMessage() {
-        // Curta e prática: o que fazer agora, em três passos, e o aviso que
-        // evita o erro mais comum de quem já usa na web ou em outro celular
-        // (cadastrar aqui antes de entrar na conta).
+        // Acolhedora e curta. O que foi cadastrado antes de entrar na conta é
+        // mesclado na primeira sincronização (LocalMerge); "Já tenho conta"
+        // leva direto ao login de quem já usa na web ou em outro celular.
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
-                .setTitle("Comece em 3 passos")
-                .setMessage("1. Toque em Novo e cadastre um produto.\n"
-                        + "2. Use Entrada e Saída no card para mexer no estoque.\n"
-                        + "3. Veja tudo em Histórico e Relatórios.\n\n"
-                        + "Funciona sem internet e sem cadastro.\n\n"
-                        + "Já usa na web ou em outro celular? Entre na sua conta antes de "
-                        + "cadastrar, para ver o mesmo estoque aqui.")
-                .setPositiveButton("Começar", (dialog, which) -> dialog.dismiss())
+                .setTitle("Boas-vindas ao Estoque Simples!")
+                .setMessage("Cadastre e gerencie seus produtos, acompanhe os relatórios e convide "
+                        + "sua equipe. O controle completo do seu estoque está aqui.\n\n"
+                        + "Ficou com alguma dúvida? Acesse o suporte e fale com a gente. "
+                        + "Respondemos o mais rápido possível!")
+                .setPositiveButton("Vamos começar", (dialog, which) -> dialog.dismiss())
                 .setNeutralButton("Já tenho conta", (dialog, which) ->
                         startActivity(new Intent(MainActivity.this, AccountActivity.class)))
                 .show();
