@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 import { pgErrorCode, type Transaction } from '../../platform/db/client.js';
 import {
@@ -436,6 +436,31 @@ export class SyncService {
         changeSeq: seq,
         lastOpId: operation.opId,
       });
+
+      // Movimentações que chegaram antes do produto (ver registrarMovimento)
+      // passam a apontar para ele e entram no saldo. O gatilho de saldo só
+      // roda na inserção da movimentação, então a soma vai à mão. Elas têm
+      // changeSeq menor que o do produto, logo o pull as entrega antes dele e
+      // o saldo que vai junto com o produto já as inclui — a conta de
+      // `posteriores` continua certa.
+      const adotadas = await tx
+        .update(stockMovements)
+        .set({ productId: payload.id, intendedProductId: null })
+        .where(
+          and(
+            eq(stockMovements.workspaceId, workspaceId),
+            eq(stockMovements.intendedProductId, payload.id),
+            isNull(stockMovements.productId),
+          ),
+        )
+        .returning({ quantity: stockMovements.quantity });
+      if (adotadas.length > 0) {
+        const saldo = adotadas.reduce((total, row) => total + Number(row.quantity), 0);
+        await tx
+          .update(products)
+          .set({ quantityCache: String(Math.round(saldo * 10_000) / 10_000) })
+          .where(and(eq(products.workspaceId, workspaceId), eq(products.id, payload.id)));
+      }
 
       return {
         opId: operation.opId,
@@ -886,7 +911,11 @@ export class SyncService {
       workspaceId,
       // Produto ausente vira vínculo nulo em vez de recusa: o histórico é
       // verdadeiro mesmo quando o produto foi apagado, e perdê-lo seria pior.
+      // Mas o produto pode simplesmente ainda não ter chegado (a fila do app
+      // pode mandar o cadastro depois da movimentação): o id pretendido fica
+      // guardado, e a criação do produto adota a movimentação e o saldo.
       productId: produto ? produto.id : null,
+      intendedProductId: produto ? null : (payload.productId ?? null),
       productName: payload.productName ?? produto?.name ?? null,
       type: payload.changeType.toLowerCase(),
       quantity: String(payload.quantity),

@@ -204,7 +204,7 @@ public final class OutboxRepository {
             List<Grupo> grupos = gruposCompactaveis();
 
             for (Grupo grupo : grupos) {
-                JSONObject payload = mergePayloads(grupo.entityId, grupo.sobrevivente);
+                JSONObject payload = mergePayloads(grupo.entityId);
 
                 descartadas += db.delete(LocalDb.TABLE_OUTBOX,
                         "status=? AND entity_type=? AND op=? AND entity_id=? AND id<>?",
@@ -249,13 +249,20 @@ public final class OutboxRepository {
      * de edições, vista de fora, partiu dali. Manter a última faria o servidor
      * comparar com uma versão que ele nunca chegou a conhecer e acusar conflito
      * onde não há.
+     *
+     * <p>A <b>linha</b> que sobrevive também é a mais antiga, pela posição na
+     * fila. Um produto novo entra na fila seguido da movimentação do seu saldo
+     * inicial; manter a linha da última edição (mais recente que a
+     * movimentação) mandava a movimentação antes do produto, e na nuvem ela
+     * chegava órfã: o produto nascia com saldo zero, e a primeira saída o
+     * deixava negativo lá enquanto aqui o saldo estava certo.
      */
     private List<Grupo> gruposCompactaveis() {
         List<Grupo> grupos = new ArrayList<>();
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(
-                    "SELECT entity_id, MAX(id), MIN(COALESCE(base_rev, -1)) "
+                    "SELECT entity_id, MIN(id), MIN(COALESCE(base_rev, -1)) "
                             + "FROM " + LocalDb.TABLE_OUTBOX
                             + " WHERE status=? AND entity_type=? AND op=? "
                             + "GROUP BY entity_id HAVING COUNT(*) > 1",
@@ -280,7 +287,7 @@ public final class OutboxRepository {
      * faria o servidor concluir que só o fornecedor mudou, e uma alteração de
      * preço feita em outro aparelho no meio-tempo apagaria a daqui em silêncio.
      */
-    private JSONObject mergePayloads(String entityId, long sobrevivente) {
+    private JSONObject mergePayloads(String entityId) {
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(
@@ -313,9 +320,9 @@ public final class OutboxRepository {
                         }
                     }
                 }
-                if (cursor.getLong(0) == sobrevivente) {
-                    ultimo = payload;
-                }
+                // O estado que vale é o da última edição, não o da linha que
+                // sobrevive (a mais antiga, pela posição na fila).
+                ultimo = payload;
             }
 
             if (ultimo == null) {

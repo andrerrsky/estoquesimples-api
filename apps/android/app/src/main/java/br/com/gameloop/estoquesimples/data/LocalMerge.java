@@ -102,13 +102,16 @@ public final class LocalMerge {
                     repetidos++;
                     continue;
                 }
-                if (outbox.hasPending(uuid)) {
-                    continue; // já está a caminho
-                }
-                JSONObject produto = SyncPayloads.product(db, uuid);
-                if (produto == null || outbox.enqueue(OutboxRepository.ENTITY_PRODUTO, uuid,
-                        OutboxRepository.OP_UPSERT, null, produto.toString()) == null) {
-                    throw new IllegalStateException("não foi possível enfileirar o produto");
+                // Uma edição feita entre o login e esta rodada já enfileirou o
+                // produto; o histórico dele, não (antes de entrar na conta nada
+                // vai para a fila). Sem o histórico, o saldo na nuvem nasceria
+                // zerado.
+                if (!outbox.hasPending(uuid)) {
+                    JSONObject produto = SyncPayloads.product(db, uuid);
+                    if (produto == null || outbox.enqueue(OutboxRepository.ENTITY_PRODUTO, uuid,
+                            OutboxRepository.OP_UPSERT, null, produto.toString()) == null) {
+                        throw new IllegalStateException("não foi possível enfileirar o produto");
+                    }
                 }
                 enqueueHistory(db, outbox, uuid);
                 // Mesmos nomes dentro do próprio aparelho não são repetição da nuvem.
