@@ -1409,18 +1409,10 @@ public class MainActivity extends BaseActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.options_menu, menu);
+        // onResume chama invalidateOptionsMenu(): entrar ou sair da conta
+        // mostra ou esconde o ícone na volta.
+        SyncIndicator.bind(this, menu);
         return true;
-    }
-
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem sync = menu.findItem(R.id.menu_sync_now);
-        if (sync != null) {
-            br.com.gameloop.estoquesimples.sync.SessionManager session =
-                    br.com.gameloop.estoquesimples.sync.SessionManager.get(this);
-            sync.setVisible(session.isSignedIn() && session.workspaceId() != null);
-        }
-        return super.onPrepareOptionsMenu(menu);
     }
 
     // -------------------------------------------------------------------------
@@ -1438,7 +1430,12 @@ public class MainActivity extends BaseActivity {
             return;
         }
         if (snapshot.running) {
-            showSyncPill(true, null, false);
+            // A rodada automática (após uma gravação, ao voltar ao app, a cada
+            // 15 min) só gira o ícone da barra. A pílula fica para quando a
+            // pessoa pediu: aí ela quer ver o resultado.
+            if (snapshot.requestedByUser) {
+                showSyncPill(true, null, false);
+            }
             return;
         }
         if (snapshot.finishedAt == 0L || snapshot.finishedAt <= syncHandledAt) {
@@ -1510,47 +1507,11 @@ public class MainActivity extends BaseActivity {
                 .start();
     }
 
-    private void syncNowFromMenu() {
-        EntitlementManager entitlements = new EntitlementManager(this);
-        if (!entitlements.canSync()) {
-            // A tela de conta explica o motivo (assinatura, sessão, empresa).
-            startActivity(new Intent(this, AccountActivity.class));
-            return;
-        }
-        android.net.ConnectivityManager manager =
-                (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        android.net.NetworkCapabilities caps = manager == null || manager.getActiveNetwork() == null
-                ? null : manager.getNetworkCapabilities(manager.getActiveNetwork());
-        if (caps == null || !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-            ConnectivityPrompt.show(this, this::syncNowFromMenu);
-            return;
-        }
-        br.com.gameloop.estoquesimples.sync.SyncStatus.markRequestedByUser();
-        long pedidoEm = System.currentTimeMillis();
-        showSyncPill(true, null, false);
-        br.com.gameloop.estoquesimples.sync.SyncBootstrap.start(this);
-        // Rodada que não começa (o sistema segurou o trabalho): a pílula não fica girando à toa.
-        android.view.View pill = findViewById(R.id.syncPill);
-        if (pill != null) {
-            pill.postDelayed(() -> {
-                br.com.gameloop.estoquesimples.sync.SyncStatus.Snapshot agora =
-                        br.com.gameloop.estoquesimples.sync.SyncStatus.current();
-                if (!agora.running && agora.finishedAt < pedidoEm && !isFinishing()) {
-                    showSyncPill(false, "Sincroniza assim que houver conexão", true);
-                    hideSyncPill(true);
-                }
-            }, 15_000);
-        }
-    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
         
-        if (itemId == R.id.menu_sync_now) {
-            syncNowFromMenu();
-            return true;
-        } else if (itemId == R.id.menu_bulk_edit) {
+        if (itemId == R.id.menu_bulk_edit) {
             showBulkEditDialog();
             return true;
         } else if (itemId == R.id.menu_analytics) {

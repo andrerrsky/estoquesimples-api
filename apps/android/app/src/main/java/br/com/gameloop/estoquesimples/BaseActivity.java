@@ -45,6 +45,9 @@ public abstract class BaseActivity extends AppCompatActivity {
         // A marca pode ter mudado com esta tela em segundo plano (atrás de outra,
         // ou com o app minimizado): ao voltar, ela já aparece com o visual novo.
         recreateIfBrandChanged();
+        // Voltou para o app: traz o que mudou em outros aparelhos. Trocar de
+        // tela dentro do app não repete a rodada (só depois de um minuto).
+        br.com.gameloop.estoquesimples.sync.SyncScheduler.syncIfStale(this);
     }
 
     @Override

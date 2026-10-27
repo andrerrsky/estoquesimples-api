@@ -110,6 +110,10 @@ public final class OutboxRepository {
             Log.e(TAG, "falha ao enfileirar operação " + op + " de " + entityType);
             return null;
         }
+        // A fila cresceu: quem agenda a sincronização decide quando enviar.
+        // Chamado dentro da transação de quem gravou, por isso ninguém aqui
+        // tenta enviar na hora — só avisa.
+        SyncGate.notifyEnqueued(pendingCount());
         return opId;
     }
 

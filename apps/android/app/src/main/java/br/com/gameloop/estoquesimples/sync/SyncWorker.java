@@ -207,7 +207,7 @@ public final class SyncWorker extends Worker {
                     "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.");
             aviso = "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.";
         }
-        SyncStatus.finished(resultado.enviadas, resultado.recebidas + fotosBaixadas, aviso);
+        SyncStatus.finished(resultado.enviadas, resultado.recebidas + fotosBaixadas, aviso, pendentes);
         br.com.gameloop.estoquesimples.diagnostics.ErrorReporter.flushAsync();
         return Result.success();
     }

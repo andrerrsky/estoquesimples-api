@@ -483,6 +483,7 @@ public class AnalyticsActivity extends BaseActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.section_menu, menu);
+        SyncIndicator.bind(this, menu);
         // Já estamos nela.
         MenuItem self = menu.findItem(R.id.menu_analytics);
         if (self != null) self.setVisible(false);

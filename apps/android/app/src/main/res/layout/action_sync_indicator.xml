@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ícone de sincronização na barra superior, ao lado do ⋮ (SyncIndicator).
+     Estados: tudo em dia (nuvem com check), sincronizando (setas girando),
+     alterações aguardando envio (nuvem com seta e contador) e erro (nuvem
+     cortada). Um toque sincroniza agora. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/syncIndicator"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="?attr/actionBarItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:contentDescription="Sincronizar agora">
+
+    <ImageView
+        android:id="@+id/syncIndicatorIcon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center"
+        android:src="@drawable/ic_cloud_done"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/syncIndicatorBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="16dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="7dp"
+        android:layout_marginEnd="5dp"
+        android:minWidth="16dp"
+        android:paddingLeft="4dp"
+        android:paddingRight="4dp"
+        android:gravity="center"
+        android:background="@drawable/bg_sync_badge"
+        android:textColor="@android:color/white"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+</FrameLayout>
