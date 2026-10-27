@@ -157,6 +157,50 @@ async function pull(user: RegisteredUser, workspaceId: string, cursor = 0, limit
 }
 
 describe('envio incremental', () => {
+  it('movimentação que chega antes do produto entra no saldo quando ele é criado', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await criarEmpresa(user);
+    const produtoId = randomUUID();
+
+    // A fila do app pode mandar o cadastro depois da movimentação de saldo
+    // inicial (compactação da fila após uma edição). Antes, a movimentação
+    // ficava órfã e o produto nascia com saldo zero: a primeira saída deixava
+    // a nuvem em -1 enquanto o aparelho mostrava 1.
+    const antes = await push(user, workspaceId, [
+      movimentacao(produtoId, { payload: { productName: 'Teste', changeType: 'cadastro', quantity: 2 } }),
+    ]);
+    expect(antes.statusCode).toBe(200);
+    expect(antes.json().results[0].status).toBe('aplicada');
+
+    const cadastro = await push(user, workspaceId, [upsertProduto({ entityId: produtoId, payload: { name: 'Teste' } })]);
+    expect(cadastro.statusCode).toBe(200);
+    expect(cadastro.json().results[0].status).toBe('aplicada');
+
+    const saida = await push(user, workspaceId, [
+      movimentacao(produtoId, { payload: { productName: 'Teste', changeType: 'saida', quantity: -1 } }),
+    ]);
+    expect(saida.statusCode).toBe(200);
+
+    const [produto] = await context.services.db.select({ quantity: products.quantityCache }).from(products).where(eq(products.id, produtoId));
+    expect(Number(produto?.quantity)).toBe(1);
+    const vinculadas = await context.services.db.execute<{ total: string }>(
+      sql`SELECT count(*)::text AS total FROM stock_movements WHERE product_id = ${produtoId} AND intended_product_id IS NULL`,
+    );
+    expect(vinculadas.rows[0]?.total).toBe('2');
+
+    // Um segundo aparelho, lendo do zero, chega ao mesmo saldo: o produto vem
+    // com o saldo do seu ponto da sequência (2, já com o cadastro adotado) e
+    // só a saída posterior é somada por cima.
+    const baixado = await pull(user, workspaceId, 0);
+    const changes = baixado.json().changes as { entity: string; changeSeq: string; data: { quantity: number } }[];
+    const entregue = changes.find((change) => change.entity === 'produto')!;
+    expect(entregue.data.quantity).toBe(2);
+    const posteriores = changes
+      .filter((change) => change.entity === 'movimentacao' && Number(change.changeSeq) > Number(entregue.changeSeq))
+      .reduce((total, change) => total + change.data.quantity, 0);
+    expect(entregue.data.quantity + posteriores).toBe(1);
+  });
+
   it('plano gratuito sincroniza para o proprietário sem assinatura', async () => {
     const user = await registerUser(context);
     const workspaceId = await criarEmpresa(user);

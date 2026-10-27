@@ -20,6 +20,7 @@
     "backup:verify": "tsx src/platform/db/verify-backup.ts",
     "openapi": "tsx src/platform/http/print-openapi.ts",
     "admin:create": "tsx scripts/admin-create.ts",
+    "reparar:orfas": "tsx scripts/reparar-movimentacoes-orfas.ts",
     "secrets:reencrypt": "tsx scripts/reencrypt-secrets.ts",
     "seed:dev": "tsx scripts/seed-dev.ts"
   },

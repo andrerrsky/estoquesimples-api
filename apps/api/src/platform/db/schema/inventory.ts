@@ -77,6 +77,12 @@ export const stockMovements = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     /** Nulo nas movimentações legadas cujo produto não existe mais. */
     productId: uuid('product_id'),
+    /**
+     * Produto que a movimentação pretendia quando chegou antes dele (a fila do
+     * app pode mandar o cadastro depois). Limpo quando o produto é criado e a
+     * movimentação passa a apontar para ele.
+     */
+    intendedProductId: uuid('intended_product_id'),
     productName: text('product_name'),
 
     type: text('type').notNull(),
