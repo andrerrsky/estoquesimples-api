@@ -10,6 +10,7 @@ import { ROLE_LABEL } from '../lib/labels';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 import { BrandMark } from './BrandMark';
 import { Icon, type IconName } from './Icon';
+import { SyncButton } from './SyncButton';
 import { Empty, Menu, Meter, Modal, Notice, Skeleton, Spinner } from './ui';
 
 interface NavItem {
@@ -181,6 +182,7 @@ export function AppShell() {
             <span className="truncate">{workspace?.name ?? 'Estoque Simples'}</span>
           </Link>
           <span className="spacer" />
+          <SyncButton workspaceId={workspaceId} />
           <Link to="/app/notificacoes" className="icon-btn" aria-label={unread > 0 ? `Notificações: ${unread} não lidas` : 'Notificações'}>
             <Icon name="bell" size={20} />
             {unread > 0 && <span className="icon-btn__dot">{unread > 9 ? '9+' : unread}</span>}

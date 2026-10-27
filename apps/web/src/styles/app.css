@@ -586,6 +586,25 @@ button {
   text-align: center;
 }
 
+/* Ícone de atualização da barra (SyncButton): gira enquanto busca, muda de cor
+   no fecho e no erro. */
+.sync-btn--syncing svg {
+  animation: spin 1s linear infinite;
+}
+.sync-btn--done {
+  color: var(--success);
+}
+.sync-btn--error,
+.sync-btn--offline {
+  color: var(--warning);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sync-btn--syncing svg {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
 .avatar {
   display: inline-grid;
   place-items: center;

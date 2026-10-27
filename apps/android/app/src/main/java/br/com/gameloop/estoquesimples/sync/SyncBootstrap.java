@@ -32,6 +32,13 @@ public final class SyncBootstrap {
     public static void start(Context context) {
         Context appContext = context.getApplicationContext();
 
+        // Toda gravação que vira operação na fila pede uma sincronização
+        // logo em seguida, e o ícone da barra passa a mostrar quantas esperam.
+        SyncGate.setEnqueueListener(pendentes -> {
+            SyncStatus.setPendentes(pendentes);
+            SyncScheduler.syncSoon(appContext);
+        });
+
         // Uma thread avulsa e não o WorkManager: isto precisa terminar em
         // segundos, e agendar trabalho para decidir se há trabalho seria dar
         // uma volta desnecessária.

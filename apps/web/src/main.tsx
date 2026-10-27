@@ -33,6 +33,15 @@ const queryClient = new QueryClient({
   },
 });
 
+// O estoque (lista, histórico, relatórios) se atualiza sozinho a cada 30 s
+// enquanto a aba está visível: quem registra uma saída no celular vê o saldo
+// mudar aqui sem recarregar. Em segundo plano a aba não gasta rede; ao voltar
+// o foco, o refetchOnWindowFocus acima já traz tudo de uma vez.
+queryClient.setQueryDefaults(['inventory'], {
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: false,
+});
+
 // O Vite avisa quando um arquivo da versão anterior não existe mais (aba
 // aberta durante um deploy): recarrega para pegar a versão nova.
 window.addEventListener('vite:preloadError', (event) => {

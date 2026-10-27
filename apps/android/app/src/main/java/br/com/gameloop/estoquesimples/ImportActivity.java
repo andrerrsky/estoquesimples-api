@@ -186,6 +186,7 @@ public class ImportActivity extends BaseActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.section_menu, menu);
+        SyncIndicator.bind(this, menu);
         return true;
     }
 

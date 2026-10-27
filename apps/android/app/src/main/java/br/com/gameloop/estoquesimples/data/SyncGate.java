@@ -39,7 +39,33 @@ public final class SyncGate {
      */
     private static final ThreadLocal<Boolean> applyingRemote = new ThreadLocal<>();
 
+    /** Quem quer saber que a fila cresceu (para sincronizar logo em seguida). */
+    public interface EnqueueListener {
+        void onEnqueued(int pendentes);
+    }
+
+    private static volatile EnqueueListener enqueueListener;
+
     private SyncGate() {
+    }
+
+    public static void setEnqueueListener(EnqueueListener listener) {
+        enqueueListener = listener;
+    }
+
+    /**
+     * Uma operação acabou de entrar na fila. A camada de dados não sabe
+     * agendar nada; só avisa, e quem conhece o WorkManager decide o que fazer.
+     */
+    public static void notifyEnqueued(int pendentes) {
+        EnqueueListener listener = enqueueListener;
+        if (listener != null) {
+            try {
+                listener.onEnqueued(pendentes);
+            } catch (RuntimeException ignored) {
+                // Um ouvinte com defeito não pode derrubar a gravação.
+            }
+        }
     }
 
     public static boolean isActive() {
