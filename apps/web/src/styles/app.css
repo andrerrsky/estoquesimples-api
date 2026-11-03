@@ -605,6 +605,24 @@ button {
   }
 }
 
+/* Redes sociais no rodapé (SocialLinks): ícones discretos, mesma cor dos links. */
+.social-links {
+  display: flex;
+  gap: 4px;
+}
+.social-links a {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+}
+.social-links a:hover {
+  background: var(--chip);
+  color: var(--brand);
+}
+
 .avatar {
   display: inline-grid;
   place-items: center;

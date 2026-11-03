@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuthOptional } from '../auth/context';
 import { openCookiePreferences } from '../lib/ga';
 import { Logo } from './Icon';
+import { SocialLinks } from './SocialLinks';
 
 /**
  * Cabeçalho e rodapé das páginas públicas que não são a página inicial
@@ -45,6 +46,7 @@ export function PublicShell({ children, className }: { children: ReactNode; clas
             <button type="button" className="link-button" onClick={openCookiePreferences}>Preferências de cookies</button>
             <a href="/blog/feed.xml">RSS</a>
           </nav>
+          <SocialLinks />
         </div>
       </footer>
     </div>

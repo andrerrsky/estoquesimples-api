@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import { useAuthOptional } from '../auth/context';
 import { Icon, Logo, type IconName } from '../components/Icon';
+import { SocialLinks } from '../components/SocialLinks';
 import { ROLE_LABEL } from '../lib/labels';
 
 import '../styles/pages-public.css';
@@ -826,6 +827,7 @@ export function LandingPage() {
             </li>
             <li><a href="/entrar">Entrar</a></li>
           </ul>
+          <SocialLinks />
         </div>
       </footer>
     </div>
