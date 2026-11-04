@@ -222,6 +222,11 @@ export class OpenAiClient {
     }
   }
 
+  /** Texto livre (sem JSON): usado pelo blog para escrever uma seção por vez. */
+  async completeText(system: string, user: string, maxTokens: number): Promise<string> {
+    return this.complete(system, user, maxTokens);
+  }
+
   private async complete(system: string, user: string, maxTokens: number): Promise<string> {
     const response = await this.fetchWithTimeout(API_URL, {
       method: 'POST',

@@ -361,18 +361,46 @@ describe('painel administrativo: visão geral e operação', () => {
     expect(pending.json().items[0]).toMatchObject({ id: job!.id, status: 'pending', dismissedAt: null });
   });
 
-  it('escrita pela IA vai para a fila, revisa o mesmo rascunho e deixa o log na página da tarefa', async () => {
+  it('escrita pela IA vai para a fila, escreve seção por seção e deixa o log e o post na página da tarefa', async () => {
     const owner = await createAdmin('owner');
     const { cookie } = await loginAdmin(owner);
-    const curto = { title: 'Estoque mínimo: como calcular', excerpt: 'x', category: 'controle-de-estoque', tags: ['estoque'], contentMd: '## Estoque mínimo\n\nTexto curto demais para passar.', faq: [] };
-    const pedidos: string[] = [];
+    const palavras = (n: number, base: string) => Array.from({ length: n }, (_, i) => `${base}${i % 7 === 0 ? '.' : ''}`).join(' ');
+    const plano = {
+      title: 'Estoque mínimo: como calcular sem faltar produto',
+      seoTitle: 'Estoque mínimo: como calcular',
+      excerpt: 'Veja como calcular o estoque mínimo de cada produto com a média de vendas e o prazo do fornecedor, sem faltar nem sobrar.',
+      category: 'controle-de-estoque',
+      tags: ['estoque mínimo', 'reposição'],
+      coverAlt: 'Cartão azul com o título do post',
+      intro: `O estoque mínimo é a menor quantidade que você pode ter antes de repor. ${palavras(55, 'abertura')}`,
+      sections: [
+        { heading: 'O que é estoque mínimo', points: ['definição'] },
+        { heading: 'Como calcular', points: ['fórmula'] },
+        { heading: 'Erros comuns', points: ['erros'] },
+        { heading: 'Como acompanhar', points: ['rotina'] },
+      ],
+      summary: ['Calcule pela média de vendas.', 'Considere o prazo do fornecedor.', 'Revise todo mês.'],
+      faq: [
+        { question: 'O que é estoque mínimo?', answer: 'A menor quantidade antes de repor.' },
+        { question: 'Como calcular?', answer: 'Média diária de vendas vezes o prazo de entrega.' },
+        { question: 'Quando revisar?', answer: 'Todo mês ou quando as vendas mudarem.' },
+      ],
+    };
+    const pedidos: Array<{ json: boolean; user: string }> = [];
+    let secoes = 0;
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
       if (url.startsWith('https://api.openai.com/v1/models')) return new Response('{}', { status: 200 });
       if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
-        pedidos.push(String(init?.body ?? ''));
-        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(curto) } }] }), { status: 200 });
+        const body = JSON.parse(String(init?.body ?? '{}')) as { response_format?: unknown; messages: Array<{ content: string }> };
+        const user = body.messages.at(-1)!.content;
+        pedidos.push({ json: Boolean(body.response_format), user });
+        let content: string;
+        if (body.response_format) content = JSON.stringify(plano);
+        else if (user.includes('RASCUNHO DESTA SEÇÃO')) content = palavras(230, 'expandida');
+        else content = (secoes += 1) === 1 ? `## O que é estoque mínimo\n\n${palavras(60, 'curta')}` : palavras(230, 'texto');
+        return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
       }
       return realFetch(input, init);
     });
@@ -385,26 +413,38 @@ describe('painel administrativo: visão geral e operação', () => {
       expect(write.statusCode).toBe(200);
       const { jobId } = write.json() as { jobId: string };
 
-      let detail: { job: { status: string; lastError: string | null; payload: Record<string, unknown> }; logs: Array<{ id: number; level: string; message: string }> } | null = null;
+      type Detail = { job: { status: string; lastError: string | null; payload: Record<string, unknown>; result: Record<string, unknown> | null }; logs: Array<{ id: number; level: string; message: string }> };
+      let detail: Detail | null = null;
       for (let i = 0; i < 100; i += 1) {
         const response = await context.app.inject({ method: 'GET', url: `/admin/api/ops/jobs/${jobId}`, headers: { cookie } });
-        detail = response.json();
-        if (detail!.job.status === 'failed' || detail!.job.status === 'completed') break;
+        detail = response.json() as Detail;
+        if (detail.job.status === 'failed' || detail.job.status === 'completed') break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      expect(detail!.job.status).toBe('failed');
+      expect(detail!.job.lastError).toBeNull();
+      expect(detail!.job.status).toBe('completed');
       expect(detail!.job.payload).toMatchObject({ manual: true, requestedBy: owner, topicKey: 'estoque-minimo' });
-      // Três versões: a segunda e a terceira revisam o rascunho anterior, não recomeçam.
-      expect(pedidos).toHaveLength(3);
-      expect(pedidos[0]).not.toContain('TEXTO ANTERIOR');
-      expect(pedidos[1]).toContain('TEXTO ANTERIOR');
-      expect(pedidos[1]).toContain('Texto curto demais para passar.');
-      expect(pedidos[0]).toContain('DISTRIBUIÇÃO DAS PALAVRAS');
+
+      // Um plano (JSON) e uma chamada por seção, mais a expansão da seção curta.
+      expect(pedidos.filter((item) => item.json)).toHaveLength(1);
+      expect(pedidos.filter((item) => !item.json)).toHaveLength(5);
+      expect(pedidos.find((item) => item.user.includes('ESCREVA A SEÇÃO: "Como calcular"'))?.user).toContain('TAMANHO: entre 200 e 250 palavras');
+
+      const postId = detail!.job.result?.['postId'];
+      expect(typeof postId).toBe('string');
+      const post = await context.app.inject({ method: 'GET', url: `/admin/api/blog/posts/${String(postId)}`, headers: { cookie } });
+      const content = (post.json() as { contentMd: string }).contentMd;
+      expect(content).toContain('## Como calcular');
+      expect(content).not.toContain('curta');
+      expect(content).toContain('](/criar-conta)');
+      expect(content).toMatch(/## Resumo\n\n- Calcule/);
+
       const mensagens = detail!.logs.map((line) => line.message);
       expect(mensagens[0]).toMatch(/^Tentativa 1 de 1 iniciada/);
-      expect(mensagens.some((line) => line.startsWith('Pauta: "estoque-minimo"'))).toBe(true);
-      expect(mensagens.filter((line) => /^Versão \d reprovada/.test(line))).toHaveLength(3);
-      expect(detail!.logs.some((line) => line.level === 'error' && line.message.startsWith('Falhou depois de'))).toBe(true);
+      expect(mensagens.some((line) => line.startsWith('Versão 1, plano: "Estoque mínimo'))).toBe(true);
+      expect(mensagens.some((line) => /^Seção 1 veio com \d+ palavras; expandida para \d+/.test(line))).toBe(true);
+      expect(mensagens.some((line) => line === 'Versão 1 aprovada na validação.')).toBe(true);
+      expect(mensagens.some((line) => line.startsWith('Rascunho gravado'))).toBe(true);
 
       // `after`: só as linhas novas.
       const lastId = detail!.logs.at(-1)!.id;

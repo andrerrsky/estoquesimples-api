@@ -96,8 +96,8 @@ const PRODUCT_FACTS = `FATOS SOBRE O ESTOQUE SIMPLES (só afirme o que está aqu
 - Não cite preços. Não prometa recursos futuros.`;
 
 const DEFAULT_TARGET_WORDS = 950;
-/** Primeira escrita e até duas revisões do mesmo rascunho. */
-const MAX_WRITE_ATTEMPTS = 3;
+/** Versões completas (plano + seções) por execução, antes de desistir. */
+const MAX_WRITE_ATTEMPTS = 2;
 /** O post exclusivo tem mais a oferecer: uma parte prática a mais. */
 const MEMBERS_EXTRA_WORDS = 350;
 const MEMBERS_ONLY_BRIEF = `POST EXCLUSIVO PARA QUEM TEM CONTA: no site público só o começo (abertura e primeira seção) fica visível, com um convite para criar conta grátis. Por isso:
@@ -125,6 +125,19 @@ interface AiDraft {
   category: string;
   tags: string[];
   contentMd: string;
+  faq: Array<{ question: string; answer: string }>;
+}
+
+interface AiPlan {
+  title: string;
+  seoTitle?: string;
+  excerpt: string;
+  category: string;
+  tags: string[];
+  coverAlt?: string;
+  intro: string;
+  sections: Array<{ heading: string; points: string[] }>;
+  summary: string[];
   faq: Array<{ question: string; answer: string }>;
 }
 
@@ -223,7 +236,8 @@ export class BlogAiWriter {
     return { key: `ia-${parsed.key.slice(0, 40)}`, category: parsed.category as AiTopic['category'], brief: parsed.brief, keyword: parsed.keyword };
   }
 
-  private systemPrompt(): string {
+  /** Contexto comum a todas as chamadas: quem escreve, fatos do produto, categorias e estilo. */
+  private baseSystem(): string {
     const categories = BLOG_CATEGORIES.map((category) => `- ${category.slug}: ${category.label} (${category.description})`).join('\n');
     return `Você escreve os posts do blog do Estoque Simples (${SITE}/blog), assinados por "Equipe Estoque Simples".
 
@@ -232,68 +246,105 @@ ${PRODUCT_FACTS}
 CATEGORIAS (use o slug):
 ${categories}
 
-${STYLE_RULES}
+${STYLE_RULES}`;
+  }
 
-FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chaves:
+  /**
+   * Primeira chamada: o plano do post (título, resumo, abertura, seções e
+   * perguntas). O texto das seções vem depois, uma chamada por seção: modelos
+   * menores param por volta de 450 palavras quando escrevem o post inteiro de
+   * uma vez, mesmo revisando o próprio rascunho; uma seção de ~200 palavras
+   * por chamada eles entregam.
+   */
+  private planPrompts(topic: AiTopic, published: Array<{ slug: string; title: string }>, sectionCount: number, membersOnly: boolean, problems: string[]) {
+    const system = `${this.baseSystem()}
+
+TAREFA DESTA ETAPA: planejar o post. O texto de cada seção será escrito depois, em outra etapa.
+FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele:
 {
-  "title": "título do post (40 a 65 caracteres, com a palavra-chave no começo, sem dois-pontos no fim, sem ponto final)",
-  "seoTitle": "título para o Google com no máximo 55 caracteres, com a palavra-chave, sem a marca (o site acrescenta \" | Estoque Simples\" quando cabe); pode ser igual ao title quando ele cabe",
+  "title": "título do post (40 a 60 caracteres, com a palavra-chave no começo, sem dois-pontos no fim, sem ponto final)",
+  "seoTitle": "título para o Google com no máximo 55 caracteres, com a palavra-chave, sem a marca",
   "excerpt": "resumo para o Google e para a lista do blog (120 a 160 caracteres, uma ou duas frases, com a palavra-chave)",
   "category": "slug da categoria",
   "tags": ["3 a 6 tags curtas, minúsculas"],
-  "coverAlt": "texto alternativo da capa, que é um cartão com o título do post e a categoria sobre fundo azul (até 120 caracteres; descreva isso, sem inventar cena)",
-  "contentMd": "o post em Markdown, conforme as regras",
+  "coverAlt": "texto alternativo da capa, que é um cartão com o título do post e a categoria sobre fundo azul (até 120 caracteres)",
+  "intro": "abertura do post: um parágrafo de 60 a 90 palavras que responde a dúvida nas duas primeiras frases e contém a palavra-chave exata",
+  "sections": [{"heading": "subtítulo da seção (sem ##), descritivo, como alguém buscaria no Google", "points": ["3 a 4 pontos que a seção vai cobrir, sem repetir os das outras seções"]}]  (exatamente ${sectionCount} seções; pelo menos um heading contém a palavra-chave),
+  "summary": ["3 a 4 frases curtas para a seção Resumo"],
   "faq": [{"question": "pergunta que as pessoas fazem sobre o tema", "answer": "resposta direta de 1 a 3 frases"}]  (3 itens)
 }`;
-  }
-
-  private userPrompt(
-    topic: AiTopic,
-    published: Array<{ slug: string; title: string }>,
-    problems: string[] = [],
-    membersOnly = false,
-    previous: { contentMd: string; words: number } | null = null,
-  ): string {
-    const target = (topic.targetWords ?? DEFAULT_TARGET_WORDS) + (membersOnly ? MEMBERS_EXTRA_WORDS : 0);
-    const sections = membersOnly ? 5 : 4;
-    const perSection = Math.round((target - 150) / sections);
-    // Modelos menores escrevem curto quando só recebem o total: a meta por
-    // seção (e, na revisão, o próprio rascunho para completar) é o que faz o
-    // texto chegar ao tamanho sem virar enchimento.
-    const budget = `DISTRIBUIÇÃO DAS PALAVRAS: abertura de ~80 palavras; ${sections} seções "## " de ~${perSection} palavras cada (cada uma com explicação, um exemplo concreto e um passo prático); "## Resumo" de ~70 palavras.`;
-    const revision = previous && problems.length > 0
-      ? [
-          '',
-          'A TENTATIVA ANTERIOR FOI REPROVADA. REVISE O TEXTO ABAIXO (não comece do zero: mantenha o que está certo e corrija só o que foi apontado).',
-          previous.words < Math.round(target * 0.75)
-            ? `Ele tem ${previous.words} palavras e precisa de ~${target}: faltam cerca de ${target - previous.words}. Aprofunde cada seção com um exemplo com números, um passo a passo ou um erro comum e como evitar. Não repita ideias para encher.`
-            : '',
-          `Problemas:\n${problems.map((problem) => `- ${problem}`).join('\n')}`,
-          '',
-          'TEXTO ANTERIOR (contentMd):',
-          previous.contentMd,
-        ].filter(Boolean).join('\n')
-      : problems.length > 0
-        ? `\nA TENTATIVA ANTERIOR FOI REPROVADA. Corrija:\n${problems.map((problem) => `- ${problem}`).join('\n')}`
-        : '';
-    return [
+    const user = [
       `PAUTA: ${topic.brief}`,
       `PALAVRA-CHAVE: ${topic.keyword}`,
       `CATEGORIA SUGERIDA: ${topic.category}`,
-      `META DE PALAVRAS: ${target}`,
-      budget,
-      membersOnly ? MEMBERS_ONLY_BRIEF : '',
+      membersOnly ? `${MEMBERS_ONLY_BRIEF}\n- Uma das seções deve se chamar "Checklist", "Modelo pronto", "Passo a passo" ou "Exemplo completo".` : '',
+      (topic.targetWords ?? 0) >= 1600 ? 'Uma das seções deve ser um exemplo resolvido com números (quantidades, prazos, R$).' : '',
       '',
-      'TRECHOS DA CENTRAL DE AJUDA RELACIONADOS (use como base do que o app faz; não copie literalmente):',
+      'TRECHOS DA CENTRAL DE AJUDA RELACIONADOS (base do que o app faz):',
       groundingFor(topic),
-      '',
-      published.length > 0
-        ? `POSTS PUBLICADOS (não repita o assunto nem o título; linke 1 a 3 que se cruzem com a pauta, como [texto](/blog/slug)):\n${published.map((post) => `- /blog/${post.slug} — ${post.title}`).join('\n')}`
-        : '',
-      revision,
+      published.length > 0 ? `\nPOSTS JÁ PUBLICADOS (não repita assunto nem título):\n${published.map((post) => `- ${post.title}`).join('\n')}` : '',
+      problems.length > 0 ? `\nA VERSÃO ANTERIOR FOI REPROVADA. Corrija no plano:\n${problems.map((problem) => `- ${problem}`).join('\n')}` : '',
     ]
       .filter(Boolean)
       .join('\n');
+    return { system, user };
+  }
+
+  /** Uma seção do post, em Markdown puro, com a meta de palavras dela. */
+  private sectionPrompts(
+    topic: AiTopic,
+    plan: AiPlan,
+    index: number,
+    words: number,
+    published: Array<{ slug: string; title: string }>,
+    options: { numbers: boolean; link: { slug: string; title: string } | null },
+  ) {
+    const section = plan.sections[index]!;
+    const system = `${this.baseSystem()}
+
+TAREFA DESTA ETAPA: escrever o texto de UMA seção do post. Responda só com o Markdown da seção: sem o subtítulo "## " dela (ele é inserido depois), sem introdução do post, sem conclusão, sem "Resumo", sem texto fora da seção. Pode usar "### " para subtópicos, listas e passos numerados.`;
+    const outline = plan.sections.map((item, position) => `${position + 1}. ${item.heading}${position === index ? '   <- ESTA' : ''}`).join('\n');
+    const user = [
+      `POST: ${plan.title}`,
+      `PALAVRA-CHAVE: ${topic.keyword}`,
+      `PAUTA: ${topic.brief}`,
+      `ABERTURA JÁ ESCRITA: ${plan.intro}`,
+      `SEÇÕES DO POST:\n${outline}`,
+      '',
+      `ESCREVA A SEÇÃO: "${section.heading}"`,
+      `COBRIR: ${section.points.join('; ')}`,
+      `TAMANHO: entre ${words} e ${Math.round(words * 1.25)} palavras. Explique, dê um exemplo concreto com um produto do dia a dia (ex.: "Café torrado 500 g") e termine com um passo prático. Não repita o que as outras seções cobrem.`,
+      options.numbers ? 'Inclua um exemplo resolvido com números (quantidades, prazos, R$) em tabela Markdown ou passo a passo.' : '',
+      options.link ? `Inclua, onde fizer sentido no texto, este link interno em Markdown: [${options.link.title}](/blog/${options.link.slug}).` : '',
+      index === 0 ? 'Mencione o Estoque Simples uma vez, de forma natural, como ferramenta que ajuda nisso (sem propaganda).' : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return { system, user };
+  }
+
+  /** O post publicado mais próximo da pauta (palavras em comum), para o link interno. */
+  private static relatedPost(topic: AiTopic, published: Array<{ slug: string; title: string }>) {
+    const terms = fold(`${topic.keyword} ${topic.brief}`).split(/[^a-z0-9]+/).filter((word) => word.length > 3);
+    let best: { slug: string; title: string } | null = null;
+    let bestScore = 0;
+    for (const post of published) {
+      const haystack = fold(post.title);
+      const score = terms.filter((term) => haystack.includes(term)).length;
+      if (score > bestScore) {
+        best = post;
+        bestScore = score;
+      }
+    }
+    return best ?? published[0] ?? null;
+  }
+
+  /** Seção como o modelo devolveu, limpa: sem o próprio "## ", sem "## " internos e sem cercas de código. */
+  private static cleanSection(text: string, heading: string): string {
+    let out = text.trim().replace(/^```(?:markdown|md)?\s*|\s*```$/g, '').trim();
+    const first = out.split('\n')[0] ?? '';
+    if (/^#{1,3}\s/.test(first) && fold(first).includes(fold(heading).slice(0, 12))) out = out.split('\n').slice(1).join('\n').trim();
+    return out.replace(/^##\s+(?!#)/gm, '### ').replace(/^#\s+/gm, '### ');
   }
 
   /**
@@ -385,22 +436,91 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
     await log(`Pauta: "${topic.key}" (${topic.category}), palavra-chave "${topic.keyword}", meta de ${target} palavras${options.membersOnly ? ', post exclusivo' : ''}.`);
     const published = (await this.blog.allPublished(60)).map((post) => ({ slug: post.slug, title: post.title }));
 
+    const membersOnly = options.membersOnly ?? false;
+    const sectionCount = membersOnly ? 5 : 4;
+    const perSection = Math.round((target - 150) / sectionCount);
+    const related = BlogAiWriter.relatedPost(topic, published);
     let problems: string[] = [];
-    let previous: { contentMd: string; words: number } | null = null;
     let body: BlogPostBody | null = null;
     for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS && !body; attempt += 1) {
-      await report(
-        attempt === 0
-          ? `Escrevendo "${topic.key}" com ${model} (versão 1 de até ${MAX_WRITE_ATTEMPTS})`
-          : `Revisando o rascunho de "${topic.key}" (versão ${attempt + 1} de até ${MAX_WRITE_ATTEMPTS})`,
-      );
-      const startedAt = Date.now();
-      const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems, options.membersOnly ?? false, previous), options.membersOnly ? 4800 : 3600, 0.7)) as AiDraft;
-      const draft: AiDraft = { ...raw, tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [], faq: Array.isArray(raw.faq) ? raw.faq : [] };
-      const words = renderMarkdown(draft.contentMd ?? '').words;
-      previous = { contentMd: draft.contentMd ?? '', words };
-      await log(`Versão ${attempt + 1}: "${draft.title ?? 'sem título'}", ${words} palavras, em ${((Date.now() - startedAt) / 1000).toFixed(1)} s.`);
-      problems = BlogAiWriter.check(draft, topic, published, { membersOnly: options.membersOnly ?? false });
+      const version = attempt + 1;
+      // 1) Plano.
+      await report(`Planejando o post (versão ${version} de até ${MAX_WRITE_ATTEMPTS})`);
+      const planPrompt = this.planPrompts(topic, published, sectionCount, membersOnly, problems);
+      const rawPlan = (await client.completeJson(planPrompt.system, planPrompt.user, 1800, 0.6)) as Partial<AiPlan>;
+      const plan: AiPlan = {
+        title: String(rawPlan.title ?? ''),
+        seoTitle: typeof rawPlan.seoTitle === 'string' ? rawPlan.seoTitle : undefined,
+        excerpt: String(rawPlan.excerpt ?? ''),
+        category: String(rawPlan.category ?? topic.category),
+        tags: Array.isArray(rawPlan.tags) ? rawPlan.tags.map(String) : [],
+        coverAlt: typeof rawPlan.coverAlt === 'string' ? rawPlan.coverAlt : undefined,
+        intro: String(rawPlan.intro ?? '').trim(),
+        sections: Array.isArray(rawPlan.sections)
+          ? rawPlan.sections
+              .filter((item) => item && typeof item.heading === 'string')
+              .map((item) => ({ heading: String(item.heading).replace(/^#+\s*/, '').trim(), points: Array.isArray(item.points) ? item.points.map(String) : [] }))
+              .slice(0, sectionCount + 1)
+          : [],
+        summary: Array.isArray(rawPlan.summary) ? rawPlan.summary.map(String).slice(0, 4) : [],
+        faq: Array.isArray(rawPlan.faq) ? rawPlan.faq : [],
+      };
+      if (plan.sections.length < 3 || !plan.intro) {
+        problems = ['O plano precisa da abertura ("intro") e de pelo menos 3 seções com heading e points.'];
+        await log(`Versão ${version}: plano incompleto (${plan.sections.length} seções), refazendo.`, 'warn');
+        continue;
+      }
+      await log(`Versão ${version}, plano: "${plan.title}" com ${plan.sections.length} seções (${plan.sections.map((item) => item.heading).join(' | ')}).`);
+
+      // 2) Uma seção por chamada, com a meta dela; curta demais ganha uma expansão.
+      const texts: string[] = [];
+      for (let index = 0; index < plan.sections.length; index += 1) {
+        const section = plan.sections[index]!;
+        await report(`Escrevendo a seção ${index + 1} de ${plan.sections.length}: "${section.heading}" (versão ${version})`);
+        const numbers = (topic.targetWords ?? 0) >= 1600 && (/exemplo|c[aá]lculo|n[uú]meros/i.test(section.heading) || index === 1);
+        const prompts = this.sectionPrompts(topic, plan, index, perSection, published, { numbers, link: index === 0 ? related : null });
+        let text = BlogAiWriter.cleanSection(await client.completeText(prompts.system, prompts.user, 1000), section.heading);
+        let words = renderMarkdown(text).words;
+        if (words < perSection * 0.7) {
+          const expanded = BlogAiWriter.cleanSection(
+            await client.completeText(
+              prompts.system,
+              `${prompts.user}\n\nRASCUNHO DESTA SEÇÃO (${words} palavras, curto demais). Reescreva com ${perSection} a ${Math.round(perSection * 1.25)} palavras, mantendo o que está bom e acrescentando um exemplo e um passo prático:\n${text}`,
+              1000,
+            ),
+            section.heading,
+          );
+          const expandedWords = renderMarkdown(expanded).words;
+          await log(`Seção ${index + 1} veio com ${words} palavras; expandida para ${expandedWords}.`, expandedWords > words ? 'info' : 'warn');
+          if (expandedWords > words) {
+            text = expanded;
+            words = expandedWords;
+          }
+        } else {
+          await log(`Seção ${index + 1}: ${words} palavras.`);
+        }
+        texts.push(text);
+      }
+
+      // 3) Montagem e ajustes que não precisam do modelo.
+      let contentMd = [plan.intro, ...plan.sections.map((section, index) => `## ${section.heading}\n\n${texts[index]}`), `## Resumo\n\n${(plan.summary.length > 0 ? plan.summary : [plan.excerpt]).map((item) => `- ${item}`).join('\n')}`].join('\n\n');
+      const hasInternalLink = /\]\(\/(criar-conta|plataformas|ajuda|blog)/.test(contentMd);
+      const hasPostLink = /\]\(\/blog\/[a-z0-9-]+\)/.test(contentMd);
+      const extras: string[] = [];
+      if ((!hasInternalLink || (published.length >= 3 && !hasPostLink)) && related) extras.push(`Veja também: [${related.title}](/blog/${related.slug}).`);
+      if (!/estoque simples/i.test(contentMd) || (!hasInternalLink && !related)) {
+        extras.push('Para organizar isso no dia a dia, dá para [criar uma conta grátis](/criar-conta) no Estoque Simples e usar no celular e no computador.');
+      }
+      if (extras.length > 0) {
+        contentMd = contentMd.replace(/\n\n## Resumo/, `\n\n${extras.join(' ')}\n\n## Resumo`);
+        await log(`Ajuste automático: ${extras.length === 2 ? 'link interno e menção ao Estoque Simples' : extras[0]!.startsWith('Veja') ? 'link interno para um post publicado' : 'link para criar conta'} incluídos antes do Resumo.`);
+      }
+      const draft: AiDraft = { title: plan.title, seoTitle: plan.seoTitle, excerpt: plan.excerpt, category: plan.category, tags: plan.tags, coverAlt: plan.coverAlt, contentMd, faq: plan.faq };
+      const totalWords = renderMarkdown(contentMd).words;
+      await log(`Versão ${version} montada: ${totalWords} palavras (meta ${target}).`);
+
+      // 4) Validação.
+      problems = BlogAiWriter.check(draft, topic, published, { membersOnly });
       const parsed = blogPostBodySchema.safeParse({
         title: draft.title,
         seoTitle: draft.seoTitle?.slice(0, 70) ?? null,
@@ -408,17 +528,17 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
         contentMd: draft.contentMd,
         category: BLOG_CATEGORY_SLUGS.includes(draft.category) ? draft.category : topic.category,
         coverAlt: typeof draft.coverAlt === 'string' && draft.coverAlt.trim() ? draft.coverAlt.trim().slice(0, 200) : null,
-        membersOnly: options.membersOnly ?? false,
+        membersOnly,
         tags: draft.tags.slice(0, 6).map((tag) => tag.toLowerCase().slice(0, 40)),
         faq: draft.faq.slice(0, 4).map((item) => ({ question: String(item.question ?? '').slice(0, 200), answer: String(item.answer ?? '').slice(0, 1000) })),
       });
       if (!parsed.success) problems.push(...parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
       if (problems.length === 0 && parsed.success) {
         body = parsed.data;
-        await log(`Versão ${attempt + 1} aprovada na validação.`);
+        await log(`Versão ${version} aprovada na validação.`);
       } else {
         this.services.logger?.warn({ attempt, problems, topic: topic.key }, 'post da IA reprovado na validação');
-        await log(`Versão ${attempt + 1} reprovada: ${problems.join(' | ')}`, 'warn');
+        await log(`Versão ${version} reprovada: ${problems.join(' | ')}`, 'warn');
       }
     }
     if (!body) {

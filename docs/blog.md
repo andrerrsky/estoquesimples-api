@@ -93,12 +93,22 @@ texto que peça cadastro. Usa a mesma chave da OpenAI configurada em Inteligênc
 (`openai-client.ts`, `completeJson` com `response_format: json_object`).
 Sem chave, o job registra e sai.
 
-**Escrita e revisão.** O prompt dá a meta total e a distribuição por seção
-(abertura ~80 palavras, 4 seções de ~200, resumo ~70): modelos menores
-(`gpt-4o-mini`) escrevem curto quando só recebem o total. Se a versão é
-reprovada na validação (tamanho, estrutura, palavra-chave, links), a
-próxima chamada **revisa o mesmo rascunho** (vai junto no prompt, com
-quantas palavras faltam) em vez de recomeçar. Até 3 versões por execução.
+**Escrita por seção.** Em vez de pedir o post inteiro numa resposta (o
+`gpt-4o-mini` parava em ~450 palavras mesmo revisando o próprio rascunho,
+como mostrou o log de 04/11/2026), a escrita tem etapas:
+
+1. **Plano** (JSON): título, `seoTitle`, resumo, abertura de 60–90
+   palavras com a palavra-chave, 4 seções (5 no exclusivo) com os pontos
+   de cada uma, itens do Resumo e 3 perguntas do FAQ.
+2. **Uma chamada por seção**, com a meta dela (~200 palavras), o esboço do
+   post para não repetir assunto e, na primeira, o link para o post
+   publicado mais próximo da pauta. Seção abaixo de 70% da meta ganha uma
+   expansão.
+3. **Montagem**: abertura, seções, "## Resumo". Sem link interno ou sem
+   menção ao Estoque Simples, uma frase com o link (post relacionado ou
+   `/criar-conta`) entra antes do Resumo, sem chamar o modelo.
+4. **Validação** (`BlogAiWriter.check`). Reprovado, o plano é refeito com
+   os problemas apontados. Até 2 versões por execução.
 
 **Acompanhar.** Toda escrita passa pela fila, inclusive o botão
 "Escrever com IA" e o clique numa pauta do banco (`POST /admin/api/blog/ai/write`

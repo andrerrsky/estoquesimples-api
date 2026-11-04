@@ -140,6 +140,8 @@ export function JobRunPage() {
   const status = JOB_STATUS[job.status];
   const postId = typeof job.result?.['postId'] === 'string' ? (job.result['postId'] as string) : null;
   const finishedAt = job.completedAt ?? job.failedAt ?? job.dismissedAt;
+  // O runner limpa locked_at ao terminar: o início da última tentativa vem do log.
+  const startedAt = job.lockedAt ?? logs.find((line) => line.attempt === job.attempts)?.at ?? null;
   const attempts = [...new Set(logs.map((line) => line.attempt))];
 
   return (
@@ -185,7 +187,7 @@ export function JobRunPage() {
           <div className="job-status__sub">
             {job.status === 'running' && <>tentativa {job.attempts} de {job.maxAttempts} · rodando há {elapsed(job.lockedAt)}{job.progressAt && <> · passo atual há {elapsed(job.progressAt)}</>}</>}
             {job.status === 'pending' && <>agendada para {fmtDateTime(job.runAt)}{job.attempts > 0 && <> · já teve {job.attempts} tentativa(s)</>}</>}
-            {(job.status === 'completed' || job.status === 'failed') && <>{job.attempts} tentativa(s) · terminou {fmtDateTime(finishedAt)}</>}
+            {(job.status === 'completed' || job.status === 'failed') && <>{job.attempts} tentativa(s){startedAt && <> · durou {elapsed(startedAt, finishedAt)}</>} · terminou {fmtDateTime(finishedAt)}</>}
             {job.status === 'dismissed' && <>por {job.dismissedBy ?? '—'} em {fmtDateTime(job.dismissedAt)}</>}
           </div>
         </div>
@@ -240,9 +242,9 @@ export function JobRunPage() {
                 { label: 'Situação', value: <Badge tone={status?.tone}>{status?.label ?? job.status}</Badge> },
                 { label: 'Criada', value: <Time value={job.createdAt} /> },
                 { label: 'Agendada', value: fmtDateTime(job.runAt) },
-                { label: 'Início', value: job.lockedAt ? fmtDateTime(job.lockedAt) : '—' },
+                { label: 'Início', value: startedAt ? fmtDateTime(startedAt) : '—' },
                 { label: 'Fim', value: finishedAt ? fmtDateTime(finishedAt) : '—' },
-                { label: 'Duração', value: job.lockedAt ? elapsed(job.lockedAt, finishedAt) : '—' },
+                { label: 'Duração', value: startedAt ? elapsed(startedAt, finishedAt) : '—' },
                 { label: 'Tentativas', value: `${job.attempts} de ${job.maxAttempts}` },
                 { label: 'Instância', value: <span className="mono small">{job.lockedBy ?? '—'}</span> },
               ]}
