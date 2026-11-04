@@ -2,9 +2,12 @@ import type { AppServices } from '../../platform/http/context.js';
 import { enqueueJob, registerJobHandler } from '../../platform/jobs/runner.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
 import { AI_TOPICS, BlogAiWriter } from './blog-ai.js';
+import { BlogCoverAi } from './blog-cover-ai.js';
 import { BLOG_NOTIFY_JOB, BlogService } from './blog.service.js';
 
 export const BLOG_AI_WRITE_JOB = 'blog.ai_write';
+/** Capa de um post gerada pela IA (botão "Gerar com IA" na seção Capa do editor). */
+export const BLOG_AI_COVER_JOB = 'blog.ai_cover';
 
 /**
  * Terça e sexta às 9h de Brasília (12:00 UTC): os dois posts públicos da
@@ -84,11 +87,36 @@ export function registerBlogJobs(_services: AppServices): void {
         report: context.progress,
         log: context.log,
       });
-      await context.setResult({ postId: post.id, slug: post.slug, title: post.title, status: post.status });
+      // Capa: uma foto gerada pela IA. Falhar aqui não perde o post: ele fica
+      // com a capa automática (título e categoria) e dá para gerar depois.
+      let coverUrl: string | null = null;
+      if (context.services.storage.configured) {
+        try {
+          const withCover = await new BlogCoverAi(context.services).generate(post.id, null, { report: context.progress, log: context.log });
+          coverUrl = withCover.coverUrl;
+        } catch (error) {
+          await context.log(`Capa não gerada (o post fica com a capa automática): ${error instanceof Error ? error.message : String(error)}`, 'warn');
+        }
+      } else {
+        await context.log('Armazenamento de imagens desligado: o post fica com a capa automática.', 'warn');
+      }
+      await context.setResult({ postId: post.id, slug: post.slug, title: post.title, status: post.status, coverUrl });
       context.logger.info({ postId: post.id, slug: post.slug, status: post.status, topic: post.aiTopic }, 'post do blog escrito pela IA');
     } finally {
       if (!manual) await scheduleNext(context.services);
     }
+  });
+  registerBlogCoverJob();
+}
+
+/** Gera a capa de um post (pedido pelo editor). */
+export function registerBlogCoverJob(): void {
+  registerJobHandler(BLOG_AI_COVER_JOB, async (payload, context) => {
+    const postId = typeof payload['postId'] === 'string' ? payload['postId'] : null;
+    if (!postId) throw new Error('Tarefa sem o id do post.');
+    await context.log(`Pedido pelo editor${typeof payload['requestedBy'] === 'string' ? ` (${payload['requestedBy']})` : ''}.`);
+    const post = await new BlogCoverAi(context.services).generate(postId, null, { report: context.progress, log: context.log });
+    await context.setResult({ postId: post.id, slug: post.slug, title: post.title, coverUrl: post.coverUrl });
   });
 }
 

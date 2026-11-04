@@ -2128,3 +2128,17 @@ code,
 }
 .job-link { color: inherit; text-decoration: none; }
 .job-link:hover .cell-main { color: var(--brand); text-decoration: underline; }
+
+/* Capa gerada pela IA (editor do blog) */
+.cover-ai {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  background: var(--brand-tint);
+}
+.cover-ai__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cover-ai__text strong { overflow-wrap: anywhere; }

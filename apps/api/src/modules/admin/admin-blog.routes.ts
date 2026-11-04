@@ -10,7 +10,9 @@ import {
   blogSettingsSchema,
 } from "../blog/blog.schemas.js";
 import { BlogService } from "../blog/blog.service.js";
-import { BLOG_AI_WRITE_JOB, nextAiRun } from "../blog/blog.jobs.js";
+import { BLOG_AI_COVER_JOB, BLOG_AI_WRITE_JOB, nextAiRun } from "../blog/blog.jobs.js";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { AdminAction, recordAdminAudit } from "./admin-audit.service.js";
 import { jobs } from "../../platform/db/schema/index.js";
 import { randomUUID } from "node:crypto";
 import { readOpenAiKey } from "../reviews/reviews.service.js";
@@ -268,6 +270,47 @@ export async function registerAdminBlogRoutes(
     },
     async (request) =>
       service.removeCover(adminActor(request), request.params.postId),
+  );
+
+  routes.post(
+    "/blog/posts/:postId/cover/ai",
+    {
+      preHandler: requireAdmin("support"),
+      schema: {
+        tags: ["admin"],
+        summary: "Pede à IA uma foto de capa para o post (vai para a fila)",
+        hide: true,
+        params: uuidParam("postId"),
+        response: { 200: z.object({ jobId: z.string(), reused: z.boolean() }), ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      const postId = request.params.postId;
+      await service.getById(postId);
+      if (!(await readOpenAiKey(app.services)))
+        throw badRequest(ErrorCode.VALIDATION_FAILED, "Configure a chave da OpenAI (painel › Inteligência artificial) para gerar capas.");
+      if (!app.services.storage.configured)
+        throw badRequest(ErrorCode.VALIDATION_FAILED, "O armazenamento de imagens não está configurado neste ambiente.");
+      // Um pedido por vez para o mesmo post: o segundo clique acompanha o primeiro.
+      const active = await app.services.db
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.kind, BLOG_AI_COVER_JOB), isNull(jobs.completedAt), isNull(jobs.failedAt), sql`${jobs.payload}->>'postId' = ${postId}`))
+        .limit(1);
+      if (active[0]) return { jobId: active[0].id, reused: true };
+      const actor = adminActor(request);
+      const jobId = randomUUID();
+      await app.services.db.insert(jobs).values({
+        id: jobId,
+        kind: BLOG_AI_COVER_JOB,
+        payload: { postId, requestedBy: actor.email },
+        uniqueKey: `${BLOG_AI_COVER_JOB}:${postId}:${jobId}`,
+        runAt: new Date(),
+        maxAttempts: 1,
+      });
+      await recordAdminAudit(app.services.db, { actor, action: AdminAction.BLOG_POST_UPDATED, targetType: "blog_post", targetId: postId, metadata: { capaIa: "pedida", jobId } });
+      return { jobId, reused: false };
+    },
   );
 
   routes.post(
