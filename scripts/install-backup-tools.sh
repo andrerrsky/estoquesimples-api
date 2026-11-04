@@ -13,6 +13,12 @@ sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)
 curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
 sudo apt-get update -qq
 sudo apt-get install -y -qq postgresql-client-18 age jq
+# O runner já traz o Postgres 16 e o /usr/bin/pg_dump (wrapper do
+# postgresql-common) escolhe essa versão: a 18 só vale se vier antes no PATH.
+PG18_BIN=/usr/lib/postgresql/18/bin
+export PATH="$PG18_BIN:$PATH"
+if [ -n "${GITHUB_PATH:-}" ]; then echo "$PG18_BIN" >> "$GITHUB_PATH"; fi
+pg_dump --version
 
 tmp="$(mktemp -d)"
 curl -fsSL -o "$tmp/rclone.zip" "https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
