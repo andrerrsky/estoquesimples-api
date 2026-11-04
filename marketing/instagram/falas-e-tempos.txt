@@ -1,0 +1,30 @@
+FALAS E TEMPOS — vídeos verticais 1080x1920 (sem áudio), 30 fps
+Comece cada fala cerca de 0,4 s após o início da cena.
+
+== reel-completo-1080x1920.mp4 (58,5 s) — Reels / Shorts / TikTok
+0:00–0:04  Abertura      Estoque Simples. Controle de estoque para o seu negócio, mesmo sem internet.
+0:04–0:13  Cena 1        Veja todos os seus produtos em um só lugar e encontre qualquer item por nome, SKU ou código de barras.
+0:13–0:22  Cena 2        Registrar uma entrada leva segundos: informe a quantidade, uma observação, e confirme.
+0:22–0:30  Cena 3        Defina o estoque mínimo de cada produto e saiba na hora o que está acabando.
+0:30–0:38  Cena 4        Cada movimentação fica registrada no histórico, com a opção de desfazer.
+0:38–0:47  Cena 5        Nos relatórios, veja onde está o dinheiro do seu estoque e gere um PDF para compartilhar.
+0:47–0:54  Cena 6        Faça backup completo dos dados e exporte planilhas para o Excel ou Google Planilhas.
+0:54–0:58  Encerramento  Estoque Simples. Seu estoque sob controle, na palma da mão. Link na bio.
+
+== anuncio-sem-internet-15s-1080x1920.mp4 (15 s) — Stories / anúncio
+0:00–0:03  Cartela       Caiu a internet? Seu estoque continua funcionando.
+0:03–0:11  Cena 1        Cadastre, busque e movimente produtos direto no celular. Os dados ficam no aparelho.
+0:11–0:15  Encerramento  Estoque Simples. Baixe grátis para Android. Link na bio.
+
+== anuncio-entrada-15s-1080x1920.mp4 (15 s) — Stories / anúncio
+0:00–0:02  Cartela       Ainda anota entrada de estoque no caderninho?
+0:02–0:11  Cena 2        No Estoque Simples é assim: quantidade, observação, confirmar. Pronto, em segundos.
+0:11–0:15  Encerramento  Estoque Simples. Seu estoque sob controle. Link na bio.
+
+== anuncio-estoque-baixo-20s-1080x1920.mp4 (20 s) — Stories / anúncio
+0:00–0:02  Cartela       Já perdeu venda porque faltou produto?
+0:02–0:09  Cena 3        Defina o estoque mínimo de cada item e o app avisa o que está acabando.
+0:09–0:16  Cena 5        E nos relatórios você vê onde está o dinheiro do seu estoque, com PDF pronto para compartilhar.
+0:16–0:20  Encerramento  Estoque Simples. Controle de estoque sem complicação. Link na bio.
+
+Observação: "Baixe grátis" só se o app for de fato gratuito no download; caso contrário use "Disponível para Android".

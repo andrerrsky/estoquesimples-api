@@ -10,7 +10,7 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 
 | | Valor | Como é cumprido |
 | --- | --- | --- |
-| **RPO** (quanto dado se pode perder) | 24 h | dump noturno externo (`backup-offsite.yml`) + backups diários do Railway |
+| **RPO** (quanto dado se pode perder) | 24 h | dump noturno externo (`backup-offsite.yml`); os backups do próprio Railway exigem o plano Pro e **não estão ligados** (plano Hobby) |
 | **RTO** (quanto tempo para voltar) | 4 h | roteiro abaixo; o procedimento é exercitado toda semana pelo `backup-drill.yml` (com a mesma receita do usuário de leitura) e, depois de ligado o backup externo, toda noite pela restauração de teste do dump real |
 | Retenção das cópias | 35 dias (Railway: o que o plano permitir, mínimo 14) | regra de expiração no bucket de backup |
 
@@ -19,6 +19,8 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
 1. **Railway** **[dono]**: no serviço Postgres → *Backups*, ligar backups
    agendados (diário; semanal se o plano permitir) com retenção de pelo menos
    14 dias. É a restauração mais rápida (mesmo provedor, um clique).
+   **Hoje não está ligado**: o recurso só existe no plano Pro, e a conta está
+   no Hobby. A cópia externa (camada 2) é o único backup.
 2. **Cópia externa noturna** (`.github/workflows/backup-offsite.yml`):
    - `pg_dump` com um usuário **somente leitura**, por TLS (o workflow recusa
      URL sem `sslmode=require`);
@@ -137,6 +139,66 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
    `OPS_BACKUP_TOKEN`) e a variável `BACKUP_OFFSITE_ENABLED=true`. Rode o
    workflow manualmente uma vez e confira `/ops/backup` (`dentroDoPrazo:
    true`, com `objeto` e `sha256` do arquivo enviado).
+
+### Como está ligado hoje (4 de novembro de 2026)
+
+Resumo do que existe de fato, para quem precisar mexer ou restaurar. Os
+**valores** dos segredos ficam só no GitHub e no gerenciador de senhas.
+
+| Item | Valor |
+| --- | --- |
+| Provedor | Backblaze B2, conta própria (separada do Railway), região `us-east-005`, endpoint `https://s3.us-east-005.backblazeb2.com` |
+| Bucket dos dumps | `estoquesimples-backup-dumps`: privado, Object Lock em modo *compliance* com retenção padrão de **35 dias**; ciclo de vida "custom": esconde aos 35 dias e apaga 1 dia depois |
+| Bucket da cópia das fotos | `estoquesimples-backup-fotos`: privado, Object Lock *compliance* de 35 dias; ciclo de vida "keep prior versions" por 35 dias |
+| Chaves do B2 | duas *application keys* restritas, uma por bucket (`backup-dumps`, `backup-fotos`), Read and Write |
+| Chave de cifra | par `age` gerado em 04/11/2026; a pública está no segredo `BACKUP_AGE_RECIPIENT`; a privada **só** no gerenciador de senhas do dono e numa cópia offline |
+| Banco | Railway, Postgres **18**; acesso público (proxy TCP) ligado em 04/11/2026 só para o backup: `zephyr.proxy.rlwy.net:54621`; usuário `backup_reader` (somente leitura, `pg_read_all_data`, `BYPASSRLS`, 2 conexões) |
+| Fotos de produção | bucket `estoquesimples-imagens` do Railway, lido com a chave da aba *Credentials* do bucket |
+| Quando roda | toda noite às 05:30 UTC (02:30 de Brasília), workflow "Backup externo" (`backup-offsite.yml`); também por *Run workflow* |
+| Primeira cópia | `db/2026/11/04/estoquesimples-20261104T212126Z.dump.age` (run 41915231990 do GitHub) |
+
+**Segredos no GitHub** (Settings › Secrets and variables › Actions):
+`BACKUP_DATABASE_URL`, `BACKUP_AGE_RECIPIENT`, `BACKUP_S3_ENDPOINT`,
+`BACKUP_S3_REGION`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`,
+`BACKUP_S3_SECRET_ACCESS_KEY`, `BACKUP_IMAGES_BUCKET`,
+`BACKUP_IMAGES_ACCESS_KEY_ID`, `BACKUP_IMAGES_SECRET_ACCESS_KEY`,
+`IMAGES_S3_ENDPOINT`, `IMAGES_S3_BUCKET`, `IMAGES_S3_ACCESS_KEY_ID`,
+`IMAGES_S3_SECRET_ACCESS_KEY`, `API_BASE_URL`, `OPS_BACKUP_TOKEN` (o mesmo
+valor está no serviço da API no Railway). **Variáveis**:
+`BACKUP_OFFSITE_ENABLED=true`, `BACKUP_IMAGES_VERSIONING_CONFIRMED=true` (o
+B2 não informa versionamento pela API S3) e `BACKUP_CONDITIONAL_WRITE=0` (o
+B2 responde 501 ao `If-None-Match`; a proteção contra sobrescrita é o Object
+Lock).
+
+**Particularidades que já custaram uma rodada cada** (todas tratadas no
+código, registradas aqui para não voltarem):
+
+- o cliente do Postgres no runner precisa ser da **mesma versão maior do
+  servidor** (18). O runner do GitHub traz o 16 pré-instalado e o
+  `/usr/bin/pg_dump` escolhe esse; `install-backup-tools.sh` põe o 18 na
+  frente do PATH. Ao subir o Postgres do Railway (por exemplo para 19),
+  mudar `postgresql-client-18`, o caminho `/usr/lib/postgresql/18/bin` e a
+  imagem `postgres:18-alpine` nos três workflows;
+- a `BACKUP_DATABASE_URL` usa o host do **proxy público** (`*.proxy.rlwy.net`),
+  nunca `postgres.railway.internal`, que só resolve dentro do Railway;
+- as variáveis `S3_*` do serviço da API são **referências** ao bucket; os
+  valores reais estão na aba *Credentials* do bucket `estoquesimples-imagens`.
+
+**Como conferir que está vivo**
+
+- Painel › Operação: o alerta `backup_desatualizado` aparece se não houver
+  registro nas últimas 48 h; o cartão de backup mostra a última restauração
+  de teste. Pela API: `GET /ops/backup` com o cabeçalho `Authorization:
+  Bearer <OPS_TOKEN>` → `dentroDoPrazo: true`, `objeto` e `sha256`.
+- GitHub › Actions › "Backup externo": o run de cada noite, com `Enviado:` e
+  `SHA-256:` no passo "Cifrar, enviar e conferir o dump". É esse SHA-256 que
+  identifica o dump verdadeiro numa restauração (passo 2 do roteiro abaixo).
+- Backblaze › Buckets › `estoquesimples-backup-dumps` › Browse Files: um
+  `db/AAAA/MM/DD/…dump.age` por noite, com o `.sha256` ao lado.
+
+**Custo**: zero até 10 GB guardados no B2; com 35 dias de retenção e o
+tamanho atual do banco e das fotos, o uso fica bem abaixo disso. O GitHub
+Actions gasta poucos minutos por noite, dentro do plano gratuito.
 
 ### Restaurar (roteiro de incidente)
 
