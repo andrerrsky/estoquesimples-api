@@ -60,6 +60,7 @@ export const AdminAction = {
   REVIEW_REPLIED: 'review.replied',
   REVIEW_DRAFT_GENERATED: 'review.draft_generated',
   REVIEWS_SYNCED: 'reviews.synced',
+  REVIEWS_IMPORTED: 'reviews.imported',
   SETTING_UPDATED: 'setting.updated',
   SETTING_REMOVED: 'setting.removed',
 

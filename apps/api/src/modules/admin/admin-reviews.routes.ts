@@ -45,6 +45,32 @@ export async function registerAdminReviewsRoutes(app: FastifyInstance): Promise<
   );
 
   routes.post(
+    '/reviews/import',
+    {
+      preHandler: requireAdmin('support'),
+      // Um relatório mensal tem poucas centenas de KB; o teto cobre anos de um app grande.
+      bodyLimit: 12 * 1024 * 1024,
+      schema: {
+        tags: ['admin'],
+        summary: 'Importa um relatório mensal de avaliações da Play Console (CSV)',
+        hide: true,
+        body: z.object({ fileName: z.string().trim().max(200).optional(), content: z.string().min(1).max(10 * 1024 * 1024) }),
+        response: { 200: z.any(), ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      const result = await service.importCsv(request.body.content);
+      await recordAdminAudit(app.services.db, {
+        actor: adminActor(request),
+        action: AdminAction.REVIEWS_IMPORTED,
+        targetType: 'reviews',
+        metadata: { arquivo: request.body.fileName ?? null, ...result },
+      });
+      return result;
+    },
+  );
+
+  routes.post(
     '/reviews/sync',
     {
       preHandler: requireAdmin('support'),
