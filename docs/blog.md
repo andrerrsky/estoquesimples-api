@@ -93,6 +93,25 @@ texto que peça cadastro. Usa a mesma chave da OpenAI configurada em Inteligênc
 (`openai-client.ts`, `completeJson` com `response_format: json_object`).
 Sem chave, o job registra e sai.
 
+**Escrita e revisão.** O prompt dá a meta total e a distribuição por seção
+(abertura ~80 palavras, 4 seções de ~200, resumo ~70): modelos menores
+(`gpt-4o-mini`) escrevem curto quando só recebem o total. Se a versão é
+reprovada na validação (tamanho, estrutura, palavra-chave, links), a
+próxima chamada **revisa o mesmo rascunho** (vai junto no prompt, com
+quantas palavras faltam) em vez de recomeçar. Até 3 versões por execução.
+
+**Acompanhar.** Toda escrita passa pela fila, inclusive o botão
+"Escrever com IA" e o clique numa pauta do banco (`POST /admin/api/blog/ai/write`
+devolve `{ jobId }` e o painel abre a página da tarefa). A página
+`/admin/operacao/tarefas/:jobId` mostra o estado fixo no topo, o passo
+atual e o log de cada tentativa (pauta, cada versão com número de
+palavras e tempo, motivo da reprovação, erro da OpenAI, rascunho gravado),
+atualizado a cada 2 s; ao concluir, oferece o atalho para o post. O log
+vem da tabela `job_logs` (migration 0027), gravado pelo runner da fila
+(início, fim, erro, nova tentativa) e pela própria tarefa
+(`context.log`, `context.progress`); fica 30 dias. A escrita manual sai
+como rascunho, tem uma tentativa e não mexe na agenda.
+
 Para a IA não fugir do tema, o prompt é fechado (`blog-ai.ts`):
 
 - **Banco de pautas** (`AI_TOPICS`, 36 itens com categoria, briefing e

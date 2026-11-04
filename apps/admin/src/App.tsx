@@ -13,6 +13,7 @@ import { HelpPage } from './pages/HelpPage';
 import { SecurityPage } from './pages/SecurityPage';
 import { LoginPage } from './pages/LoginPage';
 import { OpsPage } from './pages/OpsPage';
+import { JobRunPage } from './pages/JobRunPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { PlansPage } from './pages/PlansPage';
 import { CampaignDetailPage, NotificationsPage } from './pages/NotificationsPage';
@@ -85,6 +86,7 @@ export const router = createBrowserRouter(
         { path: '/erros', element: <ErrorsPage /> },
         { path: '/auditoria', element: <AuditPage /> },
         { path: '/operacao', element: <OpsPage /> },
+        { path: '/operacao/tarefas/:jobId', element: <JobRunPage /> },
         { path: '/administradores', element: <AdminsPage /> },
         { path: '/blog', element: <BlogPage /> },
         { path: '/blog/novo', element: <BlogEditorPage /> },

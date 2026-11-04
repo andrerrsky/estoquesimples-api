@@ -29,25 +29,19 @@ function since(iso: string | null): string {
  * passo que a tarefa informou, para ninguém disparar outra escrita por cima
  * nem ficar sem saber se travou. Some quando não há nada rodando.
  */
-function AiActivity({ writing }: { writing: boolean }) {
+function AiActivity() {
   const query = useQuery({
     queryKey: ['ops', 'jobs', 'running', 'blog.ai_write'],
     queryFn: () => api.get<Paginated<RunningJob>>('/ops/jobs', { status: 'running', kind: 'blog.ai_write', page: 1, pageSize: 5 }),
     refetchInterval: 5_000,
   });
   const job = query.data?.items[0];
-  if (!job && !writing) return null;
+  if (!job) return null;
   return (
     <Notice tone="info" title="A IA está escrevendo um post agora">
-      {job ? (
-        <>
-          Tarefa agendada da fila, começou há {since(job.lockedAt)} (tentativa {job.attempts}/{job.maxAttempts}).
-          {job.progress ? <> Passo atual: <strong>{job.progress}</strong>, há {since(job.progressAt)}.</> : ' Ainda sem passo informado.'}
-          {' '}Detalhes e log em <Link to="/operacao">Operação › Fila de tarefas</Link>.
-        </>
-      ) : (
-        'Pedido pelo botão "Escrever com IA": a resposta chega aqui em até um minuto; o rascunho aparece na lista.'
-      )}
+      Começou há {since(job.lockedAt)} (tentativa {job.attempts}/{job.maxAttempts}).
+      {job.progress ? <> Passo atual: <strong>{job.progress}</strong>, há {since(job.progressAt)}.</> : ' Ainda sem passo informado.'}
+      {' '}<Link to={`/operacao/tarefas/${job.id}`}>Acompanhar o log</Link>
     </Notice>
   );
 }
@@ -123,11 +117,12 @@ export function BlogPage() {
   });
 
   const writeNow = useMutation({
-    mutationFn: (topicKey?: string) => api.post<BlogPostRow>('/blog/ai/write', { publish: false, ...(topicKey ? { topicKey } : {}) }),
-    onSuccess: (post) => {
-      toast.push('A IA escreveu um rascunho. Revise antes de publicar.', 'success');
-      void queryClient.invalidateQueries({ queryKey: ['blog'] });
-      navigate(`/blog/${post.id}`);
+    mutationFn: (topicKey?: string) => api.post<{ jobId: string }>('/blog/ai/write', { publish: false, ...(topicKey ? { topicKey } : {}) }),
+    onSuccess: ({ jobId }) => {
+      // A escrita roda na fila (30 s a 2 min); a página da tarefa mostra cada passo e, no fim, o atalho para o rascunho.
+      toast.push('Pedido enviado. Acompanhe a IA escrevendo.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['ops'] });
+      navigate(`/operacao/tarefas/${jobId}`);
     },
     onError: (error) => toast.push(errorMessage(error), 'error'),
   });
@@ -145,7 +140,7 @@ export function BlogPage() {
           can('support') ? (
             <div className="row" style={{ gap: 8 }}>
               <button type="button" className="btn btn--secondary" onClick={() => writeNow.mutate(undefined)} disabled={writeNow.isPending || !meta.data?.openAiConfigured} title={meta.data?.openAiConfigured ? 'A IA escreve um rascunho agora, com a próxima pauta' : 'Configure a chave da OpenAI em Inteligência artificial'}>
-                <Icon name="sparkle" size={16} /> {writeNow.isPending ? 'Escrevendo…' : 'Escrever com IA'}
+                <Icon name="sparkle" size={16} /> {writeNow.isPending ? 'Enviando…' : 'Escrever com IA'}
               </button>
               <Link to="/blog/novo" className="btn btn--primary"><Icon name="plus" size={16} /> Novo post</Link>
             </div>
@@ -153,7 +148,7 @@ export function BlogPage() {
         }
       />
 
-      <AiActivity writing={writeNow.isPending} />
+      <AiActivity />
 
       <Tabs value={tab} onChange={(next) => set({ tab: next })} items={[{ key: 'posts', label: 'Posts', count: posts.data?.total }, { key: 'ia', label: 'IA e configurações' }]} />
 
