@@ -8,6 +8,7 @@ import type { PlayReview } from '../billing/play-client.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from '../admin/admin-audit.service.js';
 import { offsetOf, type Paginated, type PaginationQuery } from '../admin/admin.schemas.js';
 import { OpenAiClient } from './openai-client.js';
+import { CsvFormatError, parsePlayReviewsCsv } from './play-reviews-csv.js';
 
 /** Limite do Google para a resposta do desenvolvedor. */
 export const REPLY_MAX_LENGTH = 350;
@@ -163,7 +164,7 @@ export class ReviewsService {
       .onConflictDoUpdate({
         target: playReviews.reviewId,
         set: {
-          authorName: values.authorName,
+          authorName: sql`coalesce(excluded.author_name, ${playReviews.authorName})`,
           starRating: values.starRating,
           text: values.text,
           language: values.language,
@@ -188,6 +189,86 @@ export class ReviewsService {
       previous.lastModifiedAt?.getTime() !== lastModifiedAt?.getTime() ||
       (previous.replyText ?? null) !== (values.developerReplyText ?? null);
     return changed ? 'updated' : 'unchanged';
+  }
+
+  // -------------------------------------------------------------------------
+  // Importação do relatório da Play Console (histórico)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Importa um relatório mensal de avaliações da Play Console. Avaliação que
+   * já está aqui só é atualizada quando o relatório é mais novo que a cópia
+   * local (a coleta pela API costuma estar à frente) e nunca perde o nome de
+   * quem avaliou, que o relatório não traz.
+   */
+  async importCsv(content: string): Promise<{ rows: number; created: number; updated: number; unchanged: number; withoutText: number; withoutId: number; otherPackage: number }> {
+    let parsed;
+    try {
+      parsed = parsePlayReviewsCsv(content, this.services.env.GOOGLE_PLAY_PACKAGE_NAME || null);
+    } catch (error) {
+      if (error instanceof CsvFormatError) throw badRequest(ErrorCode.VALIDATION_FAILED, error.message);
+      throw error;
+    }
+    let created = 0;
+    let updated = 0;
+    let unchanged = 0;
+    for (const review of parsed.reviews) {
+      const existing = await this.db
+        .select({ lastModifiedAt: playReviews.lastModifiedAt })
+        .from(playReviews)
+        .where(eq(playReviews.reviewId, review.reviewId))
+        .limit(1);
+      const previous = existing[0];
+      if (previous?.lastModifiedAt && review.lastModifiedAt && previous.lastModifiedAt >= review.lastModifiedAt) {
+        unchanged += 1;
+        continue;
+      }
+      const values = {
+        reviewId: review.reviewId,
+        starRating: review.starRating,
+        text: review.text,
+        language: review.language,
+        device: review.device,
+        appVersionCode: review.appVersionCode,
+        appVersionName: review.appVersionName,
+        userCommentAt: review.userCommentAt,
+        lastModifiedAt: review.lastModifiedAt,
+        developerReplyText: review.developerReplyText,
+        developerReplyAt: review.developerReplyAt,
+        raw: { origem: 'relatorio_play_console', link: review.link },
+        fetchedAt: new Date(),
+      };
+      await this.db
+        .insert(playReviews)
+        .values(values)
+        .onConflictDoUpdate({
+          target: playReviews.reviewId,
+          set: {
+            starRating: values.starRating,
+            text: values.text,
+            language: values.language,
+            device: sql`coalesce(excluded.device, ${playReviews.device})`,
+            appVersionCode: sql`coalesce(excluded.app_version_code, ${playReviews.appVersionCode})`,
+            appVersionName: sql`coalesce(excluded.app_version_name, ${playReviews.appVersionName})`,
+            userCommentAt: values.userCommentAt,
+            lastModifiedAt: values.lastModifiedAt,
+            developerReplyText: values.developerReplyText,
+            developerReplyAt: values.developerReplyAt,
+            fetchedAt: values.fetchedAt,
+          },
+        });
+      if (previous) updated += 1;
+      else created += 1;
+    }
+    return {
+      rows: parsed.reviews.length + parsed.withoutText + parsed.withoutId + parsed.otherPackage,
+      created,
+      updated,
+      unchanged,
+      withoutText: parsed.withoutText,
+      withoutId: parsed.withoutId,
+      otherPackage: parsed.otherPackage,
+    };
   }
 
   // -------------------------------------------------------------------------

@@ -302,6 +302,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'review.replied': { label: 'Resposta publicada na Play Store', tone: 'info' },
   'review.draft_generated': { label: 'Rascunho de resposta gerado', tone: 'neutral' },
   'reviews.synced': { label: 'Avaliações buscadas no Google', tone: 'neutral' },
+  'reviews.imported': { label: 'Relatório de avaliações importado', tone: 'neutral' },
   'setting.updated': { label: 'Configuração alterada', tone: 'warning' },
   'setting.removed': { label: 'Configuração removida', tone: 'warning' },
   'push.campaign_created': { label: 'Campanha de push criada', tone: 'neutral' },

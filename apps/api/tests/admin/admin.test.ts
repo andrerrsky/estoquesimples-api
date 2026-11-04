@@ -452,6 +452,47 @@ describe('avaliações da Play Store', () => {
     expect(draft.statusCode).toBe(409);
   });
 
+  it('importa o histórico pelo relatório da Play Console sem duplicar nem apagar o nome', async () => {
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+    const pkg = context.services.env.GOOGLE_PLAY_PACKAGE_NAME;
+    context.play.reviews.length = 0;
+    context.play.reviews.push({
+      reviewId: 'gp:BBB',
+      authorName: 'Antônio',
+      comments: [{ userComment: { text: 'Texto novo', starRating: 4, lastModified: { seconds: '1790000000' } } }],
+    });
+    const sync = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/sync', headers: { cookie, ...CSRF } });
+    expect(sync.statusCode).toBe(200);
+
+    const header = 'Package Name,App Version Code,App Version Name,Reviewer Language,Device,Review Submit Millis Since Epoch,Review Last Update Millis Since Epoch,Star Rating,Review Title,Review Text,Developer Reply Millis Since Epoch,Developer Reply Text,Review Link';
+    const content = [
+      header,
+      `${pkg},24,2.4,pt,a10,1573725600000,1573725600000,3,,Precisa de categorias,,,"https://play.google.com/x?reviewId=gp:AAA"`,
+      `${pkg},30,3.0,pt,s22,1649152800000,1649152800000,3,,Texto antigo,,,"https://play.google.com/x?reviewId=gp:BBB"`,
+      `${pkg},30,3.0,pt,s22,1649152800000,1649152800000,5,,,,,"https://play.google.com/x?reviewId=gp:CCC"`,
+    ].join('\n');
+
+    const imported = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/import', headers: { cookie, ...CSRF }, payload: { fileName: 'reviews_202204.csv', content } });
+    expect(imported.statusCode).toBe(200);
+    expect(imported.json()).toMatchObject({ created: 1, updated: 0, unchanged: 1, withoutText: 1 });
+
+    const again = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/import', headers: { cookie, ...CSRF }, payload: { content } });
+    expect(again.json()).toMatchObject({ created: 0, unchanged: 2 });
+
+    const list = await context.app.inject({ method: 'GET', url: '/admin/api/reviews?status=unanswered', headers: { cookie } });
+    const items = list.json().items as Array<{ reviewId: string; text: string; authorName: string | null }>;
+    expect(items.map((item) => item.reviewId).sort()).toEqual(['gp:AAA', 'gp:BBB']);
+    // A cópia vinda da API é mais nova: o relatório antigo não a sobrescreve.
+    expect(items.find((item) => item.reviewId === 'gp:BBB')).toMatchObject({ text: 'Texto novo', authorName: 'Antônio' });
+
+    const wrong = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/import', headers: { cookie, ...CSRF }, payload: { content: 'Data,Instalações\n1,2' } });
+    expect(wrong.statusCode).toBe(400);
+
+    const audit = await context.app.inject({ method: 'GET', url: '/admin/api/audit/admins?action=reviews.imported', headers: { cookie } });
+    expect(audit.json().total).toBe(2);
+  });
+
   it('só owner configura a chave da OpenAI e o formato é validado', async () => {
     const support = await createAdmin('support');
     const { cookie } = await loginAdmin(support);

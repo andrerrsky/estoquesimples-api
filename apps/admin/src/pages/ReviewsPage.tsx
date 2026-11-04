@@ -109,7 +109,7 @@ export function ReviewsPage() {
               A última busca (<Time value={s.lastSync.at} />) chegou ao Google e ele devolveu <strong>{fmtNumber(s.lastSync.fetched)}</strong> avaliação(ões).{' '}
             </>
           ) : null}
-          A API do Google só devolve avaliações <strong>com comentário escrito nos últimos 7 dias</strong>; as mais antigas que aparecem na página da Play Store (de anos atrás) não vêm por ela, e avaliações só com estrelas também não. A coleta roda a cada 6 horas; a partir da próxima avaliação com texto, ela aparece aqui.
+          A API do Google só devolve avaliações <strong>com comentário escrito nos últimos 7 dias</strong>; as mais antigas que aparecem na página da Play Store não vêm por ela. Para trazer o histórico, use <strong>Importar avaliações antigas</strong> (ao lado) com os relatórios mensais da Play Console. A coleta automática roda a cada 6 horas.
         </Notice>
       )}
 
@@ -156,6 +156,7 @@ export function ReviewsPage() {
             )}
           </Card>
           <OpenAiCard status={openai.data} canEdit={can('owner')} onChanged={() => { void queryClient.invalidateQueries({ queryKey: ['settings'] }); refresh(); }} />
+          {can('support') && <ImportCard onImported={refresh} />}
         </div>
       </div>
     </div>
@@ -258,6 +259,84 @@ function ReviewCard({ review, canReply, aiEnabled, onChanged }: { review: Review
         <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-panel)', padding: '10px 12px', whiteSpace: 'pre-wrap', fontSize: 'var(--fs-supporting)' }}>{text.trim()}</div>
       </ConfirmDialog>
     </article>
+  );
+}
+
+interface ImportResult {
+  rows: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  withoutText: number;
+  withoutId: number;
+  otherPackage: number;
+}
+
+/**
+ * O relatório da Play Console vem em UTF-16 com BOM; os exportados de novo
+ * por uma planilha costumam virar UTF-8. Decodifica pelo BOM, com UTF-8 como
+ * padrão, antes de mandar o texto para a API.
+ */
+async function readReport(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
+  // UTF-16 sem BOM: metade dos bytes é zero.
+  if (bytes.length > 4 && bytes[1] === 0 && bytes[3] === 0) return new TextDecoder('utf-16le').decode(bytes);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/** Importa o histórico: os relatórios mensais de avaliações baixados da Play Console. */
+function ImportCard({ onImported }: { onImported: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState<Array<{ file: string; result?: ImportResult; error?: string }>>([]);
+
+  const importFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    const done: typeof results = [];
+    for (const file of Array.from(files)) {
+      try {
+        const content = await readReport(file);
+        const result = await api.post<ImportResult>('/reviews/import', { fileName: file.name, content });
+        done.push({ file: file.name, result });
+      } catch (error) {
+        done.push({ file: file.name, error: errorMessage(error) });
+      }
+    }
+    setResults(done);
+    setBusy(false);
+    const created = done.reduce((sum, item) => sum + (item.result?.created ?? 0), 0);
+    toast.push(`${fmtNumber(created)} avaliação(ões) antiga(s) importada(s).`, done.some((item) => item.error) ? 'error' : 'success');
+    onImported();
+  };
+
+  return (
+    <Card title="Importar avaliações antigas" subtitle="A API do Google só traz os últimos 7 dias; o histórico vem dos relatórios mensais da Play Console">
+      <ol className="small" style={{ margin: '0 0 12px', paddingLeft: 18, lineHeight: 1.6 }}>
+        <li>Play Console › <strong>Baixar relatórios</strong> › <strong>Avaliações</strong>.</li>
+        <li>Escolha o app e baixe os meses que quiser (um CSV por mês).</li>
+        <li>Selecione os arquivos aqui; pode mandar vários de uma vez e repetir sem duplicar.</li>
+      </ol>
+      <label className={`btn btn--secondary ${busy ? 'is-disabled' : ''}`} style={{ cursor: busy ? 'progress' : 'pointer' }}>
+        <Icon name="upload" size={16} /> {busy ? 'Importando…' : 'Escolher relatórios (.csv)'}
+        <input type="file" accept=".csv,text/csv" multiple hidden disabled={busy} onChange={(event) => { void importFiles(event.target.files); event.target.value = ''; }} />
+      </label>
+      {results.length > 0 && (
+        <ul className="small muted" style={{ margin: '12px 0 0', paddingLeft: 18 }}>
+          {results.map((item) => (
+            <li key={item.file}>
+              <strong>{item.file}</strong>:{' '}
+              {item.error
+                ? <span style={{ color: 'var(--danger, #b42318)' }}>{item.error}</span>
+                : `${fmtNumber(item.result!.created)} novas, ${fmtNumber(item.result!.updated)} atualizadas, ${fmtNumber(item.result!.unchanged)} já estavam aqui${item.result!.withoutText ? `, ${fmtNumber(item.result!.withoutText)} só com estrelas (ignoradas)` : ''}${item.result!.withoutId ? `, ${fmtNumber(item.result!.withoutId)} sem link` : ''}${item.result!.otherPackage ? `, ${fmtNumber(item.result!.otherPackage)} de outro app` : ''}.`}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="small muted" style={{ margin: '12px 0 0' }}>O relatório não traz o nome de quem avaliou. Responder às antigas depende do Google aceitar; se recusar, o painel mostra o motivo.</p>
+    </Card>
   );
 }
 
