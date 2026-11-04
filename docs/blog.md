@@ -110,6 +110,24 @@ como mostrou o log de 04/11/2026), a escrita tem etapas:
 4. **Validação** (`BlogAiWriter.check`). Reprovado, o plano é refeito com
    os problemas apontados. Até 2 versões por execução.
 
+**Capa por IA.** Cada post escrito pela IA ganha uma foto de capa, e o
+editor tem o botão "Gerar capa com IA" na seção Capa (qualquer post).
+Duas chamadas (`blog-cover-ai.ts`): o modelo de texto lê o post e descreve
+uma cena fotográfica realista de um pequeno negócio brasileiro, em inglês,
+mais o texto alternativo em português; o modelo de imagem
+(`OPENAI_IMAGE_MODEL`, padrão `gpt-image-1`, 1536×1024) gera a foto sem
+texto, logotipo nem tela legível. O `gpt-image-1` só funciona para
+organizações verificadas na OpenAI; recusado, cai sozinho para o
+`dall-e-3` (1792×1024) e o log diz isso. O recorte em 1200×630 usa o mesmo
+`normalizeImage` do envio manual (foco automático no assunto), a imagem vai
+para o bucket e o `coverAlt` é preenchido. Custo aproximado por capa:
+US$ 0,02 (low), 0,06 (medium, padrão) ou 0,25 (high) no `gpt-image-1`
+(`OPENAI_IMAGE_QUALITY`); US$ 0,08 no `dall-e-3`. Falhar a capa de um post
+escrito pela IA não perde o post: ele fica com a capa automática. O pedido
+pelo editor vira a tarefa `blog.ai_cover` (um por post por vez; o segundo
+clique acompanha o primeiro), com o progresso na própria seção Capa e o
+link para o log.
+
 **Acompanhar.** Toda escrita passa pela fila, inclusive o botão
 "Escrever com IA" e o clique numa pauta do banco (`POST /admin/api/blog/ai/write`
 devolve `{ jobId }` e o painel abre a página da tarefa). A página

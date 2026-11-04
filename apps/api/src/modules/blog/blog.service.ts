@@ -336,7 +336,7 @@ export class BlogService {
   }
 
   /** Capa: imagem reduzida e guardada no bucket, com o hash como nome (ver docs/images.md). */
-  async setCover(actor: AdminActor, id: string, bytes: Buffer, contentType: string): Promise<BlogPostView> {
+  async setCover(actor: AdminActor | null, id: string, bytes: Buffer, contentType: string, options: { coverAlt?: string | null } = {}): Promise<BlogPostView> {
     if (!this.services.storage.configured) {
       throw new AppError(503, ErrorCode.IMAGES_UNAVAILABLE, 'O armazenamento de imagens não está disponível agora.');
     }
@@ -348,8 +348,12 @@ export class BlogService {
     } catch (error) {
       throw new AppError(503, ErrorCode.IMAGES_UNAVAILABLE, 'Não foi possível guardar a capa agora. Tente de novo em instantes.', { cause: error, expected: false });
     }
-    const updated = await this.db.update(blogPosts).set({ coverHash: normalized.hash, updatedAt: new Date() }).where(eq(blogPosts.id, id)).returning();
-    await recordAdminAudit(this.db, { actor, action: AdminAction.BLOG_POST_UPDATED, targetType: 'blog_post', targetId: id, metadata: { cover: normalized.hash } });
+    const updated = await this.db
+      .update(blogPosts)
+      .set({ coverHash: normalized.hash, ...(options.coverAlt !== undefined ? { coverAlt: options.coverAlt } : {}), updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    if (actor) await recordAdminAudit(this.db, { actor, action: AdminAction.BLOG_POST_UPDATED, targetType: 'blog_post', targetId: id, metadata: { cover: normalized.hash } });
     return this.toView(updated[0]!, { withSource: true });
   }
 

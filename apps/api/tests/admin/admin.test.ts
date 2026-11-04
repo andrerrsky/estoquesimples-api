@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { jobs, platformAdmins } from '../../src/platform/db/schema/index.js';
 import { hashPassword } from '../../src/platform/auth/password.js';
 import { startJobRunner } from '../../src/platform/jobs/runner.js';
+import sharp from 'sharp';
 import { createTestApp, registerUser, resetDatabase, type TestContext } from '../helpers/test-app.js';
 
 const ADMIN_PASSWORD = 'PainelSeguro#2026';
@@ -388,6 +389,8 @@ describe('painel administrativo: visão geral e operação', () => {
     };
     const pedidos: Array<{ json: boolean; user: string }> = [];
     let secoes = 0;
+    let imagens = 0;
+    const foto = await sharp({ create: { width: 1536, height: 1024, channels: 3, background: { r: 90, g: 120, b: 80 } } }).png().toBuffer();
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
@@ -397,10 +400,15 @@ describe('painel administrativo: visão geral e operação', () => {
         const user = body.messages.at(-1)!.content;
         pedidos.push({ json: Boolean(body.response_format), user });
         let content: string;
-        if (body.response_format) content = JSON.stringify(plano);
+        if (body.response_format && user.startsWith('Post title:')) content = JSON.stringify({ scene: 'A shop owner arranging coffee bags on a wooden shelf in a small Brazilian grocery store, soft morning light.', alt: 'Dona de mercearia arrumando pacotes de café na prateleira' });
+        else if (body.response_format) content = JSON.stringify(plano);
         else if (user.includes('RASCUNHO DESTA SEÇÃO')) content = palavras(230, 'expandida');
         else content = (secoes += 1) === 1 ? `## O que é estoque mínimo\n\n${palavras(60, 'curta')}` : palavras(230, 'texto');
         return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+      }
+      if (url.startsWith('https://api.openai.com/v1/images/generations')) {
+        imagens += 1;
+        return new Response(JSON.stringify({ data: [{ b64_json: foto.toString('base64') }] }), { status: 200 });
       }
       return realFetch(input, init);
     });
@@ -425,8 +433,10 @@ describe('painel administrativo: visão geral e operação', () => {
       expect(detail!.job.status).toBe('completed');
       expect(detail!.job.payload).toMatchObject({ manual: true, requestedBy: owner, topicKey: 'estoque-minimo' });
 
-      // Um plano (JSON) e uma chamada por seção, mais a expansão da seção curta.
-      expect(pedidos.filter((item) => item.json)).toHaveLength(1);
+      // Um plano (JSON) e uma chamada por seção, mais a expansão da seção curta; depois a cena e a foto da capa.
+      expect(pedidos.filter((item) => item.json && !item.user.startsWith('Post title:'))).toHaveLength(1);
+      expect(pedidos.filter((item) => item.json && item.user.startsWith('Post title:'))).toHaveLength(1);
+      expect(imagens).toBe(1);
       expect(pedidos.filter((item) => !item.json)).toHaveLength(5);
       expect(pedidos.find((item) => item.user.includes('ESCREVA A SEÇÃO: "Como calcular"'))?.user).toContain('TAMANHO: entre 200 e 250 palavras');
 
@@ -438,6 +448,10 @@ describe('painel administrativo: visão geral e operação', () => {
       expect(content).not.toContain('curta');
       expect(content).toContain('](/criar-conta)');
       expect(content).toMatch(/## Resumo\n\n- Calcule/);
+      const saved = post.json() as { coverAuto: boolean; coverAlt: string; coverUrl: string };
+      expect(saved.coverAuto).toBe(false);
+      expect(saved.coverAlt).toBe('Dona de mercearia arrumando pacotes de café na prateleira');
+      expect(detail!.job.result?.['coverUrl']).toBe(saved.coverUrl);
 
       const mensagens = detail!.logs.map((line) => line.message);
       expect(mensagens[0]).toMatch(/^Tentativa 1 de 1 iniciada/);

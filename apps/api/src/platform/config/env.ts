@@ -207,6 +207,10 @@ const envSchema = z
     PLAY_REVIEWS_SYNC_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),
     /** Modelo usado para rascunhar respostas; a chave fica em admin_settings. */
     OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+    /** Capas do blog. gpt-image-1 exige organização verificada na OpenAI; sem isso, cai para dall-e-3. */
+    OPENAI_IMAGE_MODEL: z.string().min(1).default('gpt-image-1'),
+    /** low (~US$ 0,02), medium (~US$ 0,06) ou high (~US$ 0,25) por imagem no gpt-image-1. */
+    OPENAI_IMAGE_QUALITY: z.enum(['low', 'medium', 'high']).default('medium'),
 
     /**
      * Push (Firebase Cloud Messaging). Sem FIREBASE_SERVICE_ACCOUNT_JSON a

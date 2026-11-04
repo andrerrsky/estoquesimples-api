@@ -222,6 +222,40 @@ export class OpenAiClient {
     }
   }
 
+  /**
+   * Gera uma imagem (horizontal) e devolve os bytes. Tenta o modelo pedido;
+   * o gpt-image-1 só funciona para organizações verificadas na OpenAI, e
+   * nesse caso (ou com o modelo indisponível) cai para o dall-e-3.
+   * Leva de 15 s a 1 min: o tempo-limite aqui é maior que o das conversas.
+   */
+  async generateImage(prompt: string, options: { model: string; quality: 'low' | 'medium' | 'high' }): Promise<{ bytes: Buffer; model: string; revisedPrompt: string | null }> {
+    const attempt = async (model: string) => {
+      const gpt = model.startsWith('gpt-image');
+      const body = gpt
+        ? { model, prompt, n: 1, size: '1536x1024', quality: options.quality }
+        : { model, prompt, n: 1, size: '1792x1024', quality: options.quality === 'high' ? 'hd' : 'standard', response_format: 'b64_json', style: 'natural' };
+      return this.fetchWithTimeout(
+        'https://api.openai.com/v1/images/generations',
+        { method: 'POST', headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(body) },
+        120_000,
+      );
+    };
+    let model = options.model;
+    let response = await attempt(model);
+    if (!response.ok && model !== 'dall-e-3' && (response.status === 403 || response.status === 404 || response.status === 400)) {
+      const text = await response.clone().text();
+      if (/verif|organization|model_not_found|does not exist|not have access|invalid model/i.test(text)) {
+        model = 'dall-e-3';
+        response = await attempt(model);
+      }
+    }
+    await rejectIfFailed(response);
+    const json = (await response.json()) as { data?: Array<{ b64_json?: string; revised_prompt?: string }> };
+    const b64 = json.data?.[0]?.b64_json;
+    if (!b64) throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'A OpenAI não devolveu a imagem.');
+    return { bytes: Buffer.from(b64, 'base64'), model, revisedPrompt: json.data?.[0]?.revised_prompt ?? null };
+  }
+
   /** Texto livre (sem JSON): usado pelo blog para escrever uma seção por vez. */
   async completeText(system: string, user: string, maxTokens: number): Promise<string> {
     return this.complete(system, user, maxTokens);
@@ -251,9 +285,9 @@ export class OpenAiClient {
     return text;
   }
 
-  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  private async fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { ...init, signal: controller.signal });
     } catch (error) {

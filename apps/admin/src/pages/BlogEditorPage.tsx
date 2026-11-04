@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api, CSRF_HEADER, CSRF_VALUE } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { Badge, Card, ConfirmDialog, errorMessage, Notice, PageHeader, Skeleton, Time, useToast } from '../components/ui';
+import { fmtDuration } from '../lib/format';
 import type { BlogMeta, BlogPostRow } from './BlogPage';
 
 interface Draft {
@@ -62,11 +63,27 @@ export function BlogEditorPage() {
   const meta = useQuery({ queryKey: ['blog', 'meta'], queryFn: () => api.get<BlogMeta>('/blog/meta') });
   const post = useQuery({ queryKey: ['blog', 'post', postId], queryFn: () => api.get<BlogPostRow>(`/blog/posts/${postId}`), enabled: !creating });
 
+  // Ao recarregar o post (depois de salvar, ou quando a IA grava a capa), só
+  // os campos que a pessoa não mexeu na tela pegam o valor novo: nada que
+  // ainda não foi salvo se perde.
+  const serverDraft = useRef<{ id: string; draft: Draft } | null>(null);
   useEffect(() => {
-    if (post.data) {
-      setDraft(fromPost(post.data));
-      setSlugTouched(true);
+    if (!post.data) return;
+    const incoming = fromPost(post.data);
+    const previous = serverDraft.current;
+    if (!previous || previous.id !== post.data.id) {
+      setDraft(incoming);
+    } else {
+      setDraft((current) => {
+        const merged = { ...current };
+        for (const key of Object.keys(incoming) as Array<keyof Draft>) {
+          if (JSON.stringify(current[key]) === JSON.stringify(previous.draft[key])) (merged as Record<string, unknown>)[key] = incoming[key];
+        }
+        return merged;
+      });
     }
+    serverDraft.current = { id: post.data.id, draft: incoming };
+    setSlugTouched(true);
   }, [post.data]);
   useEffect(() => {
     if (meta.data?.settings) setNotify(meta.data.settings.notifyOnPublish);
@@ -323,9 +340,12 @@ export function BlogEditorPage() {
               ) : (
                 <span className="muted">{creating ? 'Salve o rascunho para enviar a capa.' : 'Sem imagem enviada: o site gera uma capa com o título e a categoria do post.'}</span>
               )}
+              {editable && !creating && postId && (
+                <CoverAi postId={postId} openAiConfigured={meta.data?.openAiConfigured ?? false} hasCover={Boolean(current?.coverUrl && !current.coverAuto)} />
+              )}
               {editable && !creating && (
                 <label className="btn btn--secondary btn--sm" style={{ cursor: coverBusy ? 'wait' : 'pointer' }}>
-                  <Icon name="download" size={14} /> {coverBusy ? 'Enviando…' : current?.coverUrl && !current.coverAuto ? 'Trocar capa' : 'Enviar capa'}
+                  <Icon name="download" size={14} /> {coverBusy ? 'Enviando…' : current?.coverUrl && !current.coverAuto ? 'Trocar por um arquivo' : 'Enviar um arquivo'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={coverBusy} onChange={(event) => void uploadCover(event.target.files?.[0])} />
                 </label>
               )}
@@ -341,6 +361,119 @@ export function BlogEditorPage() {
       <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Apagar este post?" onConfirm={remove} confirmWord="apagar">
         O post some do site, do web app e do app. Links já compartilhados vão parar na tela de "não encontrado".
       </ConfirmDialog>
+    </div>
+  );
+}
+
+interface CoverJob {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'dismissed';
+  payload: Record<string, unknown>;
+  progress: string | null;
+  progressAt: string | null;
+  lockedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+}
+
+/**
+ * "Gerar com IA" na seção Capa: pede a foto (fila), acompanha cada passo aqui
+ * mesmo (a cada 2 s), mostra o resultado e oferece o log completo. Se a
+ * página for recarregada no meio, retoma o pedido que ainda está rodando.
+ */
+function CoverAi({ postId, openAiConfigured, hasCover }: { postId: string; openAiConfigured: boolean; hasCover: boolean }) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [, tick] = useState(0);
+
+  // Pedido que já estava rodando para este post (página recarregada no meio).
+  const existing = useQuery({
+    queryKey: ['ops', 'jobs', 'cover', postId],
+    queryFn: () => api.get<{ items: CoverJob[] }>('/ops/jobs', { kind: 'blog.ai_cover', page: 1, pageSize: 20 }),
+    enabled: jobId === null,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    if (jobId) return;
+    const running = existing.data?.items.find((item) => item.payload['postId'] === postId && (item.status === 'pending' || item.status === 'running'));
+    if (running) {
+      setJobId(running.id);
+      setStartedAt(new Date(running.createdAt).getTime());
+    }
+  }, [existing.data, jobId, postId]);
+
+  const job = useQuery({
+    queryKey: ['ops', 'job', jobId, 'cover'],
+    queryFn: () => api.get<{ job: CoverJob }>(`/ops/jobs/${jobId}`).then((data) => data.job),
+    enabled: jobId !== null,
+    refetchInterval: (state) => (state.state.data && (state.state.data.status === 'completed' || state.state.data.status === 'failed') ? false : 2_000),
+  });
+  const status = job.data?.status ?? (jobId ? 'pending' : null);
+  const active = status === 'pending' || status === 'running';
+
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => tick((value) => value + 1), 1_000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  // Terminou: recarrega o post para a capa nova aparecer (sem perder o que está na tela).
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!jobId || handled.current === jobId) return;
+    if (status === 'completed') {
+      handled.current = jobId;
+      toast.push('Capa gerada pela IA.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['blog', 'post', postId] });
+      void queryClient.invalidateQueries({ queryKey: ['blog', 'posts'] });
+    }
+    if (status === 'failed') handled.current = jobId;
+  }, [status, jobId, postId, queryClient, toast]);
+
+  const request = useMutation({
+    mutationFn: () => api.post<{ jobId: string; reused: boolean }>(`/blog/posts/${postId}/cover/ai`),
+    onSuccess: (result) => {
+      setJobId(result.jobId);
+      setStartedAt(Date.now());
+      handled.current = null;
+      void queryClient.removeQueries({ queryKey: ['ops', 'job', result.jobId, 'cover'] });
+    },
+    onError: (error) => toast.push(errorMessage(error), 'error'),
+  });
+
+  const elapsed = startedAt ? fmtDuration(Math.max(0, Math.round((Date.now() - startedAt) / 1000))) : '';
+
+  return (
+    <div className="stack stack--tight">
+      {active && (
+        <div className="cover-ai cover-ai--running" role="status" aria-live="polite">
+          <span className="job-status__spinner" aria-hidden="true" />
+          <div className="cover-ai__text">
+            <strong>{status === 'pending' ? 'Na fila…' : (job.data?.progress ?? 'Gerando a capa…')}</strong>
+            <span className="small muted">há {elapsed} · leva de 20 s a 1 min; dá para continuar editando · <Link to={`/operacao/tarefas/${jobId}`}>ver o log</Link></span>
+          </div>
+        </div>
+      )}
+      {status === 'completed' && jobId && handled.current === jobId && (
+        <Notice tone="success">Capa nova gerada pela IA e já salva no post. O texto alternativo foi preenchido com o que a foto mostra. <Link to={`/operacao/tarefas/${jobId}`}>Ver o log</Link></Notice>
+      )}
+      {status === 'failed' && jobId && (
+        <Notice tone="error" title="A IA não conseguiu gerar a capa">
+          {job.data?.lastError ?? 'Erro desconhecido.'} <Link to={`/operacao/tarefas/${jobId}`}>Ver o log</Link>
+        </Notice>
+      )}
+      <button
+        type="button"
+        className="btn btn--primary btn--sm"
+        onClick={() => request.mutate()}
+        disabled={!openAiConfigured || active || request.isPending}
+        title={openAiConfigured ? 'Uma foto realista, sem texto, recortada em 1200×630' : 'Configure a chave da OpenAI em Inteligência artificial'}
+      >
+        <Icon name="sparkle" size={14} /> {active ? 'Gerando…' : status === 'failed' ? 'Tentar de novo com IA' : hasCover ? 'Gerar outra capa com IA' : 'Gerar capa com IA'}
+      </button>
+      <span className="field__hint">Foto realista criada pela IA a partir do post, sem texto, já no tamanho 1200×630.{hasCover ? ' Substitui a capa atual.' : ''}</span>
     </div>
   );
 }
