@@ -91,10 +91,19 @@ case "$fase" in
     # versão sobre um dump existente — e funciona com a política da chave que
     # exige isso (docs/seguranca.md). Envio em uma parte só (até 5 GB): o
     # cabeçalho condicional vale para PUT simples.
+    # O Backblaze B2 não implementa o cabeçalho (responde 501): lá a proteção
+    # é o Object Lock (a versão original fica travada; o roteiro de
+    # restauração usa a mais antiga). BACKUP_CONDITIONAL_WRITE=0 desliga.
+    condicional=()
+    if [ "${BACKUP_CONDITIONAL_WRITE:-1}" != "0" ]; then
+      condicional=(--header-upload 'If-None-Match: *')
+    else
+      echo "Gravação condicional desligada (BACKUP_CONDITIONAL_WRITE=0): o provedor não aceita If-None-Match; o Object Lock protege o dump."
+    fi
     rclone copyto "$WORKDIR/backup.dump.age" "$DUMPS_REMOTE/$objeto" --s3-no-check-bucket \
-      --s3-upload-cutoff 5G --header-upload 'If-None-Match: *'
+      --s3-upload-cutoff 5G "${condicional[@]}"
     rclone copyto "$WORKDIR/backup.dump.age.sha256" "$DUMPS_REMOTE/$objeto.sha256" --s3-no-check-bucket \
-      --s3-upload-cutoff 5G --header-upload 'If-None-Match: *'
+      --s3-upload-cutoff 5G "${condicional[@]}"
     # Confere que o objeto chegou inteiro (hash calculado de volta, do bucket).
     remoto="$(rclone cat "$DUMPS_REMOTE/$objeto" | sha256sum | cut -d' ' -f1)"
     [ "$remoto" = "$sha" ] || erro "O arquivo no bucket não confere com o enviado"

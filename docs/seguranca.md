@@ -95,7 +95,9 @@ Cloud). Itens marcados **[dono]** são ações de quem administra as contas.
      com retenção padrão de 35 dias neste bucket também (apagar só esconde;
      `daysFromHidingToDeleting: 35`) e defina a variável do GitHub
      `BACKUP_IMAGES_VERSIONING_CONFIRMED=true` (o B2 não informa o
-     versionamento pela API S3).
+     versionamento pela API S3) e `BACKUP_CONDITIONAL_WRITE=0` (o B2 responde
+     501 ao `If-None-Match`; lá a proteção contra sobrescrita é o Object Lock,
+     e o roteiro de restauração usa a versão mais antiga).
 
    Com isso, uma chave vazada do GitHub não destrói nada antes do prazo, e o
    dado de uma conta expurgada sai das cópias em até 36 dias (35 de retenção + 1 de limpeza). **Trimestralmente**,
