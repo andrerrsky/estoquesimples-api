@@ -42,7 +42,7 @@ describe('capa do post gerada pela IA', () => {
   it('descreve a cena, gera a foto (caindo para o dall-e-3), recorta em 1200×630 e grava o texto alternativo', async () => {
     const cookie = await ownerCookie();
     const foto = await sharp({ create: { width: 1536, height: 1024, channels: 3, background: { r: 120, g: 90, b: 60 } } }).png().toBuffer();
-    const pedidosImagem: Array<{ model: string; size: string }> = [];
+    const pedidosImagem: Array<{ model: string; size: string; responseFormat: boolean }> = [];
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
@@ -51,14 +51,17 @@ describe('capa do post gerada pela IA', () => {
         const cena = { scene: 'Hands of a shop owner counting bags of roasted coffee on a wooden shelf in a small Brazilian grocery store, morning light through the window, shallow depth of field.', alt: 'Mãos contando pacotes de café numa prateleira de mercearia' };
         return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(cena) } }] }), { status: 200 });
       }
+      if (url === 'https://imagens.exemplo.test/capa.png') return new Response(foto, { status: 200, headers: { 'content-type': 'image/png' } });
       if (url.startsWith('https://api.openai.com/v1/images/generations')) {
-        const body = JSON.parse(String(init?.body ?? '{}')) as { model: string; size: string; prompt: string };
-        pedidosImagem.push({ model: body.model, size: body.size });
+        const body = JSON.parse(String(init?.body ?? '{}')) as { model: string; size: string; prompt: string; response_format?: string };
+        pedidosImagem.push({ model: body.model, size: body.size, responseFormat: 'response_format' in body });
         if (body.model === 'gpt-image-1') {
           return new Response(JSON.stringify({ error: { message: 'Your organization must be verified to use the model `gpt-image-1`.', type: 'invalid_request_error' } }), { status: 403 });
         }
         expect(body.prompt).toContain('no text');
-        return new Response(JSON.stringify({ data: [{ b64_json: foto.toString('base64') }] }), { status: 200 });
+        // Como em produção (04/11/2026): o dall-e-3 recusa response_format e devolve um link.
+        if (body.response_format) return new Response(JSON.stringify({ error: { message: "Unknown parameter: 'response_format'.", type: 'invalid_request_error' } }), { status: 400 });
+        return new Response(JSON.stringify({ data: [{ url: 'https://imagens.exemplo.test/capa.png' }] }), { status: 200 });
       }
       return realFetch(input, init);
     });
@@ -96,9 +99,15 @@ describe('capa do post gerada pela IA', () => {
       }
       expect(detail!.job.lastError).toBeNull();
       expect(detail!.job.status).toBe('completed');
-      expect(pedidosImagem).toEqual([{ model: 'gpt-image-1', size: '1536x1024' }, { model: 'dall-e-3', size: '1792x1024' }]);
+      expect(pedidosImagem).toEqual([
+        { model: 'gpt-image-1', size: '1536x1024', responseFormat: false },
+        { model: 'dall-e-3', size: '1792x1024', responseFormat: true },
+        { model: 'dall-e-3', size: '1792x1024', responseFormat: false },
+      ]);
       const mensagens = detail!.logs.map((line) => line.message);
       expect(mensagens.some((line) => line.startsWith('Cena: Hands of a shop owner'))).toBe(true);
+      expect(mensagens.some((line) => line.startsWith('gpt-image-1 indisponível para esta conta (403: Your organization must be verified'))).toBe(true);
+      expect(mensagens).toContain('dall-e-3 recusou o parâmetro "response_format"; repetindo sem ele.');
       expect(mensagens.some((line) => /^Foto gerada com dall-e-3 \(o gpt-image-1 não está liberado/.test(line))).toBe(true);
 
       const post = (await context.app.inject({ method: 'GET', url: `/admin/api/blog/posts/${postId}`, headers: { cookie } })).json() as { coverUrl: string; coverAuto: boolean; coverAlt: string };

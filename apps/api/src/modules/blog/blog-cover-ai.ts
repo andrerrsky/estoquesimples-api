@@ -53,7 +53,7 @@ export class BlogCoverAi {
     await report(`Gerando a foto com ${model} (pode levar até 1 minuto)`);
     const prompt = `Photorealistic editorial photograph, shot on a full-frame camera with a 35mm lens, natural light, shallow depth of field, realistic colors and textures. ${sceneText} Horizontal composition with the main subject near the center and some breathing room on the sides, because the image will be cropped to a 1200x630 banner. The image must contain absolutely no text, letters, numbers, signs, labels, logos or watermarks.`;
     const startedAt = Date.now();
-    const image = await client.generateImage(prompt, { model, quality });
+    const image = await client.generateImage(prompt, { model, quality, onAttempt: (message) => log(message, 'warn') });
     await log(`Foto gerada com ${image.model}${image.model !== model ? ` (o ${model} não está liberado para esta conta)` : ''} em ${((Date.now() - startedAt) / 1000).toFixed(1)} s, ${Math.round(image.bytes.length / 1024)} KB.`);
 
     await report('Recortando em 1200×630 e guardando');
