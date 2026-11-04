@@ -235,7 +235,7 @@ export function SupportPage() {
               <div>O app envia junto o modelo do aparelho, a versão do Android e do app e um diagnóstico (sessão, empresa, assinatura, sincronização). Pela web vêm o navegador, o sistema e a versão da aplicação.</div>
               <div>Ao responder, o aparelho recebe um push que abre a conversa. Sem aparelho com push — caso de quem usa só a web — o aviso vai por e-mail, e a resposta fica na conversa e na caixa de notificações.</div>
               <div>Quem não tem conta é identificado pela instalação; se criar conta depois, as solicitações passam a ser dela.</div>
-              <div>Notas internas ficam só aqui e não avisam ninguém.{s?.openAiConfigured ? ' O rascunho por IA usa a chave da OpenAI configurada em Avaliações.' : ' Configure a chave da OpenAI em Avaliações para gerar rascunhos.'}</div>
+              <div>Notas internas ficam só aqui e não avisam ninguém.{s?.openAiConfigured ? ' O rascunho por IA usa a chave da OpenAI configurada em Inteligência artificial.' : ' Configure a chave da OpenAI em Inteligência artificial para gerar rascunhos.'}</div>
             </div>
           </Card>
         </div>

@@ -89,7 +89,7 @@ precisam valer por si (é o que o site público mostra), e a partir da
 segunda seção entra o material prático que justifica a conta (checklist,
 modelo pronto, passo a passo ou exemplo completo), com ~350 palavras a
 mais; a validação exige 4+ seções e uma dessas seções práticas, e recusa
-texto que peça cadastro. Usa a mesma chave da OpenAI configurada em Avaliações › OpenAI
+texto que peça cadastro. Usa a mesma chave da OpenAI configurada em Inteligência artificial (painel)
 (`openai-client.ts`, `completeJson` com `response_format: json_object`).
 Sem chave, o job registra e sai.
 

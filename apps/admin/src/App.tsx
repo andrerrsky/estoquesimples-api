@@ -17,6 +17,7 @@ import { OverviewPage } from './pages/OverviewPage';
 import { PlansPage } from './pages/PlansPage';
 import { CampaignDetailPage, NotificationsPage } from './pages/NotificationsPage';
 import { ReviewsPage } from './pages/ReviewsPage';
+import { AiPage } from './pages/AiPage';
 import { SubscriptionDetailPage } from './pages/SubscriptionDetailPage';
 import { SupportPage, TicketDetailPage } from './pages/SupportPage';
 import { SubscriptionsPage } from './pages/SubscriptionsPage';
@@ -76,6 +77,7 @@ export const router = createBrowserRouter(
         { path: '/suporte', element: <SupportPage /> },
         { path: '/suporte/:ticketId', element: <TicketDetailPage /> },
         { path: '/avaliacoes', element: <ReviewsPage /> },
+        { path: '/ia', element: <AiPage /> },
         { path: '/notificacoes', element: <NotificationsPage /> },
         { path: '/notificacoes/:campaignId', element: <CampaignDetailPage /> },
         { path: '/analytics', element: <AnalyticsPage /> },

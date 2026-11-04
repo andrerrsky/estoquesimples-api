@@ -335,7 +335,7 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
     const report = options.report ?? (async () => undefined);
     const settings = await this.blog.settings();
     const apiKey = await readOpenAiKey(this.services);
-    if (!apiKey) throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (Avaliações › OpenAI) para a IA escrever posts.');
+    if (!apiKey) throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (painel › Inteligência artificial) para a IA escrever posts.');
     const model = this.services.env.OPENAI_MODEL;
     const client = new OpenAiClient(apiKey, model);
     if (!options.topic) await report('Escolhendo a pauta');

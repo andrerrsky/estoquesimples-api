@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -118,7 +119,7 @@ export function ReviewsPage() {
         <StatTile label="Respondidas" value={fmtNumber(s?.answered)} foot={answeredRate === null ? '—' : `${answeredRate}% do total · ${fmtNumber(s?.answeredViaPanel ?? 0)} por este painel`} />
         <StatTile label="Nota média" value={s?.average ? fmtDecimal(s.average) : '—'} foot={`${fmtNumber(s?.total ?? 0)} avaliações com comentário`} />
         <StatTile label="Últimos 30 dias" value={fmtNumber(s?.last30d)} foot="novas avaliações com comentário" />
-        <StatTile label="Rascunho por IA" value={openai.data?.configured ? 'ativo' : 'inativo'} foot={openai.data?.configured ? `OpenAI · ${openai.data.model}` : 'configure a chave abaixo'} />
+        <StatTile label="Rascunho por IA" value={openai.data?.configured ? 'ativo' : 'inativo'} foot={openai.data?.configured ? `OpenAI · ${openai.data.model}` : 'configure em Inteligência artificial'} />
       </div>
 
       <div className="grid grid--2-1">
@@ -155,7 +156,9 @@ export function ReviewsPage() {
               <Skeleton />
             )}
           </Card>
-          <OpenAiCard status={openai.data} canEdit={can('owner')} onChanged={() => { void queryClient.invalidateQueries({ queryKey: ['settings'] }); refresh(); }} />
+          <Card title="Rascunho por IA" subtitle="Usa a chave da OpenAI do painel">
+            <p className="small" style={{ margin: 0 }}>{openai.data?.configured ? <>Ativo com o modelo <strong>{openai.data.model}</strong>.</> : 'Sem chave configurada: o botão de rascunho fica desligado.'} A chave fica em <Link to="/ia">Inteligência artificial</Link>, junto com o teste e o que usa a IA.</p>
+          </Card>
           {can('support') && <ImportCard onImported={refresh} />}
         </div>
       </div>
@@ -340,53 +343,3 @@ function ImportCard({ onImported }: { onImported: () => void }) {
   );
 }
 
-function OpenAiCard({ status, canEdit, onChanged }: { status: OpenAiStatus | undefined; canEdit: boolean; onChanged: () => void }) {
-  const toast = useToast();
-  const [key, setKey] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [removeOpen, setRemoveOpen] = useState(false);
-
-  const save = useMutation({
-    mutationFn: () => api.put<{ message: string }>('/settings/openai', { apiKey: key.trim() }),
-    onSuccess: (result) => {
-      toast.push(result.message, 'success');
-      setKey('');
-      setEditing(false);
-      onChanged();
-    },
-    onError: (error) => toast.push(errorMessage(error), 'error'),
-  });
-
-  return (
-    <Card title="Rascunho por IA" subtitle="Chave da OpenAI, guardada cifrada no servidor">
-      {!status ? (
-        <Skeleton />
-      ) : (
-        <div className="stack stack--tight">
-          <div className="row">
-            {status.configured ? <Badge tone="success">configurada</Badge> : <Badge tone="warning">não configurada</Badge>}
-            {status.configured && <span className="caption">chave {status.hint} · modelo {status.model} · <Time value={status.updatedAt} /></span>}
-          </div>
-          {canEdit && (editing || !status.configured) && (
-            <form className="stack stack--tight" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
-              <input className="input" type="password" autoComplete="off" placeholder="sk-…" value={key} onChange={(event) => setKey(event.target.value)} />
-              <span className="field__hint">A chave é testada na OpenAI antes de ser guardada e nunca volta em claro para o painel.</span>
-              <div className="row" style={{ justifyContent: 'flex-end' }}>
-                {status.configured && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(false)}>Cancelar</button>}
-                <button type="submit" className="btn btn--primary btn--sm" disabled={save.isPending || key.trim().length < 20}>{save.isPending ? 'Validando…' : 'Salvar chave'}</button>
-              </div>
-            </form>
-          )}
-          {canEdit && status.configured && !editing && (
-            <div className="row">
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>Trocar chave</button>
-              <button type="button" className="btn btn--danger btn--sm" onClick={() => setRemoveOpen(true)}>Remover</button>
-            </div>
-          )}
-          {!canEdit && <span className="caption">Só um owner altera a chave.</span>}
-        </div>
-      )}
-      <ConfirmDialog open={removeOpen} onClose={() => setRemoveOpen(false)} title="Remover chave da OpenAI" description="O botão de rascunho deixa de funcionar até uma nova chave ser cadastrada." confirmLabel="Remover" danger requireReason={false} onConfirm={async () => { await api.delete('/settings/openai'); toast.push('Chave removida.'); onChanged(); }} />
-    </Card>
-  );
-}
