@@ -41,7 +41,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: estoque
           POSTGRES_PASSWORD: estoque
@@ -79,7 +79,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Ferramentas (cliente do Postgres 16, age, rclone)
+      - name: Ferramentas (cliente do Postgres 18, age, rclone)
         run: bash scripts/install-backup-tools.sh
 
       - name: Conferir configuração
