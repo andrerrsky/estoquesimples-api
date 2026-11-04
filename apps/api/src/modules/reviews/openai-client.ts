@@ -223,37 +223,70 @@ export class OpenAiClient {
   }
 
   /**
-   * Gera uma imagem (horizontal) e devolve os bytes. Tenta o modelo pedido;
-   * o gpt-image-1 só funciona para organizações verificadas na OpenAI, e
-   * nesse caso (ou com o modelo indisponível) cai para o dall-e-3.
+   * Gera uma imagem (horizontal) e devolve os bytes. Tenta o modelo pedido e,
+   * se a conta não puder usá-lo (o gpt-image-1 exige organização verificada
+   * na OpenAI), o dall-e-3. A API muda os parâmetros aceitos com o tempo:
+   * parâmetro recusado ("Unknown parameter") sai e a chamada é repetida;
+   * imagem devolvida como link é baixada. Cada tentativa recusada vai para
+   * `onAttempt`, que o log da tarefa mostra.
    * Leva de 15 s a 1 min: o tempo-limite aqui é maior que o das conversas.
    */
-  async generateImage(prompt: string, options: { model: string; quality: 'low' | 'medium' | 'high' }): Promise<{ bytes: Buffer; model: string; revisedPrompt: string | null }> {
-    const attempt = async (model: string) => {
-      const gpt = model.startsWith('gpt-image');
-      const body = gpt
+  async generateImage(
+    prompt: string,
+    options: { model: string; quality: 'low' | 'medium' | 'high'; onAttempt?: (message: string) => Promise<void> },
+  ): Promise<{ bytes: Buffer; model: string; revisedPrompt: string | null }> {
+    const onAttempt = options.onAttempt ?? (async () => undefined);
+    const bodyFor = (model: string): Record<string, unknown> =>
+      model.startsWith('gpt-image')
         ? { model, prompt, n: 1, size: '1536x1024', quality: options.quality }
         : { model, prompt, n: 1, size: '1792x1024', quality: options.quality === 'high' ? 'hd' : 'standard', response_format: 'b64_json', style: 'natural' };
-      return this.fetchWithTimeout(
-        'https://api.openai.com/v1/images/generations',
-        { method: 'POST', headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(body) },
-        120_000,
-      );
-    };
-    let model = options.model;
-    let response = await attempt(model);
-    if (!response.ok && model !== 'dall-e-3' && (response.status === 403 || response.status === 404 || response.status === 400)) {
-      const text = await response.clone().text();
-      if (/verif|organization|model_not_found|does not exist|not have access|invalid model/i.test(text)) {
-        model = 'dall-e-3';
-        response = await attempt(model);
+    const models = [...new Set([options.model, 'dall-e-3'])];
+    let lastResponse: Response | null = null;
+    for (const model of models) {
+      const body = bodyFor(model);
+      for (let tries = 0; tries < 4; tries += 1) {
+        const response = await this.fetchWithTimeout(
+          'https://api.openai.com/v1/images/generations',
+          { method: 'POST', headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' }, body: JSON.stringify(body) },
+          120_000,
+        );
+        if (response.ok) {
+          const json = (await response.json()) as { data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }> };
+          const item = json.data?.[0];
+          let bytes: Buffer | null = item?.b64_json ? Buffer.from(item.b64_json, 'base64') : null;
+          if (!bytes && item?.url) {
+            const download = await this.fetchWithTimeout(item.url, {}, 60_000);
+            if (download.ok) bytes = Buffer.from(await download.arrayBuffer());
+          }
+          if (!bytes) throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'A OpenAI não devolveu a imagem.');
+          return { bytes, model, revisedPrompt: item?.revised_prompt ?? null };
+        }
+        const text = await response.clone().text();
+        const message = (() => {
+          try {
+            return (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? text;
+          } catch {
+            return text;
+          }
+        })().slice(0, 300);
+        lastResponse = response;
+        const unknown = /Unknown parameter: '([a-z_]+)'/i.exec(message)?.[1];
+        if (response.status === 400 && unknown && unknown in body && unknown !== 'model' && unknown !== 'prompt') {
+          await onAttempt(`${model} recusou o parâmetro "${unknown}"; repetindo sem ele.`);
+          delete body[unknown];
+          continue;
+        }
+        const unavailable = [400, 403, 404].includes(response.status) && /verif|organization|model_not_found|does not exist|not have access|invalid model|not supported|deprecated/i.test(message);
+        if (unavailable && model !== models[models.length - 1]) {
+          await onAttempt(`${model} indisponível para esta conta (${response.status}: ${message}); tentando o próximo modelo.`);
+          break;
+        }
+        await onAttempt(`${model} falhou (${response.status}: ${message}).`);
+        await rejectIfFailed(response);
       }
     }
-    await rejectIfFailed(response);
-    const json = (await response.json()) as { data?: Array<{ b64_json?: string; revised_prompt?: string }> };
-    const b64 = json.data?.[0]?.b64_json;
-    if (!b64) throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'A OpenAI não devolveu a imagem.');
-    return { bytes: Buffer.from(b64, 'base64'), model, revisedPrompt: json.data?.[0]?.revised_prompt ?? null };
+    if (lastResponse) await rejectIfFailed(lastResponse);
+    throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Nenhum modelo de imagem da OpenAI aceitou o pedido.');
   }
 
   /** Texto livre (sem JSON): usado pelo blog para escrever uma seção por vez. */
