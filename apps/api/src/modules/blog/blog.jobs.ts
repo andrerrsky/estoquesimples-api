@@ -1,7 +1,7 @@
 import type { AppServices } from '../../platform/http/context.js';
 import { enqueueJob, registerJobHandler } from '../../platform/jobs/runner.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
-import { BlogAiWriter } from './blog-ai.js';
+import { AI_TOPICS, BlogAiWriter } from './blog-ai.js';
 import { BLOG_NOTIFY_JOB, BlogService } from './blog.service.js';
 
 export const BLOG_AI_WRITE_JOB = 'blog.ai_write';
@@ -52,24 +52,42 @@ export function registerBlogJobs(_services: AppServices): void {
     context.logger.info({ postId, ...result }, 'post do blog avisado');
   });
 
-  // Post escrito pela IA. Sem chave ou com a geração desligada, só reagenda.
-  registerJobHandler(BLOG_AI_WRITE_JOB, async (_payload, context) => {
+  // Post escrito pela IA. Duas origens: a agenda (terça, quinta e sexta,
+  // que se reagenda sozinha) e o botão "Escrever com IA" do painel
+  // (`manual: true`, vira rascunho e não mexe na agenda). As duas passam
+  // pela fila para ganhar a página de acompanhamento com log.
+  registerJobHandler(BLOG_AI_WRITE_JOB, async (payload, context) => {
+    const manual = payload['manual'] === true;
     try {
       const blog = new BlogService(context.services);
       const settings = await blog.settings();
-      if (!settings.aiEnabled) {
+      if (!manual && !settings.aiEnabled) {
         context.logger.info('geração de posts por IA desligada; nada a fazer');
+        await context.log('Geração automática desligada no Blog › IA e configurações; nada a fazer.', 'warn');
         return;
       }
       if (!(await readOpenAiKey(context.services))) {
         context.logger.warn('geração de posts por IA sem chave da OpenAI configurada');
+        if (manual) throw new Error('Configure a chave da OpenAI (painel › Inteligência artificial) para a IA escrever posts.');
+        await context.log('Sem chave da OpenAI configurada (painel › Inteligência artificial); nada a fazer.', 'warn');
         return;
       }
-      const membersOnly = isMembersOnlyRun(new Date()) && settings.aiMembersOnlyWeekly;
-      const post = await new BlogAiWriter(context.services).writePost({ membersOnly, report: context.progress });
+      const topicKey = typeof payload['topicKey'] === 'string' ? payload['topicKey'] : null;
+      const topic = topicKey ? AI_TOPICS.find((item) => item.key === topicKey) : undefined;
+      if (topicKey && !topic) throw new Error(`Pauta desconhecida: ${topicKey}`);
+      const membersOnly = !manual && isMembersOnlyRun(new Date()) && settings.aiMembersOnlyWeekly;
+      await context.log(manual ? `Pedido pelo painel${typeof payload['requestedBy'] === 'string' ? ` (${payload['requestedBy']})` : ''}: o post sai como rascunho.` : 'Execução agendada.');
+      const post = await new BlogAiWriter(context.services).writePost({
+        membersOnly,
+        ...(manual ? { publish: payload['publish'] === true } : {}),
+        ...(topic ? { topic } : {}),
+        report: context.progress,
+        log: context.log,
+      });
+      await context.setResult({ postId: post.id, slug: post.slug, title: post.title, status: post.status });
       context.logger.info({ postId: post.id, slug: post.slug, status: post.status, topic: post.aiTopic }, 'post do blog escrito pela IA');
     } finally {
-      await scheduleNext(context.services);
+      if (!manual) await scheduleNext(context.services);
     }
   });
 }

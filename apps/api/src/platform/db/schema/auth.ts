@@ -199,6 +199,8 @@ export const jobs = pgTable(
     /** Falha descartada pelo painel: sai da lista sem ser repetida. */
     dismissedAt: timestamp('dismissed_at', tz),
     dismissedBy: text('dismissed_by'),
+    /** O que a tarefa produziu (ex.: `{ postId }`), para o painel oferecer o atalho. */
+    result: jsonb('result'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   },
   (table) => [
@@ -211,6 +213,20 @@ export const jobs = pgTable(
       .on(table.runAt)
       .where(sql`${table.completedAt} IS NULL AND ${table.failedAt} IS NULL`),
   ],
+);
+
+/** Log de cada execução da fila; o painel mostra na página da tarefa. */
+export const jobLogs = pgTable(
+  'job_logs',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    jobId: uuid('job_id').notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+    attempt: integer('attempt').notNull(),
+    level: text('level').notNull().default('info'),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+  },
+  (table) => [index('job_logs_job_idx').on(table.jobId, table.id), index('job_logs_created_idx').on(table.createdAt)],
 );
 
 export const appConfig = pgTable('app_config', {

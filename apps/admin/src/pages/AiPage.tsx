@@ -118,7 +118,7 @@ export function AiPage() {
             ) : (
               <ul style={{ margin: 0, paddingLeft: 18 }} className="small">
                 {running.data!.items.map((job) => (
-                  <li key={job.id}><strong>{JOB_KIND[job.kind] ?? job.kind}</strong> · há {since(job.lockedAt)} · {job.progress ?? 'sem passo informado'}</li>
+                  <li key={job.id}><strong>{JOB_KIND[job.kind] ?? job.kind}</strong> · há {since(job.lockedAt)} · {job.progress ?? 'sem passo informado'} · <Link to={`/operacao/tarefas/${job.id}`}>Acompanhar o log</Link></li>
                 ))}
               </ul>
             )}
@@ -132,7 +132,7 @@ export function AiPage() {
                 {recent.data!.items.map((job) => (
                   <li key={job.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                     <div className="row" style={{ justifyContent: 'space-between' }}>
-                      <span className="small mono">{job.uniqueKey ?? job.id}</span>
+                      <Link to={`/operacao/tarefas/${job.id}`} className="small mono" title="Abrir a execução com o log">{job.uniqueKey ?? job.id}</Link>
                       <Badge tone={job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'running' ? 'brand' : 'neutral'}>
                         {{ completed: 'ok', failed: 'falhou', running: 'rodando', pending: 'agendada', dismissed: 'ignorada' }[job.status] ?? job.status}
                       </Badge>

@@ -187,6 +187,7 @@ export const JOB_STATUS: Record<string, { label: string; tone: Tone }> = {
 };
 
 export const JOB_KIND: Record<string, string> = {
+  'blog.ai_write': 'Post do blog escrito pela IA',
   'billing.reconcile': 'Reconciliação de assinaturas (Google Play)',
   'billing.asaas_reconcile': 'Reconciliação de assinaturas da web (Asaas)',
   'sync.retention': 'Limpeza da sincronização',

@@ -96,6 +96,8 @@ const PRODUCT_FACTS = `FATOS SOBRE O ESTOQUE SIMPLES (só afirme o que está aqu
 - Não cite preços. Não prometa recursos futuros.`;
 
 const DEFAULT_TARGET_WORDS = 950;
+/** Primeira escrita e até duas revisões do mesmo rascunho. */
+const MAX_WRITE_ATTEMPTS = 3;
 /** O post exclusivo tem mais a oferecer: uma parte prática a mais. */
 const MEMBERS_EXTRA_WORDS = 350;
 const MEMBERS_ONLY_BRIEF = `POST EXCLUSIVO PARA QUEM TEM CONTA: no site público só o começo (abertura e primeira seção) fica visível, com um convite para criar conta grátis. Por isso:
@@ -245,13 +247,41 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
 }`;
   }
 
-  private userPrompt(topic: AiTopic, published: Array<{ slug: string; title: string }>, problems: string[] = [], membersOnly = false): string {
+  private userPrompt(
+    topic: AiTopic,
+    published: Array<{ slug: string; title: string }>,
+    problems: string[] = [],
+    membersOnly = false,
+    previous: { contentMd: string; words: number } | null = null,
+  ): string {
     const target = (topic.targetWords ?? DEFAULT_TARGET_WORDS) + (membersOnly ? MEMBERS_EXTRA_WORDS : 0);
+    const sections = membersOnly ? 5 : 4;
+    const perSection = Math.round((target - 150) / sections);
+    // Modelos menores escrevem curto quando só recebem o total: a meta por
+    // seção (e, na revisão, o próprio rascunho para completar) é o que faz o
+    // texto chegar ao tamanho sem virar enchimento.
+    const budget = `DISTRIBUIÇÃO DAS PALAVRAS: abertura de ~80 palavras; ${sections} seções "## " de ~${perSection} palavras cada (cada uma com explicação, um exemplo concreto e um passo prático); "## Resumo" de ~70 palavras.`;
+    const revision = previous && problems.length > 0
+      ? [
+          '',
+          'A TENTATIVA ANTERIOR FOI REPROVADA. REVISE O TEXTO ABAIXO (não comece do zero: mantenha o que está certo e corrija só o que foi apontado).',
+          previous.words < Math.round(target * 0.75)
+            ? `Ele tem ${previous.words} palavras e precisa de ~${target}: faltam cerca de ${target - previous.words}. Aprofunde cada seção com um exemplo com números, um passo a passo ou um erro comum e como evitar. Não repita ideias para encher.`
+            : '',
+          `Problemas:\n${problems.map((problem) => `- ${problem}`).join('\n')}`,
+          '',
+          'TEXTO ANTERIOR (contentMd):',
+          previous.contentMd,
+        ].filter(Boolean).join('\n')
+      : problems.length > 0
+        ? `\nA TENTATIVA ANTERIOR FOI REPROVADA. Corrija:\n${problems.map((problem) => `- ${problem}`).join('\n')}`
+        : '';
     return [
       `PAUTA: ${topic.brief}`,
       `PALAVRA-CHAVE: ${topic.keyword}`,
       `CATEGORIA SUGERIDA: ${topic.category}`,
       `META DE PALAVRAS: ${target}`,
+      budget,
       membersOnly ? MEMBERS_ONLY_BRIEF : '',
       '',
       'TRECHOS DA CENTRAL DE AJUDA RELACIONADOS (use como base do que o app faz; não copie literalmente):',
@@ -260,7 +290,7 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
       published.length > 0
         ? `POSTS PUBLICADOS (não repita o assunto nem o título; linke 1 a 3 que se cruzem com a pauta, como [texto](/blog/slug)):\n${published.map((post) => `- /blog/${post.slug} — ${post.title}`).join('\n')}`
         : '',
-      problems.length > 0 ? `\nA TENTATIVA ANTERIOR FOI REPROVADA. Corrija:\n${problems.map((problem) => `- ${problem}`).join('\n')}` : '',
+      revision,
     ]
       .filter(Boolean)
       .join('\n');
@@ -331,8 +361,19 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
    * Escreve e grava um post (rascunho ou publicado, conforme a configuração).
    * @returns o post, ou `null` quando a geração está desligada ou sem chave.
    */
-  async writePost(options: { publish?: boolean; topic?: AiTopic; membersOnly?: boolean; report?: (step: string) => Promise<void> } = {}) {
+  async writePost(
+    options: {
+      publish?: boolean;
+      topic?: AiTopic;
+      membersOnly?: boolean;
+      /** Passo atual (aparece em destaque na página da tarefa). */
+      report?: (step: string) => Promise<void>;
+      /** Detalhe para o log da tarefa. */
+      log?: (message: string, level?: 'info' | 'warn' | 'error') => Promise<void>;
+    } = {},
+  ) {
     const report = options.report ?? (async () => undefined);
+    const log = options.log ?? (async () => undefined);
     const settings = await this.blog.settings();
     const apiKey = await readOpenAiKey(this.services);
     if (!apiKey) throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (painel › Inteligência artificial) para a IA escrever posts.');
@@ -340,14 +381,25 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
     const client = new OpenAiClient(apiKey, model);
     if (!options.topic) await report('Escolhendo a pauta');
     const topic = options.topic ?? (await this.nextTopic(client));
+    const target = (topic.targetWords ?? DEFAULT_TARGET_WORDS) + (options.membersOnly ? MEMBERS_EXTRA_WORDS : 0);
+    await log(`Pauta: "${topic.key}" (${topic.category}), palavra-chave "${topic.keyword}", meta de ${target} palavras${options.membersOnly ? ', post exclusivo' : ''}.`);
     const published = (await this.blog.allPublished(60)).map((post) => ({ slug: post.slug, title: post.title }));
 
     let problems: string[] = [];
+    let previous: { contentMd: string; words: number } | null = null;
     let body: BlogPostBody | null = null;
-    for (let attempt = 0; attempt < 2 && !body; attempt += 1) {
-      await report(`Escrevendo "${topic.key}" com ${model} (tentativa ${attempt + 1} de 2)`);
-      const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems, options.membersOnly ?? false), options.membersOnly ? 4800 : 3600, 0.7)) as AiDraft;
+    for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS && !body; attempt += 1) {
+      await report(
+        attempt === 0
+          ? `Escrevendo "${topic.key}" com ${model} (versão 1 de até ${MAX_WRITE_ATTEMPTS})`
+          : `Revisando o rascunho de "${topic.key}" (versão ${attempt + 1} de até ${MAX_WRITE_ATTEMPTS})`,
+      );
+      const startedAt = Date.now();
+      const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems, options.membersOnly ?? false, previous), options.membersOnly ? 4800 : 3600, 0.7)) as AiDraft;
       const draft: AiDraft = { ...raw, tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [], faq: Array.isArray(raw.faq) ? raw.faq : [] };
+      const words = renderMarkdown(draft.contentMd ?? '').words;
+      previous = { contentMd: draft.contentMd ?? '', words };
+      await log(`Versão ${attempt + 1}: "${draft.title ?? 'sem título'}", ${words} palavras, em ${((Date.now() - startedAt) / 1000).toFixed(1)} s.`);
       problems = BlogAiWriter.check(draft, topic, published, { membersOnly: options.membersOnly ?? false });
       const parsed = blogPostBodySchema.safeParse({
         title: draft.title,
@@ -361,8 +413,13 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
         faq: draft.faq.slice(0, 4).map((item) => ({ question: String(item.question ?? '').slice(0, 200), answer: String(item.answer ?? '').slice(0, 1000) })),
       });
       if (!parsed.success) problems.push(...parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`));
-      if (problems.length === 0 && parsed.success) body = parsed.data;
-      else this.services.logger?.warn({ attempt, problems, topic: topic.key }, 'post da IA reprovado na validação');
+      if (problems.length === 0 && parsed.success) {
+        body = parsed.data;
+        await log(`Versão ${attempt + 1} aprovada na validação.`);
+      } else {
+        this.services.logger?.warn({ attempt, problems, topic: topic.key }, 'post da IA reprovado na validação');
+        await log(`Versão ${attempt + 1} reprovada: ${problems.join(' | ')}`, 'warn');
+      }
     }
     if (!body) {
       throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI não produziu um post válido para "${topic.key}": ${problems.join(' ')}`);
@@ -371,7 +428,9 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
     const publish = options.publish ?? settings.aiAutoPublish;
     await report(publish ? 'Gravando e publicando o post' : 'Gravando o rascunho');
     const created = await this.blog.create(null, body, { ai: { model, topic: topic.key } });
-    return publish ? this.blog.publish(null, created.id) : created;
+    const result = publish ? await this.blog.publish(null, created.id) : created;
+    await log(publish ? `Post publicado: /blog/${result.slug}` : `Rascunho gravado: "${result.title}".`);
+    return result;
   }
 }
 

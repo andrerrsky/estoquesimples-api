@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -226,6 +227,7 @@ function RunningNow() {
           <li key={job.id}>
             <strong>{JOB_KIND[job.kind] ?? job.kind}</strong> · começou há {elapsedSince(job.lockedAt)} · tentativa {job.attempts}/{job.maxAttempts}
             {job.progress ? <> · <em>{job.progress}</em> (há {elapsedSince(job.progressAt)})</> : ' · sem passo informado'}
+            {' '}· <Link to={`/operacao/tarefas/${job.id}`}>Acompanhar o log</Link>
           </li>
         ))}
       </ul>
@@ -241,6 +243,7 @@ function JobsCard() {
   const [page, setPage] = useState(1);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [dismissId, setDismissId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const query = useQuery({
     queryKey: ['ops', 'jobs', filter, page],
@@ -253,8 +256,9 @@ function JobsCard() {
   const retry = async (id: string) => {
     try {
       await api.post(`/ops/jobs/${id}/retry`);
-      toast.push('Tarefa recolocada na fila.', 'success');
+      toast.push('Tarefa recolocada na fila. Acompanhe o log aqui.', 'success');
       void queryClient.invalidateQueries({ queryKey: ['ops'] });
+      navigate(`/operacao/tarefas/${id}`);
     } catch (error) {
       toast.push(errorMessage(error), 'error');
     }
@@ -288,7 +292,7 @@ function JobsCard() {
             ) : (
               query.data?.items.map((job) => (
                 <tr key={job.id}>
-                  <td><div className="cell-main">{JOB_KIND[job.kind] ?? job.kind}</div>{job.uniqueKey && <div className="cell-sub mono">{job.uniqueKey}</div>}</td>
+                  <td><Link to={`/operacao/tarefas/${job.id}`} className="job-link" title="Abrir a execução com o log"><div className="cell-main">{JOB_KIND[job.kind] ?? job.kind}</div>{job.uniqueKey && <div className="cell-sub mono">{job.uniqueKey}</div>}</Link></td>
                   <td>
                     <Badge tone={JOB_STATUS[job.status]?.tone}>{JOB_STATUS[job.status]?.label}</Badge>
                     {job.status === 'running' && <div className="cell-sub">{job.progress ?? 'rodando'} · há {elapsedSince(job.progressAt ?? job.lockedAt)}</div>}
@@ -299,6 +303,7 @@ function JobsCard() {
                   <td><Time value={job.completedAt ?? job.failedAt} /></td>
                   <td className="muted small" style={{ maxWidth: 320 }}>{job.lastError ?? '—'}</td>
                   <td className="nowrap">
+                    <Link to={`/operacao/tarefas/${job.id}`} className="btn btn--ghost btn--sm">Log</Link>
                     {can('support') && (job.status === 'failed' || job.status === 'dismissed') && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void retry(job.id)}>Repetir</button>}
                     {can('support') && job.status === 'failed' && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDismissId(job.id)}>Ignorar</button>}
                     {can('support') && job.status === 'pending' && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCancelId(job.id)}>Cancelar</button>}

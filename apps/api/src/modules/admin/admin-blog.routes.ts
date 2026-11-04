@@ -3,14 +3,16 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { badRequest, ErrorCode } from "../../platform/http/errors.js";
-import { AI_TOPICS, BlogAiWriter, topicStatus } from "../blog/blog-ai.js";
+import { AI_TOPICS, topicStatus } from "../blog/blog-ai.js";
 import { BLOG_CATEGORIES } from "../blog/blog.categories.js";
 import {
   blogPostBodySchema,
   blogSettingsSchema,
 } from "../blog/blog.schemas.js";
 import { BlogService } from "../blog/blog.service.js";
-import { nextAiRun } from "../blog/blog.jobs.js";
+import { BLOG_AI_WRITE_JOB, nextAiRun } from "../blog/blog.jobs.js";
+import { jobs } from "../../platform/db/schema/index.js";
+import { randomUUID } from "node:crypto";
 import { readOpenAiKey } from "../reviews/reviews.service.js";
 import { adminActor, requireAdmin } from "./admin-auth.plugin.js";
 import {
@@ -275,7 +277,7 @@ export async function registerAdminBlogRoutes(
       schema: {
         tags: ["admin"],
         summary:
-          "A IA escreve um post agora (rascunho, salvo pedido para publicar)",
+          "Pede à IA um post agora (vai para a fila; acompanhe pela página da tarefa)",
         hide: true,
         body: z
           .object({
@@ -283,19 +285,31 @@ export async function registerAdminBlogRoutes(
             topicKey: z.string().max(60).optional(),
           })
           .default({}),
-        response: { 200: z.any(), ...commonAdminErrors, 502: z.any() },
+        response: { 200: z.object({ jobId: z.string() }), ...commonAdminErrors },
       },
     },
     async (request) => {
-      const topic = request.body.topicKey
-        ? AI_TOPICS.find((item) => item.key === request.body.topicKey)
-        : undefined;
-      if (request.body.topicKey && !topic)
+      if (request.body.topicKey && !AI_TOPICS.some((item) => item.key === request.body.topicKey))
         throw badRequest(ErrorCode.VALIDATION_FAILED, "Pauta desconhecida.");
-      return new BlogAiWriter(app.services).writePost({
-        publish: request.body.publish,
-        ...(topic ? { topic } : {}),
+      if (!(await readOpenAiKey(app.services)))
+        throw badRequest(ErrorCode.VALIDATION_FAILED, "Configure a chave da OpenAI (painel › Inteligência artificial) para a IA escrever posts.");
+      // Pela fila, e não na própria requisição: a escrita leva de 30 s a
+      // 2 min, e a página da tarefa mostra cada passo com o log.
+      const jobId = randomUUID();
+      await app.services.db.insert(jobs).values({
+        id: jobId,
+        kind: BLOG_AI_WRITE_JOB,
+        payload: {
+          manual: true,
+          publish: request.body.publish,
+          requestedBy: adminActor(request).email,
+          ...(request.body.topicKey ? { topicKey: request.body.topicKey } : {}),
+        },
+        uniqueKey: `${BLOG_AI_WRITE_JOB}:manual:${jobId}`,
+        runAt: new Date(),
+        maxAttempts: 1,
       });
+      return { jobId };
     },
   );
 }

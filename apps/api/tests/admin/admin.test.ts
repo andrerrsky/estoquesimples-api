@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { jobs, platformAdmins } from '../../src/platform/db/schema/index.js';
 import { hashPassword } from '../../src/platform/auth/password.js';
+import { startJobRunner } from '../../src/platform/jobs/runner.js';
 import { createTestApp, registerUser, resetDatabase, type TestContext } from '../helpers/test-app.js';
 
 const ADMIN_PASSWORD = 'PainelSeguro#2026';
@@ -358,6 +359,61 @@ describe('painel administrativo: visão geral e operação', () => {
     expect(retry.statusCode).toBe(200);
     const pending = await context.app.inject({ method: 'GET', url: '/admin/api/ops/jobs?status=pending', headers: { cookie } });
     expect(pending.json().items[0]).toMatchObject({ id: job!.id, status: 'pending', dismissedAt: null });
+  });
+
+  it('escrita pela IA vai para a fila, revisa o mesmo rascunho e deixa o log na página da tarefa', async () => {
+    const owner = await createAdmin('owner');
+    const { cookie } = await loginAdmin(owner);
+    const curto = { title: 'Estoque mínimo: como calcular', excerpt: 'x', category: 'controle-de-estoque', tags: ['estoque'], contentMd: '## Estoque mínimo\n\nTexto curto demais para passar.', faq: [] };
+    const pedidos: string[] = [];
+    const realFetch = globalThis.fetch;
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith('https://api.openai.com/v1/models')) return new Response('{}', { status: 200 });
+      if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
+        pedidos.push(String(init?.body ?? ''));
+        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(curto) } }] }), { status: 200 });
+      }
+      return realFetch(input, init);
+    });
+    const stop = startJobRunner(context.services, context.app.log, { intervalMs: 50 });
+    try {
+      const key = await context.app.inject({ method: 'PUT', url: '/admin/api/settings/openai', headers: { cookie, ...CSRF }, payload: { apiKey: `sk-${'a'.repeat(40)}` } });
+      expect(key.statusCode).toBe(200);
+
+      const write = await context.app.inject({ method: 'POST', url: '/admin/api/blog/ai/write', headers: { cookie, ...CSRF }, payload: { topicKey: 'estoque-minimo' } });
+      expect(write.statusCode).toBe(200);
+      const { jobId } = write.json() as { jobId: string };
+
+      let detail: { job: { status: string; lastError: string | null; payload: Record<string, unknown> }; logs: Array<{ id: number; level: string; message: string }> } | null = null;
+      for (let i = 0; i < 100; i += 1) {
+        const response = await context.app.inject({ method: 'GET', url: `/admin/api/ops/jobs/${jobId}`, headers: { cookie } });
+        detail = response.json();
+        if (detail!.job.status === 'failed' || detail!.job.status === 'completed') break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(detail!.job.status).toBe('failed');
+      expect(detail!.job.payload).toMatchObject({ manual: true, requestedBy: owner, topicKey: 'estoque-minimo' });
+      // Três versões: a segunda e a terceira revisam o rascunho anterior, não recomeçam.
+      expect(pedidos).toHaveLength(3);
+      expect(pedidos[0]).not.toContain('TEXTO ANTERIOR');
+      expect(pedidos[1]).toContain('TEXTO ANTERIOR');
+      expect(pedidos[1]).toContain('Texto curto demais para passar.');
+      expect(pedidos[0]).toContain('DISTRIBUIÇÃO DAS PALAVRAS');
+      const mensagens = detail!.logs.map((line) => line.message);
+      expect(mensagens[0]).toMatch(/^Tentativa 1 de 1 iniciada/);
+      expect(mensagens.some((line) => line.startsWith('Pauta: "estoque-minimo"'))).toBe(true);
+      expect(mensagens.filter((line) => /^Versão \d reprovada/.test(line))).toHaveLength(3);
+      expect(detail!.logs.some((line) => line.level === 'error' && line.message.startsWith('Falhou depois de'))).toBe(true);
+
+      // `after`: só as linhas novas.
+      const lastId = detail!.logs.at(-1)!.id;
+      const incremental = await context.app.inject({ method: 'GET', url: `/admin/api/ops/jobs/${jobId}?after=${lastId}`, headers: { cookie } });
+      expect(incremental.json().logs).toHaveLength(0);
+    } finally {
+      stop();
+      spy.mockRestore();
+    }
   });
 
   it('lista a auditoria das contas com filtros e junções', async () => {

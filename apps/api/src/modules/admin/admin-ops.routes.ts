@@ -1,10 +1,10 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-import { appConfig, jobs } from '../../platform/db/schema/index.js';
+import { appConfig, jobLogs, jobs } from '../../platform/db/schema/index.js';
 import { migrationStatus } from '../../platform/db/migrate.js';
 import { S3Storage, imageKey } from '../../platform/storage/object-storage.js';
 import { ErrorCode, conflict, notFound } from '../../platform/http/errors.js';
@@ -293,6 +293,60 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
             ? 'O bucket recusou a assinatura nos dois estilos de URL: a chave secreta não corresponde à chave de acesso. Copie de novo as duas da aba Credentials do bucket no Railway.'
             : 'Armazenamento com falha: veja a etapa e o erro.';
       return { ok, config, steps, alternativa, message };
+    },
+  );
+
+  routes.get(
+    '/ops/jobs/:jobId',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Uma tarefa da fila com o log de todas as tentativas',
+        hide: true,
+        params: uuidParam('jobId'),
+        // `after`: só as linhas novas (o painel pede assim enquanto a tarefa roda).
+        querystring: z.object({ after: z.coerce.number().int().nonnegative().optional() }),
+        response: { 200: z.any(), ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      const rows = await db.select().from(jobs).where(eq(jobs.id, request.params.jobId)).limit(1);
+      const job = rows[0];
+      if (!job) throw notFound('Tarefa não encontrada.');
+      const after = request.query.after;
+      const logs = await db
+        .select()
+        .from(jobLogs)
+        .where(after ? and(eq(jobLogs.jobId, job.id), gt(jobLogs.id, BigInt(after))) : eq(jobLogs.jobId, job.id))
+        .orderBy(asc(jobLogs.id))
+        .limit(2000);
+      const iso = (value: Date | null) => (value ? value.toISOString() : null);
+      return {
+        job: {
+          id: job.id,
+          kind: job.kind,
+          payload: job.payload ?? {},
+          uniqueKey: job.uniqueKey,
+          runAt: iso(job.runAt),
+          attempts: job.attempts,
+          maxAttempts: job.maxAttempts,
+          lockedAt: iso(job.lockedAt),
+          lockedBy: job.lockedBy,
+          completedAt: iso(job.completedAt),
+          failedAt: iso(job.failedAt),
+          lastError: job.lastError,
+          progress: job.progress,
+          progressAt: iso(job.progressAt),
+          dismissedAt: iso(job.dismissedAt),
+          dismissedBy: job.dismissedBy,
+          result: job.result ?? null,
+          createdAt: iso(job.createdAt),
+          status: job.dismissedAt ? 'dismissed' : job.failedAt ? 'failed' : job.completedAt ? 'completed' : job.lockedAt ? 'running' : 'pending',
+        },
+        logs: logs.map((line) => ({ id: Number(line.id), attempt: line.attempt, level: line.level, message: line.message, at: line.createdAt.toISOString() })),
+        serverTime: new Date().toISOString(),
+      };
     },
   );
 
