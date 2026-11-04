@@ -183,6 +183,7 @@ export const JOB_STATUS: Record<string, { label: string; tone: Tone }> = {
   running: { label: 'Executando', tone: 'brand' },
   completed: { label: 'Concluída', tone: 'success' },
   failed: { label: 'Falhou', tone: 'error' },
+  dismissed: { label: 'Descartada', tone: 'neutral' },
 };
 
 export const JOB_KIND: Record<string, string> = {
@@ -297,6 +298,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'ops.sync_config_changed': { label: 'Sincronização reconfigurada', tone: 'error' },
   'ops.job_retried': { label: 'Tarefa recolocada na fila', tone: 'info' },
   'ops.job_cancelled': { label: 'Tarefa cancelada', tone: 'warning' },
+  'ops.job_dismissed': { label: 'Tarefa falha descartada', tone: 'neutral' },
   'review.replied': { label: 'Resposta publicada na Play Store', tone: 'info' },
   'review.draft_generated': { label: 'Rascunho de resposta gerado', tone: 'neutral' },
   'reviews.synced': { label: 'Avaliações buscadas no Google', tone: 'neutral' },

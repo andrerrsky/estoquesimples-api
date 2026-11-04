@@ -18,7 +18,9 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      '/admin/api': { target: 'http://localhost:3000', changeOrigin: false },
+      // 127.0.0.1 com o Host reescrito: a API escolhe o app pelo Host, e em
+      // `localhost` ela serve o web app (o /admin/api respondia 404 no Vite).
+      '/admin/api': { target: 'http://127.0.0.1:3000', changeOrigin: true },
     },
   },
 });

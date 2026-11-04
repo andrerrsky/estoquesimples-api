@@ -1764,6 +1764,9 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Dentro do PublicShell (coluna flex) a barra encolhia para o tamanho do
+     conteúdo e ficava mais estreita que a página: largura total até o teto. */
+  width: 100%;
   max-width: var(--page-max);
   margin: 0 auto;
   padding: 18px var(--page-x);

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { platformAdmins } from '../../src/platform/db/schema/index.js';
+import { jobs, platformAdmins } from '../../src/platform/db/schema/index.js';
 import { hashPassword } from '../../src/platform/auth/password.js';
 import { createTestApp, registerUser, resetDatabase, type TestContext } from '../helpers/test-app.js';
 
@@ -320,6 +320,44 @@ describe('painel administrativo: visão geral e operação', () => {
 
     const config = await context.app.inject({ method: 'GET', url: '/v1/config' });
     expect(config.json().sync.enabled).toBe(false);
+  });
+
+  it('descarta uma tarefa falha, tira do alerta e deixa repetir depois', async () => {
+    const support = await createAdmin('support');
+    const { cookie } = await loginAdmin(support);
+    const [job] = await context.services.db
+      .insert(jobs)
+      .values({ kind: 'blog.ai_write', uniqueKey: 'blog.ai_write:teste', attempts: 2, maxAttempts: 2, failedAt: new Date(), lastError: 'A OpenAI está limitando as chamadas.' })
+      .returning({ id: jobs.id });
+
+    const failedBefore = await context.app.inject({ method: 'GET', url: '/admin/api/ops/jobs?status=failed', headers: { cookie } });
+    expect(failedBefore.json().total).toBe(1);
+    const statusBefore = await context.app.inject({ method: 'GET', url: '/admin/api/ops/status', headers: { cookie } });
+    expect(statusBefore.json().snapshot.jobsFalhos).toBe(1);
+
+    const semMotivo = await context.app.inject({ method: 'POST', url: `/admin/api/ops/jobs/${job!.id}/dismiss`, headers: { cookie, ...CSRF }, payload: {} });
+    expect(semMotivo.statusCode).toBe(400);
+
+    const dismiss = await context.app.inject({ method: 'POST', url: `/admin/api/ops/jobs/${job!.id}/dismiss`, headers: { cookie, ...CSRF }, payload: { reason: 'chave trocada; tarefa antiga' } });
+    expect(dismiss.statusCode).toBe(200);
+    const again = await context.app.inject({ method: 'POST', url: `/admin/api/ops/jobs/${job!.id}/dismiss`, headers: { cookie, ...CSRF }, payload: { reason: 'de novo' } });
+    expect(again.statusCode).toBe(409);
+
+    const failedAfter = await context.app.inject({ method: 'GET', url: '/admin/api/ops/jobs?status=failed', headers: { cookie } });
+    expect(failedAfter.json().total).toBe(0);
+    const dismissed = await context.app.inject({ method: 'GET', url: '/admin/api/ops/jobs?status=dismissed', headers: { cookie } });
+    expect(dismissed.json().items[0]).toMatchObject({ id: job!.id, status: 'dismissed', dismissedBy: support });
+    const statusAfter = await context.app.inject({ method: 'GET', url: '/admin/api/ops/status', headers: { cookie } });
+    expect(statusAfter.json().snapshot.jobsFalhos).toBe(0);
+
+    const audit = await context.app.inject({ method: 'GET', url: '/admin/api/audit/admins?action=ops.job_dismissed', headers: { cookie } });
+    expect(audit.json().items[0]).toMatchObject({ targetId: job!.id });
+
+    // Descartada ainda pode ser repetida: volta para a fila limpa.
+    const retry = await context.app.inject({ method: 'POST', url: `/admin/api/ops/jobs/${job!.id}/retry`, headers: { cookie, ...CSRF } });
+    expect(retry.statusCode).toBe(200);
+    const pending = await context.app.inject({ method: 'GET', url: '/admin/api/ops/jobs?status=pending', headers: { cookie } });
+    expect(pending.json().items[0]).toMatchObject({ id: job!.id, status: 'pending', dismissedAt: null });
   });
 
   it('lista a auditoria das contas com filtros e junções', async () => {

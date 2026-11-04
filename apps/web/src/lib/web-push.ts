@@ -52,11 +52,70 @@ function base64UrlToBytes(value: string): Uint8Array {
   return bytes;
 }
 
+/** Espera o worker ficar ativo, sem depender só de `serviceWorker.ready`. */
+function waitForActive(reg: ServiceWorkerRegistration, timeoutMs: number): Promise<ServiceWorkerRegistration> {
+  if (reg.active && !reg.installing && !reg.waiting) return Promise.resolve(reg);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (ok) resolve(reg);
+      else reject(new Error('service worker não ativou a tempo'));
+    };
+    const timer = setTimeout(() => finish(Boolean(reg.active)), timeoutMs);
+    const watch = (worker: ServiceWorker | null) => {
+      if (!worker) return;
+      if (worker.state === 'activated') finish(true);
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'activated') finish(true);
+        if (worker.state === 'redundant' && !reg.active) finish(false);
+      });
+    };
+    watch(reg.installing ?? reg.waiting ?? reg.active);
+    reg.addEventListener('updatefound', () => watch(reg.installing));
+    // Alguns navegadores só sinalizam por aqui.
+    void navigator.serviceWorker.ready.then(() => finish(true));
+  });
+}
+
 async function registration(): Promise<ServiceWorkerRegistration> {
   // `updateViaCache: 'none'`: o navegador sempre confere se o sw.js mudou.
   const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
-  await navigator.serviceWorker.ready;
-  return reg;
+  // No iPhone (web app na tela inicial), `serviceWorker.ready` às vezes não
+  // resolve na mesma abertura em que o worker foi registrado pela primeira
+  // vez — o botão ficava em "Ligando…" para sempre e só funcionava depois de
+  // fechar e abrir o app. Aqui o worker é observado diretamente e há um teto.
+  return waitForActive(reg, 15_000);
+}
+
+/**
+ * Registra o service worker na abertura do app, antes de qualquer toque:
+ * quando a pessoa ligar os avisos, o worker já está ativo e o pedido não
+ * fica esperando a instalação. O worker não guarda nada em cache nem
+ * intercepta requisições (ver public/sw.js). Não pede permissão alguma.
+ */
+export function ensureServiceWorker(): void {
+  if (!supported()) return;
+  navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => undefined);
+}
+
+/** Rejeita se a promessa não terminar a tempo (o botão nunca pode ficar preso). */
+function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what}: tempo esgotado`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
 }
 
 function remember(on: boolean): void {
@@ -80,7 +139,7 @@ function remembered(): boolean {
 async function register(subscription: PushSubscription): Promise<void> {
   const json = subscription.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
   if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) throw new Error('inscrição sem chaves');
-  await api.put(
+  await withTimeout(api.put(
     '/v1/push/tokens',
     {
       token: json.endpoint,
@@ -91,10 +150,11 @@ async function register(subscription: PushSubscription): Promise<void> {
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
     },
     { optionalAuth: true },
-  );
+  ), 20_000, 'registro da inscrição');
   // O service worker precisa do installId para medir as campanhas.
-  navigator.serviceWorker.controller?.postMessage({ type: 'install-id', installId: installId() });
-  (await navigator.serviceWorker.ready).active?.postMessage({ type: 'install-id', installId: installId() });
+  const reg = await navigator.serviceWorker.getRegistration('/').catch(() => undefined);
+  const worker = navigator.serviceWorker.controller ?? reg?.active ?? null;
+  worker?.postMessage({ type: 'install-id', installId: installId() });
 }
 
 export async function currentPushState(): Promise<PushState> {
@@ -116,7 +176,7 @@ export async function enablePush(): Promise<PushState> {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
   const reg = await registration();
-  const { publicKey } = await api.get<{ publicKey: string }>('/v1/push/web-config', undefined, { auth: false });
+  const { publicKey } = await withTimeout(api.get<{ publicKey: string }>('/v1/push/web-config', undefined, { auth: false }), 20_000, 'chave do servidor');
   let subscription = await reg.pushManager.getSubscription();
   // Inscrição feita com outra chave (troca de servidor): refaz.
   const current = subscription?.options.applicationServerKey;
@@ -124,7 +184,11 @@ export async function enablePush(): Promise<PushState> {
     await subscription.unsubscribe().catch(() => undefined);
     subscription = null;
   }
-  subscription ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) as BufferSource });
+  subscription ??= await withTimeout(
+    reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) as BufferSource }),
+    20_000,
+    'inscrição no navegador',
+  );
   await register(subscription);
   remember(true);
   return 'on';
@@ -194,8 +258,13 @@ export function useWebPush() {
     setError(null);
     try {
       setState(await action());
-    } catch {
-      setError('Não foi possível ligar os avisos agora. Verifique a conexão e tente de novo.');
+    } catch (cause) {
+      const timedOut = cause instanceof Error && /tempo esgotado|não ativou/.test(cause.message);
+      setError(
+        timedOut
+          ? 'Demorou demais para ligar os avisos. Feche o app por completo, abra de novo e toque em Ligar avisos.'
+          : 'Não foi possível ligar os avisos agora. Verifique a conexão e tente de novo.',
+      );
       setState(await currentPushState());
     } finally {
       setBusy(false);

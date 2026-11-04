@@ -331,18 +331,21 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
    * Escreve e grava um post (rascunho ou publicado, conforme a configuração).
    * @returns o post, ou `null` quando a geração está desligada ou sem chave.
    */
-  async writePost(options: { publish?: boolean; topic?: AiTopic; membersOnly?: boolean } = {}) {
+  async writePost(options: { publish?: boolean; topic?: AiTopic; membersOnly?: boolean; report?: (step: string) => Promise<void> } = {}) {
+    const report = options.report ?? (async () => undefined);
     const settings = await this.blog.settings();
     const apiKey = await readOpenAiKey(this.services);
     if (!apiKey) throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (Avaliações › OpenAI) para a IA escrever posts.');
     const model = this.services.env.OPENAI_MODEL;
     const client = new OpenAiClient(apiKey, model);
+    if (!options.topic) await report('Escolhendo a pauta');
     const topic = options.topic ?? (await this.nextTopic(client));
     const published = (await this.blog.allPublished(60)).map((post) => ({ slug: post.slug, title: post.title }));
 
     let problems: string[] = [];
     let body: BlogPostBody | null = null;
     for (let attempt = 0; attempt < 2 && !body; attempt += 1) {
+      await report(`Escrevendo "${topic.key}" com ${model} (tentativa ${attempt + 1} de 2)`);
       const raw = (await client.completeJson(this.systemPrompt(), this.userPrompt(topic, published, problems, options.membersOnly ?? false), options.membersOnly ? 4800 : 3600, 0.7)) as AiDraft;
       const draft: AiDraft = { ...raw, tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [], faq: Array.isArray(raw.faq) ? raw.faq : [] };
       problems = BlogAiWriter.check(draft, topic, published, { membersOnly: options.membersOnly ?? false });
@@ -365,8 +368,9 @@ FORMATO DA RESPOSTA: um único objeto JSON, sem texto fora dele, com estas chave
       throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI não produziu um post válido para "${topic.key}": ${problems.join(' ')}`);
     }
 
-    const created = await this.blog.create(null, body, { ai: { model, topic: topic.key } });
     const publish = options.publish ?? settings.aiAutoPublish;
+    await report(publish ? 'Gravando e publicando o post' : 'Gravando o rascunho');
+    const created = await this.blog.create(null, body, { ai: { model, topic: topic.key } });
     return publish ? this.blog.publish(null, created.id) : created;
   }
 }

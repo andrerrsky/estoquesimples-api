@@ -12,11 +12,14 @@ import { BrandMark } from './BrandMark';
 import { Icon, type IconName } from './Icon';
 import { SyncButton } from './SyncButton';
 import { Empty, Menu, Meter, Modal, Notice, Skeleton, Spinner } from './ui';
+import { useNewVersion } from '../lib/version-check';
 
 interface NavItem {
   to: string;
   label: string;
   icon: IconName;
+  /** Abre em outra aba (páginas públicas, fora da área logada). */
+  newTab?: boolean;
 }
 
 const STOCK_NAV: NavItem[] = [
@@ -37,7 +40,8 @@ const BRAND_NAV: NavItem = { to: '/app/marca', label: 'Identidade visual', icon:
 
 const HELP_NAV: NavItem[] = [
   { to: '/app/ajuda', label: 'Central de ajuda', icon: 'book' },
-  { to: '/blog', label: 'Dicas e novidades', icon: 'sparkle' },
+  // O blog é o site público: abre em outra aba para não tirar a pessoa do estoque.
+  { to: '/blog', label: 'Dicas e novidades', icon: 'sparkle', newTab: true },
   { to: '/app/plataformas', label: 'Plataformas', icon: 'phone' },
   { to: '/app/suporte', label: 'Falar com o suporte', icon: 'help' },
 ];
@@ -61,6 +65,7 @@ export function AppShell() {
   const unread = useUnreadNotifications();
   const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const newVersion = useNewVersion();
 
   useEffect(() => {
     trackScreen(location.pathname.split('/').slice(1, 3).join('/'));
@@ -103,7 +108,13 @@ export function AppShell() {
   const companyNav = can('marca.gerenciar') ? [...COMPANY_NAV, BRAND_NAV] : COMPANY_NAV;
 
   const renderNav = (items: NavItem[]) =>
-    items.map((item) => (
+    items.map((item) => item.newTab ? (
+      <a key={item.to} href={item.to} target="_blank" rel="noopener" className="navlink">
+        <Icon name={item.icon} />
+        {item.label}
+        <Icon name="external" size={14} />
+      </a>
+    ) : (
       <NavLink key={item.to} to={item.to} className={({ isActive }) => `navlink ${isActive ? 'active' : ''}`}>
         <Icon name={item.icon} />
         {item.label}
@@ -204,6 +215,13 @@ export function AppShell() {
           />
         </header>
 
+        {newVersion && (
+          <div className="page" style={{ paddingBottom: 0, gap: 0 }}>
+            <Notice tone="info" action={<button type="button" className="btn btn--primary btn--sm" onClick={() => window.location.reload()}>Atualizar</button>}>
+              Há uma versão nova do Estoque Simples. Atualize para receber as melhorias; leva um segundo.
+            </Notice>
+          </div>
+        )}
         {user && !user.emailVerified && !location.pathname.startsWith('/app/conta') && (
           <div className="page" style={{ paddingBottom: 0, gap: 0 }}>
             <Notice tone="warning" action={<Link to="/app/conta" className="btn btn--secondary btn--sm">Confirmar</Link>}>

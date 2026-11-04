@@ -55,6 +55,7 @@ export const AdminAction = {
   OPS_SYNC_CONFIG_CHANGED: 'ops.sync_config_changed',
   OPS_JOB_RETRIED: 'ops.job_retried',
   OPS_JOB_CANCELLED: 'ops.job_cancelled',
+  OPS_JOB_DISMISSED: 'ops.job_dismissed',
 
   REVIEW_REPLIED: 'review.replied',
   REVIEW_DRAFT_GENERATED: 'review.draft_generated',

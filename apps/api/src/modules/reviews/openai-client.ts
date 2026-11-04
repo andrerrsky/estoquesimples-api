@@ -48,6 +48,49 @@ Regras:
 - Não invente funcionalidades que o app não tem. Não peça senha.
 - Texto corrido, sem títulos, listas numeradas longas, assinatura ou aspas. Máximo de {MAX} caracteres.`;
 
+/** O corpo de erro da OpenAI: `{ "error": { "code", "type", "message" } }`. */
+async function openAiError(response: Response): Promise<{ code: string | null; message: string | null }> {
+  try {
+    const body = (await response.json()) as { error?: { code?: string | null; type?: string | null; message?: string | null } };
+    return { code: body.error?.code ?? body.error?.type ?? null, message: body.error?.message ?? null };
+  } catch {
+    return { code: null, message: null };
+  }
+}
+
+/**
+ * Traduz a recusa da OpenAI em algo que quem olha a fila consegue resolver.
+ * O 429 tem dois significados bem diferentes: limite de chamadas por minuto
+ * (passa sozinho) e conta sem crédito (`insufficient_quota`, que só passa
+ * depois de colocar saldo) — mostrar os dois como "tente em instantes" fazia
+ * a pessoa repetir a tarefa à toa.
+ */
+export async function rejectIfFailed(response: Response): Promise<void> {
+  if (response.ok) return;
+  if (response.status === 401) {
+    throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
+  }
+  const { code, message } = await openAiError(response);
+  if (response.status === 429) {
+    if (code === 'insufficient_quota' || /quota|billing/i.test(message ?? '')) {
+      throw new AppError(
+        409,
+        ErrorCode.CONFLICT,
+        'A conta da OpenAI está sem crédito (insufficient_quota): a chave é válida, mas o projeto não tem saldo. Adicione crédito em platform.openai.com › Settings › Billing e repita a tarefa.',
+      );
+    }
+    throw new AppError(
+      429,
+      ErrorCode.RATE_LIMITED,
+      `A OpenAI está limitando as chamadas (${code ?? 'rate_limit'}): limite de requisições por minuto do modelo. Tente em instantes.`,
+    );
+  }
+  if (response.status === 403 && code === 'model_not_found') {
+    throw new AppError(409, ErrorCode.CONFLICT, `A OpenAI não libera o modelo configurado para esta chave (${message ?? 'model_not_found'}).`);
+  }
+  throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}${message ? `: ${message.slice(0, 200)}` : '.'}`);
+}
+
 export class OpenAiClient {
   constructor(
     private readonly apiKey: string,
@@ -98,15 +141,7 @@ export class OpenAiClient {
       }),
     });
 
-    if (response.status === 401) {
-      throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
-    }
-    if (response.status === 429) {
-      throw new AppError(429, ErrorCode.RATE_LIMITED, 'A OpenAI está limitando as chamadas. Tente em instantes.');
-    }
-    if (!response.ok) {
-      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}.`);
-    }
+    await rejectIfFailed(response);
 
     const body = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
@@ -162,15 +197,7 @@ export class OpenAiClient {
         ],
       }),
     });
-    if (response.status === 401) {
-      throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
-    }
-    if (response.status === 429) {
-      throw new AppError(429, ErrorCode.RATE_LIMITED, 'A OpenAI está limitando as chamadas. Tente em instantes.');
-    }
-    if (!response.ok) {
-      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}.`);
-    }
+    await rejectIfFailed(response);
     const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const text = body.choices?.[0]?.message?.content?.trim() ?? '';
     try {
@@ -196,15 +223,7 @@ export class OpenAiClient {
       }),
     });
 
-    if (response.status === 401) {
-      throw new AppError(409, ErrorCode.CONFLICT, 'A OpenAI recusou a chave configurada. Cadastre uma nova.');
-    }
-    if (response.status === 429) {
-      throw new AppError(429, ErrorCode.RATE_LIMITED, 'A OpenAI está limitando as chamadas. Tente em instantes.');
-    }
-    if (!response.ok) {
-      throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, `A OpenAI respondeu ${response.status}.`);
-    }
+    await rejectIfFailed(response);
     const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const text = body.choices?.[0]?.message?.content?.trim() ?? '';
     if (!text) {

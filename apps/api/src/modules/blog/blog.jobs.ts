@@ -66,7 +66,7 @@ export function registerBlogJobs(_services: AppServices): void {
         return;
       }
       const membersOnly = isMembersOnlyRun(new Date()) && settings.aiMembersOnlyWeekly;
-      const post = await new BlogAiWriter(context.services).writePost({ membersOnly });
+      const post = await new BlogAiWriter(context.services).writePost({ membersOnly, report: context.progress });
       context.logger.info({ postId: post.id, slug: post.slug, status: post.status, topic: post.aiTopic }, 'post do blog escrito pela IA');
     } finally {
       await scheduleNext(context.services);

@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 
 import { settingAad } from '../../platform/crypto/purchase-token.js';
-import { adminSettings, playReviews } from '../../platform/db/schema/index.js';
+import { adminSettings, appConfig, playReviews } from '../../platform/db/schema/index.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode, badRequest, notFound } from '../../platform/http/errors.js';
 import type { PlayReview } from '../billing/play-client.js';
@@ -13,6 +13,17 @@ import { OpenAiClient } from './openai-client.js';
 export const REPLY_MAX_LENGTH = 350;
 
 export const SETTING_OPENAI_KEY = 'openai_api_key';
+
+/** Resultado da última coleta (app_config), para o painel dizer se o Google respondeu e o que devolveu. */
+const LAST_SYNC_KEY = 'play_reviews_sync';
+
+export interface ReviewsSyncRecord {
+  at: string;
+  fetched: number;
+  created: number;
+  updated: number;
+  error: string | null;
+}
 
 /** Chave da OpenAI guardada pelo painel (cifrada), ou null se não há. */
 export async function readOpenAiKey(services: AppServices): Promise<string | null> {
@@ -60,7 +71,18 @@ export class ReviewsService {
     if (!playClient.configured) {
       throw new AppError(503, ErrorCode.BILLING_UNAVAILABLE, 'Google Play não configurado neste ambiente.');
     }
+    try {
+      const result = await this.fetchAll();
+      await this.recordSync({ ...result, error: null });
+      return result;
+    } catch (error) {
+      await this.recordSync({ fetched: 0, created: 0, updated: 0, error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  }
 
+  private async fetchAll(): Promise<{ fetched: number; created: number; updated: number }> {
+    const { playClient } = this.services;
     let pageToken: string | null = null;
     let fetched = 0;
     let created = 0;
@@ -78,6 +100,23 @@ export class ReviewsService {
       if (!pageToken) break;
     }
     return { fetched, created, updated };
+  }
+
+  private async recordSync(record: Omit<ReviewsSyncRecord, 'at'>): Promise<void> {
+    const value: ReviewsSyncRecord = { ...record, error: record.error?.slice(0, 500) ?? null, at: new Date().toISOString() };
+    try {
+      await this.db
+        .insert(appConfig)
+        .values({ key: LAST_SYNC_KEY, value, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: appConfig.key, set: { value, updatedAt: new Date() } });
+    } catch (error) {
+      this.services.logger?.warn({ err: error }, 'não foi possível registrar a coleta de avaliações');
+    }
+  }
+
+  async lastSync(): Promise<ReviewsSyncRecord | null> {
+    const rows = await this.db.select({ value: appConfig.value }).from(appConfig).where(eq(appConfig.key, LAST_SYNC_KEY)).limit(1);
+    return (rows[0]?.value as ReviewsSyncRecord | undefined) ?? null;
   }
 
   private async upsert(review: PlayReview): Promise<'created' | 'updated' | 'unchanged'> {
@@ -185,6 +224,7 @@ export class ReviewsService {
       distribution: { 5: n('r5'), 4: n('r4'), 3: n('r3'), 2: n('r2'), 1: n('r1') },
       last30d: n('last_30d'),
       lastFetchedAt: r['last_fetched_at'] ? new Date(r['last_fetched_at']).toISOString() : null,
+      lastSync: await this.lastSync(),
       playConfigured: this.services.playClient.configured,
       openAiConfigured: (await this.readSetting(SETTING_OPENAI_KEY)) !== null,
     };

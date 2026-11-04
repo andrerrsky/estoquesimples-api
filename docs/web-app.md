@@ -59,6 +59,22 @@ antigos, que não existem mais. Três camadas evitam que isso vire tela de erro:
 O `index.html` nunca é guardado em cache, então recarregar sempre traz a
 versão nova.
 
+4. **Aviso de versão nova** (`apps/web/src/lib/version-check.ts`): quem nunca
+   recarrega — o web app na tela inicial do iPhone fica aberto por dias — só
+   descobria o deploy quando uma tela falhava. A página compara, ao voltar
+   para o app (no máximo uma vez por minuto) e a cada 10 minutos, o arquivo
+   principal que carregou com o que o `index.html` do servidor aponta hoje;
+   se mudou, a barra de cima mostra "Há uma versão nova" com o botão
+   Atualizar. Nunca recarrega sozinha (a pessoa pode estar no meio de um
+   cadastro).
+
+O service worker (`public/sw.js`) é registrado logo na abertura do app, não
+só quando a pessoa liga os avisos: no iPhone, `serviceWorker.ready` às vezes
+não resolvia na mesma abertura em que o worker tinha sido registrado, e o
+botão "Ligar avisos" ficava em "Ligando…" até fechar e abrir o app. Ligar os
+avisos ainda observa o worker diretamente e tem um teto de tempo, para o
+botão nunca ficar preso.
+
 ## Página inicial pré-renderizada
 
 A página inicial é uma **segunda página do build** (`apps/web/landing.html`,

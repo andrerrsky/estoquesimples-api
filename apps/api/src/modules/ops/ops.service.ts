@@ -56,7 +56,7 @@ export class OpsService {
         (SELECT count(*) FROM jobs
           WHERE completed_at IS NULL AND failed_at IS NULL
             AND run_at < now() - ${sql.raw(ATRASO_TOLERADO)}) AS jobs_atrasados,
-        (SELECT count(*) FROM jobs WHERE failed_at IS NOT NULL) AS jobs_falhos,
+        (SELECT count(*) FROM jobs WHERE failed_at IS NOT NULL AND dismissed_at IS NULL) AS jobs_falhos,
         (SELECT count(*) FROM conflict_log WHERE status = 'pendente') AS conflitos_pendentes,
         (SELECT count(*) FROM conflict_log
           WHERE status = 'pendente'
