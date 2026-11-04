@@ -110,6 +110,20 @@ export class OpenAiClient {
     }
   }
 
+  /**
+   * Chamada real ao modelo configurado, de 1 token (custo desprezível). Ao
+   * contrário de `verify()`, que só lista modelos, ela pega conta sem
+   * crédito (insufficient_quota) e modelo não liberado para a chave.
+   */
+  async ping(): Promise<void> {
+    const response = await this.fetchWithTimeout(API_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: this.model, max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] }),
+    });
+    await rejectIfFailed(response);
+  }
+
   async draftReviewReply(input: ReviewDraftInput): Promise<string> {
     const userMessage = [
       `Nota: ${input.starRating} de 5 estrelas.`,

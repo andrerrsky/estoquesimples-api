@@ -701,7 +701,7 @@ export class SupportService {
   async draft(actor: AdminActor, ticketId: string, instructions?: string): Promise<{ text: string; model: string }> {
     const apiKey = await readOpenAiKey(this.services);
     if (!apiKey) {
-      throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (em Avaliações) para gerar rascunhos.');
+      throw new AppError(409, ErrorCode.CONFLICT, 'Configure a chave da OpenAI (painel › Inteligência artificial) para gerar rascunhos.');
     }
     const rows = await this.db.execute<TicketRow>(sql`
       SELECT t.*, u.name AS user_name FROM support_tickets t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = ${ticketId}

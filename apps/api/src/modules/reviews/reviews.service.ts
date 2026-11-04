@@ -459,6 +459,16 @@ export class ReviewsService {
     };
   }
 
+  /** Testa a chave guardada com uma chamada real ao modelo (ver `OpenAiClient.ping`). */
+  async testOpenAiKey(): Promise<{ ok: true; model: string; ms: number }> {
+    const key = await this.readSetting(SETTING_OPENAI_KEY);
+    if (!key) throw notFound('Nenhuma chave da OpenAI configurada.');
+    const model = this.services.env.OPENAI_MODEL;
+    const started = Date.now();
+    await new OpenAiClient(key, model).ping();
+    return { ok: true, model, ms: Date.now() - started };
+  }
+
   async setOpenAiKey(actor: AdminActor, apiKey: string): Promise<void> {
     const cleaned = apiKey.trim();
     if (!/^sk-[A-Za-z0-9_-]{20,}$/.test(cleaned)) {

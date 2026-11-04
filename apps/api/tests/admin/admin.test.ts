@@ -450,6 +450,10 @@ describe('avaliações da Play Store', () => {
 
     const draft = await context.app.inject({ method: 'POST', url: '/admin/api/reviews/rev-1/draft', headers: { cookie, ...CSRF }, payload: {} });
     expect(draft.statusCode).toBe(409);
+
+    // Sem chave, o teste da tela Inteligência artificial diz que não há o que testar.
+    const test = await context.app.inject({ method: 'POST', url: '/admin/api/settings/openai/test', headers: { cookie, ...CSRF } });
+    expect(test.statusCode).toBe(404);
   });
 
   it('importa o histórico pelo relatório da Play Console sem duplicar nem apagar o nome', async () => {

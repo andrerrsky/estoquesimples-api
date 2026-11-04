@@ -132,6 +132,15 @@ export async function registerAdminReviewsRoutes(app: FastifyInstance): Promise<
     async () => service.openAiStatus(),
   );
 
+  routes.post(
+    '/settings/openai/test',
+    {
+      preHandler: requireAdmin('support'),
+      schema: { tags: ['admin'], summary: 'Testa a chave da OpenAI com uma chamada real de 1 token', hide: true, response: { 200: z.any(), ...commonAdminErrors, 429: z.any(), 502: z.any() } },
+    },
+    async () => service.testOpenAiKey(),
+  );
+
   routes.put(
     '/settings/openai',
     {

@@ -144,7 +144,7 @@ export function BlogPage() {
         actions={
           can('support') ? (
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" className="btn btn--secondary" onClick={() => writeNow.mutate(undefined)} disabled={writeNow.isPending || !meta.data?.openAiConfigured} title={meta.data?.openAiConfigured ? 'A IA escreve um rascunho agora, com a próxima pauta' : 'Configure a chave da OpenAI em Avaliações'}>
+              <button type="button" className="btn btn--secondary" onClick={() => writeNow.mutate(undefined)} disabled={writeNow.isPending || !meta.data?.openAiConfigured} title={meta.data?.openAiConfigured ? 'A IA escreve um rascunho agora, com a próxima pauta' : 'Configure a chave da OpenAI em Inteligência artificial'}>
                 <Icon name="sparkle" size={16} /> {writeNow.isPending ? 'Escrevendo…' : 'Escrever com IA'}
               </button>
               <Link to="/blog/novo" className="btn btn--primary"><Icon name="plus" size={16} /> Novo post</Link>
@@ -211,7 +211,7 @@ export function BlogPage() {
               ) : (
                 <div className="stack">
                   {!meta.data.openAiConfigured && (
-                    <Notice tone="warning">Sem chave da OpenAI: a IA não escreve. Configure em <Link to="/avaliacoes">Avaliações › OpenAI</Link>; a mesma chave vale para o suporte e o blog.</Notice>
+                    <Notice tone="warning">Sem chave da OpenAI: a IA não escreve. Configure em <Link to="/ia">Inteligência artificial</Link>; a mesma chave vale para o blog, as avaliações e o atendimento.</Notice>
                   )}
                   <label className="checkbox">
                     <input type="checkbox" checked={settings?.aiEnabled ?? false} onChange={() => toggle('aiEnabled')} disabled={!can('support') || saveSettings.isPending} />
