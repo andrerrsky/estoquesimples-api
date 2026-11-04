@@ -109,8 +109,9 @@ docs/         contratos e decisões (web, Asaas, notificações, analytics,
 | [docs/images.md](docs/images.md) | fotos dos produtos: armazenamento, envio, sincronização, segurança e limites |
 | [docs/help.md](docs/help.md) | central de ajuda: onde fica o conteúdo e como alterar |
 | [docs/blog.md](docs/blog.md) | blog: posts, SEO no servidor, IA duas vezes por semana, push a cada post |
-| [docs/seguranca.md](docs/seguranca.md) | segurança, LGPD (exportação, exclusão, retenção), backup externo e roteiro de restauração, rotação de chaves |
+| [docs/seguranca.md](docs/seguranca.md) | segurança, LGPD (exportação, exclusão, retenção), backup externo (como está ligado hoje: Backblaze B2) e roteiro de restauração, rotação de chaves |
 | [docs/support.md](docs/support.md) · [docs/push.md](docs/push.md) · [docs/analytics.md](docs/analytics.md) | contratos para os clientes |
+| [marketing/README.md](marketing/README.md) | capturas, ícone e gráfico da Play Store, vídeos, miniaturas do YouTube e posts do Instagram |
 
 Segredos nunca entram no repositório: `.env` local é ignorado e a produção
 usa as variáveis do Railway. A única exceção deliberada é a chave de

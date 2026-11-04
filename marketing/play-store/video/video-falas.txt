@@ -1,0 +1,26 @@
+Falas por cena — estoque-simples-apresentacao-1920x1080-sem-voz.mp4 (1:05, sem áudio)
+Cada fala deve começar cerca de 0,4 s depois do início da cena.
+
+Abertura        0:00 – 0:07 (6,8 s)
+  Estoque Simples. Controle de estoque para o seu negócio, mesmo sem internet.
+
+Cena 1          0:07 – 0:16 (9,5 s)  Tela inicial e busca
+  Veja todos os seus produtos em um só lugar e encontre qualquer item por nome, SKU ou código de barras.
+
+Cena 2          0:16 – 0:26 (10,0 s) Entrada de estoque
+  Registrar uma entrada leva segundos: informe a quantidade, uma observação, e confirme.
+
+Cena 3          0:26 – 0:35 (8,3 s)  Filtro de estoque baixo
+  Defina o estoque mínimo de cada produto e saiba na hora o que está acabando.
+
+Cena 4          0:35 – 0:43 (8,5 s)  Histórico
+  Cada movimentação fica registrada no histórico, com a opção de desfazer.
+
+Cena 5          0:43 – 0:52 (9,0 s)  Relatórios
+  Nos relatórios, veja onde está o dinheiro do seu estoque e gere um PDF para compartilhar.
+
+Cena 6          0:52 – 0:59 (7,0 s)  Backup e planilha
+  Faça backup completo dos dados e exporte planilhas para o Excel ou Google Planilhas.
+
+Encerramento    0:59 – 1:05 (5,8 s)
+  Estoque Simples. Seu estoque sob controle, na palma da mão.

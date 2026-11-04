@@ -8,6 +8,7 @@ node_modules
 **/dist
 apps/android
 docs
+marketing
 *.md
 .env
 .env.*
