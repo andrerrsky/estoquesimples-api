@@ -394,7 +394,7 @@ describe('painel administrativo: visão geral e operação', () => {
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
-      if (url.startsWith('https://api.openai.com/v1/models')) return new Response('{}', { status: 200 });
+      if (url.startsWith('https://api.openai.com/v1/models')) return new Response(JSON.stringify({ data: [{ id: 'gpt-image-1' }] }), { status: 200 });
       if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { response_format?: unknown; messages: Array<{ content: string }> };
         const user = body.messages.at(-1)!.content;

@@ -46,7 +46,7 @@ describe('capa do post gerada pela IA', () => {
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
-      if (url.startsWith('https://api.openai.com/v1/models')) return new Response('{}', { status: 200 });
+      if (url.startsWith('https://api.openai.com/v1/models')) return new Response(JSON.stringify({ data: [{ id: 'gpt-4o-mini' }, { id: 'dall-e-3' }, { id: 'gpt-image-1' }] }), { status: 200 });
       if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
         const cena = { scene: 'Hands of a shop owner counting bags of roasted coffee on a wooden shelf in a small Brazilian grocery store, morning light through the window, shallow depth of field.', alt: 'Mãos contando pacotes de café numa prateleira de mercearia' };
         return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(cena) } }] }), { status: 200 });
@@ -106,6 +106,7 @@ describe('capa do post gerada pela IA', () => {
       ]);
       const mensagens = detail!.logs.map((line) => line.message);
       expect(mensagens.some((line) => line.startsWith('Cena: Hands of a shop owner'))).toBe(true);
+      expect(mensagens).toContain('Modelos de imagem disponíveis para a chave: gpt-image-1, dall-e-3.');
       expect(mensagens.some((line) => line.startsWith('gpt-image-1 indisponível para esta conta (403: Your organization must be verified'))).toBe(true);
       expect(mensagens).toContain('dall-e-3 recusou o parâmetro "response_format"; repetindo sem ele.');
       expect(mensagens.some((line) => /^Foto gerada com dall-e-3 \(o gpt-image-1 não está liberado/.test(line))).toBe(true);
@@ -120,6 +121,24 @@ describe('capa do post gerada pela IA', () => {
       expect({ width: meta.width, height: meta.height }).toEqual({ width: 1200, height: 630 });
     } finally {
       stop();
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('capa por IA sem modelo de imagem liberado', () => {
+  it('explica o que liberar no painel da OpenAI em vez de tentar às cegas', async () => {
+    const { OpenAiClient } = await import('../../src/modules/reviews/openai-client.js');
+    const realFetch = globalThis.fetch;
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith('https://api.openai.com/v1/models')) return new Response(JSON.stringify({ data: [{ id: 'gpt-4o-mini' }, { id: 'gpt-4o' }] }), { status: 200 });
+      if (url.startsWith('https://api.openai.com/v1/images')) throw new Error('não devia tentar gerar');
+      return realFetch(input, init);
+    });
+    try {
+      await expect(new OpenAiClient('sk-teste', 'gpt-4o-mini').generateImage('foto', { model: 'gpt-image-1', quality: 'medium' })).rejects.toThrow(/não tem acesso a nenhum modelo de imagem.*Settings › Project › Limits/);
+    } finally {
       spy.mockRestore();
     }
   });

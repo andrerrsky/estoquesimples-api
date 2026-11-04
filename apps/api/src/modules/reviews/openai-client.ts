@@ -236,11 +236,31 @@ export class OpenAiClient {
     options: { model: string; quality: 'low' | 'medium' | 'high'; onAttempt?: (message: string) => Promise<void> },
   ): Promise<{ bytes: Buffer; model: string; revisedPrompt: string | null }> {
     const onAttempt = options.onAttempt ?? (async () => undefined);
+    // Os modelos de imagem que esta chave enxerga: "does not exist" da OpenAI
+    // também quer dizer "o projeto desta chave não tem acesso", então tentar
+    // às cegas não diz nada. Ordem: o configurado, depois os mais novos.
+    const visible = await this.imageModels();
+    if (visible.length === 0) {
+      throw new AppError(
+        409,
+        ErrorCode.CONFLICT,
+        'Esta chave da OpenAI não tem acesso a nenhum modelo de imagem. Em platform.openai.com › Settings › Project › Limits, libere o gpt-image-1 (ou todos os modelos) para o projeto da chave; o gpt-image-1 também pede a organização verificada em Settings › Organization › General.',
+      );
+    }
+    const preference = [options.model, 'gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini', 'dall-e-3', 'dall-e-2'];
+    const ranked = [...visible].sort((a, b) => {
+      const rank = (id: string) => {
+        const index = preference.indexOf(id);
+        return index >= 0 ? index : id.startsWith('gpt-image') ? preference.length : preference.length + 1;
+      };
+      return rank(a) - rank(b);
+    });
+    await onAttempt(`Modelos de imagem disponíveis para a chave: ${ranked.join(', ')}.`);
     const bodyFor = (model: string): Record<string, unknown> =>
       model.startsWith('gpt-image')
         ? { model, prompt, n: 1, size: '1536x1024', quality: options.quality }
         : { model, prompt, n: 1, size: '1792x1024', quality: options.quality === 'high' ? 'hd' : 'standard', response_format: 'b64_json', style: 'natural' };
-    const models = [...new Set([options.model, 'dall-e-3'])];
+    const models = ranked.slice(0, 3);
     let lastResponse: Response | null = null;
     for (const model of models) {
       const body = bodyFor(model);
@@ -287,6 +307,14 @@ export class OpenAiClient {
     }
     if (lastResponse) await rejectIfFailed(lastResponse);
     throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Nenhum modelo de imagem da OpenAI aceitou o pedido.');
+  }
+
+  /** Ids dos modelos de imagem visíveis para a chave (GET /v1/models). */
+  async imageModels(): Promise<string[]> {
+    const response = await this.fetchWithTimeout('https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${this.apiKey}` } });
+    await rejectIfFailed(response);
+    const body = (await response.json()) as { data?: Array<{ id?: string }> };
+    return (body.data ?? []).map((item) => String(item.id ?? '')).filter((id) => /^(gpt-image|dall-e|chatgpt-image)/.test(id));
   }
 
   /** Texto livre (sem JSON): usado pelo blog para escrever uma seção por vez. */
