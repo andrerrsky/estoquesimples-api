@@ -16,7 +16,8 @@ name: Backup externo
 #   BACKUP_IMAGES_ACCESS_KEY_ID / BACKUP_IMAGES_SECRET_ACCESS_KEY  chave da cópia das fotos
 #   IMAGES_S3_ENDPOINT / IMAGES_S3_BUCKET / IMAGES_S3_ACCESS_KEY_ID / IMAGES_S3_SECRET_ACCESS_KEY  leitura do bucket das fotos
 #   API_BASE_URL / OPS_BACKUP_TOKEN   registram o resultado em /ops/backup (token que só faz isso)
-# Variável: BACKUP_IMAGES_VERSIONING_CONFIRMED=true quando o provedor não informa o versionamento pela API (B2).
+# Variáveis: BACKUP_IMAGES_VERSIONING_CONFIRMED=true quando o provedor não informa o versionamento pela API (B2);
+#            BACKUP_CONDITIONAL_WRITE=0 quando ele não aceita If-None-Match no PUT (B2).
 #
 # Credenciais ficam só no passo que as usa. Os passos com as chaves dos
 # buckets (dump, envio, fotos) rodam antes de qualquer código do npm entrar
@@ -102,6 +103,8 @@ jobs:
           RCLONE_CONFIG_BACKUP_REGION: ${{ secrets.BACKUP_S3_REGION }}
           RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
           RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          # "0" no B2 (não aceita If-None-Match); vazio ou "1" no S3.
+          BACKUP_CONDITIONAL_WRITE: ${{ vars.BACKUP_CONDITIONAL_WRITE }}
         run: bash "$BACKUP_SH" upload
 
       - name: Espelhar as fotos dos produtos
