@@ -70,7 +70,7 @@ export function SupportPage() {
   );
 
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <PageHeader title="Falar com o suporte" subtitle="Fale com a equipe do Estoque Simples. A resposta chega por aqui." actions={newTicket} />
 
       <Notice tone="info" action={<Link to="/app/ajuda" className="btn btn--secondary btn--sm">Abrir a central de ajuda</Link>}>
@@ -183,7 +183,7 @@ export function SupportNewPage() {
   const messageError = error instanceof ApiError ? error.fieldError('message') : undefined;
 
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <PageHeader
         crumbs={[{ label: 'Suporte', to: '/app/suporte' }, { label: 'Nova solicitação' }]}
         title="Nova solicitação"
@@ -344,7 +344,7 @@ function TicketConversation({ ticketId }: { ticketId: string }) {
   // 400: o endereço não tem um identificador válido. Para a pessoa, dá no mesmo.
   if (detail.error instanceof ApiError && (detail.error.status === 404 || detail.error.status === 400)) {
     return (
-      <div className="page page--narrow">
+      <div className="page">
         <PageHeader crumbs={crumbs} title="Solicitação não encontrada" />
         <Card>
           <Empty icon="help" title="Não encontramos esta solicitação" actions={<Link to="/app/suporte" className="btn btn--secondary">Ver minhas solicitações</Link>}>
@@ -357,7 +357,7 @@ function TicketConversation({ ticketId }: { ticketId: string }) {
 
   if (!ticket) {
     return (
-      <div className="page page--narrow">
+      <div className="page">
         <PageHeader crumbs={crumbs} title="Solicitação" />
         <Card flush>
           <QueryState loading={detail.isLoading} error={detail.error} onRetry={() => void detail.refetch()} />
@@ -370,7 +370,7 @@ function TicketConversation({ ticketId }: { ticketId: string }) {
   const resolved = ticket.status === 'resolved';
 
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <PageHeader
         crumbs={crumbs}
         title={

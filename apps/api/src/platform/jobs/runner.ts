@@ -22,6 +22,13 @@ export interface JobContext {
   services: AppServices;
   logger: Logger;
   attempt: number;
+  /**
+   * Conta em que passo a tarefa está ("escrevendo o post", por exemplo).
+   * Fica gravado na própria linha da fila, que o painel mostra em
+   * Operação › Fila de tarefas enquanto a tarefa roda. Nunca falha: um erro
+   * ao anotar o passo não pode derrubar a tarefa.
+   */
+  progress: (step: string) => Promise<void>;
 }
 
 export type JobHandler = (payload: Record<string, unknown>, context: JobContext) => Promise<void>;
@@ -83,13 +90,14 @@ async function claimAndRun(
         SELECT id FROM jobs
         WHERE completed_at IS NULL
           AND failed_at IS NULL
+          AND locked_at IS NULL
           AND run_at <= now()
         ORDER BY run_at
         FOR UPDATE SKIP LOCKED
         LIMIT 1
       )
       UPDATE jobs
-      SET locked_at = now(), locked_by = ${workerId}, attempts = attempts + 1
+      SET locked_at = now(), locked_by = ${workerId}, attempts = attempts + 1, progress = NULL, progress_at = NULL
       WHERE id IN (SELECT id FROM next_job)
       RETURNING id, kind, payload, attempts, max_attempts
     `);
@@ -108,8 +116,20 @@ async function claimAndRun(
     return true;
   }
 
+  const progress = async (step: string): Promise<void> => {
+    try {
+      await db
+        .update(jobs)
+        .set({ progress: step.slice(0, 200), progressAt: new Date() })
+        .where(sql`${jobs.id} = ${claimed.id}`);
+      logger.info({ kind: claimed.kind, jobId: claimed.id, passo: step }, 'tarefa avançou');
+    } catch (error) {
+      logger.warn({ err: error, jobId: claimed.id }, 'não foi possível anotar o passo da tarefa');
+    }
+  };
+
   try {
-    await handler(claimed.payload ?? {}, { services, logger, attempt: claimed.attempts });
+    await handler(claimed.payload ?? {}, { services, logger, attempt: claimed.attempts, progress });
     recordJobResult(claimed.kind, 'ok');
     await db
       .update(jobs)
@@ -153,7 +173,8 @@ async function claimAndRun(
 }
 
 /**
- * Libera tarefas presas: se uma instância morreu no meio do processamento,
+ * Libera tarefas presas (a consulta de cima pula o que está com `locked_at`,
+ * então sem isto uma tarefa cuja instância morreu nunca mais rodaria): se uma instância morreu no meio do processamento,
  * o lock ficaria para sempre. Trinta minutos é folgado o suficiente para não
  * atropelar uma tarefa realmente lenta.
  */

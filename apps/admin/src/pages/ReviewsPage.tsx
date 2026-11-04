@@ -19,6 +19,7 @@ interface Stats {
   distribution: Record<string, number>;
   last30d: number;
   lastFetchedAt: string | null;
+  lastSync: { at: string; fetched: number; created: number; updated: number; error: string | null } | null;
   playConfigured: boolean;
   openAiConfigured: boolean;
 }
@@ -96,9 +97,19 @@ export function ReviewsPage() {
       {s && !s.playConfigured && (
         <Notice tone="warning" title="Google Play não configurado">Sem a conta de serviço a API não consegue ler nem responder avaliações.</Notice>
       )}
+      {s && s.playConfigured && s.lastSync?.error && (
+        <Notice tone="error" title="A última busca no Google falhou">
+          <Time value={s.lastSync.at} />: {s.lastSync.error}
+        </Notice>
+      )}
       {s && s.playConfigured && s.total === 0 && (
         <Notice tone="info" title="Nenhuma avaliação guardada ainda">
-          O Google só devolve avaliações com comentário dos últimos 7 dias; a coleta roda a cada 6 horas e você pode buscar agora. Avaliações só com estrelas não aparecem aqui.
+          {s.lastSync && !s.lastSync.error ? (
+            <>
+              A última busca (<Time value={s.lastSync.at} />) chegou ao Google e ele devolveu <strong>{fmtNumber(s.lastSync.fetched)}</strong> avaliação(ões).{' '}
+            </>
+          ) : null}
+          A API do Google só devolve avaliações <strong>com comentário escrito nos últimos 7 dias</strong>; as mais antigas que aparecem na página da Play Store (de anos atrás) não vêm por ela, e avaliações só com estrelas também não. A coleta roda a cada 6 horas; a partir da próxima avaliação com texto, ela aparece aqui.
         </Notice>
       )}
 

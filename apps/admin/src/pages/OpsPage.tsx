@@ -31,8 +31,12 @@ interface Job {
   completedAt: string | null;
   failedAt: string | null;
   lastError: string | null;
+  progress: string | null;
+  progressAt: string | null;
+  dismissedAt: string | null;
+  dismissedBy: string | null;
   createdAt: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'dismissed';
 }
 
 const ALERT_LABEL: Record<string, string> = {
@@ -195,18 +199,55 @@ export function OpsPage() {
   );
 }
 
+/** Quanto tempo uma tarefa está rodando, para a pessoa ver que ela não travou. */
+function elapsedSince(iso: string | null): string {
+  if (!iso) return '';
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  return fmtDuration(seconds);
+}
+
+/**
+ * O que está rodando neste instante (IA escrevendo um post, coleta de
+ * avaliações…), com o passo informado pela própria tarefa. Consulta a cada
+ * 5 s enquanto a tela está aberta; some quando não há nada em execução.
+ */
+function RunningNow() {
+  const query = useQuery({
+    queryKey: ['ops', 'jobs', 'running'],
+    queryFn: () => api.get<Paginated<Job>>('/ops/jobs', { status: 'running', page: 1, pageSize: 10 }),
+    refetchInterval: 5_000,
+  });
+  const items = query.data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Notice tone="info" title={items.length === 1 ? 'Uma tarefa em execução agora' : `${items.length} tarefas em execução agora`}>
+      <ul style={{ margin: 0, paddingLeft: 18 }}>
+        {items.map((job) => (
+          <li key={job.id}>
+            <strong>{JOB_KIND[job.kind] ?? job.kind}</strong> · começou há {elapsedSince(job.lockedAt)} · tentativa {job.attempts}/{job.maxAttempts}
+            {job.progress ? <> · <em>{job.progress}</em> (há {elapsedSince(job.progressAt)})</> : ' · sem passo informado'}
+          </li>
+        ))}
+      </ul>
+    </Notice>
+  );
+}
+
 function JobsCard() {
   const { can } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<'failed' | 'pending' | 'completed' | ''>('failed');
+  const [filter, setFilter] = useState<'failed' | 'pending' | 'running' | 'completed' | 'dismissed' | ''>('failed');
   const [page, setPage] = useState(1);
   const [cancelId, setCancelId] = useState<string | null>(null);
+  const [dismissId, setDismissId] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ['ops', 'jobs', filter, page],
     queryFn: () => api.get<Paginated<Job>>('/ops/jobs', { status: filter || undefined, page, pageSize: 25 }),
     placeholderData: (previous) => previous,
+    // Em execução: a lista muda a cada passo, então acompanha de perto.
+    refetchInterval: filter === 'running' ? 5_000 : 30_000,
   });
 
   const retry = async (id: string) => {
@@ -227,12 +268,15 @@ function JobsCard() {
       actions={
         <select className="select select--sm" value={filter} onChange={(event) => { setFilter(event.target.value as typeof filter); setPage(1); }}>
           <option value="failed">Falhas</option>
+          <option value="running">Em execução</option>
           <option value="pending">Na fila</option>
           <option value="completed">Concluídas</option>
+          <option value="dismissed">Descartadas</option>
           <option value="">Todas</option>
         </select>
       }
     >
+      <div style={{ padding: '12px 18px 0' }}><RunningNow /></div>
       <div className="table-wrap">
         <table className="table table--compact">
           <thead><tr><th>Tarefa</th><th>Situação</th><th className="num">Tentativas</th><th>Agendada</th><th>Terminou</th><th>Erro</th><th></th></tr></thead>
@@ -245,13 +289,18 @@ function JobsCard() {
               query.data?.items.map((job) => (
                 <tr key={job.id}>
                   <td><div className="cell-main">{JOB_KIND[job.kind] ?? job.kind}</div>{job.uniqueKey && <div className="cell-sub mono">{job.uniqueKey}</div>}</td>
-                  <td><Badge tone={JOB_STATUS[job.status]?.tone}>{JOB_STATUS[job.status]?.label}</Badge></td>
+                  <td>
+                    <Badge tone={JOB_STATUS[job.status]?.tone}>{JOB_STATUS[job.status]?.label}</Badge>
+                    {job.status === 'running' && <div className="cell-sub">{job.progress ?? 'rodando'} · há {elapsedSince(job.progressAt ?? job.lockedAt)}</div>}
+                    {job.status === 'dismissed' && <div className="cell-sub">por {job.dismissedBy ?? '—'} · <Time value={job.dismissedAt} /></div>}
+                  </td>
                   <td className="num">{job.attempts}/{job.maxAttempts}</td>
                   <td><Time value={job.runAt} /></td>
                   <td><Time value={job.completedAt ?? job.failedAt} /></td>
                   <td className="muted small" style={{ maxWidth: 320 }}>{job.lastError ?? '—'}</td>
                   <td className="nowrap">
-                    {can('support') && job.status === 'failed' && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void retry(job.id)}>Repetir</button>}
+                    {can('support') && (job.status === 'failed' || job.status === 'dismissed') && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void retry(job.id)}>Repetir</button>}
+                    {can('support') && job.status === 'failed' && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDismissId(job.id)}>Ignorar</button>}
                     {can('support') && job.status === 'pending' && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCancelId(job.id)}>Cancelar</button>}
                   </td>
                 </tr>
@@ -272,6 +321,19 @@ function JobsCard() {
           if (!cancelId) return;
           await api.post(`/ops/jobs/${cancelId}/cancel`, { reason });
           toast.push('Tarefa cancelada.', 'success');
+          void queryClient.invalidateQueries({ queryKey: ['ops'] });
+        }}
+      />
+      <ConfirmDialog
+        open={dismissId !== null}
+        onClose={() => setDismissId(null)}
+        title="Ignorar tarefa falha"
+        description="A tarefa sai da lista de falhas e do alerta, sem ser repetida. O motivo fica na auditoria e no log do servidor; dá para repetir depois pelo filtro Descartadas."
+        confirmLabel="Ignorar"
+        onConfirm={async (reason) => {
+          if (!dismissId) return;
+          await api.post(`/ops/jobs/${dismissId}/dismiss`, { reason });
+          toast.push('Tarefa descartada.', 'success');
           void queryClient.invalidateQueries({ queryKey: ['ops'] });
         }}
       />

@@ -33,12 +33,12 @@ const queryClient = new QueryClient({
   },
 });
 
-// O estoque (lista, histórico, relatórios) se atualiza sozinho a cada 30 s
+// O estoque (lista, histórico, relatórios) se atualiza sozinho a cada 15 s
 // enquanto a aba está visível: quem registra uma saída no celular vê o saldo
 // mudar aqui sem recarregar. Em segundo plano a aba não gasta rede; ao voltar
 // o foco, o refetchOnWindowFocus acima já traz tudo de uma vez.
 queryClient.setQueryDefaults(['inventory'], {
-  refetchInterval: 30_000,
+  refetchInterval: 15_000,
   refetchIntervalInBackground: false,
 });
 

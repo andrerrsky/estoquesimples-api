@@ -8,7 +8,7 @@ type State = 'idle' | 'syncing' | 'done' | 'error' | 'offline';
 /**
  * Ícone de atualização na barra superior, ao lado do sino.
  *
- * O estoque já se atualiza sozinho (a cada 30 s e ao voltar para a aba); o
+ * O estoque já se atualiza sozinho (a cada 15 s e ao voltar para a aba); o
  * ícone mostra quando isso está acontecendo e deixa a pessoa forçar agora,
  * sem sair da tela. Estados: em dia (nuvem com check), atualizando (setas
  * girando — tanto no toque quanto na rodada automática), falhou (nuvem

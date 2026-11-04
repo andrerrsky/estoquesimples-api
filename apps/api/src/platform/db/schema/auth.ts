@@ -193,6 +193,12 @@ export const jobs = pgTable(
     completedAt: timestamp('completed_at', tz),
     failedAt: timestamp('failed_at', tz),
     lastError: text('last_error'),
+    /** Passo atual de uma tarefa longa, informado pelo handler (painel). */
+    progress: text('progress'),
+    progressAt: timestamp('progress_at', tz),
+    /** Falha descartada pelo painel: sai da lista sem ser repetida. */
+    dismissedAt: timestamp('dismissed_at', tz),
+    dismissedBy: text('dismissed_by'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   },
   (table) => [

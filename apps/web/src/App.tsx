@@ -6,7 +6,7 @@ import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
 import { importPage } from './lib/chunks';
 import { resetZoom } from './lib/viewport';
-import { listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
+import { ensureServiceWorker, listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
 import { useAuth } from './auth/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
 import { CookieConsent } from './components/CookieConsent';
@@ -98,6 +98,9 @@ function Root() {
   // o app já aberto navega por aqui, sem recarregar a página.
   const { status } = useAuth();
   const navigate = useNavigate();
+  useEffect(() => {
+    ensureServiceWorker();
+  }, []);
   useEffect(() => {
     if (status !== 'loading') void refreshPushSubscription();
   }, [status]);

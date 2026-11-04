@@ -253,7 +253,7 @@ function PlatformsGuide({ standalone }: { standalone: boolean }) {
 /** Dentro da aplicação (com o menu ao lado). */
 export function PlatformsPage() {
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <PageHeader title="Plataformas" subtitle="Onde o Estoque Simples funciona e como instalar no iPhone, no iPad e no computador." />
       <PlatformsGuide standalone={false} />
     </div>

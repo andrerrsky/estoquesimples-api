@@ -7,6 +7,50 @@ import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { Badge, Card, Empty, errorMessage, KeyValue, Notice, PageHeader, Pagination, Skeleton, Tabs, Time, useToast } from '../components/ui';
 import { useListParams } from '../lib/hooks';
+import { fmtDuration } from '../lib/format';
+
+interface RunningJob {
+  id: string;
+  kind: string;
+  attempts: number;
+  maxAttempts: number;
+  lockedAt: string | null;
+  progress: string | null;
+  progressAt: string | null;
+}
+
+function since(iso: string | null): string {
+  if (!iso) return '';
+  return fmtDuration(Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000)));
+}
+
+/**
+ * A IA está escrevendo agora? Lê a fila (Operação) a cada 5 s e mostra o
+ * passo que a tarefa informou, para ninguém disparar outra escrita por cima
+ * nem ficar sem saber se travou. Some quando não há nada rodando.
+ */
+function AiActivity({ writing }: { writing: boolean }) {
+  const query = useQuery({
+    queryKey: ['ops', 'jobs', 'running', 'blog.ai_write'],
+    queryFn: () => api.get<Paginated<RunningJob>>('/ops/jobs', { status: 'running', kind: 'blog.ai_write', page: 1, pageSize: 5 }),
+    refetchInterval: 5_000,
+  });
+  const job = query.data?.items[0];
+  if (!job && !writing) return null;
+  return (
+    <Notice tone="info" title="A IA está escrevendo um post agora">
+      {job ? (
+        <>
+          Tarefa agendada da fila, começou há {since(job.lockedAt)} (tentativa {job.attempts}/{job.maxAttempts}).
+          {job.progress ? <> Passo atual: <strong>{job.progress}</strong>, há {since(job.progressAt)}.</> : ' Ainda sem passo informado.'}
+          {' '}Detalhes e log em <Link to="/operacao">Operação › Fila de tarefas</Link>.
+        </>
+      ) : (
+        'Pedido pelo botão "Escrever com IA": a resposta chega aqui em até um minuto; o rascunho aparece na lista.'
+      )}
+    </Notice>
+  );
+}
 
 export interface BlogPostRow {
   id: string;
@@ -108,6 +152,8 @@ export function BlogPage() {
           ) : undefined
         }
       />
+
+      <AiActivity writing={writeNow.isPending} />
 
       <Tabs value={tab} onChange={(next) => set({ tab: next })} items={[{ key: 'posts', label: 'Posts', count: posts.data?.total }, { key: 'ia', label: 'IA e configurações' }]} />
 

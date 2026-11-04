@@ -13,7 +13,7 @@ const fromArticle = (pathname: string) => (articleId: string | null) => ({ from:
 export function HelpPage() {
   const { pathname } = useLocation();
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <PageHeader
         title="Central de ajuda"
         subtitle="Como o Estoque Simples funciona, em poucas palavras. Busque a sua dúvida ou escolha um assunto."

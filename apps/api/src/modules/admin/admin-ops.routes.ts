@@ -48,7 +48,7 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         db.execute<{ kind: string; pending: number; failed: number; completed_24h: number; last_completed: string | null; last_error: string | null }>(sql`
           SELECT kind,
                  count(*) FILTER (WHERE completed_at IS NULL AND failed_at IS NULL)::int AS pending,
-                 count(*) FILTER (WHERE failed_at IS NOT NULL)::int AS failed,
+                 count(*) FILTER (WHERE failed_at IS NOT NULL AND dismissed_at IS NULL)::int AS failed,
                  count(*) FILTER (WHERE completed_at > now() - interval '24 hours')::int AS completed_24h,
                  max(completed_at) AS last_completed,
                  (SELECT last_error FROM jobs j2 WHERE j2.kind = jobs.kind AND j2.last_error IS NOT NULL ORDER BY j2.created_at DESC LIMIT 1) AS last_error
@@ -149,7 +149,7 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         summary: 'Fila de tarefas',
         hide: true,
         querystring: paginationQuerySchema.extend({
-          status: z.enum(['pending', 'failed', 'completed', 'running']).optional(),
+          status: z.enum(['pending', 'failed', 'completed', 'running', 'dismissed']).optional(),
           kind: z.string().max(80).optional(),
         }),
         response: { 200: z.any(), ...commonAdminErrors },
@@ -161,7 +161,8 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
       if (f.kind) conditions.push(sql`j.kind = ${f.kind}`);
       if (f.status === 'pending') conditions.push(sql`j.completed_at IS NULL AND j.failed_at IS NULL AND j.locked_at IS NULL`);
       if (f.status === 'running') conditions.push(sql`j.completed_at IS NULL AND j.failed_at IS NULL AND j.locked_at IS NOT NULL`);
-      if (f.status === 'failed') conditions.push(sql`j.failed_at IS NOT NULL`);
+      if (f.status === 'failed') conditions.push(sql`j.failed_at IS NOT NULL AND j.dismissed_at IS NULL`);
+      if (f.status === 'dismissed') conditions.push(sql`j.dismissed_at IS NOT NULL`);
       if (f.status === 'completed') conditions.push(sql`j.completed_at IS NOT NULL`);
       const where = sql.join(conditions, sql` AND `);
 
@@ -170,6 +171,7 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
           id: string; kind: string; payload: Record<string, unknown>; unique_key: string | null; run_at: string; attempts: number;
           max_attempts: number; locked_at: string | null; locked_by: string | null; completed_at: string | null;
           failed_at: string | null; last_error: string | null; created_at: string;
+          progress: string | null; progress_at: string | null; dismissed_at: string | null; dismissed_by: string | null;
         }>(sql`
           SELECT j.* FROM jobs j WHERE ${where}
           ORDER BY coalesce(j.failed_at, j.completed_at, j.run_at) DESC LIMIT ${f.pageSize} OFFSET ${offsetOf(f)}
@@ -191,8 +193,12 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
           completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
           failedAt: row.failed_at ? new Date(row.failed_at).toISOString() : null,
           lastError: row.last_error,
+          progress: row.progress,
+          progressAt: row.progress_at ? new Date(row.progress_at).toISOString() : null,
+          dismissedAt: row.dismissed_at ? new Date(row.dismissed_at).toISOString() : null,
+          dismissedBy: row.dismissed_by,
           createdAt: new Date(row.created_at).toISOString(),
-          status: row.failed_at ? 'failed' : row.completed_at ? 'completed' : row.locked_at ? 'running' : 'pending',
+          status: row.dismissed_at ? 'dismissed' : row.failed_at ? 'failed' : row.completed_at ? 'completed' : row.locked_at ? 'running' : 'pending',
         })),
         page: f.page,
         pageSize: f.pageSize,
@@ -311,7 +317,7 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
 
         await tx
           .update(jobs)
-          .set({ failedAt: null, attempts: 0, runAt: new Date(), lockedAt: null, lockedBy: null })
+          .set({ failedAt: null, attempts: 0, runAt: new Date(), lockedAt: null, lockedBy: null, dismissedAt: null, dismissedBy: null })
           .where(eq(jobs.id, job.id));
         await recordAdminAudit(tx, {
           actor: adminActor(request),
@@ -359,6 +365,45 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
         });
       });
       return { message: 'Tarefa cancelada.' };
+    },
+  );
+
+  routes.post(
+    '/ops/jobs/:jobId/dismiss',
+    {
+      preHandler: requireAdmin('support'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Descarta uma tarefa falha (sai da lista, sem repetir)',
+        hide: true,
+        params: uuidParam('jobId'),
+        body: reasonBodySchema,
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      const actor = adminActor(request);
+      await db.transaction(async (tx) => {
+        const rows = await tx.select().from(jobs).where(eq(jobs.id, request.params.jobId)).limit(1).for('update');
+        const job = rows[0];
+        if (!job) throw notFound('Tarefa não encontrada.');
+        if (!job.failedAt) throw conflict(ErrorCode.CONFLICT, 'Só tarefas falhas podem ser descartadas.');
+        if (job.dismissedAt) throw conflict(ErrorCode.CONFLICT, 'A tarefa já foi descartada.');
+
+        await tx
+          .update(jobs)
+          .set({ dismissedAt: new Date(), dismissedBy: actor.email })
+          .where(eq(jobs.id, job.id));
+        await recordAdminAudit(tx, {
+          actor,
+          action: AdminAction.OPS_JOB_DISMISSED,
+          targetType: 'job',
+          targetId: job.id,
+          metadata: { kind: job.kind, uniqueKey: job.uniqueKey, lastError: job.lastError, reason: request.body.reason },
+        });
+      });
+      request.log.info({ jobId: request.params.jobId, admin: actor.email, motivo: request.body.reason }, 'tarefa falha descartada pelo painel');
+      return { message: 'Tarefa descartada. Ela fica no histórico (filtro "Descartadas") e na auditoria.' };
     },
   );
 }

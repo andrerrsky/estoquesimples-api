@@ -61,7 +61,8 @@
         android:paddingRight="@dimen/screen_padding_horizontal"
         android:paddingTop="@dimen/field_gap"
         android:paddingBottom="@dimen/field_gap"
-        android:clipToPadding="false" />
+        android:clipToPadding="false"
+        android:scrollbarStyle="outsideOverlay" />
 
     <include layout="@layout/include_bottom_nav" />
 
