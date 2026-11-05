@@ -258,7 +258,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/field_gap"
                 android:text="Adicionar meu primeiro produto"
-                android:textColor="@color/color_brand"
+                android:textColor="@color/color_brand_ink"
                 android:textStyle="bold"
                 android:textSize="15sp" />
 
@@ -292,7 +292,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/field_gap"
                 android:text="Ver configurações do app"
-                android:textColor="@color/color_brand"
+                android:textColor="@color/color_brand_ink"
                 android:textStyle="bold"
                 android:textSize="15sp" />
 
@@ -328,7 +328,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/field_gap"
                 android:text="Limpar busca"
-                android:textColor="@color/color_brand"
+                android:textColor="@color/color_brand_ink"
                 android:textStyle="bold"
                 android:textSize="15sp" />
 

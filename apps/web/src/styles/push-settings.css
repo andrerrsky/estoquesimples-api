@@ -26,7 +26,7 @@
   height: 40px;
   border-radius: 50%;
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .push-settings--on .push-settings__icon {
   background: var(--success-soft);

@@ -29,7 +29,7 @@ type Source = 'workspace' | 'public';
 const STORAGE_KEY = 'es_web_brand';
 const DEFAULT_THEME_COLOR = '#1C679D';
 const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
-const VARIABLES = ['--brand', '--brand-dark', '--brand-pressed', '--brand-soft', '--brand-tint', '--on-brand', '--accent', '--series-1', '--info', '--text', '--text-muted', '--focus-ring', '--font'] as const;
+const VARIABLES = ['--brand', '--brand-dark', '--brand-pressed', '--brand-soft', '--brand-tint', '--on-brand', '--on-brand-muted', '--brand-ink', '--brand-ink-dark', '--accent', '--series-1', '--info', '--text', '--text-muted', '--focus-ring', '--font'] as const;
 
 let current: ActiveBrand | null = null;
 let source: Source | null = null;
@@ -50,7 +50,8 @@ const HEX = /^#[0-9a-f]{6}$/i;
 /** Defesa em profundidade: o tema vem da API, mas só entra no CSS o que é cor válida. */
 function valid(theme: BrandTheme | null | undefined): theme is BrandTheme {
   if (!theme) return false;
-  return [theme.primary, theme.primaryDark, theme.primaryPressed, theme.primarySoft, theme.primaryTint, theme.onPrimary, theme.accent, theme.text, theme.textMuted].every((color) => HEX.test(color));
+  const optional = [theme.primaryInk, theme.primaryInkDark].filter((color): color is string => color !== undefined);
+  return [theme.primary, theme.primaryDark, theme.primaryPressed, theme.primarySoft, theme.primaryTint, theme.onPrimary, theme.accent, theme.text, theme.textMuted, ...optional].every((color) => HEX.test(color));
 }
 
 function rgba(hex: string, alpha: number): string {
@@ -74,12 +75,15 @@ function paint(brand: ActiveBrand | null): void {
   set('--brand-soft', theme.primarySoft);
   set('--brand-tint', theme.primaryTint);
   set('--on-brand', theme.onPrimary);
+  set('--on-brand-muted', rgba(theme.onPrimary, 0.75));
+  set('--brand-ink', theme.primaryInk ?? theme.primary);
+  set('--brand-ink-dark', theme.primaryInkDark ?? theme.primaryDark);
   set('--accent', theme.accent);
   set('--series-1', theme.accent);
   set('--info', theme.accent);
   set('--text', theme.text);
   set('--text-muted', theme.textMuted);
-  set('--focus-ring', `0 0 0 3px ${rgba(theme.primary, 0.3)}`);
+  set('--focus-ring', `0 0 0 3px ${rgba(theme.primaryInk ?? theme.primary, 0.35)}`);
   if (theme.font === 'serif') set('--font', SERIF);
   else root.style.removeProperty('--font');
   root.dataset.brand = brand.slug;

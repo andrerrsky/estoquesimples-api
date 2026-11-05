@@ -35,7 +35,7 @@
   height: 46px;
   border-radius: var(--radius-panel);
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .plat-card__title {
   display: flex;
@@ -121,7 +121,7 @@
 .plat-inline {
   display: inline-block;
   vertical-align: -3px;
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .plat-note {
   display: flex;
@@ -158,7 +158,7 @@
   padding: 14px 16px;
   border-radius: var(--radius-panel);
   background: var(--brand-soft);
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 .plat-oneclick > div {
   display: flex;

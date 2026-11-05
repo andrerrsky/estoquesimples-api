@@ -2,6 +2,8 @@
 <resources>
     <!-- Paleta única (referência: tela Assinatura) -->
     <color name="color_brand">#1C679D</color>
+    <!-- A cor da marca como texto sobre fundo claro (marca clara: versão escurecida da API). -->
+    <color name="color_brand_ink">@color/color_brand</color>
     <color name="color_brand_dark">#15537E</color>
     <!-- Destaque (links, valores em evidência): igual à cor principal até a empresa escolher outra. -->
     <color name="color_accent">#1C679D</color>

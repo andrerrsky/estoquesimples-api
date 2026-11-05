@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { contrast, normalizeSlug, slugProblem } from '../../src/modules/branding/brand-rules.js';
+import { colorProblems, contrast, deriveTheme, normalizeSlug, slugProblem } from '../../src/modules/branding/brand-rules.js';
 import { workspaceMembers } from '../../src/platform/db/schema/index.js';
 import { createTestApp, registerUser, resetDatabase, type RegisteredUser, type TestContext } from '../helpers/test-app.js';
 
@@ -61,6 +61,26 @@ describe('regras puras', () => {
     expect(contrast('#ffffff', '#000000')).toBeCloseTo(21, 0);
     expect(contrast('#1c679d', '#ffffff')).toBeGreaterThan(4.5);
   });
+  it('aceita cor principal clara: texto escuro por cima e versão escurecida para texto', () => {
+    expect(colorProblems({ primary: '#c7e8ff', accent: null, text: null })).toEqual([]);
+    const theme = deriveTheme({ primary: '#c7e8ff', accent: null, text: null, font: 'default' });
+    expect(theme.onPrimary).not.toBe('#ffffff');
+    for (const background of [theme.primary, theme.primaryDark, theme.primaryPressed]) expect(contrast(background, theme.onPrimary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme.primaryInk, '#ffffff')).toBeGreaterThanOrEqual(5);
+    expect(contrast(theme.primaryInkDark, '#ffffff')).toBeGreaterThanOrEqual(5);
+    // Sem destaque escolhido, links usam a versão legível.
+    expect(theme.accent).toBe(theme.primaryInk);
+    // Qualquer cor principal produz texto legível por cima.
+    for (const color of ['#ffff00', '#777777', '#7f7f7f', '#00ff00', '#ff8800', '#000000', '#ffffff']) {
+      const t = deriveTheme({ primary: color, accent: null, text: null, font: 'default' });
+      expect(contrast(t.primary, t.onPrimary)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.primaryInk, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it('cor escura continua igual: texto branco e a própria cor como texto', () => {
+    const theme = deriveTheme({ primary: '#1c679d', accent: null, text: null, font: 'default' });
+    expect(theme).toMatchObject({ onPrimary: '#ffffff', primaryInk: '#1c679d', accent: '#1c679d' });
+  });
 });
 
 describe('identidade visual por empresa', () => {
@@ -80,18 +100,19 @@ describe('identidade visual por empresa', () => {
     const ws = await workspaceOf(owner);
     await subscribe(ws, 't-brand');
 
-    // Contraste insuficiente: recusa com sugestão.
-    const light = await save(ws, owner, { primaryColor: '#ffd54f' });
+    // Cor principal clara é aceita; destaque (links) claro demais é recusado com sugestão.
+    expect((await save(ws, owner, { primaryColor: '#ffd54f' })).statusCode).toBe(200);
+    const light = await save(ws, owner, { accentColor: '#ffd54f' });
     expect(light.statusCode).toBe(422);
     expect(light.json().error.code).toBe('BRAND_INVALID');
-    expect(light.json().error.suggestions?.primary).toMatch(/^#[0-9a-f]{6}$/);
+    expect(light.json().error.suggestions?.accent).toMatch(/^#[0-9a-f]{6}$/);
     expect((await save(ws, owner, { textColor: '#999999' })).statusCode).toBe(422);
     expect((await save(ws, owner, { primaryColor: 'azul' })).statusCode).toBe(400);
     expect((await save(ws, owner, { slug: 'admin' })).statusCode).toBe(422);
 
     const ok = await save(ws, owner, { accentColor: '#0b5d3b', textColor: '#101820', font: 'serif' });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json()).toMatchObject({ slug: 'padaria-ze', primaryColor: '#8a2be2', font: 'serif', version: 1 });
+    expect(ok.json()).toMatchObject({ slug: 'padaria-ze', primaryColor: '#8a2be2', font: 'serif', version: 2 });
 
     const ent = await entitlement(ws, owner);
     expect(ent.branding).toMatchObject({ eligible: true, active: true, slug: 'padaria-ze', loginPath: '/padaria-ze/entrar' });

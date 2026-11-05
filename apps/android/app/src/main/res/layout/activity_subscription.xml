@@ -267,7 +267,7 @@
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp"
                 android:text="@string/subscription_legacy_restore"
-                android:textColor="@color/color_brand"
+                android:textColor="@color/color_brand_ink"
                 android:textSize="13sp" />
         </LinearLayout>
 

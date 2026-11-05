@@ -59,7 +59,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--brand);
+  color: var(--brand-ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

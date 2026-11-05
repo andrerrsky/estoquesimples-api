@@ -43,12 +43,24 @@ números, fora da lista de reservados (rotas do produto, `admin`, `api`,
 `suporte`, `oficial`…), único. Nunca é o nome da empresa cru (a tela sugere a
 versão normalizada). Trocar: o antigo fica reservado e redireciona.
 
-**Cores** — só `#RRGGBB`. Contraste mínimo (WCAG 2.x): principal **4,5:1**
-com branco (é fundo de texto branco *e* cor de texto), destaque **4,5:1**,
-texto **7:1** (contra branco e contra o fundo `#f4f7fa`). Reprovada → 422
-`BRAND_INVALID` com `suggestions` (versão escurecida). A API deriva a paleta
-(escura, pressionada, suave, tinta, texto secundário ≥ 4,5:1): clientes só
-aplicam. Cores semânticas (sucesso, alerta, erro) **não** são personalizáveis.
+**Cores** — só `#RRGGBB`. Contraste mínimo (WCAG 2.2 AA) só para o que é
+texto: destaque **4,5:1** com branco (links e números) e texto **4,5:1**
+(contra branco e contra o fundo `#f4f7fa`). Reprovada → 422 `BRAND_INVALID`
+com `suggestions` (versão escurecida, mesmo tom).
+
+A **principal** pode ser clara ou escura (desde 11/2026):
+- `onPrimary`, o texto por cima dela, sai branco ou escuro (`#1a2330`, ou
+  preto), o que passar de 4,5:1. Uma das opções sempre passa.
+- `primaryInk` é a principal usada como texto sobre fundo claro (aba ativa,
+  links, botão secundário). É a própria cor quando ela tem 4,5:1 com o branco;
+  se for clara, é uma versão escurecida no mesmo tom (≥ 5:1). Na web vira
+  `--brand-ink` / `--brand-ink-dark`; no Android, `color_brand_ink`.
+- Sem destaque escolhido, o destaque é o `primaryInk`.
+- Hover e pressionado escurecem a principal sem deixar `onPrimary` abaixo de
+  4,5:1. No Android, barra de status com cor clara usa ícones escuros.
+
+A API deriva a paleta (escura, pressionada, suave, tinta, texto secundário
+≥ 4,5:1): clientes só aplicam. Cores semânticas (sucesso, alerta, erro) **não** são personalizáveis.
 
 **Fonte** — `default` ou `serif`, sempre fontes já instaladas no aparelho
 (a CSP não admite fonte de terceiros, e isso evita rastreio).
