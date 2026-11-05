@@ -79,6 +79,46 @@ publicados (`lastmod`);
 `/blog/feed.xml` é RSS 2.0. `Cache-Control: public, max-age=120,
 stale-while-revalidate=600`.
 
+## Buscadores e assistentes de IA
+
+ChatGPT, Claude, Perplexity, Gemini e Copilot leem texto e, em geral, não
+executam JavaScript. O site entrega a eles o mesmo conteúdo em formatos
+diretos (`modules/blog/ai-discovery.ts`), sempre do banco e de
+`packages/help`, com `Cache-Control: public, max-age=600`:
+
+| Endereço | O que tem |
+| --- | --- |
+| `/llms.txt` | Índice no formato de llmstxt.org: resumo, fatos do produto (`product-facts.ts`, os mesmos que a IA do blog usa), páginas principais, categorias da ajuda e todos os posts, cada um com link para o `.md` |
+| `/llms-full.txt` | Tudo num arquivo: fatos, a central de ajuda inteira (só artigos visíveis na web) e o texto de cada post |
+| `/blog/<slug>.md` | O post em Markdown com metadados (endereço, datas, categoria, autoria), links absolutos e FAQ. Sai com `Link: <url do post>; rel="canonical"` e `X-Robots-Tag: noindex, follow`, para não virar duplicata no Google. O HTML do post aponta para ele com `<link rel="alternate" type="text/markdown">` |
+
+Post exclusivo para quem tem conta entra só com o começo (abertura e
+primeira seção), como no HTML público.
+
+**robots.txt** libera de propósito os robôs de busca e de IA (GPTBot,
+OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, PerplexityBot,
+Google-Extended, Applebot-Extended, Bingbot e outros), com as mesmas
+exclusões da área logada. Para bloquear algum, tire-o do grupo de IA e crie
+um grupo com `Disallow: /`.
+
+**Páginas públicas da aplicação** (`public-pages.ts`): `/ajuda`,
+`/plataformas`, `/termos`, `/privacidade`, `/criar-conta` e `/entrar` saem
+do servidor com título, descrição e canonical próprios (antes iam com os
+da página inicial e pareciam cópias dela). `/ajuda` leva as perguntas e
+respostas como `FAQPage`. As demais rotas da aplicação saem sem canonical e
+com `noindex, follow`.
+
+**Dados estruturados da home** (`index.html` e `landing.html`):
+`Organization` (com os perfis oficiais em `sameAs`), `WebSite` e
+`SoftwareApplication`, num `@graph`. O `BlogPosting` usa a mesma
+organização.
+
+**IndexNow** (`indexnow.ts`): ao publicar, editar um post no ar ou
+despublicar, a API avisa `api.indexnow.org` (Bing, Yandex, Seznam, Naver).
+O índice do Bing alimenta a busca do ChatGPT e do Copilot. A chave é
+pública por definição e fica em `/<chave>.txt`. Só em produção; falha vai
+só para o log.
+
 ## IA: três vezes por semana
 
 Job `blog.ai_write`, terça e sexta às 12:00 UTC (9h em Brasília) para os

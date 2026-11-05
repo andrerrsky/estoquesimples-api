@@ -2,18 +2,31 @@ import type { AppServices } from '../../platform/http/context.js';
 import { BLOG_CATEGORY_SLUGS } from './blog.categories.js';
 import { BlogService } from './blog.service.js';
 import { fontsReady } from './blog-cover.js';
-import { feedXml, renderBlogIndex, renderBlogPost, sitemapXml } from './blog-ssr.js';
+import { llmsFullTxt, llmsTxt, postMarkdown } from './ai-discovery.js';
+import { feedXml, postUrl, renderBlogIndex, renderBlogPost, sitemapXml } from './blog-ssr.js';
 
 export interface RenderedPage {
   body: string;
   contentType: string;
   status: number;
   cacheControl: string;
+  /** Cabeçalhos a mais (ex.: canonical e noindex da versão em Markdown). */
+  headers?: Record<string, string>;
 }
+
+const MARKDOWN_POST = /^\/blog\/([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 /** Caminhos do site que a API responde com HTML/XML pronto (ver web-app.ts). */
 export function isBlogPagePath(path: string): boolean {
-  return path === '/blog' || path === '/sitemap.xml' || path === '/blog/feed.xml' || /^\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);
+  return (
+    path === '/blog' ||
+    path === '/sitemap.xml' ||
+    path === '/blog/feed.xml' ||
+    path === '/llms.txt' ||
+    path === '/llms-full.txt' ||
+    MARKDOWN_POST.test(path) ||
+    /^\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path)
+  );
 }
 
 /**
@@ -39,6 +52,24 @@ export class BlogPages {
       if (path === '/blog/feed.xml') {
         const posts = await this.blog.allPublished(30);
         return { body: feedXml(posts), contentType: 'application/rss+xml; charset=utf-8', status: 200, cacheControl: 'public, max-age=600' };
+      }
+      // Para assistentes de IA (ver ai-discovery.ts): texto puro, sempre do banco.
+      if (path === '/llms.txt' || path === '/llms-full.txt') {
+        const posts = await this.blog.allPublished(500, { markdown: path === '/llms-full.txt' });
+        return { body: path === '/llms.txt' ? llmsTxt(posts) : llmsFullTxt(posts), contentType: 'text/plain; charset=utf-8', status: 200, cacheControl: 'public, max-age=600' };
+      }
+      const markdownMatch = MARKDOWN_POST.exec(path);
+      if (markdownMatch) {
+        const post = await this.blog.getPublished(markdownMatch[1]!, { markdown: true });
+        if (!post) return null;
+        return {
+          body: postMarkdown(post),
+          contentType: 'text/markdown; charset=utf-8',
+          status: 200,
+          cacheControl: 'public, max-age=600',
+          // A página do post é a versão indexável; o Markdown é para leitura por IA, sem virar duplicata no Google.
+          headers: { Link: `<${postUrl(post)}>; rel="canonical"`, 'X-Robots-Tag': 'noindex, follow' },
+        };
       }
       const htmlCache = 'public, max-age=120, stale-while-revalidate=600';
       if (path === '/blog') {
