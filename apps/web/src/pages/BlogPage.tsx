@@ -8,6 +8,7 @@ import { useAuthOptional } from '../auth/context';
 import { PublicShell } from '../components/PublicShell';
 import { Empty, Spinner, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
+import { ssrBlogContent } from '../lib/ssr-blog';
 import { useDebounced } from '../lib/inventory';
 import '../styles/pages-blog.css';
 
@@ -63,7 +64,7 @@ function ssrData<T>(kind: 'index' | 'post'): T | null {
     if (parsed.kind !== kind) return null;
     // O HTML do post não vem repetido no JSON: ele já está na página renderizada.
     if (parsed.post && !parsed.post.contentHtml) {
-      parsed.post.contentHtml = document.querySelector('[data-ssr] .blog-post__content')?.innerHTML ?? '';
+      parsed.post.contentHtml = ssrBlogContent();
     }
     return parsed;
   } catch {
@@ -261,7 +262,8 @@ export function BlogPostPage() {
   const authed = auth?.status === 'authed';
   const initial = useMemo(() => ssrData<{ post: BlogPost; related: BlogPost[] }>('post'), []);
   // O HTML do servidor é o de quem não tem conta; com sessão, um post exclusivo é pedido de novo, inteiro.
-  const useInitial = Boolean(initial && initial.post.slug === slug && !(authed && initial.post.locked));
+  // Sem o HTML (não deveria acontecer), pede o post à API em vez de mostrar o post vazio.
+  const useInitial = Boolean(initial && initial.post.slug === slug && initial.post.contentHtml && !(authed && initial.post.locked));
   const query = useQuery({
     queryKey: ['blog', 'post', slug, authed],
     queryFn: () => api.get<{ post: BlogPost; related: BlogPost[] }>(`/v1/blog/posts/${encodeURIComponent(slug)}`, undefined, authed ? { optionalAuth: true } : { auth: false }),

@@ -12,6 +12,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import { bootBrand } from './lib/brand';
 import { reloadForNewVersion } from './lib/chunks';
 import { installGlobalErrorReporting } from './lib/error-reporter';
+import { keepSsrBlogContent } from './lib/ssr-blog';
 import { ToastProvider } from './components/ui';
 import { WorkspaceProvider } from './workspace/WorkspaceProvider';
 
@@ -74,6 +75,7 @@ const app = (
 // Blog vindo pronto da API (data-ssr): não é a árvore da aplicação, então não
 // dá para hidratar; o React desenha por cima e a página (idêntica) assume.
 if (container.querySelector('[data-ssr]')) {
+  keepSsrBlogContent(container);
   container.replaceChildren();
   createRoot(container).render(app);
 } else if (container.firstElementChild) {
