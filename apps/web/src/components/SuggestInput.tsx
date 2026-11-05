@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
 import { fold } from '../lib/format';
 import { Icon } from './Icon';
@@ -46,6 +46,21 @@ export function SuggestInput({
   }, [options, value, showAll]);
 
   const visible = open && matches.length > 0;
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Último campo do formulário (fornecedor, localização): a lista abre para baixo
+  // e ficava fora da área visível — ou atrás do teclado. Rola só o necessário para mostrá-la.
+  useEffect(() => {
+    if (!visible) return;
+    const frame = window.requestAnimationFrame(() => {
+      const list = listRef.current;
+      const scroller = list?.closest('.drawer__body, .modal__body');
+      if (!list || !scroller) return;
+      const overflow = list.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom + 8;
+      if (overflow > 0) scroller.scrollBy({ top: overflow, behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [visible]);
 
   const choose = (option: string) => {
     onChange(option);
@@ -117,7 +132,7 @@ export function SuggestInput({
         </button>
       )}
       {visible && (
-        <ul className="suggest__list" id={listId} role="listbox">
+        <ul ref={listRef} className="suggest__list" id={listId} role="listbox">
           {matches.map((option, index) => (
             <li
               key={option}

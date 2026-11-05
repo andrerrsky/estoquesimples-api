@@ -439,6 +439,88 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
 // Sobreposições
 // ---------------------------------------------------------------------------
 
+/**
+ * Página travada enquanto houver gaveta, diálogo ou confirmação aberta.
+ *
+ * No iPhone, `overflow: hidden` no body não basta: o Safari continua rolando a
+ * lista por trás, e ao abrir o teclado empurra a página inteira (o cabeçalho
+ * da gaveta some e os últimos campos ficam atrás do teclado). Por isso:
+ *  - o body fica `position: fixed` no ponto onde estava (e volta para lá ao fechar);
+ *  - a sobreposição acompanha a área VISÍVEL (VisualViewport): com o teclado
+ *    aberto, ela encolhe até a borda dele (`--vv-top`/`--vv-height`, ver .overlay);
+ *  - o campo em foco é rolado para dentro da área visível quando o teclado
+ *    abre ou o foco muda.
+ * Contagem de travas: uma confirmação aberta sobre uma gaveta não destrava a página ao fechar.
+ */
+let pageLocks = 0;
+let lockedScrollY = 0;
+let previousBodyStyle = '';
+
+const FIELD = 'input, textarea, select, [contenteditable="true"]';
+const SCROLLERS = '.drawer__body, .modal__body';
+
+function revealFocusedField(): void {
+  const element = document.activeElement;
+  if (!(element instanceof HTMLElement) || !element.matches(FIELD) || !element.closest(SCROLLERS)) return;
+  revealIfHidden(element);
+}
+
+function trackViewport(): void {
+  const viewport = window.visualViewport;
+  const root = document.documentElement.style;
+  // Com zoom de pinça a área visível não é "a tela": a sobreposição volta a ocupar tudo.
+  if (!viewport || viewport.scale > 1.01) {
+    root.removeProperty('--vv-top');
+    root.removeProperty('--vv-height');
+    return;
+  }
+  root.setProperty('--vv-top', `${Math.round(viewport.offsetTop)}px`);
+  root.setProperty('--vv-height', `${Math.round(viewport.height)}px`);
+}
+
+let revealTimer = 0;
+function onViewportChange(): void {
+  trackViewport();
+  // O teclado termina de abrir em ~250 ms: revela depois que a área visível assentou.
+  window.clearTimeout(revealTimer);
+  revealTimer = window.setTimeout(revealFocusedField, 60);
+}
+
+function onFocusIn(event: FocusEvent): void {
+  if (event.target instanceof HTMLElement && event.target.closest(SCROLLERS)) {
+    window.clearTimeout(revealTimer);
+    revealTimer = window.setTimeout(revealFocusedField, 300);
+  }
+}
+
+function lockPage(): void {
+  pageLocks += 1;
+  if (pageLocks > 1) return;
+  lockedScrollY = window.scrollY;
+  const body = document.body;
+  previousBodyStyle = body.getAttribute('style') ?? '';
+  Object.assign(body.style, { position: 'fixed', top: `-${lockedScrollY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden' });
+  trackViewport();
+  window.visualViewport?.addEventListener('resize', onViewportChange);
+  window.visualViewport?.addEventListener('scroll', onViewportChange);
+  document.addEventListener('focusin', onFocusIn);
+}
+
+function unlockPage(): void {
+  pageLocks = Math.max(0, pageLocks - 1);
+  if (pageLocks > 0) return;
+  const body = document.body;
+  if (previousBodyStyle) body.setAttribute('style', previousBodyStyle);
+  else body.removeAttribute('style');
+  window.scrollTo({ top: lockedScrollY, behavior: 'instant' });
+  window.visualViewport?.removeEventListener('resize', onViewportChange);
+  window.visualViewport?.removeEventListener('scroll', onViewportChange);
+  document.removeEventListener('focusin', onFocusIn);
+  window.clearTimeout(revealTimer);
+  document.documentElement.style.removeProperty('--vv-top');
+  document.documentElement.style.removeProperty('--vv-height');
+}
+
 function useOverlay(open: boolean, onClose: () => void) {
   useEffect(() => {
     if (!open) return;
@@ -446,13 +528,14 @@ function useOverlay(open: boolean, onClose: () => void) {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previous;
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+  // Separado do Esc: trocar a função de fechar (nova a cada render) não pode destravar e travar a página de novo.
+  useEffect(() => {
+    if (!open) return;
+    lockPage();
+    return unlockPage;
+  }, [open]);
 }
 
 export function Modal({
