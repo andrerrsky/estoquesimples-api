@@ -26,6 +26,8 @@ export interface BrandConfigView {
   accentColor: string | null;
   textColor: string | null;
   font: BrandFont;
+  loginTitle: string | null;
+  loginSubtitle: string | null;
   logo: BrandLogoView | null;
   blocked: boolean;
   blockedReason: string | null;
@@ -39,6 +41,9 @@ export interface BrandUpdateInput {
   accentColor: string | null;
   textColor: string | null;
   font: BrandFont;
+  /** Ausente = mantém o que está salvo (clientes antigos não mandam). */
+  loginTitle?: string | null;
+  loginSubtitle?: string | null;
 }
 
 const configOf = (row: WorkspaceBranding | undefined): BrandConfigView => ({
@@ -47,6 +52,8 @@ const configOf = (row: WorkspaceBranding | undefined): BrandConfigView => ({
   accentColor: row?.accentColor ?? null,
   textColor: row?.textColor ?? null,
   font: row?.font === 'serif' ? 'serif' : 'default',
+  loginTitle: row?.loginTitle ?? null,
+  loginSubtitle: row?.loginSubtitle ?? null,
   logo:
     row?.slug && row.logoHash && row.logoWidth && row.logoHeight
       ? { url: logoUrl(row.slug, row.logoHash), hash: row.logoHash, width: row.logoWidth, height: row.logoHeight }
@@ -56,6 +63,12 @@ const configOf = (row: WorkspaceBranding | undefined): BrandConfigView => ({
   version: row?.version ?? 0,
   updatedAt: row?.updatedAt.toISOString() ?? null,
 });
+
+/** Espaços nas pontas e repetidos saem; texto vazio volta ao padrão. */
+const cleanText = (value: string | null): string | null => {
+  const text = value?.replace(/\s+/g, ' ').trim() ?? '';
+  return text.length > 0 ? text : null;
+};
 
 const fieldError = (field: string, message: string, extra?: Record<string, unknown>): AppError =>
   new AppError(422, ErrorCode.BRAND_INVALID, message, { details: [{ field, message }], ...(extra ? { extra } : {}) });
@@ -160,6 +173,8 @@ export class BrandingService {
         accentColor: colors.accent,
         textColor: colors.text,
         font: body.font,
+        ...(body.loginTitle !== undefined ? { loginTitle: cleanText(body.loginTitle) } : {}),
+        ...(body.loginSubtitle !== undefined ? { loginSubtitle: cleanText(body.loginSubtitle) } : {}),
         updatedBy: input.userId,
         updatedAt: new Date(),
       };
@@ -261,7 +276,7 @@ export class BrandingService {
     const [saved] = await tx
       .update(workspaceBrandings)
       .set({
-        primaryColor: null, accentColor: null, textColor: null, font: 'default',
+        primaryColor: null, accentColor: null, textColor: null, font: 'default', loginTitle: null, loginSubtitle: null,
         logoHash: null, logoContentType: null, logoBytes: null, logoWidth: null, logoHeight: null,
         updatedBy: input.userId, updatedAt: new Date(), version: sql`${workspaceBrandings.version} + 1`,
       })

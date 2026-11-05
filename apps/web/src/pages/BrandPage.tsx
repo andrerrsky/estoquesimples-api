@@ -32,7 +32,10 @@ interface PreviewResponse {
 }
 
 type ColorKey = 'primaryColor' | 'accentColor' | 'textColor';
-type Draft = { slug: string; primaryColor: string | null; accentColor: string | null; textColor: string | null; font: 'default' | 'serif' };
+type Draft = { slug: string; primaryColor: string | null; accentColor: string | null; textColor: string | null; font: 'default' | 'serif'; loginTitle: string; loginSubtitle: string };
+
+/** Mesmo padrão da página de entrada (AuthPages.tsx) quando os campos ficam vazios. */
+const DEFAULT_LOGIN_SUBTITLE = 'Painel de controle de estoque';
 
 const COLORS: Array<{ key: ColorKey; field: Problem['field']; label: string; hint: string; fallback: string }> = [
   { key: 'primaryColor', field: 'primary', label: 'Cor principal', hint: 'Barras, botões e destaques. Precisa ter contraste com texto branco.', fallback: '#1c679d' },
@@ -57,6 +60,8 @@ const toDraft = (data: BrandResponse): Draft => ({
   accentColor: data.config.accentColor,
   textColor: data.config.textColor,
   font: data.config.font,
+  loginTitle: data.config.loginTitle ?? '',
+  loginSubtitle: data.config.loginSubtitle ?? '',
 });
 
 /**
@@ -65,7 +70,7 @@ const toDraft = (data: BrandResponse): Draft => ({
  * e quem decide se a marca vale é o plano em vigor.
  */
 export function BrandPage() {
-  const { workspaceId, can, refresh } = useCurrentWorkspace();
+  const { workspaceId, workspace, can, refresh } = useCurrentWorkspace();
   const queryClient = useQueryClient();
   const toast = useToast();
   const base = `/v1/workspaces/${workspaceId}/branding`;
@@ -111,7 +116,7 @@ export function BrandPage() {
   }, [draft, editable, base, logoUrl]);
 
   const save = useMutation({
-    mutationFn: (value: Draft) => api.put<BrandConfig>(base, value),
+    mutationFn: (value: Draft) => api.put<BrandConfig>(base, { ...value, loginTitle: value.loginTitle.trim() || null, loginSubtitle: value.loginSubtitle.trim() || null }),
     onSuccess: async () => {
       setFieldErrors({});
       toast.push('Identidade visual salva.', { tone: 'success' });
@@ -205,6 +210,19 @@ export function BrandPage() {
                       <span className="muted">/entrar</span>
                     </div>
                   </Field>
+                  <Field label="Título da página de entrada" optional error={fieldErrors.loginTitle} hint="Vazio: o nome da empresa.">
+                    <input className="input" value={draft.loginTitle} disabled={!editable} maxLength={60} placeholder={workspace?.name ?? 'Nome da empresa'} onChange={(event) => setDraft({ ...draft, loginTitle: event.target.value })} />
+                  </Field>
+                  <Field label="Subtítulo" optional error={fieldErrors.loginSubtitle} hint={`Vazio: "${DEFAULT_LOGIN_SUBTITLE}".`}>
+                    <input className="input" value={draft.loginSubtitle} disabled={!editable} maxLength={120} placeholder={DEFAULT_LOGIN_SUBTITLE} onChange={(event) => setDraft({ ...draft, loginSubtitle: event.target.value })} />
+                  </Field>
+                  {dirty && editable && (
+                    <div className="row">
+                      <button type="button" className="btn btn--primary btn--sm" disabled={save.isPending || problems.length > 0 || draft.slug.length < 3} onClick={() => save.mutate(draft)}>
+                        {save.isPending ? 'Salvando…' : 'Salvar'}
+                      </button>
+                    </div>
+                  )}
                   {loginUrl && (
                     <div className="row" style={{ gap: 8 }}>
                       <a className="btn btn--sm" href={loginUrl} target="_blank" rel="noreferrer">Abrir página de entrada</a>

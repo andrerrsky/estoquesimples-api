@@ -14,6 +14,8 @@ import { BrandingService } from './branding.service.js';
 
 const LOGO_MAX_UPLOAD_BYTES = 1_048_576;
 
+const LOGIN_TITLE_MAX = 60;
+const LOGIN_SUBTITLE_MAX = 120;
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use o formato #RRGGBB.');
 
 export const brandingViewSchema = z.object({
@@ -38,6 +40,8 @@ export const brandingViewSchema = z.object({
     })
     .nullable(),
   logo: z.object({ url: z.string(), hash: z.string(), width: z.number().int(), height: z.number().int() }).nullable(),
+  loginTitle: z.string().nullable(),
+  loginSubtitle: z.string().nullable(),
 });
 
 const configSchema = z.object({
@@ -46,6 +50,8 @@ const configSchema = z.object({
   accentColor: z.string().nullable(),
   textColor: z.string().nullable(),
   font: z.enum(['default', 'serif']),
+  loginTitle: z.string().nullable(),
+  loginSubtitle: z.string().nullable(),
   logo: z.object({ url: z.string(), hash: z.string(), width: z.number().int(), height: z.number().int() }).nullable(),
   blocked: z.boolean(),
   blockedReason: z.string().nullable(),
@@ -108,12 +114,12 @@ export async function registerBrandingRoutes(app: FastifyInstance): Promise<void
         tags: ['marca'],
         summary: 'Salva a identidade visual (substitui a configuração)',
         description:
-          'Cores `#RRGGBB` ou `null` (padrão do produto), fonte (`default` ou `serif`) e o identificador da URL de entrada. ' +
+          'Cores `#RRGGBB` ou `null` (padrão do produto), fonte (`default` ou `serif`), o identificador da URL de entrada e, opcionais, título e subtítulo da página de entrada (`null` ou vazio = padrão; ausentes = mantém). ' +
           'A API recusa cores sem contraste suficiente (422 `BRAND_INVALID`, com `extra.suggestions`) e identificadores reservados ou em uso (409 `BRAND_SLUG_TAKEN`). ' +
           'Exige plano com o recurso (403 `BRAND_NOT_IN_PLAN`).',
         security,
         params,
-        body: z.object({ slug: z.string().trim().min(1).max(64), primaryColor: hex.nullable(), accentColor: hex.nullable(), textColor: hex.nullable(), font: z.enum(FONTS as [string, ...string[]]) as z.ZodType<'default' | 'serif'> }),
+        body: z.object({ slug: z.string().trim().min(1).max(64), primaryColor: hex.nullable(), accentColor: hex.nullable(), textColor: hex.nullable(), font: z.enum(FONTS as [string, ...string[]]) as z.ZodType<'default' | 'serif'>, loginTitle: z.string().max(LOGIN_TITLE_MAX, `Título com até ${LOGIN_TITLE_MAX} caracteres.`).nullable().optional(), loginSubtitle: z.string().max(LOGIN_SUBTITLE_MAX, `Subtítulo com até ${LOGIN_SUBTITLE_MAX} caracteres.`).nullable().optional() }),
         response: { 200: configSchema, ...errors },
       },
     },
@@ -232,14 +238,14 @@ export async function registerBrandingRoutes(app: FastifyInstance): Promise<void
           'Sem autenticação. `{ active: false }` para identificador inexistente, empresa sem plano, sem personalização ou bloqueada — indistinguíveis de propósito. ' +
           'Identificador antigo (trocado nos últimos 90 dias) responde com o atual em `slug`. Cache curto: perder o plano desliga a marca em até ~1 minuto.',
         params: publicParams,
-        response: { 200: z.object({ active: z.boolean(), slug: z.string().nullable(), displayName: z.string().nullable(), version: z.number().int(), theme: brandingViewSchema.shape.theme, logo: brandingViewSchema.shape.logo }), 304: z.undefined(), 429: errorSchema },
+        response: { 200: z.object({ active: z.boolean(), slug: z.string().nullable(), displayName: z.string().nullable(), version: z.number().int(), theme: brandingViewSchema.shape.theme, logo: brandingViewSchema.shape.logo, loginTitle: z.string().nullable(), loginSubtitle: z.string().nullable() }), 304: z.undefined(), 429: errorSchema },
       },
     },
     async (request, reply) => {
       const view = await service.resolvePublic(request.params.slug);
       const body = view
-        ? { active: true, slug: view.slug, displayName: view.displayName, version: view.version, theme: view.theme, logo: view.logo }
-        : { active: false, slug: null, displayName: null, version: 0, theme: null, logo: null };
+        ? { active: true, slug: view.slug, displayName: view.displayName, version: view.version, theme: view.theme, logo: view.logo, loginTitle: view.loginTitle, loginSubtitle: view.loginSubtitle }
+        : { active: false, slug: null, displayName: null, version: 0, theme: null, logo: null, loginTitle: null, loginSubtitle: null };
       const etag = `"${createHash('sha1').update(JSON.stringify(body)).digest('hex').slice(0, 16)}"`;
       reply.header('ETag', etag).header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       if (request.headers['if-none-match'] === etag) return reply.code(304).send(undefined);

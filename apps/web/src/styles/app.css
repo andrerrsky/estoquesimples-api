@@ -1692,6 +1692,13 @@ button {
   letter-spacing: -0.02em;
   max-width: 440px;
 }
+.auth__lead {
+  margin: 14px 0 0;
+  max-width: 440px;
+  color: var(--on-brand-muted);
+  font-size: 18px;
+  line-height: 1.45;
+}
 .auth__points {
   list-style: none;
   padding: 0;
