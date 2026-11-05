@@ -26,6 +26,9 @@ export interface BrandingView {
   loginPath: string | null;
   theme: BrandTheme | null;
   logo: BrandLogoView | null;
+  /** Título e subtítulo da página de entrada; `null` = padrão (nome da empresa e "Painel de controle de estoque"). */
+  loginTitle: string | null;
+  loginSubtitle: string | null;
 }
 
 export const INACTIVE_BRANDING: BrandingView = {
@@ -37,6 +40,8 @@ export const INACTIVE_BRANDING: BrandingView = {
   loginPath: null,
   theme: null,
   logo: null,
+  loginTitle: null,
+  loginSubtitle: null,
 };
 
 export const logoUrl = (slug: string, hash: string): string => `/v1/public/brand/${slug}/logo?v=${hash}`;
@@ -85,6 +90,8 @@ export async function loadEffectiveBranding(executor: Database | Transaction, wo
       row.logoHash && row.logoWidth && row.logoHeight
         ? { url: logoUrl(row.slug, row.logoHash), hash: row.logoHash, width: row.logoWidth, height: row.logoHeight }
         : null,
+    loginTitle: row.loginTitle,
+    loginSubtitle: row.loginSubtitle,
   };
 }
 

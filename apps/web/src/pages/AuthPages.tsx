@@ -16,8 +16,17 @@ import { fmtDate } from '../lib/format';
 import { ROLE_LABEL } from '../lib/labels';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 
+/** Subtítulo da página de entrada de uma empresa quando ela não escreveu o seu (mesmo texto da tela /app/marca). */
+const DEFAULT_BRAND_LOGIN_SUBTITLE = 'Painel de controle de estoque';
+
+/** Texto do lado colorido na página de entrada de uma empresa (`/<slug>/entrar`). */
+interface BrandAside {
+  title: string;
+  subtitle: string;
+}
+
 /** Moldura das telas de entrada: a marca à esquerda, o formulário à direita. */
-function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
+function AuthLayout({ title, subtitle, children, footer, aside }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; aside?: BrandAside }) {
   const brand = useBrand();
   return (
     <div className="auth">
@@ -25,14 +34,21 @@ function AuthLayout({ title, subtitle, children, footer }: { title: string; subt
         <Link to="/" className="auth__brand">
           <BrandMark size={36} />
         </Link>
-        <div>
-          <p className="auth__headline">Seu estoque em dia, em qualquer aparelho.</p>
-          <ul className="auth__points">
-            <li><Icon name="check" /> Produtos, entradas e saídas com histórico de tudo</li>
-            <li><Icon name="check" /> Os mesmos dados no Android, na web e no iPhone (como web app)</li>
-            <li><Icon name="check" /> Grátis para você; plano Equipe para trabalhar em grupo</li>
-          </ul>
-        </div>
+        {aside ? (
+          <div>
+            <p className="auth__headline">{aside.title}</p>
+            <p className="auth__lead">{aside.subtitle}</p>
+          </div>
+        ) : (
+          <div>
+            <p className="auth__headline">Seu estoque em dia, em qualquer aparelho.</p>
+            <ul className="auth__points">
+              <li><Icon name="check" /> Produtos, entradas e saídas com histórico de tudo</li>
+              <li><Icon name="check" /> Os mesmos dados no Android, na web e no iPhone (como web app)</li>
+              <li><Icon name="check" /> Grátis para você; plano Equipe para trabalhar em grupo</li>
+            </ul>
+          </div>
+        )}
         <p className="auth__foot">
           {brand && <><span className="auth__brand--partner">Estoque Simples</span> · </>}
           <Link to="/termos">Termos de Uso</Link> · <Link to="/privacidade">Política de Privacidade</Link>
@@ -117,7 +133,7 @@ function useStripTokenFromUrl(): void {
   }, []);
 }
 
-export function LoginPage({ brandSlug }: { brandSlug?: string }) {
+export function LoginPage({ brandSlug, aside }: { brandSlug?: string; aside?: BrandAside }) {
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
@@ -153,7 +169,7 @@ export function LoginPage({ brandSlug }: { brandSlug?: string }) {
   };
 
   return (
-    <AuthLayout title="Entrar" subtitle={brand?.displayName ? `Acesse o estoque de ${brand.displayName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
+    <AuthLayout aside={aside} title="Entrar" subtitle={brand?.displayName ? `Acesse o estoque de ${brand.displayName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
       <form className="stack" onSubmit={submit}>
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="E-mail">
@@ -180,6 +196,8 @@ interface PublicBrand {
   version: number;
   theme: BrandTheme | null;
   logo: BrandLogo | null;
+  loginTitle?: string | null;
+  loginSubtitle?: string | null;
 }
 
 /**
@@ -229,7 +247,9 @@ export function BrandedLoginPage() {
   }, []);
 
   if (query.isLoading) return <FullScreenLoading />;
-  return <LoginPage brandSlug={active ? (data?.slug ?? slug) : undefined} />;
+  // Texto do lado colorido: o que a empresa escreveu em /app/marca ou, por padrão, o nome dela.
+  const aside = active && data ? { title: data.loginTitle || data.displayName || 'Estoque Simples', subtitle: data.loginSubtitle || DEFAULT_BRAND_LOGIN_SUBTITLE } : undefined;
+  return <LoginPage brandSlug={active ? (data?.slug ?? slug) : undefined} aside={aside} />;
 }
 
 export function RegisterPage() {

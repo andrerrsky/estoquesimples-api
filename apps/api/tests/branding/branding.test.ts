@@ -197,4 +197,26 @@ describe('identidade visual por empresa', () => {
     await context.services.db.execute(sql`UPDATE workspace_brandings SET blocked_at = now() WHERE workspace_id = ${ws}::uuid`);
     expect((await entitlement(ws, owner)).branding.active).toBe(false);
   });
+
+  it('textos da página de entrada: padrão nulo, salvos, mantidos quando ausentes e limpos ao voltar ao padrão', async () => {
+    const owner = await registerUser(context);
+    const ws = await workspaceOf(owner);
+    await subscribe(ws, 't-textos');
+
+    expect((await save(ws, owner, {})).json()).toMatchObject({ loginTitle: null, loginSubtitle: null });
+    expect(await publicBrand('padaria-ze')).toMatchObject({ active: true, loginTitle: null, loginSubtitle: null });
+
+    const saved = await save(ws, owner, { loginTitle: '  Padaria   do Zé ', loginSubtitle: 'Estoque da loja' });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ loginTitle: 'Padaria do Zé', loginSubtitle: 'Estoque da loja' });
+    expect(await publicBrand('padaria-ze')).toMatchObject({ loginTitle: 'Padaria do Zé', loginSubtitle: 'Estoque da loja' });
+
+    // Cliente que não manda os campos (app antigo) não apaga o que está salvo; vazio volta ao padrão.
+    expect((await save(ws, owner, { primaryColor: '#1c679d' })).json()).toMatchObject({ loginTitle: 'Padaria do Zé' });
+    expect((await save(ws, owner, { loginSubtitle: '   ' })).json()).toMatchObject({ loginTitle: 'Padaria do Zé', loginSubtitle: null });
+    expect((await save(ws, owner, { loginTitle: 'x'.repeat(61) })).statusCode).toBe(400);
+
+    const reset = await context.app.inject({ method: 'DELETE', url: `${base(ws)}/branding`, headers: owner.authHeader });
+    expect(reset.json()).toMatchObject({ loginTitle: null, loginSubtitle: null });
+  });
 });

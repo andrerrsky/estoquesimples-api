@@ -161,6 +161,9 @@ export const workspaceBrandings = pgTable(
     accentColor: text('accent_color'),
     textColor: text('text_color'),
     font: text('font').notNull().default('default'),
+    /** Textos da página de entrada (migration 0028); nulos = padrão. */
+    loginTitle: text('login_title'),
+    loginSubtitle: text('login_subtitle'),
     logoHash: text('logo_hash'),
     logoContentType: text('logo_content_type'),
     logoBytes: integer('logo_bytes'),

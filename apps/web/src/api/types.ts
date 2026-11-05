@@ -97,6 +97,8 @@ export interface BrandingView {
   loginPath: string | null;
   theme: BrandTheme | null;
   logo: BrandLogo | null;
+  loginTitle?: string | null;
+  loginSubtitle?: string | null;
 }
 
 export interface BrandConfig {
@@ -105,6 +107,8 @@ export interface BrandConfig {
   accentColor: string | null;
   textColor: string | null;
   font: 'default' | 'serif';
+  loginTitle: string | null;
+  loginSubtitle: string | null;
   logo: BrandLogo | null;
   blocked: boolean;
   blockedReason: string | null;
