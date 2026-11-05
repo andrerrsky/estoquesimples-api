@@ -252,7 +252,8 @@ export function StockPage() {
             </button>
           }
         />
-        <select className="select" value={category} onChange={(event) => update({ categoria: event.target.value })} aria-label="Categoria" style={{ width: 'auto', maxWidth: 220 }}>
+        <div className="toolbar__filters">
+        <select className="select" value={category} onChange={(event) => update({ categoria: event.target.value })} aria-label="Categoria">
           <option value="">Todas as categorias</option>
           {facets.data?.categories.map((item) => (
             <option key={item.value} value={item.value}>
@@ -260,13 +261,14 @@ export function StockPage() {
             </option>
           ))}
         </select>
-        <select className="select" value={sort} onChange={(event) => update({ ordem: event.target.value === 'name.asc' ? null : event.target.value })} aria-label="Ordenar" style={{ width: 'auto' }}>
+        <select className="select" value={sort} onChange={(event) => update({ ordem: event.target.value === 'name.asc' ? null : event.target.value })} aria-label="Ordenar">
           {SORTS.map((item) => (
             <option key={item.key} value={item.key}>
               {item.label}
             </option>
           ))}
         </select>
+        </div>
       </div>
 
       <Chips

@@ -1100,6 +1100,15 @@ button {
   flex: 1 1 260px;
   min-width: 200px;
 }
+/* Categoria e ordenação: lado a lado sempre (no celular, meio a meio). */
+.toolbar__filters {
+  display: flex;
+  gap: 10px;
+}
+.toolbar__filters .select {
+  width: auto;
+  max-width: 220px;
+}
 
 .chips {
   display: flex;
@@ -1263,8 +1272,13 @@ button {
    -------------------------------------------------------------------------- */
 
 .overlay {
+  /* Presa à área visível (acima do teclado no celular): ui.tsx mantém
+     --vv-top/--vv-height com o VisualViewport enquanto há sobreposição aberta. */
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top, 0px);
+  height: var(--vv-height, 100%);
   z-index: var(--z-overlay);
   background: rgba(26, 35, 48, 0.42);
   display: flex;
@@ -1282,7 +1296,7 @@ button {
 .modal {
   width: 100%;
   max-width: 480px;
-  max-height: calc(100dvh - 40px);
+  max-height: calc(var(--vv-height, 100dvh) - 40px);
   display: flex;
   flex-direction: column;
   background: var(--surface-content);
@@ -1318,6 +1332,7 @@ button {
 .modal__body {
   padding: 18px 22px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal__actions {
   display: flex;
@@ -1366,7 +1381,10 @@ button {
 }
 .drawer__body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  /* A rolagem para aqui: não passa para a lista atrás da gaveta. */
+  overscroll-behavior: contain;
   padding: 20px 22px;
 }
 .drawer__footer {
@@ -2040,6 +2058,17 @@ button {
   .hide-mobile {
     display: none !important;
   }
+  .toolbar__filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    width: 100%;
+  }
+  .toolbar__filters .select {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
   .overlay {
     padding: 0;
     align-items: flex-end;
@@ -2048,7 +2077,7 @@ button {
     max-width: none;
     border-radius: var(--radius-hero) var(--radius-hero) 0 0;
     border: none;
-    max-height: 92dvh;
+    max-height: calc(var(--vv-height, 100dvh) * 0.92);
   }
   .modal__actions {
     padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
