@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { addCycle, deriveAsaasState } from '../../src/modules/billing/asaas/asaas-state.js';
+import { addCycle, deriveAsaasState, todayBrazil } from '../../src/modules/billing/asaas/asaas-state.js';
 import { documentType } from '../../src/modules/billing/asaas/document.js';
 import { AppError, ErrorCode } from '../../src/platform/http/errors.js';
 import { createTestApp, registerUser, resetDatabase, type RegisteredUser, type TestContext } from '../helpers/test-app.js';
@@ -180,8 +180,10 @@ describe('assinatura pela web (Asaas)', () => {
     const subscription = [...context.asaas.subscriptions.values()][0]!;
     const first = [...context.asaas.payments.values()][0]!;
 
-    // Primeira mensalidade paga há um mês; a segunda venceu ontem.
-    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    // Primeira mensalidade paga há um mês; a segunda venceu ontem. Datas de
+    // Brasília, como o Asaas: em UTC, entre 21h e meia-noite o "hoje" já era
+    // o dia seguinte e o período pago ainda não tinha vencido.
+    const day = (offset: number) => todayBrazil(new Date(Date.now() + offset * 86_400_000));
     first.dueDate = day(-32);
     context.asaas.setPaymentStatus(first.id, 'RECEIVED');
     const second = context.asaas.addPayment(subscription.id, day(-1), 'OVERDUE');
