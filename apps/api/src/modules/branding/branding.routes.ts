@@ -235,7 +235,8 @@ export async function registerBrandingRoutes(app: FastifyInstance): Promise<void
         tags: ['marca'],
         summary: 'Marca pública de um identificador (tela de entrada)',
         description:
-          'Sem autenticação. `{ active: false }` para identificador inexistente, empresa sem plano, sem personalização ou bloqueada — indistinguíveis de propósito. ' +
+          'Sem autenticação. `{ active: false, slug: null }` para identificador inexistente, empresa sem plano ou bloqueada — indistinguíveis de propósito. ' +
+          'Empresa com plano e sem cores nem logotipo: `active: false` (visual padrão), mas com `slug`, `displayName` e os textos da página de entrada. ' +
           'Identificador antigo (trocado nos últimos 90 dias) responde com o atual em `slug`. Cache curto: perder o plano desliga a marca em até ~1 minuto.',
         params: publicParams,
         response: { 200: z.object({ active: z.boolean(), slug: z.string().nullable(), displayName: z.string().nullable(), version: z.number().int(), theme: brandingViewSchema.shape.theme, logo: brandingViewSchema.shape.logo, loginTitle: z.string().nullable(), loginSubtitle: z.string().nullable() }), 304: z.undefined(), 429: errorSchema },
@@ -244,7 +245,7 @@ export async function registerBrandingRoutes(app: FastifyInstance): Promise<void
     async (request, reply) => {
       const view = await service.resolvePublic(request.params.slug);
       const body = view
-        ? { active: true, slug: view.slug, displayName: view.displayName, version: view.version, theme: view.theme, logo: view.logo, loginTitle: view.loginTitle, loginSubtitle: view.loginSubtitle }
+        ? { active: view.active, slug: view.slug, displayName: view.displayName, version: view.version, theme: view.theme, logo: view.logo, loginTitle: view.loginTitle, loginSubtitle: view.loginSubtitle }
         : { active: false, slug: null, displayName: null, version: 0, theme: null, logo: null, loginTitle: null, loginSubtitle: null };
       const etag = `"${createHash('sha1').update(JSON.stringify(body)).digest('hex').slice(0, 16)}"`;
       reply.header('ETag', etag).header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');

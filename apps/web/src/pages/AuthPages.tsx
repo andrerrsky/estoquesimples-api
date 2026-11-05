@@ -133,7 +133,7 @@ function useStripTokenFromUrl(): void {
   }, []);
 }
 
-export function LoginPage({ brandSlug, aside }: { brandSlug?: string; aside?: BrandAside }) {
+export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: string; aside?: BrandAside; companyName?: string | null }) {
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
@@ -169,7 +169,7 @@ export function LoginPage({ brandSlug, aside }: { brandSlug?: string; aside?: Br
   };
 
   return (
-    <AuthLayout aside={aside} title="Entrar" subtitle={brand?.displayName ? `Acesse o estoque de ${brand.displayName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
+    <AuthLayout aside={aside} title="Entrar" subtitle={(brand?.displayName ?? companyName) ? `Acesse o estoque de ${brand?.displayName ?? companyName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
       <form className="stack" onSubmit={submit}>
         {error && <Notice tone="error">{error}</Notice>}
         <Field label="E-mail">
@@ -225,21 +225,24 @@ export function BrandedLoginPage() {
     retry: false,
   });
   const data = query.data;
+  // `active`: aplica cores e logotipo. Sem eles, a página da empresa existe do mesmo
+  // jeito (plano em dia, identificador salvo): visual padrão com o nome dela.
   const active = !!data?.active && !!data.slug;
+  const page = !!data?.slug && !!data.displayName;
   const statusRef = useRef(status);
   statusRef.current = status;
 
   useEffect(() => {
     if (!data) return;
+    // Identificador antigo: segue para o atual.
+    if (page && data.slug && data.slug !== slug) navigate(`/${data.slug}/entrar`, { replace: true });
     if (!active) {
       clearPublicBrand();
       return;
     }
-    // Identificador antigo: segue para o atual.
-    if (data.slug && data.slug !== slug) navigate(`/${data.slug}/entrar`, { replace: true });
     setBrand({ eligible: true, active: true, slug: data.slug, version: data.version, displayName: data.displayName, loginPath: `/${data.slug}/entrar`, theme: data.theme, logo: data.logo }, 'public');
     track('brand.login_viewed');
-  }, [data, active, slug, navigate]);
+  }, [data, active, page, slug, navigate]);
 
   // Ao sair da tela sem ter entrado, a marca pública não vaza para as outras telas.
   useEffect(() => () => {
@@ -248,8 +251,8 @@ export function BrandedLoginPage() {
 
   if (query.isLoading) return <FullScreenLoading />;
   // Texto do lado colorido: o que a empresa escreveu em /app/marca ou, por padrão, o nome dela.
-  const aside = active && data ? { title: data.loginTitle || data.displayName || 'Estoque Simples', subtitle: data.loginSubtitle || DEFAULT_BRAND_LOGIN_SUBTITLE } : undefined;
-  return <LoginPage brandSlug={active ? (data?.slug ?? slug) : undefined} aside={aside} />;
+  const aside = page && data ? { title: data.loginTitle || data.displayName || 'Estoque Simples', subtitle: data.loginSubtitle || DEFAULT_BRAND_LOGIN_SUBTITLE } : undefined;
+  return <LoginPage brandSlug={page ? (data?.slug ?? slug) : undefined} aside={aside} companyName={page ? data?.displayName : null} />;
 }
 
 export function RegisterPage() {

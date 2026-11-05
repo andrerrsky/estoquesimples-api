@@ -218,5 +218,17 @@ describe('identidade visual por empresa', () => {
 
     const reset = await context.app.inject({ method: 'DELETE', url: `${base(ws)}/branding`, headers: owner.authHeader });
     expect(reset.json()).toMatchObject({ loginTitle: null, loginSubtitle: null });
+
+    // Sem cores nem logotipo a página de entrada continua existindo, no visual padrão, com o nome da empresa.
+    const plain = await publicBrand('padaria-ze');
+    expect(plain).toMatchObject({ active: false, slug: 'padaria-ze', theme: null, logo: null, loginTitle: null, loginSubtitle: null });
+    expect(plain.displayName).toEqual(expect.any(String));
+    expect((await entitlement(ws, owner)).branding.active).toBe(false);
+    expect((await save(ws, owner, { primaryColor: null, loginTitle: 'Só o título' })).statusCode).toBe(200);
+    expect(await publicBrand('padaria-ze')).toMatchObject({ active: false, slug: 'padaria-ze', loginTitle: 'Só o título' });
+
+    // Sem plano, de fora é igual a um identificador que não existe.
+    await context.services.db.execute(sql`UPDATE subscriptions SET state = 'expirada', current_period_end = now() - interval '1 day' WHERE workspace_id = ${ws}::uuid`);
+    expect(await publicBrand('padaria-ze')).toMatchObject({ active: false, slug: null, displayName: null, loginTitle: null });
   });
 });
