@@ -12,7 +12,7 @@ import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { BillingService } from '../billing/billing.service.js';
 import { normalizeImage } from '../images/image-processing.js';
 import { colorProblems, normalizeSlug, slugProblem, type BrandFont } from './brand-rules.js';
-import { loadEffectiveBranding, logoUrl, type BrandLogoView, type BrandingView } from './branding-view.js';
+import { INACTIVE_BRANDING, loadEffectiveBranding, logoUrl, type BrandLogoView, type BrandingView } from './branding-view.js';
 
 /** Limites do logotipo: pequeno por construção, aparece em telas e cabeçalhos. */
 const LOGO_MAX_EDGE = 640;
@@ -330,11 +330,38 @@ export class BrandingService {
     let view: BrandingView | null = null;
     if (workspaceId) {
       const entitlement = await this.billing.getEntitlement(workspaceId);
-      view = entitlement.branding.active ? entitlement.branding : null;
+      if (entitlement.branding.active) view = entitlement.branding;
+      else if (entitlement.branding.eligible) view = await this.plainLoginPage(workspaceId);
     }
     if (this.publicCache.size > 500) this.publicCache.clear();
     this.publicCache.set(slug, { at: Date.now(), view });
     return view;
+  }
+
+  /**
+   * Empresa com plano e identificador, mas sem cores nem logotipo: a página de
+   * entrada existe mesmo assim, no visual padrão, com o nome da empresa (ou o
+   * título que ela escreveu) no lugar dos textos de venda. `active` continua
+   * `false`, então nenhum tema é aplicado.
+   */
+  private async plainLoginPage(workspaceId: string): Promise<BrandingView | null> {
+    const [found] = await this.db
+      .select({ row: workspaceBrandings, name: workspaces.name })
+      .from(workspaceBrandings)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceBrandings.workspaceId))
+      .where(eq(workspaceBrandings.workspaceId, workspaceId))
+      .limit(1);
+    if (!found?.row.slug || found.row.blockedAt) return null;
+    return {
+      ...INACTIVE_BRANDING,
+      eligible: true,
+      slug: found.row.slug,
+      version: found.row.version,
+      displayName: found.name,
+      loginPath: `/${found.row.slug}/entrar`,
+      loginTitle: found.row.loginTitle,
+      loginSubtitle: found.row.loginSubtitle,
+    };
   }
 
   /** Bytes do logotipo da empresa dona do identificador (só se a marca estiver ativa). */
