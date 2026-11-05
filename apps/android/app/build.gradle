@@ -81,7 +81,7 @@ dependencies {
     // AndroidX Libraries
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.activity:activity:1.9.3'
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
     implementation 'com.google.android.material:material:1.13.0'
     
     // Image Loading
@@ -103,7 +103,7 @@ dependencies {
     implementation 'com.android.billingclient:billing:8.3.0'
 
     // Splash screen padronizada (API nativa do Android 12+, com retrocompatibilidade)
-    implementation 'androidx.core:core-splashscreen:1.0.1'
+    implementation 'androidx.core:core-splashscreen:1.2.0'
     
     // Armazenamento das credenciais de sincronização. O refresh token não pode
     // ficar em SharedPreferences comum: com allowBackup ativo ele sairia do
@@ -114,7 +114,7 @@ dependencies {
     implementation 'androidx.work:work-runtime:2.10.0'
 
     // Firebase
-    implementation platform('com.google.firebase:firebase-bom:34.19.0')
+    implementation platform('com.google.firebase:firebase-bom:35.1.0')
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-messaging'
     

@@ -5,8 +5,10 @@ import {
   importSPKI,
   generateKeyPair,
   errors as joseErrors,
-  type KeyLike,
 } from 'jose';
+
+/** O jose 6 removeu `KeyLike`: o tipo é o que `importPKCS8`/`generateKeyPair` devolvem (CryptoKey). */
+type KeyLike = Awaited<ReturnType<typeof importPKCS8>>;
 
 import type { Env } from '../config/env.js';
 import { AppError, ErrorCode, unauthorized } from '../http/errors.js';
