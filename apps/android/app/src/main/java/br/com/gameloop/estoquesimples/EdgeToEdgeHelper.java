@@ -10,8 +10,11 @@ import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 /**
@@ -49,7 +52,13 @@ public final class EdgeToEdgeHelper {
 
         // A raiz recebe a cor das barras (#1c679d). Ela só fica visível nas
         // áreas de padding (status bar / nav bar).
-        root.setBackgroundColor(BrandStore.color(activity, R.color.system_bar));
+        int barColor = BrandStore.color(activity, R.color.system_bar);
+        root.setBackgroundColor(barColor);
+        // Marca clara: ícones escuros na barra de status e de navegação (brancos sumiriam).
+        boolean lightBars = ColorUtils.calculateLuminance(barColor) > 0.5;
+        WindowInsetsControllerCompat bars = WindowCompat.getInsetsController(activity.getWindow(), activity.getWindow().getDecorView());
+        bars.setAppearanceLightStatusBars(lightBars);
+        bars.setAppearanceLightNavigationBars(lightBars);
 
         // A área de conteúdo recebe o fundo padrão do tema (opaco). Sem isso,
         // telas cujo layout raiz não define android:background deixariam o azul

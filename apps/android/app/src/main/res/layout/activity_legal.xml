@@ -34,7 +34,7 @@
                 android:text="Termos de uso"
                 android:textAppearance="@style/TextAppearance.Estoque.Supporting"
                 android:textStyle="bold"
-                android:textColor="@color/color_brand" />
+                android:textColor="@color/color_brand_ink" />
 
             <View
                 android:id="@+id/tabTermosIndicator"

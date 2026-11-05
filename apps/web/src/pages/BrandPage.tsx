@@ -38,7 +38,7 @@ type Draft = { slug: string; primaryColor: string | null; accentColor: string | 
 const DEFAULT_LOGIN_SUBTITLE = 'Painel de controle de estoque';
 
 const COLORS: Array<{ key: ColorKey; field: Problem['field']; label: string; hint: string; fallback: string }> = [
-  { key: 'primaryColor', field: 'primary', label: 'Cor principal', hint: 'Barras, botões e destaques. Precisa ter contraste com texto branco.', fallback: '#1c679d' },
+  { key: 'primaryColor', field: 'primary', label: 'Cor principal', hint: 'Barras, botões e destaques. Pode ser clara ou escura: o texto por cima fica branco ou escuro, o que tiver mais contraste.', fallback: '#1c679d' },
   { key: 'accentColor', field: 'accent', label: 'Cor de destaque', hint: 'Links e números em evidência. Sem escolher, usa a cor principal.', fallback: '#1c679d' },
   { key: 'textColor', field: 'text', label: 'Cor do texto', hint: 'Textos de leitura. Precisa de alto contraste com o fundo.', fallback: '#1a2330' },
 ];
@@ -135,9 +135,13 @@ export function BrandPage() {
   const reset = useMutation({
     mutationFn: () => api.delete<BrandConfig>(base),
     onSuccess: async () => {
-      setDraft(null);
-      toast.push('Voltamos ao visual padrão do Estoque Simples.', { tone: 'success' });
+      // Primeiro os dados novos, depois o rascunho: limpando o rascunho antes, ele
+      // era recriado na hora com a configuração antiga ainda em cache e a prévia
+      // voltava a pintar as cores anteriores até recarregar a página.
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['brand-config'] }), refresh()]);
+      setDraft(null);
+      setProblems([]);
+      toast.push('Voltamos ao visual padrão do Estoque Simples.', { tone: 'success' });
     },
     onError: (error) => toast.push(errorMessage(error), { tone: 'error' }),
   });
@@ -225,7 +229,6 @@ export function BrandPage() {
                   )}
                   {loginUrl && (
                     <div className="row" style={{ gap: 8 }}>
-                      <a className="btn btn--sm" href={loginUrl} target="_blank" rel="noreferrer">Abrir página de entrada</a>
                       <button type="button" className="btn btn--sm" onClick={() => void navigator.clipboard?.writeText(loginUrl).then(() => toast.push('Endereço copiado.', { tone: 'success' }))}>Copiar endereço</button>
                     </div>
                   )}

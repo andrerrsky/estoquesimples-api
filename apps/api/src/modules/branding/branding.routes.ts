@@ -33,6 +33,8 @@ export const brandingViewSchema = z.object({
       primarySoft: z.string(),
       primaryTint: z.string(),
       onPrimary: z.string(),
+      primaryInk: z.string(),
+      primaryInkDark: z.string(),
       accent: z.string(),
       text: z.string(),
       textMuted: z.string(),

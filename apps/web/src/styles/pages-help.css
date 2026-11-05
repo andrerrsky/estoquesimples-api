@@ -111,7 +111,7 @@
   margin-bottom: 2px;
   font-size: var(--fs-caption);
   font-weight: 600;
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .faq__chevron {
   flex: none;
@@ -120,10 +120,10 @@
 }
 .faq--open .faq__chevron {
   transform: rotate(180deg);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .faq--open .faq__question {
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 .faq mark {
   background: var(--warning-soft);
@@ -181,7 +181,7 @@
   padding: 18px;
   border-radius: var(--radius-card);
   background: var(--brand-soft);
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 .help__contact > div {
   display: flex;

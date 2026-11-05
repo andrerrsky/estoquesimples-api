@@ -67,7 +67,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Ver Análise de Estoque"
-                    android:textColor="@color/color_brand"
+                    android:textColor="@color/color_brand_ink"
                     android:textStyle="bold"
                     android:textSize="15sp" />
 
@@ -260,7 +260,7 @@
                         android:gravity="center"
                         android:text="Sem valor em estoque para exibir"
                         android:textAppearance="@style/TextAppearance.Estoque.Section"
-                        android:textColor="@color/color_brand" />
+                        android:textColor="@color/color_brand_ink" />
 
                     <TextView
                         android:layout_width="wrap_content"

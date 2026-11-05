@@ -101,19 +101,71 @@ export const DEFAULT_THEME = {
   text: '#1a2330',
 } as const;
 
-/** Contraste mínimo exigido (WCAG 2.2): AA para a cor principal/destaque, AAA para o texto. */
-export const MIN_CONTRAST = { primary: 4.5, accent: 4.5, text: 7 } as const;
+/**
+ * Contraste mínimo (WCAG 2.2 AA, 4.5:1) para o que é TEXTO: a cor de destaque
+ * (links, números) sobre o branco e a cor do texto sobre o fundo das telas.
+ *
+ * A cor principal não tem mínimo: ela é fundo de botões e barras, e o texto
+ * por cima (`onPrimary`) sai branco ou escuro, o que tiver mais contraste —
+ * uma das duas opções sempre passa de 4.5:1. Onde a cor principal aparece
+ * como texto sobre fundo claro, os clientes usam `primaryInk`, que é a
+ * própria cor quando ela já tem contraste com o branco e, se for clara, uma
+ * versão escurecida dela.
+ */
+export const MIN_CONTRAST = { accent: 4.5, text: 4.5 } as const;
 
 /**
  * Escurece a cor até atingir o contraste pedido contra o branco, para
  * sugerir uma alternativa próxima em vez de só recusar.
  */
 export function darkenToContrast(hex: string, minimum: number): string {
+  // Baixa só a luminosidade (HSL), mantendo matiz e saturação: misturar com
+  // preto deixava as cores claras acinzentadas (#c7e8ff virava #5f6e79).
+  const [h, sat, l] = toHsl(toRgb(hex));
   let candidate = hex.toLowerCase();
-  for (let step = 1; step <= 40 && contrast(candidate, WHITE) < minimum; step += 1) {
-    candidate = mix(hex, BLACK, step * 0.025);
+  for (let lightness = l; lightness >= 0 && contrast(candidate, WHITE) < minimum; lightness -= 0.01) {
+    candidate = toHex(fromHsl(h, sat, lightness));
   }
   return candidate;
+}
+
+function toHsl([r, g, b]: Rgb): [number, number, number] {
+  const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === rn ? ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6 : max === gn ? ((bn - rn) / d + 2) / 6 : ((rn - gn) / d + 4) / 6;
+  return [h, sat, l];
+}
+
+function fromHsl(h: number, sat: number, l: number): Rgb {
+  if (sat === 0) return [l * 255, l * 255, l * 255];
+  const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
+  const p = 2 * l - q;
+  const channel = (t: number) => {
+    const x = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+    if (x < 1 / 6) return p + (q - p) * 6 * x;
+    if (x < 1 / 2) return q;
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+    return p;
+  };
+  return [channel(h + 1 / 3) * 255, channel(h) * 255, channel(h - 1 / 3) * 255];
+}
+
+/**
+ * Variação de hover/pressionado: escurece a cor, mas sem deixar o texto por
+ * cima (`on`) abaixo de 4.5:1 — numa principal clara com texto escuro,
+ * escurecer demais apagaria o texto.
+ */
+function shade(color: string, on: string, amount: number): string {
+  for (let step = amount; step > 0; step -= 0.02) {
+    const candidate = mix(color, BLACK, step);
+    if (contrast(candidate, on) >= 4.5) return candidate;
+  }
+  return color;
 }
 
 export type BrandFont = 'default' | 'serif';
@@ -143,6 +195,7 @@ export function colorProblems(colors: BrandColorsInput): ColorProblem[] {
       problems.push({ field, message: `${FIELD_LABEL[field]} precisa estar no formato #RRGGBB.` });
       continue;
     }
+    if (field === 'primary') continue;
     const ratio = Math.min(contrast(value, WHITE), field === 'text' ? contrast(value, SURFACE) : Infinity);
     const minimum = MIN_CONTRAST[field];
     if (ratio < minimum) {
@@ -152,7 +205,7 @@ export function colorProblems(colors: BrandColorsInput): ColorProblem[] {
         message:
           field === 'text'
             ? `${FIELD_LABEL[field]} tem contraste ${ratio.toFixed(1)}:1 com o fundo; o mínimo é ${minimum}:1 para o texto continuar legível.`
-            : `${FIELD_LABEL[field]} tem contraste ${ratio.toFixed(1)}:1 com o branco; o mínimo é ${minimum}:1 porque ela é usada como fundo de textos brancos e como cor de texto.`,
+            : `${FIELD_LABEL[field]} tem contraste ${ratio.toFixed(1)}:1 com o branco; o mínimo é ${minimum}:1 porque ela é usada em links e números sobre fundo claro.`,
         suggestion: dark,
       });
     }
@@ -167,8 +220,12 @@ export interface BrandTheme {
   primaryPressed: string;
   primarySoft: string;
   primaryTint: string;
-  /** Texto sobre a cor principal (sempre branco: a principal exige contraste com branco). */
+  /** Texto sobre a cor principal: branco, ou escuro quando a principal é clara. */
   onPrimary: string;
+  /** A cor principal usada como TEXTO sobre fundo claro (links, aba ativa): escurecida se a principal for clara. */
+  primaryInk: string;
+  /** Variação mais escura de `primaryInk` (texto em destaque). */
+  primaryInkDark: string;
   accent: string;
   text: string;
   textMuted: string;
@@ -186,7 +243,13 @@ export interface ThemeInput extends BrandColorsInput {
  */
 export function deriveTheme(input: ThemeInput): BrandTheme {
   const primary = (input.primary ?? '#1c679d').toLowerCase();
-  const accent = (input.accent ?? input.primary ?? '#1c679d').toLowerCase();
+  const light = contrast(primary, WHITE) < 4.5;
+  // Texto sobre a cor principal: branco quando passa; senão o escuro do produto (ou preto).
+  const onPrimary = !light ? WHITE : contrast(primary, DEFAULT_THEME.text) >= 4.5 ? DEFAULT_THEME.text : BLACK;
+  // Margem acima de 4.5:1 porque o mesmo texto também aparece sobre os fundos suaves da marca.
+  const primaryInk = light ? darkenToContrast(primary, 5) : primary;
+  // Sem destaque escolhido, links e números usam a versão legível da principal.
+  const accent = (input.accent ?? primaryInk).toLowerCase();
   const text = (input.text ?? DEFAULT_THEME.text).toLowerCase();
 
   let textMuted = input.text ? text : '#5c6b7a';
@@ -203,11 +266,13 @@ export function deriveTheme(input: ThemeInput): BrandTheme {
 
   return {
     primary,
-    primaryDark: mix(primary, BLACK, 0.2),
-    primaryPressed: mix(primary, BLACK, 0.1),
+    primaryDark: shade(primary, onPrimary, 0.2),
+    primaryPressed: shade(primary, onPrimary, 0.1),
     primarySoft: mix(primary, WHITE, 0.9),
     primaryTint: mix(primary, WHITE, 0.94),
-    onPrimary: WHITE,
+    onPrimary,
+    primaryInk,
+    primaryInkDark: light ? mix(primaryInk, BLACK, 0.2) : mix(primary, BLACK, 0.2),
     accent,
     text,
     textMuted,

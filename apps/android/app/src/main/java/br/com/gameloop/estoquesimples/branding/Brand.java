@@ -30,6 +30,8 @@ public final class Brand {
     public final int primaryDark;
     public final int primaryPressed;
     public final int onPrimary;
+    /** A cor principal como texto sobre fundo claro (igual à principal quando ela já é escura). */
+    public final int primaryInk;
     public final int accent;
     public final int text;
     public final int textMuted;
@@ -40,7 +42,7 @@ public final class Brand {
     public final String logoHash;
 
     private Brand(String slug, String displayName, int version, int[] c, boolean serif,
-                  String logoUrl, String logoHash) {
+                  int primaryInk, String logoUrl, String logoHash) {
         this.slug = slug;
         this.displayName = displayName;
         this.version = version;
@@ -48,6 +50,7 @@ public final class Brand {
         this.primaryDark = c[1];
         this.primaryPressed = c[2];
         this.onPrimary = c[3];
+        this.primaryInk = primaryInk;
         this.accent = c[4];
         this.text = c[5];
         this.textMuted = c[6];
@@ -88,8 +91,11 @@ public final class Brand {
             }
         }
         String name = json.isNull("displayName") ? null : json.optString("displayName", null);
+        // Opcional (API anterior a 11/2026 não manda): sem ele, a própria principal.
+        String ink = theme.optString("primaryInk", "");
+        int primaryInk = HEX.matcher(ink).matches() ? Color.parseColor(ink) : colors[0];
         return new Brand(slug, name, json.optInt("version", 0), colors,
-                "serif".equals(theme.optString("font")), logoUrl, logoHash);
+                "serif".equals(theme.optString("font")), primaryInk, logoUrl, logoHash);
     }
 
     /** Cores do tema do app que a marca substitui (recurso -> cor). */
@@ -99,6 +105,9 @@ public final class Brand {
         map.put(R.color.color_brand_dark, primaryDark);
         map.put(R.color.color_brand_pressed, primaryPressed);
         map.put(R.color.color_text_on_brand, onPrimary);
+        // Texto secundário sobre a marca: segue o texto principal (escuro numa marca clara).
+        map.put(R.color.color_text_on_brand_muted, (onPrimary & 0x00FFFFFF) | 0xD9000000);
+        map.put(R.color.color_brand_ink, primaryInk);
         map.put(R.color.color_ripple_brand, (primary & 0x00FFFFFF) | 0x33000000);
         map.put(R.color.color_accent, accent);
         map.put(R.color.color_text, text);

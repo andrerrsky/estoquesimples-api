@@ -54,7 +54,7 @@
 .suggest__option:hover,
 .suggest__option.is-active {
   background: var(--brand-soft);
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 @keyframes suggest-in {
   from {

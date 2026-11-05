@@ -75,6 +75,9 @@ export interface BrandTheme {
   primarySoft: string;
   primaryTint: string;
   onPrimary: string;
+  /** Ausentes em respostas antigas: o cliente usa a própria cor principal. */
+  primaryInk?: string;
+  primaryInkDark?: string;
   accent: string;
   text: string;
   textMuted: string;

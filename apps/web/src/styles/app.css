@@ -253,7 +253,7 @@ button {
 }
 .navlink.active {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
   font-weight: 600;
 }
 .navlink__badge {
@@ -474,7 +474,7 @@ button {
 .btn--secondary {
   background: var(--surface-content);
   border-color: var(--brand);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .btn--secondary:hover:not(:disabled) {
   background: var(--brand-soft);
@@ -506,12 +506,15 @@ button {
   background: var(--brand-soft);
 }
 .btn--outline-on-brand {
-  /* 72% dá 4:1 sobre o azul da marca: o contorno do botão precisa de 3:1. */
+  /* 72% dá 4:1 sobre o azul da marca: o contorno do botão precisa de 3:1.
+     Segue o texto sobre a marca (escuro quando a marca é clara). */
   border-color: rgba(255, 255, 255, 0.72);
+  border-color: color-mix(in srgb, var(--on-brand) 72%, transparent);
   color: var(--on-brand);
 }
 .btn--outline-on-brand:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--on-brand) 12%, transparent);
 }
 .btn--sm {
   min-height: 34px;
@@ -620,7 +623,7 @@ button {
 }
 .social-links a:hover {
   background: var(--chip);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 
 .avatar {
@@ -630,7 +633,7 @@ button {
   height: 34px;
   border-radius: 50%;
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
   font-size: 12px;
   font-weight: 700;
   flex: none;
@@ -809,7 +812,7 @@ button {
 .form-section {
   font-size: var(--fs-label);
   font-weight: 700;
-  color: var(--brand);
+  color: var(--brand-ink);
   margin-top: 6px;
 }
 
@@ -944,7 +947,7 @@ button {
 .badge--info,
 .badge--brand {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .badge--solid {
   background: var(--brand);
@@ -975,7 +978,7 @@ button {
 .notice--info {
   background: var(--info-soft);
   border-color: color-mix(in srgb, var(--info) 25%, transparent);
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 .notice--warning {
   background: var(--warning-soft);
@@ -1150,7 +1153,7 @@ button {
   color: var(--text);
 }
 .tab.active {
-  color: var(--brand);
+  color: var(--brand-ink);
   border-bottom-color: var(--brand);
 }
 
@@ -1568,7 +1571,7 @@ button {
   color: var(--error);
 }
 .movement--neutral {
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 
 .type-badge {
@@ -1591,7 +1594,7 @@ button {
 }
 .type-badge--neutral {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 
 .stepper {
@@ -1860,7 +1863,7 @@ button {
   height: 42px;
   border-radius: var(--radius-panel);
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-ink);
 }
 .feature__title {
   font-weight: 700;
@@ -1928,7 +1931,7 @@ button {
   margin: 8px 0;
 }
 .legal .kicker {
-  color: var(--brand);
+  color: var(--brand-ink);
   font-weight: 700;
   font-size: var(--fs-label);
   letter-spacing: 0.06em;
@@ -1942,7 +1945,7 @@ button {
   display: block;
   background: var(--brand-soft);
   border-color: transparent;
-  color: var(--brand-dark);
+  color: var(--brand-ink-dark);
 }
 
 /* Conversa do suporte */
