@@ -31,14 +31,42 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Estoque Simples",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Android, Web",
-        "inLanguage": "pt-BR",
-        "url": "https://estoquesimples.com.br/",
-        "installUrl": "https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL", "description": "Plano Gratuito, para uma pessoa" }
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://estoquesimples.com.br/#org",
+            "name": "Estoque Simples",
+            "url": "https://estoquesimples.com.br/",
+            "logo": { "@type": "ImageObject", "url": "https://estoquesimples.com.br/icon-512.png", "width": 512, "height": 512 },
+            "sameAs": [
+              "https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples",
+              "https://www.instagram.com/estoquesimplesapp",
+              "https://www.facebook.com/share/1Ew1KKeopW/",
+              "https://www.linkedin.com/company/estoque-simples/"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://estoquesimples.com.br/#site",
+            "name": "Estoque Simples",
+            "url": "https://estoquesimples.com.br/",
+            "inLanguage": "pt-BR",
+            "publisher": { "@id": "https://estoquesimples.com.br/#org" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://estoquesimples.com.br/#app",
+            "name": "Estoque Simples",
+            "description": "Controle de estoque para pequenos negócios: produtos, entradas e saídas, aviso de estoque baixo, leitor de código de barras, relatórios e equipe, no app Android e na web com os mesmos dados.",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Android, Web",
+            "inLanguage": "pt-BR",
+            "url": "https://estoquesimples.com.br/",
+            "installUrl": "https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples",
+            "publisher": { "@id": "https://estoquesimples.com.br/#org" },
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL", "description": "Plano Gratuito, para uma pessoa" }
+          }
+        ]
       }
     </script>
   </head>

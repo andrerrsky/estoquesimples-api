@@ -6,6 +6,8 @@ import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 import { resolveAppDist } from './app-dist.js';
 import { BlogPages, isBlogPagePath } from '../../modules/blog/blog-pages.js';
+import { INDEXNOW_KEY } from '../../modules/blog/indexnow.js';
+import { isPublicAppPage, privateAppHtml, publicPageHtml } from '../../modules/blog/public-pages.js';
 import { ErrorCode } from './errors.js';
 
 /**
@@ -202,6 +204,21 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     'utf8',
   );
   const blogNotFound: StaticFile = { ...index, cacheControl: 'no-store', etag: etagFor(notFoundRaw), raw: notFoundRaw, gzip: gzipSync(notFoundRaw, { level: 6 }), brotli: null };
+  // Páginas públicas da aplicação com o próprio título/canonical (e FAQ na ajuda);
+  // as demais rotas sem canonical da home e com noindex (ver public-pages.ts).
+  const htmlFile = (html: string, cacheControl: string): StaticFile => {
+    const raw = Buffer.from(html, 'utf8');
+    return { ...index, cacheControl, etag: etagFor(raw), raw, gzip: gzipSync(raw, { level: 6 }), brotli: null };
+  };
+  const publicPages = new Map<string, StaticFile>();
+  for (const path of ['/ajuda', '/plataformas', '/termos', '/privacidade', '/criar-conta', '/entrar']) {
+    const html = distDir ? publicPageHtml(indexTemplate, path) : null;
+    if (html) publicPages.set(path, htmlFile(html, 'no-cache'));
+  }
+  const privateIndex = distDir ? htmlFile(privateAppHtml(indexTemplate), 'no-store') : { ...index, cacheControl: 'no-store' };
+  // Chave do IndexNow (Bing e outros): o buscador confere este arquivo antes de aceitar os avisos.
+  const indexNowFile = htmlFile(INDEXNOW_KEY, 'public, max-age=86400');
+  indexNowFile.contentType = 'text/plain; charset=utf-8';
   const landingLastmod = (/<loc>https:\/\/estoquesimples\.com\.br\/<\/loc><lastmod>([^<]*)/.exec(files.get('/sitemap.xml')?.raw.toString('utf8') ?? '')?.[1] ?? new Date().toISOString().slice(0, 10));
 
   const send = (request: FastifyRequest, reply: FastifyReply, file: StaticFile, status = 200): FastifyReply => {
@@ -292,6 +309,7 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
         return reply.code(503).header('Retry-After', '120').header('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send('Blog temporariamente indisponível. Tente de novo em instantes.');
       }
       if (page) {
+        for (const [name, value] of Object.entries(page.headers ?? {})) reply.header(name, value);
         const raw = Buffer.from(page.body, 'utf8');
         return send(request, reply, { contentType: page.contentType, cacheControl: page.cacheControl, etag: etagFor(raw), raw, gzip: raw.length > 1024 ? gzipSync(raw, { level: 6 }) : null, brotli: null }, page.status);
       }
@@ -299,6 +317,7 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
 
     const file = files.get(path);
     if (file) return send(request, reply, file);
+    if (path === `/${INDEXNOW_KEY}.txt`) return send(request, reply, indexNowFile);
 
     // Post que não existe (ou qualquer caminho inválido sob /blog/): 404 de
     // verdade, com a SPA mostrando a própria tela de "não encontrado".
@@ -325,6 +344,8 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     // Qualquer outra rota é da SPA: o roteador do cliente decide. A página
     // inicial fica em `no-cache` (revalida a cada visita, mas deixa o
     // navegador guardar a página para o botão Voltar); as demais, `no-store`.
-    return send(request, reply, path === '/' ? landing : { ...index, cacheControl: 'no-store' });
+    if (path === '/') return send(request, reply, landing);
+    if (isPublicAppPage(path)) return send(request, reply, publicPages.get(path) ?? { ...index, cacheControl: 'no-store' });
+    return send(request, reply, privateIndex);
   });
 }

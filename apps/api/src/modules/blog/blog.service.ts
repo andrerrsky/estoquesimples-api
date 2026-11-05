@@ -12,6 +12,8 @@ import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 import { BLOG_CATEGORIES, blogCategory } from './blog.categories.js';
 import { DEFAULT_BLOG_SETTINGS, blogSettingsSchema, type BlogListQuery, type BlogPostBody, type BlogSettings } from './blog.schemas.js';
 import { fontsKnownMissing } from './blog-cover.js';
+import { postUrl } from './blog-ssr.js';
+import { notifyIndexNow } from './indexnow.js';
 import { previewHtml, readingMinutes, renderMarkdown, slugify } from './markdown.js';
 
 export const BLOG_NOTIFY_JOB = 'blog.notify_post';
@@ -150,13 +152,16 @@ export class BlogService {
     };
   }
 
-  async getPublished(slug: string): Promise<BlogPostView | null> {
+  /** `markdown`: inclui o texto-fonte (`contentMd`), para a versão `.md` do post. */
+  async getPublished(slug: string, options: { markdown?: boolean } = {}): Promise<BlogPostView | null> {
     const rows = await this.db
       .select()
       .from(blogPosts)
       .where(and(eq(blogPosts.slug, slug), eq(blogPosts.status, 'published')))
       .limit(1);
-    return rows[0] ? this.toView(rows[0]) : null;
+    if (!rows[0]) return null;
+    const view = this.toView(rows[0]);
+    return options.markdown ? { ...view, contentMd: rows[0].contentMd } : view;
   }
 
   /**
@@ -179,10 +184,10 @@ export class BlogService {
     return rows.map((row) => ({ ...this.toView(row), contentHtml: '' }));
   }
 
-  /** Para o sitemap e o feed. */
-  async allPublished(limit = 500): Promise<BlogPostView[]> {
+  /** Para o sitemap, o feed e os arquivos para IA (`markdown`: inclui o texto-fonte). */
+  async allPublished(limit = 500, options: { markdown?: boolean } = {}): Promise<BlogPostView[]> {
     const rows = await this.db.select().from(blogPosts).where(eq(blogPosts.status, 'published')).orderBy(desc(blogPosts.publishedAt)).limit(limit);
-    return rows.map((row) => this.toView(row));
+    return rows.map((row) => (options.markdown ? { ...this.toView(row), contentMd: row.contentMd } : this.toView(row)));
   }
 
   async readCover(hash: string): Promise<Buffer | null> {
@@ -286,6 +291,8 @@ export class BlogService {
     const post = updated[0];
     if (!post) throw notFound('Post não encontrado.');
     await recordAdminAudit(this.db, { actor, action: AdminAction.BLOG_POST_UPDATED, targetType: 'blog_post', targetId: id, metadata: { title: post.title, slug: post.slug } });
+    // Post no ar mudou: avisa os buscadores (o endereço antigo também, se o slug trocou).
+    if (post.status === 'published') notifyIndexNow(this.services, [...new Set([postUrl(post), postUrl(current)])]);
     return this.toView(post, { withSource: true });
   }
 
@@ -314,6 +321,7 @@ export class BlogService {
       }
       return published;
     });
+    notifyIndexNow(this.services, [postUrl(post), 'https://estoquesimples.com.br/blog']);
     return this.toView(post, { withSource: true });
   }
 
@@ -322,6 +330,8 @@ export class BlogService {
     const post = updated[0];
     if (!post) throw notFound('Post não encontrado.');
     await recordAdminAudit(this.db, { actor, action: AdminAction.BLOG_POST_UNPUBLISHED, targetType: 'blog_post', targetId: id, metadata: { title: post.title } });
+    // O endereço passa a dar 404: avisar faz o buscador tirar o post do índice antes.
+    notifyIndexNow(this.services, [postUrl(post)]);
     return this.toView(post, { withSource: true });
   }
 

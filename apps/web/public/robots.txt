@@ -1,5 +1,43 @@
+# Estoque Simples: robots.txt
+#
+# Buscadores e assistentes de IA são bem-vindos em todo o conteúdo público:
+# página inicial, blog, central de ajuda, onde usar, termos e privacidade.
+# Para IAs, o índice do site está em /llms.txt, o texto completo em
+# /llms-full.txt, e cada post também existe em Markdown (/blog/<post>.md).
+#
+# Fora do índice: a área logada e as telas de convite, senha e e-mail.
+
 User-agent: *
 Allow: /
+Disallow: /app/
+Disallow: /convite/
+Disallow: /redefinir-senha
+Disallow: /confirmar-email
+
+# Assistentes de IA, buscas com IA e coleta para modelos. Liberados de
+# propósito: ser citado nas respostas traz quem procura controle de estoque.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: anthropic-ai
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: GoogleOther
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Bingbot
+User-agent: DuckAssistBot
+User-agent: meta-externalagent
+User-agent: MistralAI-User
+User-agent: Amazonbot
+User-agent: CCBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
 Disallow: /app/
 Disallow: /convite/
 Disallow: /redefinir-senha

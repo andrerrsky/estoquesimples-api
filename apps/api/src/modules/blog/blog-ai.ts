@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { desc, eq, isNotNull } from 'drizzle-orm';
 
@@ -9,6 +6,8 @@ import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
 import { OpenAiClient } from '../reviews/openai-client.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
+import { helpContent, type HelpArticle } from './help-content.js';
+import { PRODUCT_FACT_LINES } from './product-facts.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_SLUGS } from './blog.categories.js';
 import { blogPostBodySchema, type BlogPostBody } from './blog.schemas.js';
 import { BlogService } from './blog.service.js';
@@ -82,17 +81,7 @@ const SITE = 'https://estoquesimples.com.br';
 
 /** O que o app faz e o que não faz: a IA só pode afirmar o que está aqui. */
 const PRODUCT_FACTS = `FATOS SOBRE O ESTOQUE SIMPLES (só afirme o que está aqui):
-- É um controle de estoque brasileiro para pequenos negócios: mercearia, loja de roupas, pet shop, papelaria, distribuidora, lanchonete, revenda, salão.
-- Existe como aplicativo Android (Google Play) e como versão web em estoquesimples.com.br (navegador no computador, tablet e celular, inclusive iPhone e iPad como web app na tela inicial). Não existe app na App Store.
-- Cadastro de produtos com nome, categoria, fornecedor, localização, unidade (un, kg, L, caixa…), valor unitário, estoque mínimo, código de barras e foto.
-- Entradas e saídas em poucos toques; o saldo se atualiza na hora; todo movimento fica no histórico com data e quem lançou; é possível estornar.
-- Aviso de estoque baixo: na lista, nos relatórios e, no Android, uma notificação diária no aparelho; na web, avisos opcionais no navegador.
-- Leitor de código de barras pela câmera (Android e navegadores com câmera) e por leitor USB no computador.
-- Relatórios: valor do estoque, produtos abaixo do mínimo, movimentações por período, em PDF para compartilhar. Análise avançada (tendências, giro) no plano Equipe.
-- Importar e exportar por planilha (CSV/Excel) e JSON; backup; os dados ficam na nuvem com conta grátis.
-- Plano Gratuito: uma pessoa, nuvem incluída, com teto de produtos. Plano Equipe (assinatura mensal, cancelável quando quiser): várias pessoas no mesmo estoque com papéis (quem cadastra, quem movimenta, quem só consulta), produtos sem limite na nuvem, análise avançada e identidade visual da empresa. Assinatura pela Google Play ou, na web, por Pix, boleto ou cartão.
-- O app Android funciona sem internet; a versão web precisa de internet.
-- NÃO faz: emissão de nota fiscal, PDV/frente de caixa, integração automática com marketplaces, controle de lotes/validade por data (a validade pode ser anotada na descrição), multi-depósito, contas a pagar.
+${PRODUCT_FACT_LINES.map((line) => `- ${line}`).join('\n')}
 - Não cite preços. Não prometa recursos futuros.`;
 
 const DEFAULT_TARGET_WORDS = 950;
@@ -141,32 +130,9 @@ interface AiPlan {
   faq: Array<{ question: string; answer: string }>;
 }
 
-interface HelpArticle {
-  id: string;
-  category: string;
-  question: string;
-  answer: string[];
-  keywords?: string[];
-}
 
-/** A central de ajuda (packages/help/faq.json), lida uma vez; sem ela a IA segue só com os fatos. */
-let helpCache: HelpArticle[] | null = null;
-function helpArticles(): HelpArticle[] {
-  if (helpCache) return helpCache;
-  const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [join(here, '../../../../../packages/help/faq.json'), join(process.cwd(), 'packages/help/faq.json'), join(process.cwd(), '../../packages/help/faq.json')];
-  for (const path of candidates) {
-    try {
-      const parsed = JSON.parse(readFileSync(path, 'utf8')) as { articles?: HelpArticle[] };
-      helpCache = parsed.articles ?? [];
-      return helpCache;
-    } catch {
-      // próximo candidato
-    }
-  }
-  helpCache = [];
-  return helpCache;
-}
+/** A central de ajuda (packages/help/faq.json); sem ela a IA segue só com os fatos. */
+const helpArticles = (): HelpArticle[] => helpContent().articles;
 
 function fold(text: string): string {
   return text.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();

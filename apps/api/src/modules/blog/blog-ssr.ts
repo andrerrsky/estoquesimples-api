@@ -18,6 +18,13 @@ const DEFAULT_IMAGE = `${SITE}/og.jpg`;
 const BLOG_TITLE = 'Blog do Estoque Simples: dicas de estoque, vendas e gestão';
 const BLOG_DESCRIPTION = 'Dicas práticas de controle de estoque, vendas e gestão para pequenos negócios, mais as novidades do Estoque Simples. Novos posts toda semana.';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
+/** Perfis oficiais: ajudam buscadores e assistentes a ligar o site à marca. */
+export const SAME_AS = [
+  PLAY_STORE_URL,
+  'https://www.instagram.com/estoquesimplesapp',
+  'https://www.facebook.com/share/1Ew1KKeopW/',
+  'https://www.linkedin.com/company/estoque-simples/',
+];
 
 /**
  * Endereço canônico do post: sempre no domínio público, independente de
@@ -44,6 +51,8 @@ export interface HeadMeta {
   jsonLd: unknown[];
   article?: { publishedAt: string; modifiedAt: string; section: string; tags: string[] };
   noindex?: boolean;
+  /** Versão em Markdown da página (posts), para assistentes de IA. */
+  markdown?: string;
 }
 
 function dateLong(iso: string | null): string {
@@ -78,6 +87,7 @@ export function applyHead(template: string, meta: HeadMeta): string {
   const extra = [
     meta.noindex ? '<meta name="robots" content="noindex, follow" />' : '<meta name="robots" content="max-image-preview:large" />',
     `<link rel="alternate" type="application/rss+xml" title="Blog do Estoque Simples" href="${SITE}/blog/feed.xml" />`,
+    meta.markdown ? `<link rel="alternate" type="text/markdown" title="Versão em Markdown" href="${e(meta.markdown)}" />` : '',
     meta.article
       ? [
           `<meta property="article:published_time" content="${e(meta.article.publishedAt)}" />`,
@@ -97,14 +107,14 @@ export function applyHead(template: string, meta: HeadMeta): string {
   return html.replace('</head>', `    ${extra}\n  </head>`);
 }
 
-function organization() {
+export function organization() {
   return {
     '@type': 'Organization',
     '@id': `${SITE}/#org`,
     name: SITE_NAME,
     url: SITE,
     logo: { '@type': 'ImageObject', url: `${SITE}/icon-512.png`, width: 512, height: 512 },
-    sameAs: [PLAY_STORE_URL],
+    sameAs: SAME_AS,
   };
 }
 
@@ -113,7 +123,7 @@ function author(name: string) {
   return { '@type': 'Organization', '@id': `${SITE}/#equipe`, name, url: SITE, parentOrganization: { '@id': `${SITE}/#org` } };
 }
 
-function breadcrumb(items: Array<{ name: string; url: string }>) {
+export function breadcrumb(items: Array<{ name: string; url: string }>) {
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -298,6 +308,7 @@ export function renderBlogPost(template: string, post: BlogPostView, related: Bl
     type: 'article',
     image: imageOf(post),
     imageAlt: post.coverAlt ?? post.title,
+    markdown: `${url}.md`,
     article: { publishedAt, modifiedAt: post.updatedAt, section: post.category.label, tags: post.tags },
     jsonLd: [
       {
