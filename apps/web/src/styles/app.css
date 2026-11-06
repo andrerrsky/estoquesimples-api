@@ -371,6 +371,11 @@ button {
 .page--narrow {
   max-width: 760px;
 }
+/* Aviso fixo no topo (confirmar e-mail, versão nova): separado do conteúdo abaixo. */
+.page.page--banner {
+  padding-bottom: 14px;
+  gap: 0;
+}
 
 .page-header {
   display: flex;
@@ -974,6 +979,20 @@ button {
   margin-left: auto;
   flex: none;
   align-self: center;
+}
+/* Com botão ao lado, ícone, texto e botão ficam na mesma linha central. */
+.notice--with-action {
+  align-items: center;
+}
+.notice--with-action svg {
+  margin-top: 0;
+}
+.notice__link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
 }
 .notice--info {
   background: var(--info-soft);

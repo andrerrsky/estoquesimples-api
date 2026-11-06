@@ -216,14 +216,14 @@ export function AppShell() {
         </header>
 
         {newVersion && (
-          <div className="page" style={{ paddingBottom: 0, gap: 0 }}>
+          <div className="page page--banner">
             <Notice tone="info" action={<button type="button" className="btn btn--primary btn--sm" onClick={() => window.location.reload()}>Atualizar</button>}>
               Há uma versão nova do Estoque Simples. Atualize para receber as melhorias; leva um segundo.
             </Notice>
           </div>
         )}
         {user && !user.emailVerified && !location.pathname.startsWith('/app/conta') && (
-          <div className="page" style={{ paddingBottom: 0, gap: 0 }}>
+          <div className="page page--banner">
             <Notice tone="warning" action={<Link to="/app/conta" className="btn btn--secondary btn--sm">Confirmar</Link>}>
               Confirme seu e-mail para poder convidar pessoas e recuperar a senha.
             </Notice>
