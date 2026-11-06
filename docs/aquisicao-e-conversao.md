@@ -63,7 +63,14 @@ cadastro e **não** deve virar evento principal no GA4 nem conversão no Ads.
 4. **Localização ambígua do clique em "Criar conta".** Os botões do topo da
    página e da chamada final saíam como `pagina`. Agora: `menu`, `hero` e
    `cta_final` (atributo `data-ga-local`).
-5. **Sem sinal de ativação.** A API passou a responder `firstProduct` no
+5. **Referenciador com query string.** O gtag envia `document.referrer`
+   inteiro (`dr`); um parâmetro da página anterior iria ao Google. Agora vai
+   `page_referrer` com origem e caminho só.
+6. **Evento ao montar a tela se perdia.** O React roda os efeitos dos filhos
+   antes dos do pai: o `signup.started` de /criar-conta chegava ao `gaEvent`
+   antes de o App carregar o GA e era descartado em toda carga direta da
+   página. O `gaEvent` agora inicia o GA quando há aceite.
+7. **Sem sinal de ativação.** A API passou a responder `firstProduct` no
    cadastro de produto pela web, e a web envia `product_first_created` só
    nesse caso.
 
@@ -90,11 +97,12 @@ Conferido em 6/11/2026, somente leitura:
   Os dias no Ads e no GA4 não batem nas bordas (cadastro às 23h em Brasília já
   é outro dia em um dos dois). O fuso de uma conta do Ads não muda depois de
   criado; compare semanas, não dias.
-- Na listagem de campanhas (com os filtros salvos) apareceu só a
-  “Campanha nº 1” (vídeo, pausada, sem grupos de anúncios) e “Rascunhos em
-  andamento: 0”. A campanha nova não foi conferida; quando estiver pronta,
-  confira metas, URLs finais com UTMs e que a codificação automática não é
-  desligada por um modelo de acompanhamento.
+- Rascunho “Estoque Simples | Display | 3 conceitos” (conferido em
+  6/11/2026, sem alterar): meta **Inscrições**, lances **Maximizar
+  conversões**, R$ 15,60/dia, Brasil, português, segmentação otimizada,
+  6 anúncios responsivos. Está preparado para otimizar por cadastros; sem
+  histórico de conversões, o lance passa por aprendizado. URLs finais dos
+  anúncios não foram abertas.
 
 ## 3. Consentimento: o que ele custa nos números
 
@@ -134,6 +142,8 @@ proprietário.
 
 ## 4. Separar testes e equipe sem tirar ninguém de verdade
 
+- **Estado verificado em 6/11/2026**: existe só o filtro “Internal Traffic”,
+  em **Teste** (eventos internos entram nos relatórios, marcados).
 - **Navegadores da equipe**: abra uma vez `https://estoquesimples.com.br/?es_interno=1`
   em cada navegador da equipe. Todos os eventos dele passam a sair com
   `traffic_type: internal` (o painel administrativo já faz isso sempre).
@@ -144,9 +154,14 @@ proprietário.
   depois mude para **Ativo** — filtro ativo descarta os dados de vez.
   Opcionalmente defina também regras de IP fixo em Fluxos de dados › Web ›
   Configurar definições da tag › Definir tráfego interno.
-- **Testes**: `?es_debug=1` liga o DebugView na aba. Eventos de depuração
-  aparecem no DebugView e o filtro “Developer Traffic” (Filtros de dados) os
-  tira dos relatórios quando ativo.
+- **Testes**: `?es_debug=1` (fica na aba, `sessionStorage`) manda
+  `debug_mode: true` na configuração. **Verificado em 6/11/2026: na versão
+  atual do gtag isso sai como parâmetro comum (`ep.debug_mode=true`), sem o
+  sinal `_dbg=1`, e o aparelho não aparece no DebugView.** Para ver no
+  DebugView use o [Tag Assistant](https://tagassistant.google.com) (ele liga
+  o modo de depuração sozinho). A propriedade não tem filtro “Developer
+  Traffic”, então eventos de teste entram nos relatórios; o que os separa é o
+  `traffic_type: internal` (`?es_interno=1`).
 - **Contas de teste**: use e-mails de teste próprios (ex.:
   `teste+ads1@seu-dominio`) e anote-os; no painel administrativo dá para
   excluir a conta depois. Nunca use dados de clientes.
@@ -184,6 +199,12 @@ Não clique em anúncios reais nem gere tráfego pago. Use UTMs fictícias.
 12. **Aceite tardio**: janela anônima, URL com UTMs, clique em “Criar conta”
     **sem** responder o aviso, e só aceite em /criar-conta: o `page_view` de
     /criar-conta leva os UTMs da página de entrada.
+
+Tempo real × DebugView: a propriedade `estoque-simples-f3604` recebe também
+o **app Android** (Firebase), que envia o próprio `sign_up` (e `first_open`,
+também evento principal). Um `sign_up` no Tempo real pode ser do app ou de
+outra pessoa; filtre por fluxo/plataforma “Web”. A conversão do Ads
+“(web) sign_up” só conta o fluxo web.
 
 O que isso prova e o que não prova: ver o evento no DebugView confirma que
 ele chegou ao GA4 com os parâmetros certos. **Não** prova que um cadastro
