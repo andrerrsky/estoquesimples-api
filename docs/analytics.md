@@ -129,6 +129,26 @@ Além do analytics próprio, os eventos também vão para o Google Analytics:
   - Visualizações de página: a medição otimizada do GA4 (eventos de
     histórico do navegador) registra cada troca de rota. Deixe ligada em
     Administrador › Fluxos de dados › Web › Medição otimizada.
+  - **Origem da visita**: o endereço enviado ao GA (`page_location`) não leva
+    a query string, exceto os parâmetros de campanha de uma lista fechada
+    (`utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`,
+    `utm_id`, `gclid`, `gbraid`, `wbraid`; valores com `@` ou com mais de 150
+    caracteres são descartados). Quem chega por um anúncio e só aceita os
+    cookies em outra página da mesma aba tem esses parâmetros guardados no
+    `sessionStorage` (`es_campanha`) e enviados uma vez, na primeira carga do
+    GA; recusar apaga.
+  - **Revogação**: "Recusar" depois de ter aceitado liga
+    `window['ga-disable-<ID>']` e o `gaEvent` deixa de chamar o gtag: nada mais
+    sai da página, nem as visualizações automáticas.
+  - **Primeiro produto**: `POST /v1/workspaces/:id/products` responde
+    `firstProduct: true` só no primeiro produto que a empresa já teve; a web
+    envia então `product_first_created` (só ao GA), além do `product_created`
+    de sempre. É evento de observação, não conversão.
+  - **Equipe e testes**: `?es_interno=1` em qualquer página marca o navegador
+    (localStorage) e todo evento sai com `traffic_type: internal`
+    (`?es_interno=0` desmarca); `?es_debug=1` liga o DebugView do GA4 na aba.
+  - Detalhes de aquisição, conversão no Google Ads, validação e consultas:
+    [aquisicao-e-conversao.md](aquisicao-e-conversao.md).
   - A CSP libera `www.googletagmanager.com` (script) e os domínios
     `*.google-analytics.com`, `*.analytics.google.com` e
     `*.googletagmanager.com` (envio).

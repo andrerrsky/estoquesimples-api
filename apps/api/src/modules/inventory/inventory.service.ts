@@ -590,10 +590,18 @@ export class InventoryService {
     }
   }
 
-  async createProduct(tx: Transaction, ctx: InventoryContext, body: CreateProductBody): Promise<ProductView> {
+  /**
+   * `firstProduct`: este é o primeiro produto que a empresa já teve (nenhum
+   * outro, nem excluído, nem vindo do app). A web usa como sinal de ativação
+   * para o Google Analytics; repetir a mesma requisição (mesmo `id`) responde
+   * igual, então uma resposta perdida não some com o sinal.
+   */
+  async createProduct(tx: Transaction, ctx: InventoryContext, body: CreateProductBody): Promise<ProductView & { firstProduct: boolean }> {
     await this.assertImageExists(tx, ctx.workspaceId, body.photoHash);
     this.validateUnit(body.unit, body.quantity);
     const id = body.id ?? randomUUID();
+    const others = await tx.execute(sql`SELECT 1 FROM products WHERE workspace_id = ${ctx.workspaceId} AND id <> ${id} LIMIT 1`);
+    const firstProduct = others.rows.length === 0;
     const unit = body.unit && body.unit !== '' ? body.unit : 'un';
 
     const upsert: Operation = {
@@ -633,7 +641,7 @@ export class InventoryService {
 
     const results = await this.push(tx, ctx, operations);
     for (const operation of operations) this.assertApplied(results.get(operation.opId));
-    return this.getProduct(tx, ctx.workspaceId, id);
+    return { ...(await this.getProduct(tx, ctx.workspaceId, id)), firstProduct };
   }
 
   async updateProduct(tx: Transaction, ctx: InventoryContext, productId: string, body: UpdateProductBody): Promise<ProductView> {

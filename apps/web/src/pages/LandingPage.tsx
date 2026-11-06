@@ -529,7 +529,7 @@ export function LandingPage() {
         Pular para o conteúdo
       </a>
 
-      <header className="landing__hero lp-on-brand">
+      <header className="landing__hero lp-on-brand" data-ga-local="menu">
         <div className="landing__nav">
           <a href="/" className="lp-brand">
             <Logo size={34} /> Estoque Simples
@@ -553,7 +553,7 @@ export function LandingPage() {
       </header>
 
       <main id="conteudo">
-        <section className="landing__hero lp-on-brand">
+        <section className="landing__hero lp-on-brand" data-ga-local="hero">
           <div className="landing__hero-inner">
             <div className="lp-hero__text">
               <p className="lp-eyebrow">Controle de estoque para mercearia, loja, pet shop e qualquer balcão</p>
@@ -778,7 +778,7 @@ export function LandingPage() {
 
         <FaqSection />
 
-        <section className="lp-cta lp-on-brand">
+        <section className="lp-cta lp-on-brand" data-ga-local="cta_final">
           <div className="lp-cta__inner">
             <div>
               <h2 id="lp-comecar">Comece pelo primeiro produto.</h2>

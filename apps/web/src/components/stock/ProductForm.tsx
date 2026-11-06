@@ -2,9 +2,11 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
 
 import { api, ApiError, errorMessage, uploadBinary } from '../../api/client';
-import type { Facets, Product, ProductList, UploadedImage } from '../../api/types';
+import type { CreatedProduct, Facets, Product, ProductList, UploadedImage } from '../../api/types';
+import { productSavedEvents } from '../../lib/activation';
 import { track } from '../../lib/analytics';
 import { newId } from '../../lib/device';
+import { gaEvent } from '../../lib/ga';
 import { fmtQuantity, fold, numberInput, parseNumber } from '../../lib/format';
 import { IMAGE_ACCEPT, ImageError, prepareImage, type PreparedImage } from '../../lib/image';
 import { inventoryKeys, useDebounced, useInvalidateInventory } from '../../lib/inventory';
@@ -193,7 +195,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
       };
       if (!product) {
         // `id` gerado aqui: se a resposta se perder, repetir não duplica.
-        return api.post<Product>(`${base}/products`, { id: draftId, ...fields, ...(photoHash ? { photoHash } : {}), quantity: values.quantity });
+        return api.post<CreatedProduct>(`${base}/products`, { id: draftId, ...fields, ...(photoHash ? { photoHash } : {}), quantity: values.quantity });
       }
       const changes: Record<string, unknown> = {};
       const original: Record<string, string | number | null> = {};
@@ -218,7 +220,9 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     },
     onSuccess: (saved) => {
       invalidate();
-      track(product ? 'product.updated' : 'product.created');
+      const events = productSavedEvents(!product, saved as Partial<CreatedProduct>);
+      track(events.track);
+      if (events.ga) gaEvent(events.ga);
       toast.success(product ? 'Produto atualizado.' : 'Produto cadastrado.');
       onSaved?.(saved);
       onClose();

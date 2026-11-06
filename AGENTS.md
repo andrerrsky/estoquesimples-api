@@ -393,8 +393,11 @@ acrescentar uma entrada com `key`, `label` e a consulta.
   entrada do usuário (`sql.raw` só com constantes do código, como a coluna de
   ordenação escolhida de um mapa fechado).
 - Testes de integração (`tests/`) rodam contra Postgres real (`docker compose
-  up -d`; sem Docker Desktop use Colima). `npm test`, `npm run typecheck`,
-  `npm run build` precisam passar antes de um PR (CI faz os três).
+  up -d`; sem Docker Desktop use Colima). A web tem testes de lógica sem
+  navegador em `apps/web/tests` (Vitest; Google Analytics, consentimento e
+  conversões — ver [docs/aquisicao-e-conversao.md](docs/aquisicao-e-conversao.md)).
+  `npm test` (API + web), `npm run typecheck`, `npm run build` precisam passar
+  antes de um PR (CI faz os três).
 - Segredos: nunca no repositório; `.env` local ignorado; Railway para produção.
 
 ## 10. Como estender
