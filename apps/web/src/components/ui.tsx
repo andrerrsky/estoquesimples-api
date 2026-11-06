@@ -227,7 +227,7 @@ export function Notice({
     revealIfHidden(ref.current);
   }, [tone, text]);
   return (
-    <div ref={ref} className={`notice notice--${tone}`} role={tone === 'error' ? 'alert' : 'status'}>
+    <div ref={ref} className={`notice notice--${tone}${action ? ' notice--with-action' : ''}`} role={tone === 'error' ? 'alert' : 'status'}>
       <Icon name={icon} />
       <div style={{ minWidth: 0 }}>
         {title && <div className="notice__title">{title}</div>}

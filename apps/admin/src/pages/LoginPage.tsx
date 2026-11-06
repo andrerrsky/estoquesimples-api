@@ -106,11 +106,8 @@ export function LoginPage() {
           </div>
         </div>
         <div>
-          <h1>Acompanhe o produto e dê suporte a quem usa.</h1>
-          <p>
-            Contas, empresas, assinaturas, uso do aplicativo e operação da API num só lugar. Toda ação que altera
-            dados de clientes fica registrada com quem fez, quando e por quê.
-          </p>
+          <h1>Gestão e suporte do Estoque Simples.</h1>
+          <p>Contas, empresas e assinaturas num só lugar.</p>
         </div>
         <div style={{ color: 'var(--on-brand-muted)', fontSize: 12 }}>Acesso restrito a administradores autorizados.</div>
       </aside>

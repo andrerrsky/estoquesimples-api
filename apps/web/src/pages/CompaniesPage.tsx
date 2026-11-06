@@ -136,7 +136,7 @@ function FirstCompany() {
   const nameError = error instanceof ApiError ? error.fieldError('name') : undefined;
 
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <Card>
         <form className="onboard" onSubmit={submit}>
           <span className="feature__icon">

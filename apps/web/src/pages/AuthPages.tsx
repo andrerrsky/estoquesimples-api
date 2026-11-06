@@ -137,8 +137,10 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
+  const location = useLocation();
   const [saved] = useState(readRememberedLogin);
-  const [email, setEmail] = useState(saved?.email ?? '');
+  // Vindo do cadastro com um e-mail que já tem conta, o campo chega preenchido.
+  const [email, setEmail] = useState((location.state as { email?: string } | null)?.email ?? saved?.email ?? '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(saved !== null);
   const [busy, setBusy] = useState(false);
@@ -292,7 +294,20 @@ export function RegisterPage() {
   return (
     <AuthLayout title="Criar conta" subtitle="Grátis, sem cartão. Seu estoque fica guardado na nuvem." footer={<>Já tem conta? <Link to="/entrar">Entrar</Link></>}>
       <form className="stack" onSubmit={submit}>
-        {error && !passwordError && <Notice tone="error">{errorMessage(error)}</Notice>}
+        {error && !passwordError && (
+          <Notice tone="error">
+            {error instanceof ApiError && error.code === 'AUTH_EMAIL_IN_USE' ? (
+              <>
+                Já existe uma conta com este e-mail.{' '}
+                <Link to="/entrar" state={{ email: email.trim() }} className="notice__link">
+                  Entrar com ele
+                </Link>
+              </>
+            ) : (
+              errorMessage(error)
+            )}
+          </Notice>
+        )}
         <Field label="Seu nome">
           <input className="input" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={120} autoFocus required />
         </Field>
