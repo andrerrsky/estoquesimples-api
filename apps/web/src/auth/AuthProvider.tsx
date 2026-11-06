@@ -6,6 +6,7 @@ import type { User } from '../api/types';
 import { track } from '../lib/analytics';
 import { gaEvent } from '../lib/ga';
 import { clearProductImages } from '../lib/product-image';
+import { createAuthActions } from './actions';
 import { AuthContext, type AuthContextValue, type Status } from './context';
 
 // Os hooks continuam importáveis daqui (é o que o resto da aplicação usa).
@@ -53,30 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    const auth = await sessionApi.login(email, password);
-    setUser(auth.user);
-    setStatus('authed');
-    gaEvent('auth.login', { method: 'email' });
-  }, []);
-
-  const register = useCallback(async (name: string, email: string, password: string) => {
-    const auth = await sessionApi.register(name, email, password);
-    setUser(auth.user);
-    setStatus('authed');
-    gaEvent('signup.completed', { method: 'email' });
-  }, []);
-
-  const loginWithAppCode = useCallback(
-    async (code: string) => {
-      const auth = await sessionApi.handoff(code);
-      // Outra conta podia estar aberta neste navegador: nada dela fica na tela.
-      queryClient.clear();
-      clearProductImages();
-      setUser(auth.user);
-      setStatus('authed');
-      gaEvent('auth.login', { method: 'app' });
-    },
+  const { login, register, loginWithAppCode } = useMemo(
+    () =>
+      createAuthActions({
+        sessionApi,
+        onAuthed: (authed) => {
+          setUser(authed);
+          setStatus('authed');
+        },
+        onAccountSwitch: () => {
+          queryClient.clear();
+          clearProductImages();
+        },
+        report: gaEvent,
+      }),
     [queryClient],
   );
 

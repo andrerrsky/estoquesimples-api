@@ -246,6 +246,34 @@ describe('estoque pela web', () => {
     expect(saldos.get(id)).toBe(10);
   });
 
+  it('marca só o primeiro produto da empresa (sinal de ativação), também na repetição do mesmo envio', async () => {
+    const user = await registerUser(context, { installId: 'aparelho-web-ativ-000000000000000000' });
+    const ws = await criarEmpresa(user);
+    const h = user.authHeader;
+    const post = (payload: Record<string, unknown>) => context.app.inject({ method: 'POST', url: `${base(ws)}/products`, headers: h, payload });
+
+    const firstId = randomUUID();
+    const first = await post({ id: firstId, name: 'Primeiro', quantity: 1 });
+    expect(first.statusCode).toBe(201);
+    expect(first.json().firstProduct).toBe(true);
+    // Resposta perdida e reenviada com o mesmo id: continua sendo o primeiro.
+    expect((await post({ id: firstId, name: 'Primeiro', quantity: 1 })).json().firstProduct).toBe(true);
+
+    const second = await post({ name: 'Segundo', quantity: 2 });
+    expect(second.json().firstProduct).toBe(false);
+
+    // Excluir tudo e cadastrar de novo não é "primeiro produto" outra vez.
+    for (const product of [first.json(), second.json()]) {
+      expect((await context.app.inject({ method: 'DELETE', url: `${base(ws)}/products/${product.id}`, headers: h })).statusCode).toBe(200);
+    }
+    expect((await post({ name: 'Depois de excluir', quantity: 1 })).json().firstProduct).toBe(false);
+
+    // Outra empresa começa do zero.
+    const other = await criarEmpresa(user, 'Outra Loja');
+    const inOther = await context.app.inject({ method: 'POST', url: `${base(other)}/products`, headers: h, payload: { name: 'Primeiro', quantity: 1 } });
+    expect(inOther.json().firstProduct).toBe(true);
+  });
+
   it('edita com mesclagem por campo, acusa conflito no mesmo campo e ajusta quantidade por movimentação', async () => {
     const user = await registerUser(context);
     const ws = await criarEmpresa(user);

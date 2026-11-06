@@ -152,6 +152,11 @@ export interface Product {
   updatedAt: string | null;
 }
 
+/** Resposta do cadastro: o produto e se ele é o primeiro que a empresa já teve. */
+export interface CreatedProduct extends Product {
+  firstProduct: boolean;
+}
+
 export type ProductFields = Pick<
   Product,
   'name' | 'description' | 'unitValue' | 'minStock' | 'unit' | 'category' | 'supplier' | 'location' | 'sku' | 'barcode' | 'photoHash'

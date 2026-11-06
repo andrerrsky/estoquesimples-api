@@ -20,7 +20,7 @@
     "build:api": "npm run build --workspace @estoquesimples/api",
     "start": "node apps/api/dist/index.js",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspace @estoquesimples/api",
+    "test": "npm run test --workspace @estoquesimples/api && npm run test --workspace @estoquesimples/web",
     "migrate": "npm run migrate --workspace @estoquesimples/api",
     "migrate:down": "npm run migrate:down --workspace @estoquesimples/api",
     "migrate:status": "npm run migrate:status --workspace @estoquesimples/api",
@@ -31,6 +31,7 @@
     "legal:sync": "npm run sync -w @estoquesimples/legal",
     "legal:check": "npm run check -w @estoquesimples/legal",
     "help:sync": "npm run sync -w @estoquesimples/help",
-    "help:check": "npm run check -w @estoquesimples/help"
+    "help:check": "npm run check -w @estoquesimples/help",
+    "test:web": "npm run test --workspace @estoquesimples/web"
   }
 }
