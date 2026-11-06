@@ -146,7 +146,9 @@ Além do analytics próprio, os eventos também vão para o Google Analytics:
     de sempre. É evento de observação, não conversão.
   - **Equipe e testes**: `?es_interno=1` em qualquer página marca o navegador
     (localStorage) e todo evento sai com `traffic_type: internal`
-    (`?es_interno=0` desmarca); `?es_debug=1` liga o DebugView do GA4 na aba.
+    (`?es_interno=0` desmarca); `?es_debug=1` manda `debug_mode` na aba (o
+    gtag atual não liga o DebugView só com isso: use o Tag Assistant).
+  - `page_referrer` vai sem query string (origem + caminho).
   - Detalhes de aquisição, conversão no Google Ads, validação e consultas:
     [aquisicao-e-conversao.md](aquisicao-e-conversao.md).
   - A CSP libera `www.googletagmanager.com` (script) e os domínios

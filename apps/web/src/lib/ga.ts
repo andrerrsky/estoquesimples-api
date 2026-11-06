@@ -34,7 +34,7 @@ export const CAMPAIGN_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm
 const CAMPAIGN_KEY = 'es_campanha';
 /** `?es_interno=1` marca este navegador como da equipe (`?es_interno=0` desmarca). */
 const INTERNAL_KEY = 'es_trafego_interno';
-/** `?es_debug=1` manda os eventos desta aba ao DebugView do GA4 (e fora dos relatórios). */
+/** `?es_debug=1` manda `debug_mode` nesta aba (o DebugView em si pede o Tag Assistant). */
 const DEBUG_KEY = 'es_ga_debug';
 
 type GtagParams = Record<string, string | number | boolean | null | undefined>;
@@ -119,6 +119,23 @@ export function pageLocation(): string {
     if (stored && !stored.delivered) query = stored.query;
   }
   return `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ''}`;
+}
+
+/**
+ * Página anterior sem query string nem fragmento. O gtag envia o
+ * `document.referrer` inteiro (`dr`): vindo de /redefinir-senha?token=… o
+ * token iria ao Google na página seguinte. De fora (busca, anúncio) só a
+ * origem e o caminho, que bastam para a origem da visita.
+ */
+export function pageReferrer(): string {
+  const raw = typeof document !== 'undefined' ? document.referrer : '';
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
 }
 
 function markCampaignDelivered(): void {
@@ -210,6 +227,7 @@ export function loadGa(): void {
     app_version: __APP_VERSION__,
     // Sem a query string inteira (links de e-mail carregam ?token=): só os parâmetros de campanha.
     page_location: pageLocation(),
+    page_referrer: pageReferrer(),
     platform: isStandalone() ? 'web_app' : 'navegador',
     // Equipe e testes: filtráveis no GA sem tirar ninguém de verdade dos relatórios.
     ...(isInternalTraffic() ? { traffic_type: 'internal' } : {}),
@@ -223,8 +241,17 @@ export function loadGa(): void {
 }
 
 /** Na abertura: quem já aceitou antes volta a ser medido sem ver o aviso de novo. */
+let booted = false;
+
+/**
+ * Uma vez por página. O React roda os efeitos dos filhos antes dos do pai:
+ * uma tela que emite evento ao montar (ex.: `signup.started` em
+ * /criar-conta) chega ao `gaEvent` antes do `bootGa` do App, e por isso o
+ * `gaEvent` também chama isto.
+ */
 export function bootGa(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || booted) return;
+  booted = true;
   readFlagsFromUrl();
   rememberCampaign();
   if (readConsent() === 'granted') loadGa();
@@ -256,7 +283,9 @@ export function gaName(name: string): string {
 
 export function gaEvent(name: string, params: GtagParams = {}): void {
   // Sem aceite (ou depois de revogar) nada vai ao Google, nem sem cookies.
-  if (!loaded || typeof window === 'undefined' || !window.gtag || readConsent() !== 'granted') return;
+  if (typeof window === 'undefined' || readConsent() !== 'granted') return;
+  if (!loaded) bootGa();
+  if (!loaded || !window.gtag) return;
   const clean: GtagParams = {};
   for (const [key, value] of Object.entries(params).slice(0, 25)) {
     if (value === undefined) continue;

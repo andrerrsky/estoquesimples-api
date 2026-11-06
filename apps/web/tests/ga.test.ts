@@ -178,3 +178,58 @@ describe('tráfego interno e de teste', () => {
     expect(configOf(browser)).toMatchObject({ debug_mode: true });
   });
 });
+
+describe('evento antes do boot da página', () => {
+  it('tela que emite ao montar (signup.started) antes do bootGa do App: o evento sai e a campanha não é reenviada depois', async () => {
+    browser = installBrowser(AD_URL);
+    let ga = await freshGa();
+    ga.setConsent('granted');
+
+    browser.open('https://estoquesimples.com.br/criar-conta?utm_source=google&utm_medium=cpc&utm_campaign=teste_campanha&es_debug=1');
+    ga = await freshGa();
+    ga.gaEvent('signup.started'); // efeito do filho (RegisterPage)
+    ga.bootGa(); // efeito do pai (App)
+    expect(browser.scripts).toHaveLength(1);
+    expect(browser.events('signup_started')).toHaveLength(1);
+    expect(configOf(browser)).toMatchObject({ debug_mode: true });
+    expect(browser.calls().filter((call) => call[0] === 'config')).toHaveLength(1);
+
+    // Página seguinte sem UTMs: a campanha já foi entregue e não volta.
+    browser.open('https://estoquesimples.com.br/app');
+    ga = await freshGa();
+    ga.bootGa();
+    expect(String(configOf(browser)?.['page_location'])).toBe('https://estoquesimples.com.br/app');
+    expect(configOf(browser)).toMatchObject({ debug_mode: true });
+  });
+
+  it('sem consentimento, o evento antecipado continua sem carregar nada', async () => {
+    browser = installBrowser('https://estoquesimples.com.br/criar-conta');
+    const ga = await freshGa();
+    ga.gaEvent('signup.started');
+    ga.bootGa();
+    expect(browser.scripts).toHaveLength(0);
+    expect(browser.window.dataLayer).toBeUndefined();
+  });
+});
+
+describe('referenciador', () => {
+  it('a página anterior vai sem query string: nem token, nem marcações de teste', async () => {
+    browser = installBrowser('https://estoquesimples.com.br/redefinir-senha?token=segredo&es_debug=1');
+    browser.open('https://estoquesimples.com.br/entrar');
+    const ga = await freshGa();
+    ga.setConsent('granted');
+    expect(configOf(browser)?.['page_referrer']).toBe('https://estoquesimples.com.br/redefinir-senha');
+  });
+
+  it('de fora (anúncio, busca): só origem e caminho; sem referenciador, vazio', async () => {
+    browser = installBrowser('https://estoquesimples.com.br/?gclid=abc', 'https://www.googleadservices.com/pagead/aclk?sa=L&ai=xyz');
+    let ga = await freshGa();
+    ga.setConsent('granted');
+    expect(configOf(browser)?.['page_referrer']).toBe('https://www.googleadservices.com/pagead/aclk');
+
+    browser = installBrowser('https://estoquesimples.com.br/');
+    ga = await freshGa();
+    ga.setConsent('granted');
+    expect(configOf(browser)?.['page_referrer']).toBe('');
+  });
+});

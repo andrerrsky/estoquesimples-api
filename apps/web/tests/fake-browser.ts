@@ -33,8 +33,8 @@ export interface FakeBrowser {
   calls(): unknown[][];
   /** Eventos enviados ao GA com este nome. */
   events(name: string): Array<Record<string, unknown>>;
-  /** Abre outra página na mesma aba: o armazenamento continua, o script não. */
-  open(url: string): void;
+  /** Abre outra página na mesma aba (referenciador = a atual): o armazenamento continua, o script não. */
+  open(url: string, referrer?: string): void;
 }
 
 /**
@@ -43,10 +43,11 @@ export interface FakeBrowser {
  * <head> onde o gtag.js seria injetado. Nada sai da máquina: o que iria ao
  * Google fica em `window.dataLayer`.
  */
-export function installBrowser(url: string): FakeBrowser {
+export function installBrowser(url: string, referrer = ''): FakeBrowser {
   const local = new MemoryStorage();
   const session = new MemoryStorage();
   let scripts: Array<{ src?: string }> = [];
+  let currentReferrer = referrer;
   const makeWindow = (address: string) => {
     const parsed = new URL(address);
     return {
@@ -75,7 +76,8 @@ export function installBrowser(url: string): FakeBrowser {
         .filter((call) => call[0] === 'event' && call[1] === name)
         .map((call) => (call[2] ?? {}) as Record<string, unknown>);
     },
-    open(address) {
+    open(address, from = browser.window.location.href) {
+      currentReferrer = from;
       browser.window = makeWindow(address);
       scripts = [];
       stub();
@@ -87,6 +89,7 @@ export function installBrowser(url: string): FakeBrowser {
     vi.stubGlobal('sessionStorage', session);
     vi.stubGlobal('navigator', {});
     vi.stubGlobal('document', {
+      referrer: currentReferrer,
       createElement: () => ({}),
       head: { appendChild: (element: { src?: string }) => scripts.push(element) },
       addEventListener: () => undefined,
