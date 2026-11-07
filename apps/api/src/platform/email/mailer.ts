@@ -11,11 +11,29 @@ export interface EmailMessage {
   subject: string;
   text: string;
   /** Tipo lógico da mensagem, usado em logs e métricas. */
-  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert' | 'support_reply' | 'support_new_ticket' | 'onboarding_nudge';
+  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert' | 'support_reply' | 'support_new_ticket' | 'onboarding_nudge' | 'lifecycle';
+  /** Nome do remetente (o endereço continua o de `EMAIL_FROM`). */
+  fromName?: string;
+  replyTo?: string;
+  /** Cabeçalhos extras (ex.: `List-Unsubscribe`). */
+  headers?: Record<string, string>;
+}
+
+export interface SendResult {
+  /** Id do provedor (o Resend devolve; liga o envio aos eventos do webhook). */
+  id?: string;
 }
 
 export interface Mailer {
-  send: (message: EmailMessage) => Promise<void>;
+  send: (message: EmailMessage) => Promise<SendResult | void>;
+}
+
+/** O provedor recusou por limite (cota diária/mensal ou taxa): não adianta repetir agora. */
+export class MailerRateLimitError extends Error {
+  constructor(detail: string) {
+    super(`Limite do provedor de e-mail: ${detail}`);
+    this.name = 'MailerRateLimitError';
+  }
 }
 
 /**

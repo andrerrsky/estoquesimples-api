@@ -36,6 +36,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
       { to: '/assinaturas', label: 'Assinaturas', icon: 'card' },
       { to: '/avaliacoes', label: 'Avaliações', icon: 'mail' },
       { to: '/notificacoes', label: 'Notificações', icon: 'zap' },
+      { to: '/emails', label: 'E-mails automáticos', icon: 'mail' },
       { to: '/auditoria', label: 'Auditoria', icon: 'list' },
     ],
   },

@@ -13,6 +13,7 @@ import { registerAdminReviewsRoutes } from './admin-reviews.routes.js';
 import { registerAdminStatic } from './admin-static.js';
 import { registerAdminSupportRoutes } from './admin-support.routes.js';
 import { registerAdminUsersRoutes } from './admin-users.routes.js';
+import { registerAdminLifecycleRoutes } from './admin-lifecycle.routes.js';
 import { registerAdminWorkspacesRoutes } from './admin-workspaces.routes.js';
 
 /**
@@ -31,6 +32,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       await api.register(registerAdminAuthRoutes);
       await api.register(registerAdminOverviewRoutes);
       await api.register(registerAdminUsersRoutes);
+      await api.register(registerAdminLifecycleRoutes);
       await api.register(registerAdminWorkspacesRoutes);
       await api.register(registerAdminBillingRoutes);
       await api.register(registerAdminAnalyticsRoutes);

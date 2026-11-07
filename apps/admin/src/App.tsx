@@ -10,6 +10,7 @@ import { EventsPage } from './pages/EventsPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
 import { BlogPage } from './pages/BlogPage';
 import { HelpPage } from './pages/HelpPage';
+import { LifecyclePage } from './pages/LifecyclePage';
 import { SecurityPage } from './pages/SecurityPage';
 import { LoginPage } from './pages/LoginPage';
 import { OpsPage } from './pages/OpsPage';
@@ -80,6 +81,7 @@ export const router = createBrowserRouter(
         { path: '/avaliacoes', element: <ReviewsPage /> },
         { path: '/ia', element: <AiPage /> },
         { path: '/notificacoes', element: <NotificationsPage /> },
+        { path: '/emails', element: <LifecyclePage /> },
         { path: '/notificacoes/:campaignId', element: <CampaignDetailPage /> },
         { path: '/analytics', element: <AnalyticsPage /> },
         { path: '/eventos', element: <EventsPage /> },

@@ -1,5 +1,5 @@
 import type { Logger } from '../observability/logger.js';
-import { maskEmail, type EmailMessage, type Mailer } from './mailer.js';
+import { MailerRateLimitError, maskEmail, type EmailMessage, type Mailer, type SendResult } from './mailer.js';
 
 /**
  * Envio via Resend (HTTPS). Zero dependências extras — usa `fetch` do Node 22.
@@ -14,7 +14,7 @@ export class ResendMailer implements Mailer {
     private readonly logger: Logger,
   ) {}
 
-  async send(message: EmailMessage): Promise<void> {
+  async send(message: EmailMessage): Promise<SendResult> {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -24,10 +24,12 @@ export class ResendMailer implements Mailer {
       // Sem isto, um DNS/TLS mudo no Resend prende o POST /register para sempre.
       signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({
-        from: this.from,
+        from: message.fromName ? `${message.fromName.replace(/[<>"]/g, '')} <${this.from}>` : this.from,
         to: [message.to],
         subject: message.subject,
         text: message.text,
+        ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+        ...(message.headers ? { headers: message.headers } : {}),
       }),
     });
 
@@ -42,12 +44,15 @@ export class ResendMailer implements Mailer {
         },
         'falha ao enviar e-mail via Resend',
       );
+      if (response.status === 429 || /quota|rate.?limit|daily_quota/i.test(detail)) throw new MailerRateLimitError(`${response.status} ${detail}`);
       throw new Error(`Resend respondeu ${response.status}: ${detail}`);
     }
+    const body = (await response.json().catch(() => ({}))) as { id?: string };
 
     this.logger.info(
       { kind: message.kind, to: maskEmail(message.to) },
       'e-mail enviado via Resend',
     );
+    return { id: body.id };
   }
 }

@@ -169,3 +169,27 @@ export function emailReminderDue(createdAt: string, now = Date.now()): boolean {
   const created = Date.parse(createdAt);
   return Number.isFinite(created) ? now - created >= 24 * 3_600_000 : true;
 }
+
+/**
+ * Clique num e-mail do ciclo de vida: o link traz `le=<id do envio>`. Avisa a
+ * API (marca o clique daquele envio) uma vez por aba. Não depende de cookies
+ * nem do provedor de e-mail.
+ */
+export function reportLifecycleClick(search = typeof window === 'undefined' ? '' : window.location.search): void {
+  const id = new URLSearchParams(search).get('le');
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+  const key = `es_le_${id}`;
+  try {
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+  } catch {
+    // sem armazenamento: pode avisar de novo, a API ignora repetição
+  }
+  void fetch('/v1/email/clicked', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id }),
+    keepalive: true,
+    credentials: 'same-origin',
+  }).catch(() => undefined);
+}

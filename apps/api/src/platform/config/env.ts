@@ -146,6 +146,23 @@ const envSchema = z
      * endereço responde 404.
      */
     ADS_UPLOAD_PASSWORD: z.string().min(24).optional(),
+    /**
+     * E-mails do ciclo de vida (modules/lifecycle). `dry_run` (padrão) decide
+     * e registra quem receberia o quê, sem enviar; `send` envia; `off` não
+     * roda. Só passar para `send` com o webhook do Resend configurado.
+     */
+    LIFECYCLE_EMAILS_MODE: z.enum(['off', 'dry_run', 'send']).default('dry_run'),
+    /** Teto diário de e-mails do ciclo de vida e de todos os e-mails (reserva a cota dos essenciais). */
+    /** Cadastros antes disto não entram na sequência de ativação (sem e-mails retroativos). */
+    LIFECYCLE_ACTIVATION_START: z.coerce.date().default(new Date('2026-11-07T21:00:00Z')),
+    LIFECYCLE_DAILY_LIMIT: z.coerce.number().int().min(0).default(50),
+    EMAIL_DAILY_TOTAL_LIMIT: z.coerce.number().int().min(1).default(70),
+    /** Nome do remetente dos e-mails do ciclo de vida (o endereço é o de EMAIL_FROM). */
+    LIFECYCLE_FROM_NAME: z.string().min(1).max(60).default('André, do Estoque Simples'),
+    /** Para onde vão as respostas aos e-mails do ciclo de vida. Vazio = o primeiro de SUPPORT_NOTIFY_EMAILS. */
+    LIFECYCLE_REPLY_TO: z.string().email().optional(),
+    /** Segredo de assinatura do webhook do Resend (whsec_…). Sem ele, a rota do webhook responde 404. */
+    RESEND_WEBHOOK_SECRET: z.string().min(10).optional(),
     OPS_WATCHDOG_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
     /** Prazo máximo aceitável desde a última restauração de teste bem-sucedida. */
     BACKUP_MAX_AGE_HOURS: z.coerce.number().int().positive().default(48),
