@@ -344,8 +344,14 @@ Já feito no Ads (reversível, sem mexer em orçamento):
 Checklist da importação offline:
 - [ ] Criar a ação "Ativação (offline)" **≥ 24 h antes** de publicar a
       Pesquisa (cliques anteriores à ação são rejeitados).
-- [ ] Subir o CSV 1×/dia (Ferramentas › Uploads). No dia seguinte ao
-      primeiro upload real, conferir os erros nos detalhes do upload.
+- [ ] **Upload programado** (sem trabalho manual): Ferramentas › Uploads ›
+      Programações › origem **HTTPS**, URL
+      `https://api.estoquesimples.com.br/v1/ads/offline-conversions.csv`,
+      usuário `googleads`, senha = `ADS_UPLOAD_PASSWORD` do Railway (sem a
+      variável o endereço responde 404), 1×/dia. O arquivo traz os últimos
+      7 dias; o Google ignora a conversão repetida (mesmo gclid e ação).
+      Alternativa manual: o botão do painel. No dia seguinte ao primeiro
+      upload real, conferir os erros nos detalhes do upload.
 - [ ] gbraid/wbraid ficam fora do CSV (exigem a API); a limitação está
       declarada e eles ficam gravados para depois.
 - [ ] A conta está em GMT-06:00 e o fuso não muda. O CSV leva offset

@@ -203,3 +203,24 @@ describe('CSP da web', () => {
     expect(csp).toContain("script-src 'self' https://www.googletagmanager.com;");
   });
 });
+
+describe('upload programado do Google Ads', () => {
+  it('sem senha configurada não existe; com senha exige autenticação básica do usuário googleads', async () => {
+    expect((await context.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv' })).statusCode).toBe(404);
+
+    const password = 'senha-de-teste-do-upload-1234567890';
+    const other = await createTestApp({ ADS_UPLOAD_PASSWORD: password });
+    try {
+      const basic = (user: string, pass: string) => ({ authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` });
+      expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv' })).statusCode).toBe(401);
+      expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('googleads', 'errada-errada-errada-errada') })).statusCode).toBe(401);
+      expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('outro', password) })).statusCode).toBe(401);
+      const ok = await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('googleads', password) });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.headers['content-type']).toContain('text/csv');
+      expect(ok.body.split('\n')[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
+    } finally {
+      await other.close();
+    }
+  });
+});

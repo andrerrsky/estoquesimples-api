@@ -1,0 +1,51 @@
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+
+import { safeEquals } from '../../platform/auth/tokens.js';
+import { notFound, unauthorized, ErrorCode } from '../../platform/http/errors.js';
+import { AdminUsersService } from '../admin/admin-users.service.js';
+import { offlineConversionsCsv } from '../auth/signup-attribution.js';
+
+/** Usuário fixo do upload programado; a senha vem de `ADS_UPLOAD_PASSWORD`. */
+export const ADS_UPLOAD_USER = 'googleads';
+/** O Google busca 1×/dia; uma janela de 7 dias cobre falhas e é deduplicada por ele (mesmo gclid + ação). */
+const WINDOW_DAYS = 7;
+
+function requireUploadPassword(request: FastifyRequest): void {
+  const expected = request.server.services.env.ADS_UPLOAD_PASSWORD;
+  // Sem senha configurada o recurso não existe, em vez de ficar aberto.
+  if (!expected) throw notFound('Recurso não encontrado');
+  const header = request.headers.authorization ?? '';
+  const decoded = header.startsWith('Basic ') ? Buffer.from(header.slice(6).trim(), 'base64').toString('utf8') : '';
+  const separator = decoded.indexOf(':');
+  const user = separator >= 0 ? decoded.slice(0, separator) : '';
+  const password = separator >= 0 ? decoded.slice(separator + 1) : '';
+  const ok = safeEquals(user, ADS_UPLOAD_USER) && safeEquals(password, expected);
+  if (!ok) throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Credenciais inválidas.');
+}
+
+/**
+ * Upload programado de conversões offline do Google Ads: o mesmo CSV do
+ * botão do painel (ativações de quem veio por anúncio e aceitou o aviso de
+ * cookies atual; ver `AdminUsersService.offlineActivations`), buscado pelo
+ * próprio Google com autenticação básica. Só gclid e horários: nenhum dado
+ * pessoal sai por aqui.
+ */
+export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
+  const routes = app.withTypeProvider<ZodTypeProvider>();
+  const service = new AdminUsersService(app.services);
+
+  routes.get(
+    '/ads/offline-conversions.csv',
+    {
+      config: { rateLimit: { max: 30, timeWindow: 60_000 } },
+      schema: { tags: ['ads'], summary: 'CSV de ativações para o upload programado do Google Ads', hide: true },
+    },
+    async (request, reply) => {
+      requireUploadPassword(request);
+      const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
+      const csv = offlineConversionsCsv(await service.offlineActivations(since));
+      return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
+    },
+  );
+}
