@@ -58,7 +58,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `app.opened` | app | app ganhou foco (cold ou warm start) | `coldStart: boolean` |
 | `screen.viewed` | app | Activity/tela exibida | `screen: "MainActivity"` |
 | `landing.viewed` | web | abriu a página inicial (sem cookie; primeiro degrau do funil de anúncios) | `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `has_click_id` — nunca o gclid |
-| `signup.started` | app | abriu o formulário de cadastro | — |
+| `signup.started` | app | primeira digitação no formulário de cadastro (`/criar-conta` ou `/comece`; antes de 7/11/2026: abriu o formulário) | `page` |
 | `product.created` / `product.updated` / `product.deleted` | app | CRUD de produto no aparelho | `withPhoto`, `withBarcode` (created) |
 | `movement.created` | app | entrada, saída ou ajuste registrado | `type: entrada \| saida \| ajuste` |
 | `movement.cancelled` | app | cancelamento (evento compensatório) | — |

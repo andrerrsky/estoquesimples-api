@@ -1,0 +1,149 @@
+/* ==========================================================================
+   Página de destino dos anúncios (/comece): uma coluna no celular, duas no
+   computador; o formulário aparece logo depois do título no celular.
+   ========================================================================== */
+.comece {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+}
+.comece__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+}
+.comece__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+.comece__login {
+  font-size: var(--fs-supporting);
+  font-weight: 600;
+}
+.comece__main {
+  display: grid;
+  gap: 20px;
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 4px 16px 32px;
+}
+.comece__title {
+  margin: 0;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.comece__benefits {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.comece__benefits li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.45;
+}
+.comece__benefits svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--brand);
+}
+.comece__proof {
+  margin: 14px 0 0;
+  font-size: var(--fs-supporting);
+  color: var(--text-muted);
+}
+.comece__proof span {
+  color: #f5b301;
+  letter-spacing: 1px;
+}
+.comece__card {
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hero);
+  background: var(--surface-content);
+}
+.comece__card-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.comece__card-sub {
+  margin: 4px 0 16px;
+  font-size: var(--fs-supporting);
+  color: var(--text-muted);
+}
+.comece__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-hero);
+  border: 1px solid var(--border);
+}
+.comece__faq {
+  display: grid;
+  gap: 8px;
+}
+.comece__faq details {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-content);
+}
+.comece__faq summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.comece__faq p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.comece__foot {
+  padding: 16px;
+  text-align: center;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+
+@media (min-width: 900px) {
+  .comece__main {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: start;
+    gap: 28px 40px;
+    padding-top: 24px;
+  }
+  .comece__pitch {
+    padding-top: 12px;
+  }
+  .comece__card {
+    grid-row: span 3;
+    padding: 28px;
+  }
+}
+
+/* O aviso de cookies fica compacto aqui, para não cobrir o botão do formulário. */
+.comece ~ .cookie-consent,
+body:has(.comece) .cookie-consent {
+  max-width: 420px;
+  padding: 10px 12px;
+  font-size: var(--fs-caption);
+}
+@media (max-width: 899px) {
+  /* Espaço para o aviso de cookies no rodapé não esconder o fim da página. */
+  .comece__foot {
+    padding-bottom: 120px;
+  }
+}

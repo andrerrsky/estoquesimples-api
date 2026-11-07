@@ -279,9 +279,13 @@ export function BrandedLoginPage() {
   return <LoginPage brandSlug={page ? (data?.slug ?? slug) : undefined} aside={aside} companyName={page ? data?.displayName : null} />;
 }
 
-export function RegisterPage() {
+/**
+ * Formulário de cadastro, o mesmo em /criar-conta e na página dos anúncios
+ * (/comece). `signup.started` sai na **primeira digitação** em qualquer campo
+ * (nos dois lugares), para a métrica valer igual: abrir a página não conta.
+ */
+export function RegisterForm({ autoFocus = true, submitLabel = 'Criar conta' }: { autoFocus?: boolean; submitLabel?: string }) {
   const { register } = useAuth();
-  const redirect = useRedirectIfAuthed();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -289,17 +293,15 @@ export function RegisterPage() {
   const [error, setError] = useState<ApiError | Error | null>(null);
   const started = useRef(false);
 
-  useEffect(() => {
-    if (!started.current) {
-      started.current = true;
-      track('signup.started');
-    }
-  }, []);
-
-  if (redirect) return redirect;
+  const markStarted = () => {
+    if (started.current) return;
+    started.current = true;
+    track('signup.started', { page: window.location.pathname });
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    markStarted();
     setBusy(true);
     setError(null);
     setWelcomePending(true);
@@ -316,40 +318,51 @@ export function RegisterPage() {
   const passwordError = error instanceof ApiError ? error.fieldError('password') : undefined;
 
   return (
+    <form className="stack" onSubmit={submit} onInputCapture={markStarted}>
+      {error && !passwordError && (
+        <Notice tone="error">
+          {error instanceof ApiError && error.code === 'AUTH_EMAIL_IN_USE' ? (
+            <>
+              Já existe uma conta com este e-mail.{' '}
+              <Link to="/entrar" state={{ email: email.trim() }} className="notice__link">
+                Entrar com ele
+              </Link>
+            </>
+          ) : (
+            errorMessage(error)
+          )}
+        </Notice>
+      )}
+      <Field label="Seu nome">
+        <input className="input" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={120} autoFocus={autoFocus} required />
+      </Field>
+      <Field label="E-mail">
+        <input className="input" type="email" inputMode="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
+      </Field>
+      <PasswordField value={password} onChange={setPassword} autoComplete="new-password" error={passwordError} />
+      <PasswordRules password={password} email={email} />
+      <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
+        {busy ? 'Criando…' : submitLabel}
+      </button>
+      <p className="caption" style={{ textAlign: 'center' }}>
+        Ao criar a conta, você declara ter lido e concordado com os <Link to="/termos">Termos de Uso</Link> e a <Link to="/privacidade">Política de Privacidade</Link>.
+      </p>
+    </form>
+  );
+}
+
+export function RegisterPage() {
+  const redirect = useRedirectIfAuthed();
+  if (redirect) return redirect;
+  return (
     <AuthLayout title="Criar conta" subtitle="Grátis, sem cartão. Seu estoque fica guardado na nuvem." footer={<>Já tem conta? <Link to="/entrar">Entrar</Link></>}>
-      <form className="stack" onSubmit={submit}>
-        {error && !passwordError && (
-          <Notice tone="error">
-            {error instanceof ApiError && error.code === 'AUTH_EMAIL_IN_USE' ? (
-              <>
-                Já existe uma conta com este e-mail.{' '}
-                <Link to="/entrar" state={{ email: email.trim() }} className="notice__link">
-                  Entrar com ele
-                </Link>
-              </>
-            ) : (
-              errorMessage(error)
-            )}
-          </Notice>
-        )}
-        <Field label="Seu nome">
-          <input className="input" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={120} autoFocus required />
-        </Field>
-        <Field label="E-mail">
-          <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" required />
-        </Field>
-        <PasswordField value={password} onChange={setPassword} autoComplete="new-password" error={passwordError} />
-        <PasswordRules password={password} email={email} />
-        <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
-          {busy ? 'Criando…' : 'Criar conta'}
-        </button>
-        <p className="caption" style={{ textAlign: 'center' }}>
-          Ao criar a conta, você declara ter lido e concordado com os <Link to="/termos">Termos de Uso</Link> e a <Link to="/privacidade">Política de Privacidade</Link>.
-        </p>
-      </form>
+      <RegisterForm />
     </AuthLayout>
   );
 }
+
+/** Página dos anúncios: o mesmo redirecionamento de quem já entrou (vai para as boas-vindas ou o estoque). */
+export { useRedirectIfAuthed };
 
 const SEGMENT_OPTIONS: Array<{ key: string; label: string; example: string }> = [
   { key: 'salao', label: 'Salão de beleza', example: 'Salão da Ana' },

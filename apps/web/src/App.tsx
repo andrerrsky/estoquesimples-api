@@ -46,6 +46,7 @@ const BlogIndexPage = page(() => import('./pages/BlogPage'), 'BlogIndexPage');
 const BlogPostPage = page(() => import('./pages/BlogPage'), 'BlogPostPage');
 const RegisterPage = page(() => import('./pages/AuthPages'), 'RegisterPage');
 const WelcomePage = page(() => import('./pages/AuthPages'), 'WelcomePage');
+const ComecePage = page(() => import('./pages/ComecePage'), 'ComecePage');
 const ForgotPasswordPage = page(() => import('./pages/AuthPages'), 'ForgotPasswordPage');
 const ResetPasswordPage = page(() => import('./pages/AuthPages'), 'ResetPasswordPage');
 const VerifyEmailPage = page(() => import('./pages/AuthPages'), 'VerifyEmailPage');
@@ -150,6 +151,7 @@ export const router = createBrowserRouter([
       // Entrada personalizada da empresa (identificadores reservados nunca chegam aqui: ver brand-rules.ts).
       { path: '/:slug/entrar', element: <Suspense fallback={<FullScreenLoading />}><BrandedLoginPage /></Suspense> },
       { path: '/criar-conta', element: <Suspense fallback={<FullScreenLoading />}><RegisterPage /></Suspense> },
+      { path: '/comece', element: <Suspense fallback={<FullScreenLoading />}><ComecePage /></Suspense> },
       { path: '/boas-vindas', element: <Suspense fallback={<FullScreenLoading />}><WelcomePage /></Suspense> },
       { path: '/esqueci-a-senha', element: <Suspense fallback={<FullScreenLoading />}><ForgotPasswordPage /></Suspense> },
       { path: '/redefinir-senha', element: <Suspense fallback={<FullScreenLoading />}><ResetPasswordPage /></Suspense> },
