@@ -12,7 +12,7 @@ import { ProductForm } from '../components/stock/ProductForm';
 import { Card, Chips, ConfirmDialog, Empty, Field, Menu, Modal, Notice, PageHeader, Pagination, QueryState, SearchInput, useToast, type MenuItem } from '../components/ui';
 import { track } from '../lib/analytics';
 import { fmtMoney, fmtQuantity, parseNumber, plural } from '../lib/format';
-import { originContent } from '../lib/attribution';
+import { segmentContent } from '../lib/attribution';
 import { ProductImage } from '../lib/product-image';
 import { inventoryKeys, SYNC_HEADERS, useDebounced, useInvalidateInventory } from '../lib/inventory';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
@@ -164,6 +164,16 @@ export function StockPage() {
 
   const items = list.data?.items ?? [];
   const counts = list.data?.counts;
+
+  // Vindo das boas-vindas (?primeiro=1) com o estoque vazio: o formulário do
+  // primeiro produto já abre, que é o passo que importa no começo.
+  const firstVisit = params.get('primeiro') === '1';
+  useEffect(() => {
+    if (!firstVisit || !list.data) return;
+    if (list.data.total === 0 && can('produtos.criar')) openCreate();
+    update({ primeiro: null }, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstVisit, list.data]);
   const filtered = urlQuery !== '' || lowOnly || category !== '';
   const canSelect = can('produtos.editar');
   // Miniatura só aparece se algum produto desta página tem foto: sem isso a coluna seria só um ícone repetido.
@@ -334,7 +344,7 @@ export function StockPage() {
                 )
               }
             >
-              {segmentTip(originContent()) ?? 'Cadastre o primeiro produto ou importe uma planilha.'} Se você já usa o aplicativo Android, os produtos
+              {segmentTip(segmentContent()) ?? 'Cadastre o primeiro produto ou importe uma planilha.'} Se você já usa o aplicativo Android, os produtos
               aparecem aqui depois da sincronização.
             </Empty>
           )

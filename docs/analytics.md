@@ -78,6 +78,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `help.searched` | app e web | busca na central de ajuda (após pausa na digitação) | `results` — só a contagem, nunca o texto buscado |
 | `user.registered` / `user.logged_in` / `user.email_verified` / `user.deletion_requested` | API | ciclo de vida da conta | `origin` |
 | `workspace.created` / `invite.sent` / `invite.accepted` | API | empresa e equipe | `roleKey`, `newAccount`; `automatic` (empresa criada no cadastro web) |
+| `onboarding.viewed` / `onboarding.name_set` / `onboarding.name_skipped` | web | tela de boas-vindas pós-cadastro: exibida, nome dado, pulada (reversão: viewed sem passo seguinte em 24 h > 10% com ≥ 30 cadastros) | `segment` |
 | `onboarding.nudge_sent` | API | e-mail único de lembrete do primeiro produto (24 h sem produto) | — |
 | `sync.initial_upload_completed` / `sync.pushed` / `sync.pulled` / `sync.conflict_resolved` | API | sincronização | `products`, `movements`, `operations`, `rejected`, `conflicts`, `changes`, `choice` |
 | `subscription.linked` / `subscription.state_changed` | API | assinatura | `planKey`, `state`, `from`, `to` |

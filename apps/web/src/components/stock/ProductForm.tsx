@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type FormE
 import { api, ApiError, errorMessage, uploadBinary } from '../../api/client';
 import type { CreatedProduct, Facets, Product, ProductList, UploadedImage } from '../../api/types';
 import { productSavedEvents } from '../../lib/activation';
+import { markFirstProduct } from '../../lib/attribution';
 import { track } from '../../lib/analytics';
 import { newId } from '../../lib/device';
 import { gaEvent } from '../../lib/ga';
@@ -222,7 +223,10 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
       invalidate();
       const events = productSavedEvents(!product, saved as Partial<CreatedProduct>);
       track(events.track);
-      if (events.ga) gaEvent(events.ga);
+      if (events.ga) {
+        gaEvent(events.ga);
+        markFirstProduct();
+      }
       toast.success(product ? 'Produto atualizado.' : 'Produto cadastrado.');
       onSaved?.(saved);
       onClose();

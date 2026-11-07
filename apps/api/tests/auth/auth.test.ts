@@ -370,6 +370,8 @@ describe('recuperação de senha', () => {
       payload: { email, password: newPassword },
     });
     expect(login.statusCode).toBe(200);
+    // Usar o link que chegou ao e-mail prova a posse do endereço: o e-mail fica confirmado.
+    expect(login.json().user.emailVerified).toBe(true);
   });
 
   it('não revela se o e-mail existe', async () => {

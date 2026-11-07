@@ -90,3 +90,32 @@ describe('textos por segmento', () => {
     expect(landingTitleFor(null)).toBeNull();
   });
 });
+
+describe('primeiro contato', () => {
+  it('o aviso de confirmar e-mail espera o primeiro produto ou 24 h de conta', async () => {
+    const browser = installBrowser('https://estoquesimples.com.br/app/estoque');
+    const { attribution } = await fresh();
+    const now = Date.parse('2026-11-07T15:00:00Z');
+    expect(attribution.emailReminderDue('2026-11-07T14:00:00Z', now)).toBe(false);
+    expect(attribution.emailReminderDue('2026-11-06T14:00:00Z', now)).toBe(true);
+    attribution.markFirstProduct();
+    expect(browser.local.getItem('es_primeiro_produto')).toBe('1');
+    expect(attribution.emailReminderDue('2026-11-07T14:00:00Z', now)).toBe(true);
+  });
+
+  it('segmento: o do anúncio vale primeiro; sem anúncio, o escolhido nas boas-vindas (lista fechada)', async () => {
+    installBrowser('https://estoquesimples.com.br/app/estoque');
+    const { attribution } = await fresh();
+    expect(attribution.segmentContent()).toBeNull();
+    attribution.setChosenSegment('roupas');
+    expect(attribution.segmentContent()).toBe('roupas');
+    attribution.setChosenSegment('<script>');
+    expect(attribution.segmentContent()).toBeNull();
+
+    installBrowser(AD_URL);
+    const again = await fresh();
+    again.attribution.captureFirstTouch();
+    again.attribution.setChosenSegment('roupas');
+    expect(again.attribution.segmentContent()).toBe('salao');
+  });
+});

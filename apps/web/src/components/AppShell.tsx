@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { emailReminderDue } from '../lib/attribution';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
@@ -222,10 +223,10 @@ export function AppShell() {
             </Notice>
           </div>
         )}
-        {user && !user.emailVerified && !location.pathname.startsWith('/app/conta') && (
+        {user && !user.emailVerified && !location.pathname.startsWith('/app/conta') && emailReminderDue(user.createdAt) && (
           <div className="page page--banner">
             <Notice tone="warning" action={<Link to="/app/conta" className="btn btn--secondary btn--sm">Confirmar</Link>}>
-              Confirme seu e-mail para poder convidar pessoas e recuperar a senha.
+              Confirme seu e-mail para poder convidar pessoas da equipe.
             </Notice>
           </div>
         )}
