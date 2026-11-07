@@ -7,6 +7,7 @@ import { AppError, ErrorCode, forbidden, unauthorized } from '../../platform/htt
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { acceptInviteBodySchema, inviteTokenParamsSchema } from '../invites/invites.schemas.js';
 import { InvitesService } from '../invites/invites.service.js';
+import { startWebOnboarding } from '../workspaces/onboarding.js';
 import { requestMeta } from './auth.routes.js';
 import { AuthService } from './auth.service.js';
 import {
@@ -18,6 +19,7 @@ import {
   registerBodySchema,
   type AuthSuccess,
 } from './auth.schemas.js';
+import { signupAttributionSchema } from './signup-attribution.js';
 
 export const WEB_CSRF_HEADER = 'x-requested-with';
 export const WEB_CSRF_VALUE = 'estoquesimples-web';
@@ -25,6 +27,8 @@ export const WEB_CSRF_VALUE = 'estoquesimples-web';
 const COOKIE_PATH = '/v1/auth/web';
 
 const webAuthSchema = authSuccessSchema.omit({ refreshToken: true });
+/** Cadastro web: o do app mais a origem da visita (ver `signup-attribution.ts`). */
+const webRegisterBodySchema = registerBodySchema.extend({ attribution: signupAttributionSchema.optional() }).strict();
 const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema, 429: errorSchema };
 
 /**
@@ -100,11 +104,13 @@ export async function registerWebSessionRoutes(app: FastifyInstance): Promise<vo
     '/web/register',
     {
       ...strictLimit,
-      schema: { tags: ['auth'], summary: 'Cadastro pela aplicação web', body: registerBodySchema, response: { 201: webAuthSchema, ...errors } },
+      schema: { tags: ['auth'], summary: 'Cadastro pela aplicação web', body: webRegisterBodySchema, response: { 201: webAuthSchema, ...errors } },
     },
     async (request, reply) => {
       assertSameSite(request);
-      const auth = await service.register({ ...request.body, device: webDevice(request.body.device) }, requestMeta(request));
+      const meta = requestMeta(request);
+      const auth = await service.register({ ...request.body, device: webDevice(request.body.device) }, meta);
+      await startWebOnboarding(app.services, auth, meta);
       return reply.code(201).send(startSession(reply, auth));
     },
   );

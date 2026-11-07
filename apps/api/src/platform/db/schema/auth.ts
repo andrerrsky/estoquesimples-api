@@ -28,6 +28,8 @@ export const users = pgTable(
     lockedUntil: timestamp('locked_until', tz),
     status: text('status').notNull().default('active'),
     deletionRequestedAt: timestamp('deletion_requested_at', tz),
+    /** Origem do cadastro web (UTMs, clique no anúncio, escolha de cookies). Ver `signup-attribution.ts`. */
+    signupAttribution: jsonb('signup_attribution').$type<Record<string, string>>(),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', tz),

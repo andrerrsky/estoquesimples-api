@@ -35,6 +35,7 @@ import {
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
 import type { AuthSuccess, DeviceInfo } from './auth.schemas.js';
+import { attributionEventProperties, attributionToStore, type SignupAttribution } from './signup-attribution.js';
 
 export interface RequestMeta {
   ipAddress: string | null;
@@ -84,7 +85,7 @@ export class AuthService {
   }
 
   async register(
-    input: { email: string; password: string; name: string; device?: DeviceInfo },
+    input: { email: string; password: string; name: string; device?: DeviceInfo; attribution?: SignupAttribution },
     meta: RequestMeta,
   ): Promise<AuthSuccess> {
     // Além do limite por IP: o mesmo e-mail não pode ser testado em sequência
@@ -99,6 +100,7 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(input.password);
+    const attribution = attributionToStore(input.attribution, new Date());
 
     const created = await this.db.transaction(async (tx) => {
       const existing = await tx
@@ -113,7 +115,7 @@ export class AuthService {
 
       const inserted = await tx
         .insert(users)
-        .values({ email: input.email, name: input.name, passwordHash })
+        .values({ email: input.email, name: input.name, passwordHash, signupAttribution: attribution })
         .returning();
 
       const user = inserted[0];
@@ -149,7 +151,7 @@ export class AuthService {
       name: 'user.registered',
       userId: created.auth.user.id,
       deviceId: created.auth.deviceId,
-      properties: { origin: 'direto', platform: input.device?.platform ?? null },
+      properties: { origin: 'direto', platform: input.device?.platform ?? null, ...attributionEventProperties(attribution) },
     });
     return created.auth;
   }

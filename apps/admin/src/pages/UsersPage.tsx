@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
+import { useAuth } from '../auth/AuthProvider';
 import { Badge, Card, DataTable, Empty, PageHeader, Pagination, PlatformBadges, Time, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtNumber } from '../lib/format';
@@ -21,10 +22,27 @@ interface UserRow {
   lockedUntil: string | null;
   /** Plataformas em que a conta tem aparelho (ou navegador) ativo. */
   platforms: string[];
+  /** Origem do cadastro web quando veio de campanha (UTMs; nunca o identificador do clique). */
+  origin: { source: string | null; medium: string | null; campaign: string | null; content: string | null; hasClickId: boolean; consent: string | null } | null;
+  /** Já cadastrou produto (ativação). */
+  activated: boolean;
+}
+
+function OriginCell({ origin }: { origin: UserRow['origin'] }) {
+  if (!origin) return <span className="muted">direto</span>;
+  const main = [origin.source, origin.medium].filter(Boolean).join(' / ') || 'campanha';
+  const sub = [origin.campaign, origin.content].filter(Boolean).join(' · ');
+  return (
+    <div title={origin.hasClickId ? (origin.consent === 'v2_accepted' ? 'Clique em anúncio; entra na exportação para o Google Ads' : 'Clique em anúncio; não vai ao Google Ads (sem aceite do aviso atual)') : undefined}>
+      <div className="cell-main">{main}</div>
+      {sub && <div className="cell-sub">{sub}</div>}
+    </div>
+  );
 }
 
 export function UsersPage() {
   const navigate = useNavigate();
+  const { can } = useAuth();
   const { values, set, page, pageSize } = useListParams();
   const sort = useSort('createdAt');
   const [search, setSearch] = useState(values['q'] ?? '');
@@ -72,9 +90,15 @@ export function UsersPage() {
         <div className="row" style={{ gap: 4 }}>
           <Badge tone={USER_STATUS[row.status]?.tone}>{USER_STATUS[row.status]?.label ?? row.status}</Badge>
           {!row.emailVerified && <Badge tone="warning">e-mail pendente</Badge>}
+          {row.activated && <Badge tone="success">1º produto</Badge>}
           {row.lockedUntil && new Date(row.lockedUntil) > new Date() && <Badge tone="error">bloqueada</Badge>}
         </div>
       ),
+    },
+    {
+      key: 'origin',
+      header: 'Origem',
+      render: (row) => <OriginCell origin={row.origin} />,
     },
     {
       key: 'platforms',
@@ -98,7 +122,22 @@ export function UsersPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Usuários" subtitle={query.data ? `${fmtNumber(query.data.total)} conta(s) · app Android e web` : 'Contas do app Android e da web'} />
+      <PageHeader
+        title="Usuários"
+        subtitle={query.data ? `${fmtNumber(query.data.total)} conta(s) · app Android e web` : 'Contas do app Android e da web'}
+        actions={
+          can('owner') && (
+            <a
+              className="btn btn--secondary btn--sm"
+              href="/admin/api/ads/offline-conversions.csv?days=7"
+              download
+              title="Ativações (1º produto) dos últimos 7 dias de quem veio por anúncio e aceitou os cookies. Importe em Google Ads › Ferramentas › Uploads. Veja docs/aquisicao-e-conversao.md."
+            >
+              Ativações para o Google Ads (CSV)
+            </a>
+          )
+        }
+      />
       <Card flush>
         <div className="filters" style={{ padding: '14px 18px' }}>
           <input

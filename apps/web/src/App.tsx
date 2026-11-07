@@ -11,6 +11,7 @@ import { useAuth } from './auth/AuthProvider';
 import { LandingPage } from './pages/LandingPage';
 import { CookieConsent } from './components/CookieConsent';
 import './styles/pages-blog.css';
+import { captureFirstTouch } from './lib/attribution';
 import { bootGa, installGaClickTracking } from './lib/ga';
 
 /**
@@ -106,6 +107,7 @@ function Root() {
   }, [status]);
   // Google Analytics: carrega para quem já aceitou os cookies e mede os cliques das páginas públicas.
   useEffect(() => {
+    captureFirstTouch();
     bootGa();
     return installGaClickTracking();
   }, []);

@@ -12,6 +12,7 @@ import { ProductForm } from '../components/stock/ProductForm';
 import { Card, Chips, ConfirmDialog, Empty, Field, Menu, Modal, Notice, PageHeader, Pagination, QueryState, SearchInput, useToast, type MenuItem } from '../components/ui';
 import { track } from '../lib/analytics';
 import { fmtMoney, fmtQuantity, parseNumber, plural } from '../lib/format';
+import { originContent } from '../lib/attribution';
 import { ProductImage } from '../lib/product-image';
 import { inventoryKeys, SYNC_HEADERS, useDebounced, useInvalidateInventory } from '../lib/inventory';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
@@ -35,6 +36,22 @@ type BulkAction = 'adjust' | 'category' | 'supplier';
  * dia (entrada, saída, cadastro). Os filtros vivem na URL, então dá para
  * favoritar "estoque baixo" ou voltar do detalhe sem perder a posição.
  */
+/**
+ * Dica do estoque vazio pelo anúncio de origem (`utm_content`): a promessa do
+ * anúncio continua no primeiro uso. Sem origem conhecida, o texto padrão.
+ */
+const SEGMENT_TIPS: Record<string, string> = {
+  salao: 'Comece pelos produtos que mais usa no salão (shampoo, tintura, luvas) e defina o estoque mínimo de cada um para ser avisado antes de acabar.',
+  roupas: 'Cadastre cada peça com tamanho e cor no nome (ex.: "Camiseta preta M") e lance as vendas como saída.',
+  mercearia: 'Comece pelos itens que mais vendem e defina o estoque mínimo: o relatório de reposição mostra o que comprar.',
+  cosmeticos: 'Cadastre os produtos com o código de barras (dá para ler pela câmera no app) e defina o estoque mínimo de cada um.',
+  planilha: 'Já tem a lista numa planilha? Use "Importar planilha" e traga tudo de uma vez.',
+};
+
+export function segmentTip(content: string | null): string | null {
+  return content ? (SEGMENT_TIPS[content] ?? null) : null;
+}
+
 export function StockPage() {
   const { workspaceId, base, can, entitlement, currency } = useCurrentWorkspace();
   const [params, setParams] = useSearchParams();
@@ -317,7 +334,8 @@ export function StockPage() {
                 )
               }
             >
-              Cadastre o primeiro produto ou importe uma planilha. Se você já usa o aplicativo Android, os produtos aparecem aqui depois da sincronização.
+              {segmentTip(originContent()) ?? 'Cadastre o primeiro produto ou importe uma planilha.'} Se você já usa o aplicativo Android, os produtos
+              aparecem aqui depois da sincronização.
             </Empty>
           )
         ) : (

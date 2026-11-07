@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { emailSchema } from '../auth/auth.schemas.js';
+import { offlineConversionsCsv } from '../auth/signup-attribution.js';
 import { adminActor, requireAdmin } from './admin-auth.plugin.js';
 import { AdminUsersService } from './admin-users.service.js';
 import {
@@ -26,6 +27,17 @@ const userListItemSchema = z.object({
   hasActiveSubscription: z.boolean(),
   lockedUntil: z.string().nullable(),
   platforms: z.array(z.string()),
+  origin: z
+    .object({
+      source: z.string().nullable(),
+      medium: z.string().nullable(),
+      campaign: z.string().nullable(),
+      content: z.string().nullable(),
+      hasClickId: z.boolean(),
+      consent: z.string().nullable(),
+    })
+    .nullable(),
+  activated: z.boolean(),
 });
 
 const noteSchema = z.object({
@@ -70,6 +82,29 @@ const userParams = uuidParam('userId');
 export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<void> {
   const routes = app.withTypeProvider<ZodTypeProvider>();
   const service = new AdminUsersService(app.services);
+
+  routes.get(
+    '/ads/offline-conversions.csv',
+    {
+      preHandler: requireAdmin('owner'),
+      schema: {
+        tags: ['admin'],
+        summary: 'CSV de ativações para importar no Google Ads (conversões de cliques)',
+        hide: true,
+        querystring: z.object({ days: z.coerce.number().int().min(1).max(90).default(7) }),
+      },
+    },
+    async (request, reply) => {
+      const since = new Date(Date.now() - request.query.days * 86_400_000);
+      const csv = offlineConversionsCsv(await service.offlineActivations(since));
+      const day = new Date().toISOString().slice(0, 10);
+      return reply
+        .header('Content-Type', 'text/csv; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="ativacoes-google-ads-${day}.csv"`)
+        .header('Cache-Control', 'no-store')
+        .send(csv);
+    },
+  );
 
   routes.get(
     '/users',
