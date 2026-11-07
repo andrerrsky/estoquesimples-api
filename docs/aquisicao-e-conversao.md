@@ -405,6 +405,12 @@ Regras:
 - **Assinaturas:** por coorte de origem em 60 e 90 dias (CAC por pagante ×
   R$ 175). Não decidem nada no dia 30.
 
+### Página dos anúncios `/comece` (7/11/2026)
+
+- Destino da campanha de Pesquisa: sem menu, título por `utm_content`, formulário de cadastro na própria página, prova social e dúvidas comuns. Linha de base, não teste.
+- `signup.started` passou a significar **primeira digitação no formulário** (em `/criar-conta` e em `/comece`), com `page`. Antes saía ao abrir `/criar-conta`; números anteriores a 7/11 não são comparáveis.
+- Teste A/B opcional (só depois): sorteio 50/50 no servidor por visitante, gravado em `signup_attribution.variant`; métrica `signup.started ÷ landing.viewed`; decisão com P(variante melhor) ≥ 90% e ≥ 300 visitas por braço; duração máxima 12 semanas (sem conclusão, fica `/comece`).
+
 ### Campanha de Pesquisa (rascunho; publicar só depois do QA)
 
 - **Configuração:**
