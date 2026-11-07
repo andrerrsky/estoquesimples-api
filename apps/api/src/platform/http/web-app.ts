@@ -26,7 +26,21 @@ import { ErrorCode } from './errors.js';
 // Google Analytics (gtag.js): só carrega com o consentimento da pessoa
 // (apps/web/src/lib/ga.ts), mas os domínios precisam estar liberados aqui.
 const GA_SCRIPT = 'https://www.googletagmanager.com';
-const GA_BEACONS = 'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
+// Com o aceite do aviso atual (ad_storage/ad_user_data), o gtag também avisa
+// o Google Ads de que o clique virou cadastro: essas chamadas vão para
+// google.com, doubleclick e googleadservices. Sem eles na CSP, o navegador
+// bloqueia e a conversão nunca chega (lista da documentação do Google para
+// GA4 + Google Ads).
+const GA_BEACONS = [
+  'https://*.google-analytics.com',
+  'https://*.analytics.google.com',
+  'https://analytics.google.com',
+  'https://*.googletagmanager.com',
+  'https://*.g.doubleclick.net',
+  'https://www.google.com',
+  'https://www.google.com.br',
+  'https://www.googleadservices.com',
+].join(' ');
 
 const CSP = [
   "default-src 'self'",

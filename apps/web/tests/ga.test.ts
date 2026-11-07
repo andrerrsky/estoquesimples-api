@@ -48,16 +48,37 @@ describe('consentimento', () => {
     expect(browser.session.getItem('es_campanha')).toBeNull();
   });
 
-  it('aceito: carrega uma vez, sem sinais de publicidade', async () => {
+  it('aceito (aviso atual): carrega uma vez, mede anúncios e nunca personaliza', async () => {
     const ga = await freshGa();
     ga.bootGa();
     ga.setConsent('granted');
     ga.setConsent('granted');
     expect(browser.scripts).toHaveLength(1);
     expect(browser.scripts[0]?.src).toContain(`id=${ID}`);
+    expect(browser.local.getItem('es_cookie_consent')).toBe('granted_v2');
+    const consent = browser.calls().find((call) => call[0] === 'consent');
+    expect(consent?.[2]).toMatchObject({ analytics_storage: 'granted', ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied' });
+    expect(configOf(browser)).toMatchObject({ allow_google_signals: false, allow_ad_personalization_signals: false });
+    expect(ga.consentNeedsPrompt()).toBe(false);
+    expect(ga.attributionConsent()).toBe('v2_accepted');
+  });
+
+  it('aceite do aviso antigo: continua só análise e o aviso novo aparece de novo', async () => {
+    browser.local.setItem('es_cookie_consent', 'granted');
+    const ga = await freshGa();
+    ga.bootGa();
+    expect(browser.scripts).toHaveLength(1);
     const consent = browser.calls().find((call) => call[0] === 'consent');
     expect(consent?.[2]).toMatchObject({ analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
-    expect(configOf(browser)).toMatchObject({ allow_google_signals: false, allow_ad_personalization_signals: false });
+    expect(ga.consentNeedsPrompt()).toBe(true);
+    expect(ga.adsMeasurementAllowed()).toBe(false);
+    expect(ga.attributionConsent()).toBe('v1_accepted');
+
+    // Aceitou o texto novo na mesma página: a medição de anúncios liga na hora.
+    ga.setConsent('granted');
+    const update = browser.calls().filter((call) => call[0] === 'consent' && call[1] === 'update').at(-1);
+    expect(update?.[2]).toMatchObject({ ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied' });
+    expect(ga.consentNeedsPrompt()).toBe(false);
   });
 
   it('revogado depois de aceitar: o gtag é desligado e nenhum evento sai mais', async () => {

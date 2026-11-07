@@ -111,15 +111,14 @@ Conferido em 6/11/2026, somente leitura:
   conta" antes de responder o aviso não tem esse clique registrado). O total
   real de cadastros está no painel administrativo (`user.registered`), que é
   o analytics próprio, dentro da Política.
-- **Conversões no Google Ads podem ficar abaixo do GA4.** O site nega
-  `ad_storage` e `ad_user_data` (a Política promete “não usamos cookies de
-  publicidade”). O GA4 continua sabendo que a sessão veio de `google / cpc`
-  pelo `gclid` no endereço, mas o Google pode limitar ou modelar o
-  compartilhamento dessas conversões com o Ads quando os sinais de anúncios
-  estão negados. Se, depois de cliques reais, o GA4 mostrar `sign_up` em
-  `google / cpc` e o Ads continuar em 0 por mais de 3 dias, essa é a primeira
-  suspeita. Mudar exige decisão do proprietário, revisão da Política
-  (seção 5) e do texto do aviso; o código não muda isso sozinho.
+- **Conversões no Google Ads ficavam em zero.** Até 7/11/2026 o site negava
+  `ad_storage` e `ad_user_data` mesmo para quem aceitava os cookies, e o GA4
+  respeita esse sinal: não repassa a conversão ao Ads. Foi a causa do aviso
+  “A configuração do acompanhamento de conversões está incompleta” no
+  primeiro dia do Display. Desde o aviso **v2** (seção 9), quem aceita libera
+  `ad_storage` e `ad_user_data`; `ad_personalization` e Google Signals
+  continuam desligados. Quem aceitou o texto antigo continua só com análise e
+  vê o aviso de novo.
 - **Bloqueadores** (uBlock, Brave, Safari com proteção avançada) impedem o
   `gtag.js` mesmo com aceite. Não há coleta alternativa, de propósito.
 - **Janelas de atribuição**: o Ads credita o cadastro ao clique se ele
@@ -131,14 +130,10 @@ Conferido em 6/11/2026, somente leitura:
   em até 24–48 h; conversões importadas no Ads costumam levar algumas horas e
   podem levar mais de um dia para aparecer.
 
-### Política de Privacidade (sugestão, não aplicada)
+### Política de Privacidade
 
-A seção 5 lista o que fica guardado no navegador. Para ficar completa com a
-correção 2, o proprietário pode acrescentar: “Se você chegar por um link de
-campanha, a origem da visita (por exemplo, o anúncio de onde veio) fica
-guardada nesta aba e só é enviada ao Google Analytics se você aceitar os
-cookies; recusar ou fechar a aba apaga.” Mudança de texto legal é decisão do
-proprietário.
+Atualizada em 7/11/2026 (seção 5): medição de anúncios com aceite e origem
+do cadastro por legítimo interesse. Ver a seção 9.
 
 ## 4. Separar testes e equipe sem tirar ninguém de verdade
 
@@ -271,7 +266,12 @@ atraso da importação.
   e possível limitação pelos sinais de anúncios negados (seção 3).
 - Nunca some `sign_up` com `signup_completed`: são o mesmo cadastro.
 
-## 7. Primeiro produto como meta (proposta)
+## 7. Primeiro produto como meta
+
+> Substituído pela seção 9: a ativação vai ao Ads por importação offline
+> (lida do banco, vale para web e app), não pelo evento do GA4.
+
+
 
 `product_first_created` é um bom indicador de ativação (a pessoa passou do
 cadastro ao uso). Proposta: deixá-lo como evento de **observação** por
@@ -298,3 +298,159 @@ por planilha e produtos criados no app Android não disparam o evento na web
 
 Não alterado: publicidade personalizada, faturamento, orçamento, estado de
 publicação da campanha, ações de conversão.
+
+## 9. Plano depois do primeiro dia do Display (7/11/2026)
+
+### Diagnóstico
+
+1. **Medição.** O Ads recebia conversão só pelo GA4, e o GA4 não repassava
+   nada (seção 3). Com 0 conversões, "Maximizar conversões" otimizava no
+   escuro.
+2. **Tráfego.** Num dia: 115 cliques, CTR de 7,6% e CPC de R$ 0,14. 98% dos
+   cliques vieram de celular, em 97 posicionamentos de apps e sites de
+   APK/jogos (CTR de até 300%), ou seja, cliques acidentais. A campanha não
+   tinha nenhum segmento de público.
+3. **Funil.** Na janela logo após o início: 13 aberturas de /criar-conta,
+   3 cadastros, 1 empresa e 0 produtos. Com n=3 não se calcula taxa; serve só
+   para achar atrito. Dois dos três pararam em "dê um nome à sua empresa".
+
+Já feito no Ads (reversível, sem mexer em orçamento):
+- exclusões de conteúdo na campanha (abaixo da dobra, não classificado,
+  sensível);
+- na conta (Adequação do conteúdo), 204 canais excluídos: as 140 categorias
+  de apps do Google Play e da App Store, além de 64 sites do relatório.
+
+### Medição: fonte única da ação principal
+
+- **Ação principal no Ads: "Ativação (offline)"** (importação de cliques,
+  contagem Uma, janela de 30 dias, modelo baseado em dados).
+  - Origem: Painel › Usuários › "Ativações para o Google Ads (CSV)"
+    (`GET /admin/api/ads/offline-conversions.csv?days=7`, só owner).
+  - Entra no CSV quem tem `gclid` gravado no cadastro, aceitou o aviso
+    **v2** (`consent = v2_accepted`, atualizado se a pessoa mudar a escolha
+    logada) e criou o primeiro produto há mais de 6 horas.
+  - Horário: o do produto, em `-03:00`. Valor: R$ 12.
+- **`sign_up` (GA4):** vira ação **secundária**.
+- **`product_first_created`:** **não** vira ação no Ads, para não contar a
+  mesma ativação duas vezes.
+- **Origem própria (sem cookie):** `lib/attribution.ts` guarda na aba a
+  primeira campanha e a envia no cadastro.
+  - A API grava em `users.signup_attribution`, que aparece no painel
+    (coluna Origem) e nas UTMs de `user.registered`.
+  - `landing.viewed` registra a chegada ao site sem depender do aviso de
+    cookies.
+  - O gclid nunca vai para eventos nem logs.
+
+Checklist da importação offline:
+- [ ] Criar a ação "Ativação (offline)" **≥ 24 h antes** de publicar a
+      Pesquisa (cliques anteriores à ação são rejeitados).
+- [ ] Subir o CSV 1×/dia (Ferramentas › Uploads). No dia seguinte ao
+      primeiro upload real, conferir os erros nos detalhes do upload.
+- [ ] gbraid/wbraid ficam fora do CSV (exigem a API); a limitação está
+      declarada e eles ficam gravados para depois.
+- [ ] A conta está em GMT-06:00 e o fuso não muda. O CSV leva offset
+      explícito, mas o relatório diário do Ads fica 3 h deslocado do painel.
+
+### Funil (no mesmo PR, antes do lançamento da Pesquisa)
+
+- **Empresa automática** no cadastro web ("Minha empresa", renomeável); a
+  pessoa cai direto no estoque.
+- **Um e-mail** depois de 24 h para quem não tem produto
+  (`onboarding.first_product_nudge`, evento `onboarding.nudge_sent`).
+- **Textos por segmento** (`utm_content`): título da página inicial e dica do
+  estoque vazio para salao, roupas, mercearia, cosmeticos e planilha.
+- **Congelamento:** depois do lançamento, nada muda no funil até o dia 30
+  (login com Google etc. ficam para depois). Toda exceção é anotada aqui, com
+  data.
+- **CTA no celular durante o teste:** cadastro web, que é medido. A Play Store
+  segue como secundária.
+
+### Economia e critérios de decisão
+
+Premissas (a revisar no dia 30):
+- Plano Equipe: ~R$ 22/mês líquido; vida média de 8 meses, então LTV ≈ R$ 175.
+- 5–8% dos ativados assinam. Uma ativação vale ≈ R$ 9–14.
+
+Metas:
+- CAC por pagante ≤ R$ 175.
+- CPA de ativação: alvo ≤ R$ 15, aceito até R$ 30 nos primeiros 30 dias.
+
+Regras:
+- **CPA e contagem de ativações saem do painel**, por `utm_campaign`.
+  - O Ads só vê quem aceitou o aviso v2, então mostra menos ativações.
+  - Registre a cobertura (Ads ÷ painel) a partir do dia 7.
+- **Lance da Pesquisa:**
+  - Maximizar cliques com CPC máximo de R$ 2,50.
+  - Passar para Maximizar conversões quando houver ~15 ativações em 30 dias
+    no painel **e** ≥ 10–15 recebidas pelo Ads.
+  - tCPA fica fora do horizonte.
+- **Dia 7** (só com ≥ 50 cliques):
+  - CTR ≥ 5%;
+  - ≥ 70% dos termos de pesquisa relevantes;
+  - landing.viewed → signup.started ≥ 15%;
+  - cadastro → empresa ≥ 80%.
+- **Dia 14:** cadastro → 1º produto ≥ 30%. Se falhar, mexer em landing ou
+  onboarding antes do lance.
+- **Dia 30 ou R$ 450:** decidir por CPA de ativação e qualidade (% de
+  ativados com ≥ 10 produtos ou ativos em 3+ dias).
+  - CPA ≤ R$ 30: seguir.
+  - R$ 30–60: revisar por 15 dias.
+  - Acima de R$ 60 ou 0 ativações: pausar.
+- **Assinaturas:** por coorte de origem em 60 e 90 dias (CAC por pagante ×
+  R$ 175). Não decidem nada no dia 30.
+
+### Campanha de Pesquisa (rascunho; publicar só depois do QA)
+
+- **Configuração:**
+  - só Rede de Pesquisa, sem parceiros e sem Display;
+  - Brasil por **presença**, português;
+  - públicos em **Observação**: pequenas empresas, varejo, beleza.
+- **Grupos (frase/exata):**
+  - *Genérico:* app controle de estoque, aplicativo controle de estoque,
+    controle de estoque grátis, controle de estoque pelo celular, sistema de
+    estoque simples, programa de estoque para pequena empresa.
+  - *Nichos:* estoque para salão de beleza, loja de roupas,
+    mercearia/mercadinho, loja de cosméticos.
+  - *Planilha:* planilha controle de estoque, planilha de estoque grátis.
+    - CPC máximo R$ 1,20 e `utm_content=planilha`.
+    - Pausar se o CPA do grupo no dia 14 for maior que o dobro da média.
+- **Negativas:** curso, aula, apostila, tcc, vaga, emprego, sap, totvs, erp,
+  sped, nota fiscal, contabilidade, almoxarifado, farmácia hospitalar, o que
+  é, conceito, crack, pirata, modelo pdf, gratis download ("excel" em
+  observação). Revisar os termos a cada 2–3 dias na 1ª semana.
+- **Anúncios RSA:**
+  - 12–15 títulos, com 2–3 variantes fixadas por posição;
+  - URL com `utm_source=google&utm_medium=cpc&utm_campaign=pesquisa_estoque`
+    e `utm_content` por grupo.
+- **Recursos de anúncio:**
+  - sitelinks: Comece grátis, App Android, Importar planilha, Plano Equipe;
+  - frases de destaque;
+  - snippets de tipos de negócio.
+- **Antes de publicar:**
+  - Planejador de palavras-chave (volume e CPC);
+  - SPF/DKIM/DMARC do remetente de e-mail;
+  - ação offline criada há ≥ 24 h.
+
+### QA de ponta a ponta (antes de publicar)
+
+1. No celular, abrir
+   `/?gclid=TESTE_QA&utm_source=google&utm_medium=cpc&utm_campaign=qa&utm_content=salao`
+   **sem aceitar** cookies: o título fala de salão e `landing.viewed`
+   aparece no painel com `has_click_id=true`.
+2. Cadastrar: a empresa é criada sozinha, a pessoa cai no estoque com a dica
+   de salão e o painel mostra a Origem `google / cpc · qa · salao`.
+3. Recusar cookies → cadastrar → criar produto: **não** aparece no CSV.
+   Aceitar → cadastrar → criar produto → esperar 6 h: aparece; validar no Ads
+   com "pré-visualizar", sem aplicar.
+4. E-mail de 24 h: testar localmente adiantando `run_at` do job.
+5. GA4 DebugView: depois de aceitar, `gcs` com `ad_storage` concedido.
+   Diagnóstico de conversões do Ads em 48 h.
+
+### Follow-ups (fora deste PR)
+
+- App Android: ler a Install Referrer API e enviar UTMs e gclid no cadastro
+  do app para o mesmo `signup_attribution`.
+- Login com Google (depois do dia 30).
+- Página "modelo de planilha" para o grupo Planilha.
+- Envio automático do CSV (Sheets agendado ou API do Google Ads, que cobre
+  gbraid/wbraid).

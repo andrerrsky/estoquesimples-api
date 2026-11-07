@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { api, onSessionChange, refreshSession, sessionApi } from '../api/client';
 import type { User } from '../api/types';
 import { track } from '../lib/analytics';
-import { gaEvent } from '../lib/ga';
+import { gaEvent, onConsentChange } from '../lib/ga';
 import { clearProductImages } from '../lib/product-image';
 import { createAuthActions } from './actions';
 import { AuthContext, type AuthContextValue, type Status } from './context';
@@ -53,6 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     [queryClient],
   );
+
+  // Escolha de cookies mudada com a conta aberta: a origem do cadastro passa a
+  // refletir a última escolha (decide se o clique vai para o Google Ads).
+  useEffect(() => {
+    if (status !== 'authed') return undefined;
+    return onConsentChange((consent) => {
+      if (consent === null) return;
+      void api.put('/v1/me/cookie-consent', { consent: consent === 'granted' ? 'v2_accepted' : 'refused' }).catch(() => undefined);
+    });
+  }, [status]);
 
   const { login, register, loginWithAppCode } = useMemo(
     () =>
