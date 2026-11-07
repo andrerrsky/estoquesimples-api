@@ -115,3 +115,57 @@ export function sendLandingViewed(): void {
     credentials: 'same-origin',
   }).catch(() => undefined);
 }
+
+/**
+ * Segmento escolhido na tela de boas-vindas (quando a visita não veio de
+ * anúncio por segmento). Fica só neste navegador: personaliza a dica do
+ * estoque vazio e vai como propriedade de `onboarding.name_set`.
+ */
+const SEGMENT_KEY = 'es_segmento';
+export const SEGMENTS = ['salao', 'roupas', 'mercearia', 'cosmeticos', 'outro'] as const;
+
+export function setChosenSegment(segment: string | null): void {
+  try {
+    if (segment) localStorage.setItem(SEGMENT_KEY, segment);
+    else localStorage.removeItem(SEGMENT_KEY);
+  } catch {
+    // sem armazenamento: segue sem a dica do segmento
+  }
+}
+
+/** Segmento para personalizar textos: o do anúncio de origem ou o escolhido nas boas-vindas. */
+export function segmentContent(): string | null {
+  const fromAd = originContent();
+  if (fromAd) return fromAd;
+  try {
+    const chosen = localStorage.getItem(SEGMENT_KEY);
+    return chosen && (SEGMENTS as readonly string[]).includes(chosen) ? chosen : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Marcas deste navegador para a hora certa de pedir a confirmação do e-mail. */
+const FIRST_PRODUCT_KEY = 'es_primeiro_produto';
+export function markFirstProduct(): void {
+  try {
+    localStorage.setItem(FIRST_PRODUCT_KEY, '1');
+  } catch {
+    // sem armazenamento
+  }
+}
+
+/**
+ * O aviso "confirme seu e-mail" não aparece no primeiro contato: só depois do
+ * primeiro produto ou a partir de 24 h de conta (a confirmação não é
+ * necessária para usar; o passo que importa no começo é cadastrar produtos).
+ */
+export function emailReminderDue(createdAt: string, now = Date.now()): boolean {
+  try {
+    if (localStorage.getItem(FIRST_PRODUCT_KEY) === '1') return true;
+  } catch {
+    // sem armazenamento: vale só a idade da conta
+  }
+  const created = Date.parse(createdAt);
+  return Number.isFinite(created) ? now - created >= 24 * 3_600_000 : true;
+}

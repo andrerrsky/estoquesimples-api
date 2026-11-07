@@ -757,6 +757,9 @@ export class AuthService {
         .where(eq(passwordResetTokens.id, stored.id));
 
       // Incrementar permission_version invalida todo access token já emitido.
+      // O link chegou ao e-mail e foi usado (token único, válido por 30 min):
+      // isso prova a posse do endereço, então confirma o e-mail de quem não
+      // tinha confirmado.
       await tx
         .update(users)
         .set({
@@ -764,6 +767,7 @@ export class AuthService {
           permissionVersion: sql`${users.permissionVersion} + 1`,
           failedLoginAttempts: 0,
           lockedUntil: null,
+          emailVerifiedAt: sql`COALESCE(${users.emailVerifiedAt}, now())`,
         })
         .where(eq(users.id, stored.userId));
 

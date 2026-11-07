@@ -10,6 +10,7 @@ import { BrandMark } from '../components/BrandMark';
 import { Icon } from '../components/Icon';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
+import { originContent, setChosenSegment } from '../lib/attribution';
 import { applyRememberedLogin, readRememberedLogin } from '../lib/remembered-login';
 import { clearPublicBrand, setBrand, useBrand } from '../lib/brand';
 import { fmtDate } from '../lib/format';
@@ -103,11 +104,32 @@ function PasswordRules({ password, email }: { password: string; email: string })
   );
 }
 
+/** Marcado ao enviar o cadastro: a primeira tela depois dele é a de boas-vindas. */
+export const WELCOME_KEY = 'es_boas_vindas';
+
+function welcomePending(): boolean {
+  try {
+    return sessionStorage.getItem(WELCOME_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setWelcomePending(pending: boolean): void {
+  try {
+    if (pending) sessionStorage.setItem(WELCOME_KEY, '1');
+    else sessionStorage.removeItem(WELCOME_KEY);
+  } catch {
+    // sem armazenamento: vai direto para o estoque, que também funciona
+  }
+}
+
 function useRedirectIfAuthed(): ReactNode | null {
   const { status } = useAuth();
   const location = useLocation();
   if (status === 'loading') return <FullScreenLoading />;
   if (status === 'authed') {
+    if (welcomePending()) return <Navigate to="/boas-vindas" replace />;
     // Vem do estado da navegação ou, para links comuns (a página inicial
     // não usa o roteador), da URL: /criar-conta?depois=/app/plano.
     const from = (location.state as { from?: string } | null)?.from ?? new URLSearchParams(location.search).get('depois');
@@ -280,9 +302,11 @@ export function RegisterPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setWelcomePending(true);
     try {
       await register(name.trim(), email.trim(), password);
     } catch (caught) {
+      setWelcomePending(false);
       setError(caught as Error);
     } finally {
       setBusy(false);
@@ -322,6 +346,121 @@ export function RegisterPage() {
         <p className="caption" style={{ textAlign: 'center' }}>
           Ao criar a conta, você declara ter lido e concordado com os <Link to="/termos">Termos de Uso</Link> e a <Link to="/privacidade">Política de Privacidade</Link>.
         </p>
+      </form>
+    </AuthLayout>
+  );
+}
+
+const SEGMENT_OPTIONS: Array<{ key: string; label: string; example: string }> = [
+  { key: 'salao', label: 'Salão de beleza', example: 'Salão da Ana' },
+  { key: 'roupas', label: 'Loja de roupas', example: 'Moda da Carla' },
+  { key: 'mercearia', label: 'Mercearia', example: 'Mercearia São José' },
+  { key: 'cosmeticos', label: 'Cosméticos', example: 'Beleza & Cia' },
+  { key: 'outro', label: 'Outro', example: 'Loja do Bairro' },
+];
+
+/**
+ * Primeira tela depois do cadastro web: só o nome da empresa, sem menu nem
+ * avisos. A empresa já existe ("Minha empresa", criada pela API no
+ * cadastro), então "Pular" não trava ninguém; aqui ela só ganha o nome. Se a
+ * visita não veio de um anúncio por segmento, a pessoa pode tocar no tipo de
+ * negócio (opcional), que personaliza a dica do estoque vazio.
+ *
+ * Reversão combinada (docs/aquisicao-e-conversao.md): se `onboarding.viewed`
+ * sem nenhum passo seguinte em 24 h passar de 10% com ≥ 30 cadastros, esta
+ * tela sai e o nome passa a ser editado só no estoque.
+ */
+export function WelcomePage() {
+  const { status, user } = useAuth();
+  const { workspaces, loading, refresh, select } = useWorkspace();
+  const navigate = useNavigate();
+  const fromAd = originContent();
+  const adSegment = fromAd && SEGMENT_OPTIONS.some((option) => option.key === fromAd) ? fromAd : null;
+  const [segment, setSegment] = useState<string | null>(adSegment);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const viewed = useRef(false);
+
+  const owned = workspaces.find((item) => item.isOwner) ?? workspaces[0] ?? null;
+
+  useEffect(() => {
+    setWelcomePending(false);
+    if (status === 'authed' && !viewed.current) {
+      viewed.current = true;
+      track('onboarding.viewed', { segment: adSegment });
+    }
+  }, [status, adSegment]);
+
+  if (status === 'loading' || (status === 'authed' && loading)) return <FullScreenLoading />;
+  if (status !== 'authed') return <Navigate to="/entrar" replace />;
+
+  const example = SEGMENT_OPTIONS.find((option) => option.key === segment)?.example ?? 'Loja da Ana';
+  const finish = () => {
+    if (owned) select(owned.id);
+    navigate('/app/estoque?primeiro=1', { replace: true });
+  };
+
+  const skip = () => {
+    setChosenSegment(adSegment ? null : segment);
+    track('onboarding.name_skipped', { segment });
+    finish();
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    const chosen = name.trim();
+    if (!chosen || !owned) {
+      skip();
+      return;
+    }
+    setChosenSegment(adSegment ? null : segment);
+    setBusy(true);
+    setError(null);
+    try {
+      if (chosen !== owned.name) await api.patch(`/v1/workspaces/${owned.id}`, { name: chosen });
+      await refresh();
+      track('onboarding.name_set', { segment });
+      finish();
+    } catch (caught) {
+      setError(caught);
+      setBusy(false);
+    }
+  };
+
+  const first = user?.name.trim().split(/\s+/)[0];
+  return (
+    <AuthLayout title={first ? `Bem-vindo, ${first}!` : 'Bem-vindo!'} subtitle="Sua conta está pronta. Só uma pergunta antes de começar.">
+      <form className="stack" onSubmit={submit}>
+        {error !== null && <Notice tone="error">{errorMessage(error)}</Notice>}
+        <Field label="Como se chama a sua empresa?">
+          <input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder={`Ex.: ${example}`} autoFocus enterKeyHint="go" />
+        </Field>
+        {!adSegment && (
+          <div className="stack" style={{ gap: 8 }}>
+            <span className="caption">Seu negócio é… (opcional)</span>
+            <div className="segment-picker" role="group" aria-label="Tipo de negócio (opcional)">
+              {SEGMENT_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`segment-picker__chip${segment === option.key ? ' segment-picker__chip--active' : ''}`}
+                  aria-pressed={segment === option.key}
+                  onClick={() => setSegment(segment === option.key ? null : option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
+          {busy ? 'Salvando…' : 'Começar'}
+        </button>
+        <button type="button" className="btn btn--link" onClick={skip} disabled={busy}>
+          Pular por agora
+        </button>
       </form>
     </AuthLayout>
   );

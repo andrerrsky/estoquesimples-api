@@ -2208,3 +2208,33 @@ button {
   font-size: var(--fs-caption);
   font-weight: 500;
 }
+
+/* Boas-vindas: tipo de negócio (opcional), tocável no celular. */
+.segment-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.segment-picker__chip {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-content);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-supporting);
+  cursor: pointer;
+}
+.segment-picker__chip:hover {
+  border-color: var(--brand);
+}
+.segment-picker__chip--active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.segment-picker__chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
