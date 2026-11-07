@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import { registerAdsRoutes } from '../../modules/ads/ads.routes.js';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -221,6 +222,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerAnalyticsRoutes, { prefix: '/v1' });
   await app.register(registerPushRoutes, { prefix: '/v1' });
   await app.register(registerErrorRoutes, { prefix: '/v1' });
+  await app.register(registerAdsRoutes, { prefix: '/v1' });
   await app.register(registerBlogRoutes, { prefix: '/v1' });
   await app.register(registerSupportRoutes, { prefix: '/v1' });
   await app.register(registerWebSessionRoutes, { prefix: '/v1/auth' });

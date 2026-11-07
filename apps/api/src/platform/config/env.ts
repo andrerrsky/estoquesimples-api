@@ -139,6 +139,13 @@ const envSchema = z
     OPS_TOKEN: z.string().min(24).optional(),
     /** Token só para registrar restaurações de teste (POST /ops/backup), guardado no GitHub em vez do OPS_TOKEN. */
     OPS_BACKUP_TOKEN: z.string().min(24).optional(),
+    /**
+     * Senha do upload programado do Google Ads (Ferramentas › Uploads ›
+     * Programações, origem HTTPS, usuário `googleads`). O Google busca 1×/dia
+     * o CSV de ativações em /v1/ads/offline-conversions.csv. Sem ela, o
+     * endereço responde 404.
+     */
+    ADS_UPLOAD_PASSWORD: z.string().min(24).optional(),
     OPS_WATCHDOG_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
     /** Prazo máximo aceitável desde a última restauração de teste bem-sucedida. */
     BACKUP_MAX_AGE_HOURS: z.coerce.number().int().positive().default(48),
