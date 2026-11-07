@@ -8,15 +8,6 @@ import { offlineConversionsCsv } from '../auth/signup-attribution.js';
 
 /** Usuário fixo do upload programado; a senha vem de `ADS_UPLOAD_PASSWORD`. */
 export const ADS_UPLOAD_USER = 'googleads';
-/**
- * O assistente da Central de dados só aceita a conexão se o arquivo tiver ao
- * menos uma linha (para descobrir o formato). Até este horário, sem ativações
- * reais, sai uma linha de configuração com um gclid que não existe: o Google
- * a recusa no upload e nada é contado. Depois disso, nunca mais.
- */
-export const SCHEMA_SAMPLE_UNTIL = new Date('2026-11-07T19:00:00Z');
-const SCHEMA_SAMPLE_GCLID = 'TESTE_CONFIGURACAO_IGNORAR';
-
 /** O Google busca 1×/dia; uma janela de 7 dias cobre falhas e é deduplicada por ele (mesmo gclid + ação). */
 const WINDOW_DAYS = 7;
 
@@ -58,11 +49,7 @@ export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       requireUploadPassword(request, reply);
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
-      let rows = await service.offlineActivations(since);
-      if (rows.length === 0 && Date.now() < SCHEMA_SAMPLE_UNTIL.getTime()) {
-        rows = [{ gclid: SCHEMA_SAMPLE_GCLID, convertedAt: new Date(Date.now() - 86_400_000) }];
-      }
-      const csv = offlineConversionsCsv(rows);
+      const csv = offlineConversionsCsv(await service.offlineActivations(since));
       return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
     },
   );
