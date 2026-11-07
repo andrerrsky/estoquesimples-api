@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
 import { safeEquals } from '../../platform/auth/tokens.js';
@@ -11,7 +11,7 @@ export const ADS_UPLOAD_USER = 'googleads';
 /** O Google busca 1×/dia; uma janela de 7 dias cobre falhas e é deduplicada por ele (mesmo gclid + ação). */
 const WINDOW_DAYS = 7;
 
-function requireUploadPassword(request: FastifyRequest): void {
+function requireUploadPassword(request: FastifyRequest, reply: FastifyReply): void {
   const expected = request.server.services.env.ADS_UPLOAD_PASSWORD;
   // Sem senha configurada o recurso não existe, em vez de ficar aberto.
   if (!expected) throw notFound('Recurso não encontrado');
@@ -21,7 +21,12 @@ function requireUploadPassword(request: FastifyRequest): void {
   const user = separator >= 0 ? decoded.slice(0, separator) : '';
   const password = separator >= 0 ? decoded.slice(separator + 1) : '';
   const ok = safeEquals(user, ADS_UPLOAD_USER) && safeEquals(password, expected);
-  if (!ok) throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Credenciais inválidas.');
+  if (!ok) {
+    // O desafio é obrigatório: clientes como o conector HTTPS do Google Ads
+    // só mandam usuário e senha depois de receberem este cabeçalho.
+    reply.header('WWW-Authenticate', 'Basic realm="estoquesimples-ads", charset="UTF-8"');
+    throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Credenciais inválidas.');
+  }
 }
 
 /**
@@ -42,7 +47,7 @@ export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
       schema: { tags: ['ads'], summary: 'CSV de ativações para o upload programado do Google Ads', hide: true },
     },
     async (request, reply) => {
-      requireUploadPassword(request);
+      requireUploadPassword(request, reply);
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
       const csv = offlineConversionsCsv(await service.offlineActivations(since));
       return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
