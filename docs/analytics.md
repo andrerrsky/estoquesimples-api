@@ -57,6 +57,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | --- | --- | --- | --- |
 | `app.opened` | app | app ganhou foco (cold ou warm start) | `coldStart: boolean` |
 | `screen.viewed` | app | Activity/tela exibida | `screen: "MainActivity"` |
+| `landing.viewed` | web | abriu a página inicial (sem cookie; primeiro degrau do funil de anúncios) | `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `has_click_id` — nunca o gclid |
 | `signup.started` | app | abriu o formulário de cadastro | — |
 | `product.created` / `product.updated` / `product.deleted` | app | CRUD de produto no aparelho | `withPhoto`, `withBarcode` (created) |
 | `movement.created` | app | entrada, saída ou ajuste registrado | `type: entrada \| saida \| ajuste` |
@@ -76,7 +77,8 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `platform.play_clicked` / `platform.device_selected` / `platform.install_clicked` / `platform.web_app_installed` | web | página Plataformas: clique na Google Play, aparelho escolhido no passo a passo, instalação com um clique e instalação confirmada | `device` |
 | `help.searched` | app e web | busca na central de ajuda (após pausa na digitação) | `results` — só a contagem, nunca o texto buscado |
 | `user.registered` / `user.logged_in` / `user.email_verified` / `user.deletion_requested` | API | ciclo de vida da conta | `origin` |
-| `workspace.created` / `invite.sent` / `invite.accepted` | API | empresa e equipe | `roleKey`, `newAccount` |
+| `workspace.created` / `invite.sent` / `invite.accepted` | API | empresa e equipe | `roleKey`, `newAccount`; `automatic` (empresa criada no cadastro web) |
+| `onboarding.nudge_sent` | API | e-mail único de lembrete do primeiro produto (24 h sem produto) | — |
 | `sync.initial_upload_completed` / `sync.pushed` / `sync.pulled` / `sync.conflict_resolved` | API | sincronização | `products`, `movements`, `operations`, `rejected`, `conflicts`, `changes`, `choice` |
 | `subscription.linked` / `subscription.state_changed` | API | assinatura | `planKey`, `state`, `from`, `to` |
 

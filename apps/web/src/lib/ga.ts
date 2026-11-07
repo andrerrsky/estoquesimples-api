@@ -28,6 +28,14 @@ export const GA_MEASUREMENT_ID = (import.meta.env['VITE_GA_MEASUREMENT_ID'] as s
 
 const CONSENT_KEY = 'es_cookie_consent';
 export type Consent = 'granted' | 'denied';
+/**
+ * Versão do texto aceito. `granted` (sem versão) é o aviso antigo, que dizia
+ * "nada é usado para publicidade": vale para análise, mas não autoriza medir
+ * anúncios, e o aviso novo aparece de novo para essa pessoa. `granted_v2` é o
+ * aviso que diz que o Google fica sabendo quais anúncios trazem cadastros.
+ */
+const GRANTED_V2 = 'granted_v2';
+const GRANTED_V1 = 'granted';
 
 /** Parâmetros de campanha que podem ir para o GA (e só eles). */
 export const CAMPAIGN_PARAMS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'gclid', 'gbraid', 'wbraid'] as const;
@@ -166,36 +174,64 @@ let loaded = false;
 const listeners = new Set<(consent: Consent | null) => void>();
 
 /** Escolha desta página quando o navegador não deixa gravar (aba privada, armazenamento bloqueado). */
-let memoryConsent: Consent | null = null;
+let memoryRaw: string | null = null;
 
-export function readConsent(): Consent | null {
+function rawConsent(): string | null {
   try {
     const value = localStorage.getItem(CONSENT_KEY);
-    return value === 'granted' || value === 'denied' ? value : memoryConsent;
+    if (value === GRANTED_V2 || value === GRANTED_V1 || value === 'denied') return value;
   } catch {
-    return memoryConsent;
+    // sem armazenamento
   }
+  return memoryRaw;
+}
+
+export function readConsent(): Consent | null {
+  const raw = rawConsent();
+  if (raw === GRANTED_V2 || raw === GRANTED_V1) return 'granted';
+  if (raw === 'denied') return 'denied';
+  return null;
+}
+
+/** Aceitou o aviso atual (que inclui a medição de anúncios). */
+export function adsMeasurementAllowed(): boolean {
+  return rawConsent() === GRANTED_V2;
+}
+
+/** O aviso precisa aparecer: nunca escolheu ou aceitou só o texto antigo. */
+export function consentNeedsPrompt(): boolean {
+  const raw = rawConsent();
+  return raw === null || raw === GRANTED_V1;
+}
+
+/** Estado gravado junto da origem do cadastro (decide o envio ao Google Ads). */
+export function attributionConsent(): 'v2_accepted' | 'v1_accepted' | 'refused' | 'none' {
+  const raw = rawConsent();
+  if (raw === GRANTED_V2) return 'v2_accepted';
+  if (raw === GRANTED_V1) return 'v1_accepted';
+  if (raw === 'denied') return 'refused';
+  return 'none';
 }
 
 export function setConsent(consent: Consent): void {
-  memoryConsent = consent;
+  memoryRaw = consent === 'granted' ? GRANTED_V2 : 'denied';
   try {
-    localStorage.setItem(CONSENT_KEY, consent);
+    localStorage.setItem(CONSENT_KEY, memoryRaw);
   } catch {
     // sem armazenamento: o aviso volta na próxima visita
   }
   if (consent === 'granted') {
     if (loaded) {
-      // Aceitou de novo na mesma página: religa o que a recusa desligou.
+      // Aceitou (de novo, ou o texto novo) na mesma página: religa o que a recusa desligou.
       (window as unknown as Record<string, unknown>)[disableFlag()] = false;
-      window.gtag?.('consent', 'update', { analytics_storage: 'granted' });
+      window.gtag?.('consent', 'update', ADS_MEASUREMENT_GRANTED);
     } else loadGa();
   } else {
     // Recusa ou revogação: nada guardado para depois e, se o gtag já estava
     // na página, ele para de enviar (inclusive as visualizações automáticas).
     storageSet(session, CAMPAIGN_KEY, null);
     if (loaded) {
-      window.gtag?.('consent', 'update', { analytics_storage: 'denied' });
+      window.gtag?.('consent', 'update', ALL_DENIED);
       (window as unknown as Record<string, unknown>)[disableFlag()] = true;
     }
   }
@@ -206,6 +242,10 @@ export function onConsentChange(listener: (consent: Consent | null) => void): ()
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+const ANALYTICS_ONLY = { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' } as const;
+const ADS_MEASUREMENT_GRANTED = { analytics_storage: 'granted', ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied' } as const;
+const ALL_DENIED = { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' } as const;
 
 /** Injeta o gtag.js (uma vez). Chamado só com consentimento. */
 export function loadGa(): void {
@@ -218,10 +258,13 @@ export function loadGa(): void {
     // eslint-disable-next-line prefer-rest-params
     window.dataLayer!.push(arguments);
   };
-  window.gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  // Aviso atual aceito: o Google pode ligar o cadastro ao clique no anúncio
+  // (ad_storage, ad_user_data). Aviso antigo: só análise, como ele dizia.
+  // Personalização de anúncios e Google Signals continuam sempre desligados.
+  window.gtag('consent', 'default', adsMeasurementAllowed() ? ADS_MEASUREMENT_GRANTED : ANALYTICS_ONLY);
   window.gtag('js', new Date());
   window.gtag('config', GA_MEASUREMENT_ID, {
-    // Sem sinais de publicidade e sem personalização: o site não tem anúncios.
+    // Sem Google Signals nem personalização: nada de remarketing ou perfil para anúncios.
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
     app_version: __APP_VERSION__,

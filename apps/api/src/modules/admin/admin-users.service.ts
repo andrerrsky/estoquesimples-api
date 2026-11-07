@@ -15,6 +15,7 @@ import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/e
 import { AuditAction, SECURITY_USER_ACTIONS, recordAudit } from '../audit/audit.service.js';
 import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
+import type { OfflineConversionRow } from '../auth/signup-attribution.js';
 import { AdminAction, SECURITY_ADMIN_ACTIONS, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
 import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
@@ -42,6 +43,31 @@ export interface UserListItem {
   lockedUntil: string | null;
   /** Plataformas em que a conta tem aparelho não revogado (`devices.platform`). */
   platforms: string[];
+  /** Origem do cadastro web, quando veio de campanha. Nunca o identificador do clique. */
+  origin: SignupOrigin | null;
+  /** Já tem produto em alguma empresa de que é proprietária (ativação). */
+  activated: boolean;
+}
+
+export interface SignupOrigin {
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+  content: string | null;
+  hasClickId: boolean;
+  consent: string | null;
+}
+
+export function signupOriginOf(raw: Record<string, string> | null | undefined): SignupOrigin | null {
+  if (!raw) return null;
+  return {
+    source: raw.utm_source ?? null,
+    medium: raw.utm_medium ?? null,
+    campaign: raw.utm_campaign ?? null,
+    content: raw.utm_content ?? null,
+    hasClickId: Boolean(raw.gclid || raw.gbraid || raw.wbraid),
+    consent: raw.consent ?? null,
+  };
 }
 
 export interface UserDetail {
@@ -168,8 +194,13 @@ export class AdminUsersService {
         has_subscription: boolean;
         locked_until: string | null;
         platforms: string[];
+        signup_attribution: Record<string, string> | null;
+        activated: boolean;
       }>(sql`
-        SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until,
+        SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until, u.signup_attribution,
+               EXISTS (
+                 SELECT 1 FROM products p JOIN workspaces w ON w.id = p.workspace_id WHERE w.owner_user_id = u.id
+               ) AS activated,
                (SELECT max(s.last_used_at) FROM sessions s WHERE s.user_id = u.id) AS last_activity_at,
                (SELECT count(*)::int FROM workspace_members wm
                   WHERE wm.user_id = u.id AND wm.status <> 'removed') AS workspaces_count,
@@ -206,6 +237,8 @@ export class AdminUsersService {
         hasActiveSubscription: row.has_subscription,
         lockedUntil: row.locked_until ? new Date(row.locked_until).toISOString() : null,
         platforms: row.platforms ?? [],
+        origin: signupOriginOf(row.signup_attribution),
+        activated: row.activated,
       })),
       page: filters.page,
       pageSize: filters.pageSize,
@@ -578,6 +611,33 @@ export class AdminUsersService {
   // -------------------------------------------------------------------------
   // Notas de suporte
   // -------------------------------------------------------------------------
+
+  /**
+   * Ativações para a importação de conversões offline no Google Ads: contas
+   * com `gclid` gravado no cadastro, que aceitaram os cookies na versão que
+   * menciona anúncios (`v2_accepted`, também depois de revogar não entra) e
+   * cujo primeiro produto foi criado entre `since` e 6 horas atrás (o Google
+   * rejeita conversão enviada cedo demais). O horário é o do produto.
+   */
+  async offlineActivations(since: Date): Promise<OfflineConversionRow[]> {
+    const rows = await this.db.execute<{ gclid: string; first_product_at: string }>(sql`
+      SELECT u.signup_attribution->>'gclid' AS gclid, fp.first_product_at
+      FROM users u
+      JOIN LATERAL (
+        SELECT min(p.created_at) AS first_product_at
+        FROM products p JOIN workspaces w ON w.id = p.workspace_id
+        WHERE w.owner_user_id = u.id
+      ) fp ON fp.first_product_at IS NOT NULL
+      WHERE u.deleted_at IS NULL
+        AND u.status = 'active'
+        AND u.signup_attribution->>'gclid' IS NOT NULL
+        AND u.signup_attribution->>'consent' = 'v2_accepted'
+        AND fp.first_product_at >= ${since.toISOString()}::timestamptz
+        AND fp.first_product_at < now() - interval '6 hours'
+      ORDER BY fp.first_product_at
+    `);
+    return rows.rows.map((row) => ({ gclid: row.gclid, convertedAt: new Date(row.first_product_at) }));
+  }
 
   async listNotes(target: { userId?: string; workspaceId?: string }) {
     const rows = await this.db

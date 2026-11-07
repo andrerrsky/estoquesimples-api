@@ -22,6 +22,7 @@ import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
 import { registerSupportJobs } from './modules/support/support.jobs.js';
 import { registerImageJobs } from './modules/images/images.jobs.js';
+import { registerOnboardingJobs } from './modules/workspaces/onboarding.js';
 import type { AppServices } from './platform/http/context.js';
 import { LoginThrottle } from './platform/http/login-throttle.js';
 import { buildServer } from './platform/http/server.js';
@@ -108,6 +109,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerAsaasJobs(services);
   registerSupportJobs(services);
   registerImageJobs(services);
+  registerOnboardingJobs(services);
 
   return {
     app,

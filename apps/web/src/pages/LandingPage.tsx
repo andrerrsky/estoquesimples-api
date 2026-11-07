@@ -505,6 +505,23 @@ function useChatReady(): boolean {
  * do plano gratuito ficam de fora de propósito: os dois são configuráveis no
  * servidor e aparecem dentro da aplicação, lidos da API.
  */
+/**
+ * Título da página inicial por segmento, conforme o `utm_content` do anúncio:
+ * quem busca "estoque salão de beleza" vê a página falar de salão. Lista
+ * fechada; qualquer outro valor fica com o título padrão.
+ */
+const SEGMENT_TITLES: Record<string, string> = {
+  salao: 'Controle de estoque para o seu salão, sem planilha.',
+  roupas: 'Controle de estoque para a sua loja de roupas, no celular.',
+  mercearia: 'Controle de estoque para mercearia e mercadinho.',
+  cosmeticos: 'Controle de estoque para a sua loja de cosméticos.',
+  planilha: 'Troque a planilha de estoque por um app grátis.',
+};
+
+export function landingTitleFor(content: string | null): string | null {
+  return content ? (SEGMENT_TITLES[content] ?? null) : null;
+}
+
 export function LandingPage() {
   const fromShell = useAuthOptional()?.status === 'authed';
   const fromLanding = useContext(LandingSessionContext);
@@ -515,6 +532,10 @@ export function LandingPage() {
   const [year, setYear] = useState(2026);
   useEffect(() => setYear(new Date().getFullYear()), []);
   const chatReady = useChatReady();
+  // Título do anúncio de origem (salão, roupas, planilha...): só depois do
+  // mount, para o HTML pré-renderizado e a hidratação continuarem iguais.
+  const [segmentTitle, setSegmentTitle] = useState<string | null>(null);
+  useEffect(() => setSegmentTitle(landingTitleFor(new URLSearchParams(window.location.search).get('utm_content'))), []);
 
   useEffect(() => {
     document.title = 'Estoque Simples · Controle de estoque no celular e na web';
@@ -557,7 +578,7 @@ export function LandingPage() {
           <div className="landing__hero-inner">
             <div className="lp-hero__text">
               <p className="lp-eyebrow">Controle de estoque para mercearia, loja, pet shop e qualquer balcão</p>
-              <h1 className="landing__title" id="lp-titulo">Saiba o que tem na prateleira sem contar tudo de novo.</h1>
+              <h1 className="landing__title" id="lp-titulo">{segmentTitle ?? 'Saiba o que tem na prateleira sem contar tudo de novo.'}</h1>
               <p className="landing__lead">
                 Cadastre os produtos, lance o que entra e o que sai e veja o que está acabando. No celular e no computador, com a mesma conta.
               </p>

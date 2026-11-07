@@ -1,3 +1,4 @@
+import { signupAttribution } from '../lib/attribution';
 import { deviceInfo } from '../lib/device';
 import type { WebAuth } from './types';
 import { reportApiFailure, setErrorReporterAuth } from '../lib/error-reporter';
@@ -370,7 +371,11 @@ export const sessionApi = {
     return auth;
   },
   async register(name: string, email: string, password: string): Promise<WebAuth> {
-    const auth = await parse<WebAuth>(await rawFetch('POST', '/v1/auth/web/register', { name, email, password, device: deviceInfo() }, CSRF));
+    // Origem da visita (campanha) e escolha de cookies: ver lib/attribution.ts.
+    const attribution = signupAttribution();
+    const auth = await parse<WebAuth>(
+      await rawFetch('POST', '/v1/auth/web/register', { name, email, password, device: deviceInfo(), ...(attribution ? { attribution } : {}) }, CSRF),
+    );
     setSession(auth);
     return auth;
   },

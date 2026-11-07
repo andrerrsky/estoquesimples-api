@@ -101,6 +101,31 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  routes.put(
+    '/me/cookie-consent',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        tags: ['usuário'],
+        summary: 'Registra a escolha de cookies na origem do cadastro',
+        description:
+          'A web chama ao mudar a escolha com a conta aberta. Só altera quem tem origem de campanha gravada: é o que decide se o ' +
+          'clique no anúncio pode ser informado ao Google Ads. Quem recusa depois de aceitar deixa de ser enviado.',
+        security: [{ bearerAuth: [] }],
+        body: z.object({ consent: z.enum(['v2_accepted', 'refused']) }).strict(),
+        response: { 200: messageSchema, ...commonErrors },
+      },
+    },
+    async (request) => {
+      const auth = requireAuth(request);
+      await db
+        .update(users)
+        .set({ signupAttribution: sql`jsonb_set(${users.signupAttribution}, '{consent}', to_jsonb(${request.body.consent}::text))` })
+        .where(and(eq(users.id, auth.userId), sql`${users.signupAttribution} IS NOT NULL`));
+      return { message: 'Escolha registrada.' };
+    },
+  );
+
   routes.get(
     '/me/sessions',
     {
