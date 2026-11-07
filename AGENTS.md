@@ -328,6 +328,16 @@ solicitação nasce pela instalação. Toda solicitação nova enfileira
 `support.notify_team`, que avisa a equipe por e-mail (`SUPPORT_NOTIFY_EMAILS`
 ou, sem ela, os owners do painel).
 
+### E-mails do ciclo de vida (`src/modules/lifecycle/`)
+
+Funil automático de ativação e recuperação (dia 1/4/8 sem produto, confirmar
+e-mail, 14 dias sem uso, limite do plano grátis), decidido a cada hora pelo job
+`lifecycle.tick` e enviado pelo mesmo Resend. Modo `LIFECYCLE_EMAILS_MODE`
+(`dry_run` por padrão), teto diário que reserva a cota dos e-mails essenciais
+(todo envio passa por `CountingMailer`), descadastro em 1 clique, webhook do
+Resend com assinatura Svix e painel em `/admin/emails`. Detalhes e garantias em
+[docs/emails-ciclo-de-vida.md](docs/emails-ciclo-de-vida.md).
+
 ### Planos e limites (`src/modules/billing/plan-limits.ts`)
 
 Desde a migration 0013 a nuvem é **grátis com conta**: o plano `gratuito`

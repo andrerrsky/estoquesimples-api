@@ -8,6 +8,7 @@ import { bootstrapReviewsJobs } from './modules/reviews/reviews.jobs.js';
 import { bootstrapBillingJobs } from './modules/billing/billing.jobs.js';
 import { bootstrapAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { bootstrapImageJobs } from './modules/images/images.jobs.js';
+import { bootstrapLifecycleJobs } from './modules/lifecycle/lifecycle.jobs.js';
 import { bootstrapOpsJobs } from './modules/ops/ops.jobs.js';
 import { bootstrapSyncJobs } from './modules/sync/sync.jobs.js';
 import { bootstrapLowStockJobs } from './modules/push/low-stock.jobs.js';
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
     await bootstrapBillingJobs(services);
     await bootstrapAsaasJobs(services);
     await bootstrapImageJobs(services);
+    await bootstrapLifecycleJobs(services);
     await bootstrapSyncJobs(services);
     await bootstrapLowStockJobs(services);
     await bootstrapBlogJobs(services);

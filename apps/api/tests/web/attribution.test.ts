@@ -4,7 +4,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { hashPassword } from '../../src/platform/auth/password.js';
 import { platformAdmins } from '../../src/platform/db/schema/index.js';
-import { startJobRunner } from '../../src/platform/jobs/runner.js';
 import { adsConversionTime, offlineConversionsCsv } from '../../src/modules/auth/signup-attribution.js';
 import { createTestApp, resetDatabase, uniqueEmail, VALID_PASSWORD, type TestContext } from '../helpers/test-app.js';
 
@@ -103,7 +102,7 @@ describe('origem do cadastro web', () => {
 });
 
 describe('primeiros passos na web', () => {
-  it('cria a empresa no cadastro web (o do app não) e agenda um único lembrete', async () => {
+  it('cria a empresa no cadastro web (o do app não)', async () => {
     const user = await register();
     const list = await context.app.inject({ method: 'GET', url: '/v1/workspaces', headers: user.authHeader });
     expect(list.statusCode).toBe(200);
@@ -115,35 +114,8 @@ describe('primeiros passos na web', () => {
     expect(app.statusCode).toBe(201);
     const appList = await context.app.inject({ method: 'GET', url: '/v1/workspaces', headers: { authorization: `Bearer ${app.json().accessToken}` } });
     expect(appList.json().workspaces ?? appList.json()).toHaveLength(0);
-
-    const jobs = await context.services.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM jobs WHERE kind = 'onboarding.first_product_nudge'`);
-    expect(jobs.rows[0]?.n).toBe(1);
   });
 
-  it('o lembrete sai só para quem continua sem produto', async () => {
-    const semProduto = await register(undefined, 'Ana Souza');
-    const comProduto = await register(undefined, 'Bruno');
-    const ws = (await context.app.inject({ method: 'GET', url: '/v1/workspaces', headers: comProduto.authHeader })).json();
-    const wsId = (ws.workspaces ?? ws)[0].id;
-    const created = await context.app.inject({ method: 'POST', url: `/v1/workspaces/${wsId}/products`, headers: comProduto.authHeader, payload: { name: 'Shampoo', quantity: 3 } });
-    expect(created.statusCode).toBe(201);
-
-    await context.services.db.execute(sql`UPDATE jobs SET run_at = now() WHERE kind = 'onboarding.first_product_nudge'`);
-    context.mailer.sent.length = 0;
-    const stop = startJobRunner(context.services, context.app.log, { intervalMs: 30 });
-    try {
-      await expect
-        .poll(async () => (await context.services.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM jobs WHERE kind = 'onboarding.first_product_nudge' AND completed_at IS NOT NULL`)).rows[0]?.n, { timeout: 5000 })
-        .toBe(2);
-    } finally {
-      await stop();
-    }
-    const nudges = context.mailer.sent.filter((message) => message.kind === 'onboarding_nudge');
-    expect(nudges).toHaveLength(1);
-    expect(nudges[0]?.text).toContain('Olá, Ana!');
-    expect(nudges[0]?.text).toContain('único lembrete');
-    void semProduto;
-  });
 });
 
 describe('exportação de ativações para o Google Ads', () => {

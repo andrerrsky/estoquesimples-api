@@ -23,6 +23,8 @@ import { registerPushJobs } from './modules/push/push.jobs.js';
 import { registerSupportJobs } from './modules/support/support.jobs.js';
 import { registerImageJobs } from './modules/images/images.jobs.js';
 import { registerOnboardingJobs } from './modules/workspaces/onboarding.js';
+import { registerLifecycleJobs } from './modules/lifecycle/lifecycle.jobs.js';
+import { CountingMailer } from './platform/email/counting-mailer.js';
 import type { AppServices } from './platform/http/context.js';
 import { LoginThrottle } from './platform/http/login-throttle.js';
 import { buildServer } from './platform/http/server.js';
@@ -96,6 +98,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   if (!options.mailer) {
     services.mailer = createMailer(env, app.log);
   }
+  // Todo envio passa pela contagem diária (protege a cota dos essenciais).
+  services.mailer = new CountingMailer(services.mailer, services.db, app.log);
 
   registerBillingJobs(services);
   registerSyncJobs(services);
@@ -110,6 +114,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerSupportJobs(services);
   registerImageJobs(services);
   registerOnboardingJobs(services);
+  registerLifecycleJobs(services);
 
   return {
     app,
