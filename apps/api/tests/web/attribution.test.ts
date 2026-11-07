@@ -212,7 +212,9 @@ describe('upload programado do Google Ads', () => {
     const other = await createTestApp({ ADS_UPLOAD_PASSWORD: password });
     try {
       const basic = (user: string, pass: string) => ({ authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` });
-      expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv' })).statusCode).toBe(401);
+      const challenge = await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv' });
+      expect(challenge.statusCode).toBe(401);
+      expect(challenge.headers['www-authenticate']).toContain('Basic realm=');
       expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('googleads', 'errada-errada-errada-errada') })).statusCode).toBe(401);
       expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('outro', password) })).statusCode).toBe(401);
       const ok = await other.app.inject({ method: 'GET', url: '/v1/ads/offline-conversions.csv', headers: basic('googleads', password) });
