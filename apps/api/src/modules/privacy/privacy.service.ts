@@ -69,54 +69,72 @@ export class PrivacyService {
     let purged = 0;
     let skipped = 0;
     for (const { id } of due.rows) {
-      const owns = await this.services.db.execute<Counted>(sql`
-        SELECT count(*)::int AS count FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NULL
-      `);
-      if ((owns.rows[0]?.count ?? 0) > 0) {
-        skipped += 1;
-        this.services.logger?.warn({ userId: id }, 'expurgo de conta adiado: ainda é dona de empresa ativa');
-        continue;
-      }
-      // Fotos e logotipos dessas empresas saem do bucket antes das linhas: sem
-      // as linhas de `workspace_images`, a coleta de lixo não acharia mais os
-      // arquivos. Falha aqui adia o expurgo para a próxima execução.
-      await this.deleteWorkspaceObjects(id);
-      const [account] = (await this.services.db.execute<{ email: string }>(sql`SELECT lower(email) AS email FROM users WHERE id = ${id}`)).rows;
-      const email = account?.email ?? '';
-      await this.services.db.transaction(async (tx) => {
-        // E-mail da pessoa em públicos de campanha (tipo "users") e em detalhes da trilha do painel que não apontam para ela.
-        await tx.execute(sql`
-          UPDATE push_campaigns
-          SET audience = jsonb_set(audience, '{emails}', COALESCE((SELECT jsonb_agg(item) FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) <> ${email}), '[]'::jsonb))
-          WHERE audience->>'type' = 'users' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) = ${email})
-        `);
-        await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE lower(metadata->>'email') = ${email}`);
-        // Empresas já excluídas que a pessoa possuía: saem inteiras (estoque, fotos, assinatura).
-        await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
-        await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id} OR (user_id IS NULL AND lower(contact_email) = ${email})`);
-        await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
-        await tx.execute(sql`UPDATE audit_log SET ip_address = NULL, user_agent = NULL WHERE actor_user_id = ${id}`);
-        // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
-        await tx.execute(sql`
-          UPDATE admin_audit_log
-          SET metadata = (metadata - 'email') #- '{changes,email}' #- '{changes,name}'
-          WHERE target_id = ${id} AND (metadata ? 'email' OR metadata #> '{changes,email}' IS NOT NULL OR metadata #> '{changes,name}' IS NOT NULL)
-        `);
-        await tx.execute(sql`DELETE FROM invites WHERE accepted_by = ${id}`);
-        await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
-        // O registro do expurgo não guarda nada que identifique a pessoa além do id, que já não aponta para ninguém.
-        await recordAudit(tx, {
-          actorUserId: null,
-          action: AuditAction.USER_PURGED,
-          entityType: 'user',
-          entityId: id,
-          metadata: { reason: 'deletion_requested', recoveryDays: ACCOUNT_RECOVERY_DAYS },
-          ipAddress: null,
-        });
-      });
-      purged += 1;
+      if (await this.purgeAccount(id, { reason: 'deletion_requested' })) purged += 1;
+      else skipped += 1;
     }
     return { purged, skipped };
+  }
+
+  /**
+   * Expurga uma conta já marcada para exclusão (`pending_deletion`). Devolve
+   * `false`, sem mexer em nada, se ela ainda é dona de empresa ativa.
+   * `removeUsage`: apaga também os eventos de uso da pessoa (e os anônimos dos
+   * aparelhos dela), em vez de só desvinculá-los. É o que o painel usa para
+   * contas de teste, que não podem continuar contando nos números do produto.
+   */
+  async purgeAccount(id: string, options: { reason: 'deletion_requested' | 'admin_test_account'; removeUsage?: boolean }): Promise<boolean> {
+    const owns = await this.services.db.execute<Counted>(sql`
+      SELECT count(*)::int AS count FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NULL
+    `);
+    if ((owns.rows[0]?.count ?? 0) > 0) {
+      this.services.logger?.warn({ userId: id }, 'expurgo de conta adiado: ainda é dona de empresa ativa');
+      return false;
+    }
+    // Fotos e logotipos dessas empresas saem do bucket antes das linhas: sem
+    // as linhas de `workspace_images`, a coleta de lixo não acharia mais os
+    // arquivos. Falha aqui adia o expurgo para a próxima execução.
+    await this.deleteWorkspaceObjects(id);
+    const [account] = (await this.services.db.execute<{ email: string }>(sql`SELECT lower(email) AS email FROM users WHERE id = ${id}`)).rows;
+    const email = account?.email ?? '';
+    await this.services.db.transaction(async (tx) => {
+      if (options.removeUsage) {
+        await tx.execute(sql`
+          DELETE FROM analytics_events
+          WHERE user_id = ${id}
+             OR (user_id IS NULL AND install_id IN (SELECT install_id FROM devices WHERE user_id = ${id}))
+        `);
+      }
+      // E-mail da pessoa em públicos de campanha (tipo "users") e em detalhes da trilha do painel que não apontam para ela.
+      await tx.execute(sql`
+        UPDATE push_campaigns
+        SET audience = jsonb_set(audience, '{emails}', COALESCE((SELECT jsonb_agg(item) FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) <> ${email}), '[]'::jsonb))
+        WHERE audience->>'type' = 'users' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(audience->'emails') item WHERE lower(item) = ${email})
+      `);
+      await tx.execute(sql`UPDATE admin_audit_log SET metadata = metadata - 'email' WHERE lower(metadata->>'email') = ${email}`);
+      // Empresas já excluídas que a pessoa possuía: saem inteiras (estoque, fotos, assinatura).
+      await tx.execute(sql`DELETE FROM workspaces WHERE owner_user_id = ${id} AND deleted_at IS NOT NULL`);
+      await tx.execute(sql`DELETE FROM support_tickets WHERE user_id = ${id} OR (user_id IS NULL AND lower(contact_email) = ${email})`);
+      await tx.execute(sql`UPDATE error_events SET user_id = NULL, user_agent = NULL WHERE user_id = ${id}`);
+      await tx.execute(sql`UPDATE audit_log SET ip_address = NULL, user_agent = NULL WHERE actor_user_id = ${id}`);
+      // A trilha do painel fica (quem fez o quê), sem o e-mail da pessoa nos detalhes.
+      await tx.execute(sql`
+        UPDATE admin_audit_log
+        SET metadata = (metadata - 'email') #- '{changes,email}' #- '{changes,name}'
+        WHERE target_id = ${id} AND (metadata ? 'email' OR metadata #> '{changes,email}' IS NOT NULL OR metadata #> '{changes,name}' IS NOT NULL)
+      `);
+      await tx.execute(sql`DELETE FROM invites WHERE accepted_by = ${id}`);
+      await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
+      // O registro do expurgo não guarda nada que identifique a pessoa além do id, que já não aponta para ninguém.
+      await recordAudit(tx, {
+        actorUserId: null,
+        action: AuditAction.USER_PURGED,
+        entityType: 'user',
+        entityId: id,
+        metadata: options.reason === 'deletion_requested' ? { reason: options.reason, recoveryDays: ACCOUNT_RECOVERY_DAYS } : { reason: options.reason },
+        ipAddress: null,
+      });
+    });
+    return true;
   }
 
   /** Apaga do bucket as fotos e logotipos das empresas excluídas que pertencem à conta. */

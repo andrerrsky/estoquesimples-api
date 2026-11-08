@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { NotesPanel } from '../components/Notes';
+import { PurgeUserDialog } from '../components/PurgeUserDialog';
 import { EventsPanel, TimelinePanel } from '../components/Timeline';
 import {
   ActionMenu,
@@ -67,10 +68,11 @@ interface NotificationRow {
   readAt: string | null;
   createdAt: string;
 }
-type Dialog = null | 'suspend' | 'reactivate' | 'verify' | 'revoke' | 'cancelDeletion' | 'edit' | { device: string };
+type Dialog = null | 'suspend' | 'reactivate' | 'verify' | 'revoke' | 'cancelDeletion' | 'purge' | 'edit' | { device: string };
 
 export function UserDetailPage() {
   const { userId = '' } = useParams();
+  const navigate = useNavigate();
   const { can } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -151,6 +153,9 @@ export function UserDetailPage() {
                   : { label: 'Suspender conta', icon: 'pause', danger: true, disabled: user.status === 'pending_deletion', onClick: () => setDialog('suspend') },
                 ...(user.status === 'pending_deletion'
                   ? [{ label: 'Cancelar exclusão da conta', icon: 'refresh' as const, onClick: () => setDialog('cancelDeletion') }]
+                  : []),
+                ...(can('owner')
+                  ? ['sep' as const, { label: 'Excluir conta definitivamente', icon: 'trash' as const, danger: true, onClick: () => setDialog('purge') }]
                   : []),
               ]}
             />
@@ -389,6 +394,17 @@ export function UserDetailPage() {
             toast.push(result.message, 'success');
             refresh();
           }
+        }}
+      />
+      <PurgeUserDialog
+        open={dialog === 'purge'}
+        onClose={() => setDialog(null)}
+        userId={userId}
+        email={user.email}
+        onDone={(message) => {
+          toast.push(message, 'success');
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          navigate('/usuarios');
         }}
       />
       <EditUserDialog open={dialog === 'edit'} onClose={() => setDialog(null)} user={user} onSaved={refresh} />

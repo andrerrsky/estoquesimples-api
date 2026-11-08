@@ -127,3 +127,76 @@ describe('purga de empresas excluídas', () => {
     expect(audit?.n).toBe(1);
   });
 });
+
+describe('exclusão definitiva pelo painel (contas de teste)', () => {
+  async function ownerSession(role: 'owner' | 'support' = 'owner') {
+    const adminEmail = `${role}.${randomUUID()}@exemplo.com.br`;
+    await context.services.db.insert(platformAdmins).values({ email: adminEmail, name: 'Admin', passwordHash: await hashPassword('PainelSeguro#2026'), role });
+    const CSRF = { 'x-requested-with': 'estoquesimples-admin' };
+    const login = await context.app.inject({ method: 'POST', url: '/admin/api/auth/login', headers: CSRF, payload: { email: adminEmail, password: 'PainelSeguro#2026' } });
+    const raw = login.headers['set-cookie'];
+    return { ...CSRF, cookie: String(Array.isArray(raw) ? raw[0] : raw).split(';')[0]! };
+  }
+  const purge = (headers: Record<string, string>, userId: string, confirmEmail: string) =>
+    context.app.inject({ method: 'POST', url: `/admin/api/users/${userId}/purge`, headers, payload: { reason: 'conta de teste do dono', confirmEmail } });
+
+  it('apaga na hora a conta, a empresa e os eventos de uso; exige o e-mail certo e papel owner', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await createWorkspace(user, 'Loja Teste');
+    await context.services.db.execute(sql`INSERT INTO analytics_events (name, occurred_at, user_id, platform) VALUES ('screen.viewed', now(), ${user.userId}, 'web')`);
+
+    const support = await ownerSession('support');
+    expect((await purge(support, user.userId, user.email)).statusCode).toBe(403);
+
+    const owner = await ownerSession();
+    const wrong = await purge(owner, user.userId, 'outro@exemplo.com.br');
+    expect(wrong.statusCode).toBe(400);
+
+    const done = await purge(owner, user.userId, user.email.toUpperCase());
+    expect(done.statusCode).toBe(200);
+    const left = (
+      await context.services.db.execute<{ users: number; workspaces: number; events: number }>(sql`
+        SELECT (SELECT count(*)::int FROM users WHERE id = ${user.userId}) AS users,
+               (SELECT count(*)::int FROM workspaces WHERE id = ${workspaceId}) AS workspaces,
+               (SELECT count(*)::int FROM analytics_events WHERE name = 'screen.viewed') AS events
+      `)
+    ).rows[0];
+    expect(left).toEqual({ users: 0, workspaces: 0, events: 0 });
+    const [audit] = (await context.services.db.execute<{ action: string }>(sql`SELECT action FROM admin_audit_log WHERE target_id = ${user.userId}`)).rows;
+    expect(audit?.action).toBe('user.purged');
+  });
+
+  it('recusa conta dona de empresa com outras pessoas', async () => {
+    const user = await registerUser(context);
+    const member = await registerUser(context);
+    const workspaceId = await createWorkspace(user, 'Loja Compartilhada');
+    await context.services.db.insert(workspaceMembers).values({ workspaceId, userId: member.userId, roleKey: 'operador', status: 'active', invitedBy: user.userId });
+    const owner = await ownerSession();
+    const preview = await context.app.inject({ method: 'GET', url: `/admin/api/users/${user.userId}/purge-preview`, headers: owner });
+    expect(preview.json().blockers).toMatchObject([{ reason: 'members', workspaceId, members: [{ userId: member.userId, email: member.email }] }]);
+    const refused = await purge(owner, user.userId, user.email);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.blockers[0].members[0].userId).toBe(member.userId);
+    const [row] = (await context.services.db.execute<{ status: string }>(sql`SELECT status FROM users WHERE id = ${user.userId}`)).rows;
+    expect(row?.status).toBe('active');
+  });
+
+  it('assinatura pagante bloqueia; suspensa (fatura em aberto) não bloqueia', async () => {
+    const owner = await ownerSession();
+    const paying = await registerUser(context);
+    const payingWs = await createWorkspace(paying, 'Loja Pagante');
+    await context.services.db.execute(sql`
+      INSERT INTO subscriptions (workspace_id, purchaser_user_id, plan_key, provider, state, auto_renewing, purchase_token_hash, purchase_token_enc, google_product_id)
+      VALUES (${payingWs}, ${paying.userId}, 'basico', 'google_play', 'ativa', false, ${randomUUID()}, 'v2:k1:teste', 'assinatura')
+    `);
+    const blocked = await purge(owner, paying.userId, paying.email);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error.blockers[0].reason).toBe('paying_subscription');
+
+    const unpaid = await registerUser(context);
+    const unpaidWs = await createWorkspace(unpaid, 'Loja Inadimplente');
+    await context.services.db.execute(sql`UPDATE subscriptions SET state = 'suspensa' WHERE workspace_id = ${payingWs}`);
+    await context.services.db.execute(sql`UPDATE subscriptions SET workspace_id = ${unpaidWs}, purchaser_user_id = ${unpaid.userId} WHERE workspace_id = ${payingWs}`);
+    expect((await purge(owner, unpaid.userId, unpaid.email)).statusCode).toBe(200);
+  });
+});
