@@ -12,7 +12,7 @@ import {
 } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
-import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
+import { AppError, ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
 import { AuditAction, SECURITY_USER_ACTIONS, recordAudit } from '../audit/audit.service.js';
 import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
@@ -154,6 +154,26 @@ const SORT_COLUMNS: Record<NonNullable<UserListFilters['sort']>, string> = {
  * sessão ou o acesso do cliente, `audit_log` (para aparecer na linha do
  * tempo da conta que o próprio cliente poderia ver).
  */
+export interface PurgeBlocker {
+  reason: 'members' | 'paying_subscription' | 'play_renewing';
+  workspaceId: string;
+  workspaceName: string;
+  message: string;
+  members?: Array<{ userId: string; name: string; email: string; role: string }>;
+}
+
+export interface PurgePreview {
+  workspaces: Array<{
+    id: string;
+    name: string;
+    subscription: { provider: string; state: string; cancelsAtProvider: boolean } | null;
+    members: Array<{ userId: string; name: string; email: string; role: string }>;
+  }>;
+  memberOf: Array<{ id: string; name: string; ownerId: string; ownerName: string }>;
+  usageEvents: number;
+  blockers: PurgeBlocker[];
+}
+
 export class AdminUsersService {
   constructor(private readonly services: AppServices) {}
 
@@ -616,11 +636,83 @@ export class AdminUsersService {
   }
 
   /**
+   * O que a exclusão definitiva levaria e o que a impede. O painel mostra isto
+   * antes de pedir a confirmação; `purgeAccount` usa as mesmas travas.
+   * Bloqueia: empresa da conta com outras pessoas ativas (perderiam o acesso)
+   * e assinatura que está dando acesso (cliente pagante). Assinatura pendente
+   * ou suspensa (fatura em aberto) não bloqueia: no Asaas ela é cancelada na
+   * exclusão, para não gerar cobrança nova.
+   */
+  async purgePreview(userId: string): Promise<PurgePreview> {
+    const [user] = await this.db.select({ id: users.id, deletedAt: users.deletedAt }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!user || user.deletedAt) throw notFound('Usuário não encontrado.');
+    const owned = await new AccountClosureService(this.services).ownedWorkspaces(userId);
+    const ownedIds = owned.map((item) => item.id);
+    const people = ownedIds.length
+      ? (
+          await this.db.execute<{ workspace_id: string; user_id: string; name: string; email: string; role_key: string }>(sql`
+            SELECT m.workspace_id, u.id AS user_id, u.name, u.email, m.role_key
+            FROM workspace_members m JOIN users u ON u.id = m.user_id
+            WHERE m.workspace_id IN ${sqlList(ownedIds)} AND m.status = 'active' AND m.user_id <> ${userId} AND u.deleted_at IS NULL
+            ORDER BY u.name
+          `)
+        ).rows
+      : [];
+    const memberOf = (
+      await this.db.execute<{ id: string; name: string; owner_id: string; owner_name: string }>(sql`
+        SELECT w.id, w.name, o.id AS owner_id, o.name AS owner_name
+        FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id JOIN users o ON o.id = w.owner_user_id
+        WHERE m.user_id = ${userId} AND m.status = 'active' AND w.owner_user_id <> ${userId} AND w.deleted_at IS NULL
+        ORDER BY w.name
+      `)
+    ).rows;
+    const [usage] = (await this.db.execute<{ count: number }>(sql`SELECT count(*)::int AS count FROM analytics_events WHERE user_id = ${userId}`)).rows;
+
+    const entitled = new Set<string>(ENTITLED_STATES);
+    const blockers: PurgeBlocker[] = [];
+    const workspacesOut = owned.map((item) => {
+      const members = people.filter((row) => row.workspace_id === item.id).map((row) => ({ userId: row.user_id, name: row.name, email: row.email, role: row.role_key }));
+      if (members.length > 0) {
+        blockers.push({
+          reason: 'members',
+          workspaceId: item.id,
+          workspaceName: item.name,
+          message: `A empresa "${item.name}" tem outras pessoas na equipe. Excluir a conta tiraria o acesso delas. Remova esses membros (ou exclua as contas deles antes) ou transfira a propriedade.`,
+          members,
+        });
+      }
+      const sub = item.subscription;
+      if (sub && entitled.has(sub.state)) {
+        blockers.push({
+          reason: 'paying_subscription',
+          workspaceId: item.id,
+          workspaceName: item.name,
+          message: `A empresa "${item.name}" tem assinatura ${sub.provider === 'google_play' ? 'do Google Play' : 'do Asaas'} dando acesso (${sub.state}). Cancele a assinatura antes: excluir agora apagaria um cliente pagante.`,
+        });
+      } else if (sub && sub.provider === 'google_play' && sub.renews) {
+        blockers.push({
+          reason: 'play_renewing',
+          workspaceId: item.id,
+          workspaceName: item.name,
+          message: `A empresa "${item.name}" tem assinatura do Google Play que ainda renova. Só a pessoa cancela, na Play Store.`,
+        });
+      }
+      return { id: item.id, name: item.name, subscription: sub ? { provider: sub.provider, state: sub.state, cancelsAtProvider: sub.provider === 'asaas' && sub.renews } : null, members };
+    });
+    return {
+      workspaces: workspacesOut,
+      memberOf: memberOf.map((row) => ({ id: row.id, name: row.name, ownerId: row.owner_id, ownerName: row.owner_name })),
+      usageEvents: usage?.count ?? 0,
+      blockers,
+    };
+  }
+
+  /**
    * Exclusão definitiva e imediata, sem os 30 dias de recuperação: para contas
-   * de teste que poluem os números. Exige o e-mail digitado de novo e recusa
-   * contas com gente de verdade em volta (empresa com outros membros ou
-   * assinatura que ainda renova). As empresas da conta, o estoque, as fotos e
-   * os eventos de uso saem junto; a trilha do painel guarda só o id e o motivo.
+   * de teste que poluem os números. Exige o e-mail digitado de novo e as
+   * travas de `purgePreview` (recusa com 409 e a lista do que impede). As
+   * empresas da conta, o estoque, as fotos e os eventos de uso saem junto; a
+   * trilha do painel guarda só o id e o motivo.
    */
   async purgeAccount(actor: AdminActor, userId: string, input: { reason: string; confirmEmail: string }): Promise<void> {
     const [user] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -628,24 +720,19 @@ export class AdminUsersService {
     if (input.confirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
       throw badRequest(ErrorCode.VALIDATION_FAILED, 'O e-mail digitado não confere com o da conta.');
     }
-    const closure = new AccountClosureService(this.services);
-    const owned = await closure.ownedWorkspaces(userId);
-    const shared = owned.filter((item) => item.otherMembers > 0);
-    if (shared.length > 0) {
-      throw conflict(ErrorCode.CONFLICT, `A conta é dona de empresa com outras pessoas (${shared.map((item) => item.name).join(', ')}). Transfira ou remova os membros antes.`);
-    }
-    if (owned.some((item) => item.subscription?.renews)) {
-      throw conflict(ErrorCode.CONFLICT, 'A conta tem assinatura que ainda renova. Cancele a assinatura antes de excluir.');
+    const preview = await this.purgePreview(userId);
+    if (preview.blockers.length > 0) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'A exclusão foi recusada: há pessoas ou assinatura dependendo desta conta.', { extra: { blockers: preview.blockers } });
     }
     if (user.status !== 'pending_deletion') {
-      await closure.requestDeletion(userId, { closeWorkspaces: true }, { ipAddress: null, userAgent: null });
+      await new AccountClosureService(this.services).requestDeletion(userId, { closeWorkspaces: true }, { ipAddress: null, userAgent: null });
     }
     await recordAdminAudit(this.db, {
       actor,
       action: AdminAction.USER_PURGED,
       targetType: 'user',
       targetId: userId,
-      metadata: { reason: input.reason, workspaces: owned.length },
+      metadata: { reason: input.reason, workspaces: preview.workspaces.length, usageEvents: preview.usageEvents },
     });
     const purged = await new PrivacyService(this.services).purgeAccount(userId, { reason: 'admin_test_account', removeUsage: true });
     if (!purged) throw conflict(ErrorCode.CONFLICT, 'Não foi possível excluir agora: a conta ainda é dona de uma empresa ativa.');

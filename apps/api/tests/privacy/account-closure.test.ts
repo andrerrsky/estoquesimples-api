@@ -171,9 +171,32 @@ describe('exclusão definitiva pelo painel (contas de teste)', () => {
     const member = await registerUser(context);
     const workspaceId = await createWorkspace(user, 'Loja Compartilhada');
     await context.services.db.insert(workspaceMembers).values({ workspaceId, userId: member.userId, roleKey: 'operador', status: 'active', invitedBy: user.userId });
-    const refused = await purge(await ownerSession(), user.userId, user.email);
+    const owner = await ownerSession();
+    const preview = await context.app.inject({ method: 'GET', url: `/admin/api/users/${user.userId}/purge-preview`, headers: owner });
+    expect(preview.json().blockers).toMatchObject([{ reason: 'members', workspaceId, members: [{ userId: member.userId, email: member.email }] }]);
+    const refused = await purge(owner, user.userId, user.email);
     expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.blockers[0].members[0].userId).toBe(member.userId);
     const [row] = (await context.services.db.execute<{ status: string }>(sql`SELECT status FROM users WHERE id = ${user.userId}`)).rows;
     expect(row?.status).toBe('active');
+  });
+
+  it('assinatura pagante bloqueia; suspensa (fatura em aberto) não bloqueia', async () => {
+    const owner = await ownerSession();
+    const paying = await registerUser(context);
+    const payingWs = await createWorkspace(paying, 'Loja Pagante');
+    await context.services.db.execute(sql`
+      INSERT INTO subscriptions (workspace_id, purchaser_user_id, plan_key, provider, state, auto_renewing, purchase_token_hash, purchase_token_enc, google_product_id)
+      VALUES (${payingWs}, ${paying.userId}, 'basico', 'google_play', 'ativa', false, ${randomUUID()}, 'v2:k1:teste', 'assinatura')
+    `);
+    const blocked = await purge(owner, paying.userId, paying.email);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error.blockers[0].reason).toBe('paying_subscription');
+
+    const unpaid = await registerUser(context);
+    const unpaidWs = await createWorkspace(unpaid, 'Loja Inadimplente');
+    await context.services.db.execute(sql`UPDATE subscriptions SET state = 'suspensa' WHERE workspace_id = ${payingWs}`);
+    await context.services.db.execute(sql`UPDATE subscriptions SET workspace_id = ${unpaidWs}, purchaser_user_id = ${unpaid.userId} WHERE workspace_id = ${payingWs}`);
+    expect((await purge(owner, unpaid.userId, unpaid.email)).statusCode).toBe(200);
   });
 });

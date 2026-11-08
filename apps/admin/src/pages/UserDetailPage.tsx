@@ -6,6 +6,7 @@ import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { NotesPanel } from '../components/Notes';
+import { PurgeUserDialog } from '../components/PurgeUserDialog';
 import { EventsPanel, TimelinePanel } from '../components/Timeline';
 import {
   ActionMenu,
@@ -395,22 +396,13 @@ export function UserDetailPage() {
           }
         }}
       />
-      <ConfirmDialog
+      <PurgeUserDialog
         open={dialog === 'purge'}
         onClose={() => setDialog(null)}
-        title="Excluir conta definitivamente"
-        description={
-          <>
-            Para contas de teste. Apaga agora, sem os 30 dias de recuperação: a conta, as empresas dela (estoque, fotos, movimentações) e os eventos de uso, que deixam de contar nos números.
-            Não dá para desfazer. Contas com empresa compartilhada ou assinatura ativa são recusadas.
-          </>
-        }
-        confirmLabel="Excluir de vez"
-        confirmWord={user.email}
-        danger
-        onConfirm={async (reason) => {
-          const result = await api.post<{ message: string }>(`/users/${userId}/purge`, { reason, confirmEmail: user.email });
-          toast.push(result.message, 'success');
+        userId={userId}
+        email={user.email}
+        onDone={(message) => {
+          toast.push(message, 'success');
           void queryClient.invalidateQueries({ queryKey: ['users'] });
           navigate('/usuarios');
         }}

@@ -332,6 +332,15 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
     );
   }
 
+  routes.get(
+    '/users/:userId/purge-preview',
+    {
+      preHandler: requireAdmin('owner'),
+      schema: { tags: ['admin'], summary: 'O que a exclusão definitiva levaria e o que a impede', hide: true, params: userParams, response: { 200: z.any(), ...commonAdminErrors } },
+    },
+    async (request) => service.purgePreview(request.params.userId),
+  );
+
   routes.post(
     '/users/:userId/purge',
     {
