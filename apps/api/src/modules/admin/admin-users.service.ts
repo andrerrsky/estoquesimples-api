@@ -798,7 +798,7 @@ export class AdminUsersService {
           WHERE name = 'signup.google_clicked' AND occurred_at > now() - make_interval(days => ${days})) AS google_clicks,
         (SELECT count(*)::int FROM analytics_events
           WHERE name = 'user.logged_in' AND properties->>'method' = 'google' AND occurred_at > now() - make_interval(days => ${days})) AS google_logins,
-        (SELECT count(*)::int FROM audit_log WHERE action = 'user.google_linked' AND created_at > now() - make_interval(days => ${days})) AS linked
+        (SELECT count(*)::int FROM audit_log a WHERE a.action = 'user.google_linked' AND a.created_at > now() - make_interval(days => ${days}) AND EXISTS (SELECT 1 FROM users u WHERE u.id::text = a.entity_id::text)) AS linked
     `);
     const row = rows.rows[0] ?? { email: 0, google: 0, google_clicks: 0, google_onetap: 0, google_logins: 0, linked: 0, activated_email: 0, activated_google: 0 };
     return {
