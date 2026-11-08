@@ -88,6 +88,7 @@ function PasswordField({ value, onChange, label = 'Senha', autoComplete, error }
 }
 
 function PasswordRules({ password, email }: { password: string; email: string }) {
+  // As regras se atualizam enquanto a pessoa digita; o leitor de tela acompanha.
   const local = email.split('@')[0]?.toLowerCase() ?? '';
   const rules = [
     { ok: password.length >= 10, text: 'Pelo menos 10 caracteres' },
@@ -95,10 +96,11 @@ function PasswordRules({ password, email }: { password: string; email: string })
     { ok: password.length > 0 && !(local.length >= 4 && password.toLowerCase().includes(local)), text: 'Não pode conter o seu e-mail' },
   ];
   return (
-    <ul className="rules">
+    <ul className="rules" aria-live="polite">
       {rules.map((rule) => (
         <li key={rule.text} className={rule.ok ? 'ok' : ''}>
           <Icon name={rule.ok ? 'check' : 'minus'} size={14} /> {rule.text}
+          <span className="sr-only">{rule.ok ? ' (cumprida)' : ' (pendente)'}</span>
         </li>
       ))}
     </ul>
@@ -192,12 +194,15 @@ const GOOGLE_G = (
 export function GoogleSignIn({
   oneTap = false,
   signup = false,
+  primary = false,
   divider = 'ou com e-mail',
   onAvailable,
 }: {
   oneTap?: boolean;
   /** Cadastro: mostra o aviso de Termos e Privacidade junto do botão. */
   signup?: boolean;
+  /** Botão em azul cheio (caminho principal); senão, contorno. */
+  primary?: boolean;
   divider?: string;
   onAvailable?: (available: boolean) => void;
 }) {
@@ -209,6 +214,7 @@ export function GoogleSignIn({
   const [error, setError] = useState<unknown>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'off'>('loading');
   const inApp = useMemo(() => isInAppBrowser(), []);
+  const oneTapScheduled = useRef(false);
 
   useEffect(() => {
     if (clientId === null || inApp) {
@@ -249,8 +255,8 @@ export function GoogleSignIn({
         const width = Math.round(Math.min(400, Math.max(240, slot.current.offsetWidth)));
         id.renderButton(slot.current, {
           type: 'standard',
-          // No cadastro o Google é o caminho principal (azul cheio); na entrada, contorno.
-          theme: signup ? 'filled_blue' : 'outline',
+          // Caminho principal: azul cheio; com o formulário de e-mail aberto ou na entrada, contorno.
+          theme: primary ? 'filled_blue' : 'outline',
           size: 'large',
           shape: 'rectangular',
           text: 'continue_with',
@@ -260,7 +266,8 @@ export function GoogleSignIn({
           click_listener: () => track('signup.google_clicked', { page: window.location.pathname }),
         });
         setState('ready');
-        if (oneTap && status === 'guest' && oneTapAllowed()) {
+        if (oneTap && status === 'guest' && oneTapAllowed() && !oneTapScheduled.current) {
+          oneTapScheduled.current = true;
           // Não no instante em que a página abre: a pessoa primeiro vê onde está.
           oneTapTimer = window.setTimeout(() => {
             if (cancelled) return;
@@ -280,7 +287,7 @@ export function GoogleSignIn({
       window.google?.accounts.id.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, inApp]);
+  }, [clientId, inApp, primary]);
 
   if (state === 'off') return null;
   const errorText =
@@ -342,7 +349,8 @@ export function SignupChoices({ autoFocus = true, submitLabel }: { autoFocus?: b
   const open = google === false || showEmail;
   return (
     <>
-      <GoogleSignIn oneTap signup divider={open ? 'ou com e-mail' : 'ou'} onAvailable={setGoogle} />
+      {/* Com o formulário aberto, o "Criar conta" vira o botão principal e o aviso de termos fica só lá embaixo. */}
+      <GoogleSignIn oneTap signup={!open} primary={!open} divider={open ? 'ou com e-mail' : 'ou'} onAvailable={setGoogle} />
       {open ? (
         <RegisterForm autoFocus={autoFocus && google === false ? true : showEmail} {...(submitLabel ? { submitLabel } : {})} />
       ) : (
@@ -712,9 +720,9 @@ export function WelcomePage() {
           <input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} autoFocus={!editingName} enterKeyHint="go" />
         </Field>
         {!adSegment && (
-          <div className="stack" style={{ gap: 8 }}>
-            <span className="caption">Seu negócio é… (opcional)</span>
-            <div className="segment-picker" role="group" aria-label="Tipo de negócio (opcional)">
+          <fieldset className="segment-field">
+            <legend className="field__label">Tipo de negócio (opcional)</legend>
+            <div className="segment-picker">
               {SEGMENT_OPTIONS.map((option) => (
                 <button
                   key={option.key}
@@ -723,23 +731,29 @@ export function WelcomePage() {
                   aria-pressed={segment === option.key}
                   onClick={() => setSegment(segment === option.key ? null : option.key)}
                 >
+                  {segment === option.key && <Icon name="check" size={15} />}
                   {option.label}
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
         )}
         {fromGoogle && noPassword && (
           <div className="welcome-app">
             <label className="checkbox">
               <input type="checkbox" checked={wantsPassword} onChange={(event) => setWantsPassword(event.target.checked)} />
-              Vou usar o aplicativo Android: criar uma senha agora
+              Usa o aplicativo Android? Crie uma senha para entrar nele.
             </label>
             {wantsPassword && (
               <>
-                <p className="caption">O aplicativo entra com e-mail e senha. Na web, você continua entrando com o Google.</p>
                 <PasswordField label="Senha para o aplicativo" value={appPassword} onChange={setAppPassword} autoComplete="new-password" error={passwordError} />
                 <PasswordRules password={appPassword} email={user?.email ?? ''} />
+                <p className="caption">
+                  No app, entre com <strong>{user?.email}</strong> e esta senha. Na web, você continua entrando com o Google.{' '}
+                  <a href="https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples" target="_blank" rel="noopener noreferrer">
+                    Baixar o app na Google Play
+                  </a>
+                </p>
               </>
             )}
           </div>
@@ -748,7 +762,7 @@ export function WelcomePage() {
           {busy ? 'Salvando…' : 'Começar'}
         </button>
         <button type="button" className="btn btn--link" onClick={() => void save(false)} disabled={busy}>
-          Pular por agora
+          Fazer depois
         </button>
         {fromGoogle && (
           <p className="caption" style={{ textAlign: 'center' }}>

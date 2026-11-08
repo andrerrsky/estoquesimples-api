@@ -52,7 +52,8 @@ function SignupMethodTiles() {
   const data = query.data;
   const total = data ? data.email + data.google : 0;
   const share = (part: number) => (total > 0 ? `${Math.round((part / total) * 100)}% dos cadastros` : 'nenhum cadastro ainda');
-  const rate = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
+  // Sempre com o n: com pouco volume, a porcentagem sozinha engana.
+  const rate = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}% (${part}/${whole})` : '—');
   return (
     <div className="grid grid--tiles">
       <StatTile

@@ -173,10 +173,11 @@ function PasswordRules({ password, email }: { password: string; email: string })
     { ok: password.length > 0 && !(local.length >= 4 && password.toLowerCase().includes(local)), text: 'Não pode conter o seu e-mail' },
   ];
   return (
-    <ul className="rules">
+    <ul className="rules" aria-live="polite">
       {rules.map((rule) => (
         <li key={rule.text} className={rule.ok ? 'ok' : ''}>
           <Icon name={rule.ok ? 'check' : 'minus'} size={14} /> {rule.text}
+          <span className="sr-only">{rule.ok ? ' (cumprida)' : ' (pendente)'}</span>
         </li>
       ))}
     </ul>
@@ -250,7 +251,7 @@ function PasswordCard() {
           </>
         )}
         <div className="row row--end">
-          <button type="submit" className="btn btn--primary" disabled={busy || (!noPassword && current === '') || next === ''}>
+          <button type="submit" className="btn btn--primary" disabled={busy || (!noPassword && current === '')}>
             {busy ? 'Salvando…' : noPassword ? 'Criar senha' : 'Alterar senha'}
           </button>
         </div>
