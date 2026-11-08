@@ -619,6 +619,7 @@ export function WelcomePage() {
   }, [user]);
   // O app Android ainda entra só com e-mail e senha: quem veio pelo Google pode criar uma aqui.
   const [wantsPassword, setWantsPassword] = useState(false);
+  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
   const [appPassword, setAppPassword] = useState('');
   const { workspaces, loading, refresh, select } = useWorkspace();
   const navigate = useNavigate();
@@ -741,7 +742,15 @@ export function WelcomePage() {
         {fromGoogle && noPassword && (
           <div className="welcome-app">
             <label className="checkbox">
-              <input type="checkbox" checked={wantsPassword} onChange={(event) => setWantsPassword(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={wantsPassword}
+                onChange={(event) => {
+                  setWantsPassword(event.target.checked);
+                  // Ao marcar, o próximo passo é a senha.
+                  if (event.target.checked) window.setTimeout(() => document.querySelector<HTMLInputElement>('.welcome-app input[type="password"], .welcome-app input[autocomplete="new-password"]')?.focus(), 0);
+                }}
+              />
               Usa o aplicativo Android? Crie uma senha para entrar nele.
             </label>
             {wantsPassword && (
@@ -749,20 +758,19 @@ export function WelcomePage() {
                 <PasswordField label="Senha para o aplicativo" value={appPassword} onChange={setAppPassword} autoComplete="new-password" error={passwordError} />
                 <PasswordRules password={appPassword} email={user?.email ?? ''} />
                 <p className="caption">
-                  No app, entre com <strong>{user?.email}</strong> e esta senha. Na web, você continua entrando com o Google.{' '}
-                  <a href="https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples" target="_blank" rel="noopener noreferrer">
+                  No app, entre com <strong>{user?.email}</strong> e esta senha. Na web, você continua entrando com o Google.
+                </p>
+                {isAndroid && (
+                  <a className="btn btn--secondary btn--block" href="https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples" target="_blank" rel="noopener noreferrer">
                     Baixar o app na Google Play
                   </a>
-                </p>
+                )}
               </>
             )}
           </div>
         )}
         <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
           {busy ? 'Salvando…' : 'Começar'}
-        </button>
-        <button type="button" className="btn btn--link" onClick={() => void save(false)} disabled={busy}>
-          Fazer depois
         </button>
         {fromGoogle && (
           <p className="caption" style={{ textAlign: 'center' }}>
