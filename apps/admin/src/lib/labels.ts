@@ -216,7 +216,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'user.password_reset_completed': { label: 'Senha redefinida', tone: 'info' },
   'user.email_verified': { label: 'E-mail confirmado', tone: 'success' },
   'user.deletion_requested': { label: 'Exclusão da conta solicitada', tone: 'error' },
-  'user.purged': { label: 'Conta apagada definitivamente (30 dias após o pedido)', tone: 'error' },
+  'user.purged': { label: 'Conta apagada definitivamente', tone: 'error' },
   'user.data_exported': { label: 'Baixou os próprios dados (LGPD)', tone: 'neutral' },
   'user.token_reuse_detected': { label: 'Reuso de token detectado', tone: 'error' },
   'user.login_blocked': { label: 'Login tentado durante bloqueio', tone: 'error' },

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
+import { EventLabel } from '../components/EventLabel';
 import { Badge, Card, Details, Empty, PageHeader, Pagination, Props, Skeleton, Tabs, Time } from '../components/ui';
 import { fmtNumber } from '../lib/format';
 import { useListParams } from '../lib/hooks';
@@ -101,7 +102,7 @@ export function EventsPage() {
                   events.data?.items.map((event) => (
                     <tr key={event.id}>
                       <td className="nowrap"><Time value={event.occurredAt} relative={false} /></td>
-                      <td><code>{event.name}</code><div className="cell-sub">{eventDomain(event.name)}</div></td>
+                      <td><EventLabel name={event.name} properties={event.properties} /><div className="cell-sub">{eventDomain(event.name)}</div></td>
                       <td>{event.userEmail ? <Link to={`/usuarios/${event.userId}`}>{event.userEmail}</Link> : event.installId ? <span className="muted mono small" title={event.installId}>instalação {event.installId.slice(0, 8)}</span> : <span className="muted">—</span>}</td>
                       <td>{event.workspaceName ? <Link to={`/empresas/${event.workspaceId}`}>{event.workspaceName}</Link> : <span className="muted">—</span>}</td>
                       <td className="muted">

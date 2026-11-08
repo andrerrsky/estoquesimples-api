@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { api, type Paginated } from '../api/client';
 import { describeUserAgent } from '../lib/format';
 import { auditLabel, PLATFORM_LABEL } from '../lib/labels';
+import { EventLabel } from './EventLabel';
 import { Icon, type IconName } from './Icon';
 import { Details, Empty, Pagination, Props, Skeleton, Time } from './ui';
 
@@ -174,7 +175,7 @@ export function EventsPanel({ path, queryKey }: { path: string; queryKey: unknow
                   <Time value={event.occurredAt} relative={false} />
                 </td>
                 <td>
-                  <code>{event.name}</code>
+                  <EventLabel name={event.name} properties={event.properties} />
                 </td>
                 <td className="muted">
                   {event.source === 'server' ? 'API' : `${PLATFORM_LABEL[event.platform] ?? event.platform}${event.appVersionCode ? ` v${event.appVersionCode}` : ''}`}

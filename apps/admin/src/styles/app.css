@@ -2142,3 +2142,62 @@ code,
 }
 .cover-ai__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cover-ai__text strong { overflow-wrap: anywhere; }
+
+/* Nome do evento com balão explicativo (EventLabel) */
+.event-label {
+  cursor: help;
+  text-decoration: underline dotted var(--text-faint);
+  text-underline-offset: 3px;
+  border-radius: 4px;
+}
+.event-tip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--text);
+  color: #fff;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.event-tip__title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.event-tip__text {
+  margin: 0 0 6px;
+  opacity: 0.85;
+}
+.event-tip__subtitle {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.event-tip__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0;
+}
+.event-tip__row {
+  display: contents;
+}
+.event-tip__grid dt {
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.event-tip__grid dd {
+  margin: 0;
+}
+.event-tip__grid code {
+  color: inherit;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.event-tip__muted {
+  opacity: 0.8;
+}

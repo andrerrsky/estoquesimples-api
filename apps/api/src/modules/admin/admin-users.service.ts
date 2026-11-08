@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { AccountClosureService } from '../users/account-closure.service.js';
+import { PrivacyService } from '../privacy/privacy.service.js';
 import {
   adminAccountNotes,
   devices,
@@ -612,6 +613,42 @@ export class AdminUsersService {
         metadata: { reason, requestedAt: iso(user.deletionRequestedAt), restoredWorkspaces },
       });
     });
+  }
+
+  /**
+   * Exclusão definitiva e imediata, sem os 30 dias de recuperação: para contas
+   * de teste que poluem os números. Exige o e-mail digitado de novo e recusa
+   * contas com gente de verdade em volta (empresa com outros membros ou
+   * assinatura que ainda renova). As empresas da conta, o estoque, as fotos e
+   * os eventos de uso saem junto; a trilha do painel guarda só o id e o motivo.
+   */
+  async purgeAccount(actor: AdminActor, userId: string, input: { reason: string; confirmEmail: string }): Promise<void> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user || user.deletedAt) throw notFound('Usuário não encontrado.');
+    if (input.confirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'O e-mail digitado não confere com o da conta.');
+    }
+    const closure = new AccountClosureService(this.services);
+    const owned = await closure.ownedWorkspaces(userId);
+    const shared = owned.filter((item) => item.otherMembers > 0);
+    if (shared.length > 0) {
+      throw conflict(ErrorCode.CONFLICT, `A conta é dona de empresa com outras pessoas (${shared.map((item) => item.name).join(', ')}). Transfira ou remova os membros antes.`);
+    }
+    if (owned.some((item) => item.subscription?.renews)) {
+      throw conflict(ErrorCode.CONFLICT, 'A conta tem assinatura que ainda renova. Cancele a assinatura antes de excluir.');
+    }
+    if (user.status !== 'pending_deletion') {
+      await closure.requestDeletion(userId, { closeWorkspaces: true }, { ipAddress: null, userAgent: null });
+    }
+    await recordAdminAudit(this.db, {
+      actor,
+      action: AdminAction.USER_PURGED,
+      targetType: 'user',
+      targetId: userId,
+      metadata: { reason: input.reason, workspaces: owned.length },
+    });
+    const purged = await new PrivacyService(this.services).purgeAccount(userId, { reason: 'admin_test_account', removeUsage: true });
+    if (!purged) throw conflict(ErrorCode.CONFLICT, 'Não foi possível excluir agora: a conta ainda é dona de uma empresa ativa.');
   }
 
   // -------------------------------------------------------------------------

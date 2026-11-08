@@ -32,6 +32,7 @@ export const AdminAction = {
   USER_DEVICE_REVOKED: 'user.device_revoked',
   USER_PASSWORD_RESET_SENT: 'user.password_reset_sent',
   USER_DELETION_CANCELLED: 'user.deletion_cancelled',
+  USER_PURGED: 'user.purged',
 
   WORKSPACE_UPDATED: 'workspace.updated',
   WORKSPACE_DELETED: 'workspace.deleted',
@@ -126,6 +127,7 @@ export const SECURITY_ADMIN_ACTIONS: readonly AdminActionValue[] = [
   AdminAction.USER_DEVICE_REVOKED,
   AdminAction.USER_PASSWORD_RESET_SENT,
   AdminAction.USER_DELETION_CANCELLED,
+  AdminAction.USER_PURGED,
   AdminAction.WORKSPACE_DELETED,
   AdminAction.WORKSPACE_RESTORED,
   AdminAction.WORKSPACE_OWNERSHIP_TRANSFERRED,

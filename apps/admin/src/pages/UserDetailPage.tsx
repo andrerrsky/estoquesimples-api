@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
@@ -67,10 +67,11 @@ interface NotificationRow {
   readAt: string | null;
   createdAt: string;
 }
-type Dialog = null | 'suspend' | 'reactivate' | 'verify' | 'revoke' | 'cancelDeletion' | 'edit' | { device: string };
+type Dialog = null | 'suspend' | 'reactivate' | 'verify' | 'revoke' | 'cancelDeletion' | 'purge' | 'edit' | { device: string };
 
 export function UserDetailPage() {
   const { userId = '' } = useParams();
+  const navigate = useNavigate();
   const { can } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -151,6 +152,9 @@ export function UserDetailPage() {
                   : { label: 'Suspender conta', icon: 'pause', danger: true, disabled: user.status === 'pending_deletion', onClick: () => setDialog('suspend') },
                 ...(user.status === 'pending_deletion'
                   ? [{ label: 'Cancelar exclusão da conta', icon: 'refresh' as const, onClick: () => setDialog('cancelDeletion') }]
+                  : []),
+                ...(can('owner')
+                  ? ['sep' as const, { label: 'Excluir conta definitivamente', icon: 'trash' as const, danger: true, onClick: () => setDialog('purge') }]
                   : []),
               ]}
             />
@@ -389,6 +393,26 @@ export function UserDetailPage() {
             toast.push(result.message, 'success');
             refresh();
           }
+        }}
+      />
+      <ConfirmDialog
+        open={dialog === 'purge'}
+        onClose={() => setDialog(null)}
+        title="Excluir conta definitivamente"
+        description={
+          <>
+            Para contas de teste. Apaga agora, sem os 30 dias de recuperação: a conta, as empresas dela (estoque, fotos, movimentações) e os eventos de uso, que deixam de contar nos números.
+            Não dá para desfazer. Contas com empresa compartilhada ou assinatura ativa são recusadas.
+          </>
+        }
+        confirmLabel="Excluir de vez"
+        confirmWord={user.email}
+        danger
+        onConfirm={async (reason) => {
+          const result = await api.post<{ message: string }>(`/users/${userId}/purge`, { reason, confirmEmail: user.email });
+          toast.push(result.message, 'success');
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          navigate('/usuarios');
         }}
       />
       <EditUserDialog open={dialog === 'edit'} onClose={() => setDialog(null)} user={user} onSaved={refresh} />

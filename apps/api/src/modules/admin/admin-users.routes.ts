@@ -333,6 +333,25 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
   }
 
   routes.post(
+    '/users/:userId/purge',
+    {
+      preHandler: requireAdmin('owner'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Exclui a conta de vez, sem prazo de recuperação (contas de teste)',
+        hide: true,
+        params: userParams,
+        body: reasonBodySchema.extend({ confirmEmail: z.string().trim().min(3).max(320) }),
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      await service.purgeAccount(adminActor(request), request.params.userId, request.body);
+      return { message: 'Conta excluída definitivamente.' };
+    },
+  );
+
+  routes.post(
     '/users/:userId/unlock',
     {
       preHandler: requireAdmin('support'),
