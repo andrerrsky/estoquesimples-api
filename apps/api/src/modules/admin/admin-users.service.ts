@@ -652,8 +652,22 @@ export class AdminUsersService {
    * mesma pessoa contam uma vez por dia).
    */
   async signupMethods(days: number) {
-    const rows = await this.db.execute<{ email: number; google: number; google_clicks: number; google_logins: number; linked: number }>(sql`
+    const rows = await this.db.execute<{
+      email: number;
+      google: number;
+      google_clicks: number;
+      google_onetap: number;
+      google_logins: number;
+      linked: number;
+      activated_email: number;
+      activated_google: number;
+    }>(sql`
       SELECT
+        (SELECT count(*)::int FROM users u WHERE u.deleted_at IS NULL AND u.signup_method = 'email' AND u.created_at > now() - make_interval(days => ${days})
+           AND EXISTS (SELECT 1 FROM products p JOIN workspaces w ON w.id = p.workspace_id WHERE w.owner_user_id = u.id)) AS activated_email,
+        (SELECT count(*)::int FROM users u WHERE u.deleted_at IS NULL AND u.signup_method = 'google' AND u.created_at > now() - make_interval(days => ${days})
+           AND EXISTS (SELECT 1 FROM products p JOIN workspaces w ON w.id = p.workspace_id WHERE w.owner_user_id = u.id)) AS activated_google,
+        (SELECT count(*)::int FROM analytics_events WHERE name = 'signup.google_onetap' AND occurred_at > now() - make_interval(days => ${days})) AS google_onetap,
         (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND signup_method = 'email' AND created_at > now() - make_interval(days => ${days})) AS email,
         (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND signup_method = 'google' AND created_at > now() - make_interval(days => ${days})) AS google,
         (SELECT count(DISTINCT (COALESCE(install_id, user_id::text), date_trunc('day', occurred_at)))::int FROM analytics_events
@@ -662,8 +676,18 @@ export class AdminUsersService {
           WHERE name = 'user.logged_in' AND properties->>'method' = 'google' AND occurred_at > now() - make_interval(days => ${days})) AS google_logins,
         (SELECT count(*)::int FROM audit_log WHERE action = 'user.google_linked' AND created_at > now() - make_interval(days => ${days})) AS linked
     `);
-    const row = rows.rows[0] ?? { email: 0, google: 0, google_clicks: 0, google_logins: 0, linked: 0 };
-    return { days, email: row.email, google: row.google, googleClicks: row.google_clicks, googleLogins: row.google_logins, linked: row.linked };
+    const row = rows.rows[0] ?? { email: 0, google: 0, google_clicks: 0, google_onetap: 0, google_logins: 0, linked: 0, activated_email: 0, activated_google: 0 };
+    return {
+      days,
+      email: row.email,
+      google: row.google,
+      googleClicks: row.google_clicks,
+      googleOneTap: row.google_onetap,
+      googleLogins: row.google_logins,
+      linked: row.linked,
+      activatedEmail: row.activated_email,
+      activatedGoogle: row.activated_google,
+    };
   }
 
   async listNotes(target: { userId?: string; workspaceId?: string }) {

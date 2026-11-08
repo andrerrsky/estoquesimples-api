@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { api, ApiError, errorMessage, fetchBlob } from '../api/client';
+import { api, ApiError, errorMessage, fetchBlob, sessionApi } from '../api/client';
 import type { DeviceSummary, SessionSummary, User } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
@@ -10,6 +10,7 @@ import { OpenInBrowserCard } from '../components/OpenInBrowserCard';
 import { Badge, Card, ConfirmDialog, Empty, Field, Notice, PageHeader, QueryState, Time, useToast } from '../components/ui';
 import { APP_VERSION } from '../lib/device';
 import { fmtDate } from '../lib/format';
+import { setupGoogle } from '../lib/google-signin';
 import { openCookiePreferences } from '../lib/ga';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 
@@ -28,9 +29,11 @@ export function AccountPage() {
   return (
     <div className="page page--narrow">
       <PageHeader title="Minha conta" subtitle="Seus dados de acesso valem para o aplicativo e para o navegador." />
+      {/* Conta só com Google: a senha é o que permite entrar no app Android, então vem primeiro. */}
+      {user.hasPassword === false && <PasswordCard />}
       <ProfileCard />
       <OpenInBrowserCard />
-      <PasswordCard />
+      {user.hasPassword !== false && <PasswordCard />}
       <SessionsCard />
       <MyDataCard />
       <DeleteAccountCard />
@@ -120,7 +123,7 @@ function ProfileCard() {
           <div className="row row--wrap" style={{ marginTop: 6, gap: 8 }}>
             <span style={{ overflowWrap: 'anywhere' }}>{user.email}</span>
             {user.emailVerified ? <Badge tone="success">Confirmado</Badge> : <Badge tone="warning">Não confirmado</Badge>}
-            {user.signupMethod === 'google' && <Badge tone="info">Entra com o Google</Badge>}
+            {user.signupMethod === 'google' && <Badge tone="info">Acesso pelo Google</Badge>}
           </div>
           <p className="caption" style={{ marginTop: 4 }}>O e-mail é o seu acesso e não pode ser trocado por aqui. Se precisar mudar, fale com o suporte.</p>
         </div>
@@ -198,7 +201,7 @@ function PasswordCard() {
     setBusy(true);
     setError(null);
     try {
-      await api.post('/v1/auth/change-password', { currentPassword: current, newPassword: next, revokeOtherSessions: revokeOthers });
+      await api.post('/v1/auth/change-password', { currentPassword: current, newPassword: next, revokeOtherSessions: noPassword ? false : revokeOthers });
       setCurrent('');
       setNext('');
       if (noPassword) void reloadUser().catch(() => undefined);
@@ -224,7 +227,7 @@ function PasswordCard() {
       title={noPassword ? 'Criar senha' : 'Senha'}
       subtitle={
         noPassword
-          ? 'Você entra com o Google. Se quiser, crie uma senha para entrar também com e-mail, inclusive no aplicativo Android.'
+          ? 'Você entra com o Google na web. O aplicativo Android entra com e-mail e senha: crie uma senha para usar o app.'
           : 'A mesma senha vale em todas as plataformas: aplicativo Android, navegador e web app.'
       }
     >
@@ -235,6 +238,8 @@ function PasswordCard() {
           <PasswordInput label={noPassword ? 'Senha' : 'Nova senha'} value={next} onChange={setNext} autoComplete="new-password" error={weak} />
         </div>
         <PasswordRules password={next} email={user?.email ?? ''} />
+        {!noPassword && (
+          <>
         <label className="checkbox">
           <input type="checkbox" checked={revokeOthers} onChange={(event) => setRevokeOthers(event.target.checked)} />
           Desconectar os outros aparelhos e navegadores
@@ -242,6 +247,8 @@ function PasswordCard() {
         <p className="caption">
           Este navegador continua conectado. {revokeOthers ? 'Nos outros lugares será preciso entrar de novo, com a senha nova.' : 'Os outros lugares continuam conectados até a sessão deles terminar.'}
         </p>
+          </>
+        )}
         <div className="row row--end">
           <button type="submit" className="btn btn--primary" disabled={busy || (!noPassword && current === '') || next === ''}>
             {busy ? 'Salvando…' : noPassword ? 'Criar senha' : 'Alterar senha'}
@@ -465,6 +472,37 @@ interface DeletionPreview {
   recoveryDays: number;
 }
 
+/** Confirmação com o Google (para quem não tem senha): entra de novo com a mesma conta Google. */
+function GoogleConfirm({ confirmed, onCredential }: { confirmed: boolean; onCredential: (credential: string) => void }) {
+  const slot = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void sessionApi.config().then(async ({ googleClientId }) => {
+      if (!googleClientId || cancelled) return setFailed(!googleClientId);
+      try {
+        const id = await setupGoogle(googleClientId, (credential) => onCredential(credential));
+        if (cancelled || !slot.current) return;
+        slot.current.replaceChildren();
+        id.renderButton(slot.current, { type: 'standard', theme: 'outline', size: 'large', shape: 'rectangular', text: 'continue_with', locale: 'pt-BR' });
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (confirmed) return <Notice tone="success">Confirmado com o Google. Toque em Excluir para concluir.</Notice>;
+  if (failed) return <Notice tone="error">Não foi possível abrir o Google aqui. Crie uma senha em Minha conta ou fale com o suporte.</Notice>;
+  return (
+    <Field label="Confirme que é você" hint="Entre de novo com a mesma conta Google desta conta.">
+      <div ref={slot} />
+    </Field>
+  );
+}
+
 function DeleteAccountCard() {
   const { logout, user } = useAuth();
   const noPassword = user?.hasPassword === false;
@@ -488,10 +526,10 @@ function DeleteAccountCard() {
   const others = owned.reduce((total, item) => total + item.otherMembers, 0);
 
   const remove = async () => {
-    if (password === '') throw new Error(noPassword ? 'Digite o e-mail da conta para confirmar.' : 'Digite sua senha para confirmar.');
+    if (password === '') throw new Error(noPassword ? 'Confirme com o Google para excluir.' : 'Digite sua senha para confirmar.');
     if (owned.length > 0 && !closeWorkspaces) throw new Error('Marque a caixa para excluir também as empresas.');
     const result = await api.delete<{ message: string; recoverableUntil: string }>('/v1/me', {
-      ...(noPassword ? { confirmEmail: password } : { password }),
+      ...(noPassword ? { googleCredential: password } : { password }),
       ...(owned.length > 0 ? { closeWorkspaces: true } : {}),
     });
     toast.push(`Conta marcada para exclusão. Se mudar de ideia, fale com o suporte até ${fmtDate(result.recoverableUntil)}.`, { duration: 15_000 });
@@ -562,9 +600,7 @@ function DeleteAccountCard() {
             </label>
           )}
           {noPassword ? (
-            <Field label="E-mail da conta" hint={`Digite ${user?.email ?? 'o e-mail da conta'} para confirmar que é você.`}>
-              <input className="input" type="email" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="off" maxLength={320} />
-            </Field>
+            <GoogleConfirm confirmed={password !== ''} onCredential={setPassword} />
           ) : (
             <Field label="Sua senha" hint="Pedimos a senha para ter certeza de que é você.">
               <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" maxLength={200} />

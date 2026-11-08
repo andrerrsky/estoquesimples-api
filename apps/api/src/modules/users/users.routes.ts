@@ -19,6 +19,7 @@ import { deviceInfoSchema, errorSchema, messageSchema } from '../auth/auth.schem
 import { requestMeta } from '../auth/auth.routes.js';
 import { ACCOUNT_RECOVERY_DAYS } from '../privacy/privacy.service.js';
 import { AccountClosureService } from './account-closure.service.js';
+import { createGoogleVerifier } from '../auth/google-identity.js';
 
 const commonErrors = {
   400: errorSchema,
@@ -444,8 +445,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
           .object({
             /** Obrigatória para quem tem senha. */
             password: z.string().min(1).max(200).optional(),
-            /** Contas sem senha (criadas com o Google) confirmam digitando o próprio e-mail. */
-            confirmEmail: z.string().trim().max(320).optional(),
+            /** Contas sem senha (criadas com o Google) confirmam entrando de novo com o Google (ID token). */
+            googleCredential: z.string().min(20).max(4096).optional(),
             /** Exclui também as empresas de que a pessoa é dona (ver GET /me/deletion-preview). */
             closeWorkspaces: z.boolean().optional(),
           })
@@ -465,10 +466,19 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       if (user.passwordHash) {
         const ok = request.body.password ? await verifyPassword(user.passwordHash, request.body.password) : false;
         if (!ok) throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
-      } else if ((request.body.confirmEmail ?? '').toLowerCase() !== user.email.toLowerCase()) {
-        throw new AppError(400, ErrorCode.VALIDATION_FAILED, 'Digite o e-mail da conta para confirmar.', {
-          details: [{ field: 'confirmEmail', message: 'Digite o e-mail da conta para confirmar.' }],
-        });
+      } else {
+        // Sem senha: prova de identidade = entrar de novo com a mesma conta Google.
+        const clientId = app.services.env.GOOGLE_OAUTH_CLIENT_ID;
+        if (!request.body.googleCredential || !clientId) {
+          throw new AppError(400, ErrorCode.VALIDATION_FAILED, 'Confirme com o Google para excluir a conta.');
+        }
+        const profile = await (app.services.googleVerifier ?? createGoogleVerifier(clientId))(request.body.googleCredential);
+        const linked = await db.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM user_identities WHERE user_id = ${user.id} AND provider = 'google' AND provider_user_id = ${profile.sub}`,
+        );
+        if ((linked.rows[0]?.n ?? 0) === 0) {
+          throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Use a mesma conta Google desta conta.');
+        }
       }
 
       // Dono de empresa: sem `closeWorkspaces` recebe 409 LAST_OWNER com a

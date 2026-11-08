@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { api, ApiError, errorMessage, sessionApi } from '../api/client';
@@ -11,7 +11,7 @@ import { Icon } from '../components/Icon';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
 import { originContent, setChosenSegment } from '../lib/attribution';
-import { setupGoogle } from '../lib/google-signin';
+import { isInAppBrowser, markOneTapShown, oneTapAllowed, setupGoogle } from '../lib/google-signin';
 import { applyRememberedLogin, readRememberedLogin } from '../lib/remembered-login';
 import { clearPublicBrand, setBrand, useBrand } from '../lib/brand';
 import { fmtDate } from '../lib/format';
@@ -171,24 +171,67 @@ function useGoogleClientId(): string | null | undefined {
   return clientId;
 }
 
+const GOOGLE_G = (
+  <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+  </svg>
+);
+
 /**
- * "Continuar com o Google" + divisor "ou com e-mail". Serve para entrar e para
- * criar conta (a API decide: conta ligada, mesmo e-mail ou conta nova). Com o
- * login com Google desligado na API, não aparece nada (nem o divisor).
- * `oneTap`: oferece a conta Google já conectada no navegador (só no cadastro).
+ * "Continuar com o Google" + divisor. Serve para entrar e para criar conta (a
+ * API decide: conta ligada, mesmo e-mail ou conta nova). Não aparece nada
+ * (nem o divisor) quando o login com Google está desligado na API, no
+ * navegador embutido de apps (o Google bloqueia login ali) ou se o botão não
+ * carregar; `onAvailable` avisa a tela, que então mostra o formulário de
+ * e-mail aberto. `oneTap`: oferece, depois de alguns segundos, a conta Google
+ * já conectada no navegador (no máximo a cada 7 dias).
  */
-export function GoogleSignIn({ oneTap = false }: { oneTap?: boolean }) {
+export function GoogleSignIn({
+  oneTap = false,
+  signup = false,
+  divider = 'ou com e-mail',
+  onAvailable,
+}: {
+  oneTap?: boolean;
+  /** Cadastro: mostra o aviso de Termos e Privacidade junto do botão. */
+  signup?: boolean;
+  divider?: string;
+  onAvailable?: (available: boolean) => void;
+}) {
   const { loginWithGoogle, status } = useAuth();
   const clientId = useGoogleClientId();
   const slot = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [failed, setFailed] = useState(false);
+  const [state, setState] = useState<'loading' | 'ready' | 'off'>('loading');
+  const inApp = useMemo(() => isInAppBrowser(), []);
 
   useEffect(() => {
-    if (!clientId || !slot.current) return undefined;
+    if (clientId === null || inApp) {
+      setState('off');
+      if (inApp && clientId) track('signup.google_unavailable', { reason: 'in_app', page: window.location.pathname });
+    }
+  }, [clientId, inApp]);
+
+  useEffect(() => {
+    if (state !== 'loading') onAvailable?.(state === 'ready');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  useEffect(() => {
+    if (error !== null) errorRef.current?.focus();
+  }, [error]);
+
+  useEffect(() => {
+    if (!clientId || inApp || !slot.current) return undefined;
     let cancelled = false;
-    const onCredential = async (credential: string) => {
+    let oneTapTimer: number | undefined;
+    const onCredential = async (credential: string, fromOneTap: boolean) => {
+      if (fromOneTap) track('signup.google_onetap', { page: window.location.pathname });
       setBusy(true);
       setError(null);
       try {
@@ -198,7 +241,7 @@ export function GoogleSignIn({ oneTap = false }: { oneTap?: boolean }) {
         setBusy(false);
       }
     };
-    setupGoogle(clientId, (credential) => void onCredential(credential))
+    setupGoogle(clientId, (credential, fromOneTap) => void onCredential(credential, fromOneTap))
       .then((id) => {
         if (cancelled || !slot.current) return;
         // Desenhar de novo no mesmo lugar acumula botões: limpa antes.
@@ -206,41 +249,117 @@ export function GoogleSignIn({ oneTap = false }: { oneTap?: boolean }) {
         const width = Math.round(Math.min(400, Math.max(240, slot.current.offsetWidth)));
         id.renderButton(slot.current, {
           type: 'standard',
-          theme: 'outline',
+          // No cadastro o Google é o caminho principal (azul cheio); na entrada, contorno.
+          theme: signup ? 'filled_blue' : 'outline',
           size: 'large',
-          shape: 'pill',
+          shape: 'rectangular',
           text: 'continue_with',
           logo_alignment: 'center',
           width,
           locale: 'pt-BR',
           click_listener: () => track('signup.google_clicked', { page: window.location.pathname }),
         });
-        if (oneTap && status === 'guest') id.prompt();
+        setState('ready');
+        if (oneTap && status === 'guest' && oneTapAllowed()) {
+          // Não no instante em que a página abre: a pessoa primeiro vê onde está.
+          oneTapTimer = window.setTimeout(() => {
+            if (cancelled) return;
+            markOneTapShown();
+            id.prompt();
+          }, 3000);
+        }
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        track('signup.google_unavailable', { reason: 'load_failed', page: window.location.pathname });
+        setState('off');
       });
     return () => {
       cancelled = true;
+      if (oneTapTimer) window.clearTimeout(oneTapTimer);
       window.google?.accounts.id.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [clientId, inApp]);
 
-  if (clientId === null || failed) return null;
+  if (state === 'off') return null;
+  const errorText =
+    error === null
+      ? null
+      : error instanceof ApiError && error.code === 'AUTH_ACCOUNT_SUSPENDED'
+        ? 'Esta conta está suspensa. Fale com o suporte.'
+        : errorMessage(error);
   return (
     <div className="google-signin">
-      {error !== null && (
-        <Notice tone="error">{error instanceof ApiError && error.code === 'AUTH_ACCOUNT_SUSPENDED' ? 'Esta conta está suspensa. Fale com o suporte.' : errorMessage(error)}</Notice>
+      {errorText && (
+        <div ref={errorRef} tabIndex={-1} role="alert">
+          <Notice tone="error">{errorText}</Notice>
+        </div>
       )}
       <div className="google-signin__slot" aria-busy={busy || undefined}>
         <div ref={slot} className="google-signin__button" />
-        {busy && <Spinner label="Entrando com o Google…" />}
+        {busy && (
+          <div role="status" aria-live="polite">
+            <Spinner label="Entrando com o Google…" />
+          </div>
+        )}
       </div>
-      <div className="divider-or" role="separator" aria-label="ou com e-mail">
-        <span>ou com e-mail</span>
-      </div>
+      {state === 'ready' && (
+        <>
+          <p className="google-signin__note">
+            Do Google usamos só o seu nome e e-mail; nada é publicado na sua conta.
+            {signup && (
+              <>
+                {' '}
+                Ao continuar, você concorda com os <Link to="/termos">Termos de Uso</Link> e a <Link to="/privacidade">Política de Privacidade</Link>.
+              </>
+            )}
+          </p>
+          <div className="divider-or" role="separator">
+            <span>{divider}</span>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Cadastro com o Google como caminho principal: quando o botão do Google
+ * está disponível, o formulário de e-mail fica recolhido atrás de "Criar
+ * conta com e-mail" (três campos e regras de senha a menos na primeira
+ * impressão). Sem o Google (desligado, navegador de app, falha), o
+ * formulário já aparece aberto.
+ */
+export function SignupChoices({ autoFocus = true, submitLabel }: { autoFocus?: boolean; submitLabel?: string }) {
+  const [google, setGoogle] = useState<boolean | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
+  // Google lento para responder: não deixa a tela sem nada; abre o formulário.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowEmail((current) => current || google === null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [google]);
+  const open = google === false || showEmail;
+  return (
+    <>
+      <GoogleSignIn oneTap signup divider={open ? 'ou com e-mail' : 'ou'} onAvailable={setGoogle} />
+      {open ? (
+        <RegisterForm autoFocus={autoFocus && google === false ? true : showEmail} {...(submitLabel ? { submitLabel } : {})} />
+      ) : (
+        google === true && (
+          <button
+            type="button"
+            className="btn btn--secondary btn--lg btn--block"
+            onClick={() => {
+              setShowEmail(true);
+              track('signup.email_expanded', { page: window.location.pathname });
+            }}
+          >
+            <Icon name="mail" size={18} /> Criar conta com e-mail
+          </button>
+        )
+      )}
+    </>
   );
 }
 
@@ -283,13 +402,13 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
   };
 
   return (
-    <AuthLayout aside={aside} title="Entrar" subtitle={(brand?.displayName ?? companyName) ? `Acesse o estoque de ${brand?.displayName ?? companyName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
+    <AuthLayout aside={aside} title="Entrar" subtitle={(brand?.displayName ?? companyName) ? `Acesse o estoque de ${brand?.displayName ?? companyName} com a sua conta.` : 'Entre com o Google ou com o e-mail e a senha.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
       {!brandSlug && <GoogleSignIn />}
       <form className="stack" onSubmit={submit}>
         {error && (
           <Notice tone="error">
             {error}
-            {googleOn && ' Se você criou a conta com o Google, use "Continuar com o Google".'}
+            {googleOn && ' Se você criou a conta com o Google, toque em “Continuar com o Google” acima.'}
           </Notice>
         )}
         <Field label="E-mail">
@@ -452,8 +571,7 @@ export function RegisterPage() {
   if (redirect) return redirect;
   return (
     <AuthLayout title="Criar conta" subtitle="Grátis, sem cartão. Seu estoque fica guardado na nuvem." footer={<>Já tem conta? <Link to="/entrar">Entrar</Link></>}>
-      <GoogleSignIn oneTap />
-      <RegisterForm />
+      <SignupChoices />
     </AuthLayout>
   );
 }
@@ -483,12 +601,17 @@ const SEGMENT_OPTIONS: Array<{ key: string; label: string; example: string }> = 
 export function WelcomePage() {
   const { status, user, reloadUser } = useAuth();
   const fromGoogle = user?.signupMethod === 'google';
-  // Do Google vêm nome e e-mail: o nome aparece preenchido para conferir.
+  const noPassword = user?.hasPassword === false;
+  // Do Google vêm nome e e-mail: o nome fica em modo leitura, com "alterar".
   const [personName, setPersonName] = useState(user?.name ?? '');
+  const [editingName, setEditingName] = useState(false);
   useEffect(() => {
     if (user && personName === '') setPersonName(user.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+  // O app Android ainda entra só com e-mail e senha: quem veio pelo Google pode criar uma aqui.
+  const [wantsPassword, setWantsPassword] = useState(false);
+  const [appPassword, setAppPassword] = useState('');
   const { workspaces, loading, refresh, select } = useWorkspace();
   const navigate = useNavigate();
   const fromAd = originContent();
@@ -497,6 +620,7 @@ export function WelcomePage() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const viewed = useRef(false);
 
   const owned = workspaces.find((item) => item.isOwner) ?? workspaces[0] ?? null;
@@ -505,77 +629,87 @@ export function WelcomePage() {
     setWelcomePending(false);
     if (status === 'authed' && !viewed.current) {
       viewed.current = true;
-      track('onboarding.viewed', { segment: adSegment });
+      track('onboarding.viewed', { segment: adSegment, method: fromGoogle ? 'google' : 'email' });
     }
-  }, [status, adSegment]);
+  }, [status, adSegment, fromGoogle]);
+
+  useEffect(() => {
+    if (error !== null) errorRef.current?.focus();
+  }, [error]);
 
   if (status === 'loading' || (status === 'authed' && loading)) return <FullScreenLoading />;
   if (status !== 'authed') return <Navigate to="/entrar" replace />;
 
   const example = SEGMENT_OPTIONS.find((option) => option.key === segment)?.example ?? 'Loja da Ana';
-  const finish = () => {
-    if (owned) select(owned.id);
-    navigate('/app/estoque?primeiro=1', { replace: true });
-  };
+  const passwordError = error instanceof ApiError ? error.details.filter((detail) => detail.field === 'newPassword').map((detail) => detail.message).join(' ') || undefined : undefined;
 
-  const skip = () => {
-    setChosenSegment(adSegment ? null : segment);
-    track('onboarding.name_skipped', { segment });
-    finish();
-  };
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  /** Salva o que foi preenchido (nome da pessoa, senha do app, nome da empresa) e abre o estoque. */
+  const save = async (withCompany: boolean) => {
     if (busy) return;
-    const chosen = name.trim();
-    if (!chosen || !owned) {
-      skip();
-      return;
-    }
+    const chosen = withCompany ? name.trim() : '';
     setChosenSegment(adSegment ? null : segment);
     setBusy(true);
     setError(null);
     try {
       if (fromGoogle && personName.trim() && personName.trim() !== user?.name) {
         await api.patch('/v1/me', { name: personName.trim() });
-        await reloadUser().catch(() => undefined);
       }
-      if (chosen !== owned.name) await api.patch(`/v1/workspaces/${owned.id}`, { name: chosen });
-      await refresh();
-      track('onboarding.name_set', { segment });
-      finish();
+      if (noPassword && wantsPassword && appPassword) {
+        await api.post('/v1/auth/change-password', { newPassword: appPassword, revokeOtherSessions: false });
+      }
+      if (chosen && owned && chosen !== owned.name) await api.patch(`/v1/workspaces/${owned.id}`, { name: chosen });
+      await Promise.all([refresh(), reloadUser().catch(() => undefined)]);
+      track(chosen ? 'onboarding.name_set' : 'onboarding.name_skipped', { segment, method: fromGoogle ? 'google' : 'email' });
+      if (owned) select(owned.id);
+      navigate('/app/estoque?primeiro=1', { replace: true });
     } catch (caught) {
       setError(caught);
       setBusy(false);
     }
   };
 
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void save(true);
+  };
+
   const first = user?.name.trim().split(/\s+/)[0];
   return (
     <AuthLayout
-      title={first ? `Bem-vindo, ${first}!` : 'Bem-vindo!'}
-      subtitle={fromGoogle ? 'Sua conta foi criada com o Google. Confira os dados e diga o nome da empresa.' : 'Sua conta está pronta. Só uma pergunta antes de começar.'}
+      title={first ? `Boas-vindas, ${first}!` : 'Boas-vindas!'}
+      subtitle={fromGoogle ? 'Sua conta foi criada com o Google. Falta só o nome da empresa.' : 'Sua conta está pronta. Só uma pergunta antes de começar.'}
     >
       <form className="stack" onSubmit={submit}>
-        {error !== null && <Notice tone="error">{errorMessage(error)}</Notice>}
-        {fromGoogle && user && (
-          <>
-            <div className="welcome-account" aria-label="Conta Google conectada">
-              <span className="welcome-account__icon" aria-hidden="true">
-                <Icon name="check" size={16} />
-              </span>
-              <span>
-                <strong>Conta Google conectada</strong>
-                <span className="welcome-account__email">{user.email}</span>
-              </span>
-            </div>
-            <Field label="Seu nome">
-              <input className="input" value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={120} autoComplete="name" />
-            </Field>
-          </>
+        {error !== null && !passwordError && (
+          <div ref={errorRef} tabIndex={-1} role="alert">
+            <Notice tone="error">{errorMessage(error)}</Notice>
+          </div>
         )}
-        <Field label="Como se chama a sua empresa?">
-          <input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder={`Ex.: ${example}`} autoFocus enterKeyHint="go" />
+        {fromGoogle && user && (
+          <div className="welcome-account">
+            <span className="welcome-account__icon">{GOOGLE_G}</span>
+            <span className="welcome-account__who">
+              <strong>Conta Google conectada</strong>
+              {editingName ? null : (
+                <span className="welcome-account__email">
+                  {personName || user.name} · {user.email}
+                </span>
+              )}
+            </span>
+            {!editingName && (
+              <button type="button" className="btn btn--link btn--sm" onClick={() => setEditingName(true)} aria-label="Alterar o seu nome">
+                alterar
+              </button>
+            )}
+          </div>
+        )}
+        {fromGoogle && editingName && (
+          <Field label="Seu nome">
+            <input className="input" value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={120} autoComplete="name" autoFocus />
+          </Field>
+        )}
+        <Field label="Nome da empresa (opcional)" hint={`Pode ser o nome da loja, do salão ou o seu. Ex.: ${example}. Dá para mudar depois.`}>
+          <input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} autoFocus={!editingName} enterKeyHint="go" />
         </Field>
         {!adSegment && (
           <div className="stack" style={{ gap: 8 }}>
@@ -595,12 +729,32 @@ export function WelcomePage() {
             </div>
           </div>
         )}
+        {fromGoogle && noPassword && (
+          <div className="welcome-app">
+            <label className="checkbox">
+              <input type="checkbox" checked={wantsPassword} onChange={(event) => setWantsPassword(event.target.checked)} />
+              Vou usar o aplicativo Android: criar uma senha agora
+            </label>
+            {wantsPassword && (
+              <>
+                <p className="caption">O aplicativo entra com e-mail e senha. Na web, você continua entrando com o Google.</p>
+                <PasswordField label="Senha para o aplicativo" value={appPassword} onChange={setAppPassword} autoComplete="new-password" error={passwordError} />
+                <PasswordRules password={appPassword} email={user?.email ?? ''} />
+              </>
+            )}
+          </div>
+        )}
         <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
           {busy ? 'Salvando…' : 'Começar'}
         </button>
-        <button type="button" className="btn btn--link" onClick={skip} disabled={busy}>
+        <button type="button" className="btn btn--link" onClick={() => void save(false)} disabled={busy}>
           Pular por agora
         </button>
+        {fromGoogle && (
+          <p className="caption" style={{ textAlign: 'center' }}>
+            Ao continuar, você concorda com os <Link to="/termos">Termos de Uso</Link> e a <Link to="/privacidade">Política de Privacidade</Link>.
+          </p>
+        )}
       </form>
     </AuthLayout>
   );

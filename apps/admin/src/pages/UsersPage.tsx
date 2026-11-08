@@ -35,25 +35,44 @@ interface SignupMethods {
   email: number;
   google: number;
   googleClicks: number;
+  googleOneTap: number;
   googleLogins: number;
   linked: number;
+  activatedEmail: number;
+  activatedGoogle: number;
 }
 
-/** Cadastros por método nos últimos 30 dias e uso do botão do Google. */
+/**
+ * Cadastros por método nos últimos 30 dias, uso do Google (botão e One Tap) e
+ * ativação (1º produto) por método: é o que diz se o Google traz gente que
+ * usa ou só cadastros.
+ */
 function SignupMethodTiles() {
   const query = useQuery({ queryKey: ['users', 'signup-methods'], queryFn: () => api.get<SignupMethods>('/users/signup-methods', { days: 30 }) });
   const data = query.data;
   const total = data ? data.email + data.google : 0;
   const share = (part: number) => (total > 0 ? `${Math.round((part / total) * 100)}% dos cadastros` : 'nenhum cadastro ainda');
+  const rate = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
   return (
     <div className="grid grid--tiles">
-      <StatTile label="Cadastro normal (30 dias)" value={data ? fmtNumber(data.email) : '—'} foot={data ? share(data.email) : undefined} hint="Contas criadas com e-mail e senha." />
-      <StatTile label="Cadastro com Google (30 dias)" value={data ? fmtNumber(data.google) : '—'} foot={data ? share(data.google) : undefined} hint="Contas criadas pelo botão Continuar com o Google." tone="accent" />
       <StatTile
-        label="Cliques no botão do Google"
-        value={data ? fmtNumber(data.googleClicks) : '—'}
-        foot={data ? (data.googleClicks > 0 ? `${Math.round((data.google / data.googleClicks) * 100)}% viraram cadastro` : 'ninguém clicou ainda') : undefined}
-        hint="Pessoas (por aparelho e dia) que tocaram em Continuar com o Google, para entrar ou criar conta."
+        label="Cadastro normal (30 dias)"
+        value={data ? fmtNumber(data.email) : '—'}
+        foot={data ? `${share(data.email)} · ativação ${rate(data.activatedEmail, data.email)}` : undefined}
+        hint="Contas criadas com e-mail e senha. Ativação = cadastrou o 1º produto."
+      />
+      <StatTile
+        label="Cadastro com Google (30 dias)"
+        value={data ? fmtNumber(data.google) : '—'}
+        foot={data ? `${share(data.google)} · ativação ${rate(data.activatedGoogle, data.google)}` : undefined}
+        hint="Contas criadas pelo botão ou pelo One Tap do Google. Ativação = cadastrou o 1º produto."
+        tone="accent"
+      />
+      <StatTile
+        label="Toques no Google (30 dias)"
+        value={data ? fmtNumber(data.googleClicks + data.googleOneTap) : '—'}
+        foot={data ? `botão ${fmtNumber(data.googleClicks)} · One Tap ${fmtNumber(data.googleOneTap)}` : undefined}
+        hint="Botão: toques em Continuar com o Google (por aparelho e dia). One Tap: contas escolhidas no cartão do Google. Inclui quem já tinha conta e só entrou."
       />
       <StatTile
         label="Entradas com Google"

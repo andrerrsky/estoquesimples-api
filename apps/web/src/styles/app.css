@@ -705,7 +705,8 @@ button {
 
 .input::placeholder,
 .textarea::placeholder {
-  color: var(--text-faint);
+  /* ≥ 4,5:1 sobre o branco do campo (o --text-faint ficava em ~2,9:1). */
+  color: #6b7886;
 }
 .input:hover,
 .select:hover,
@@ -2258,6 +2259,10 @@ button {
   justify-content: center;
   width: 100%;
   max-width: 400px;
+  /* Altura fixa: enquanto o script do Google carrega ele desenha um botão
+     provisório e o definitivo por baixo; sem isto a página "pula". */
+  height: 44px;
+  overflow: hidden;
 }
 .google-signin__slot[aria-busy='true'] .google-signin__button {
   opacity: 0.5;
@@ -2293,18 +2298,34 @@ button {
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--success-soft, #e6f4ea);
-  color: var(--success, #1e7d3a);
+  background: #fff;
 }
-.welcome-account > span:last-child {
+.welcome-account__who {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
+}
+.welcome-app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
 }
 .welcome-account__email {
   color: var(--text-muted);
   overflow-wrap: anywhere;
+}
+.google-signin__note {
+  margin: -4px 0 0;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+  color: var(--text-muted);
+  text-align: center;
 }

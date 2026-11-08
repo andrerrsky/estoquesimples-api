@@ -110,8 +110,21 @@ describe('Continuar com o Google (web)', () => {
     expect(login.statusCode).toBe(401);
     expect(login.json().error.code).toBe('AUTH_INVALID_CREDENTIALS');
 
-    const wrongDelete = await context.app.inject({ method: 'DELETE', url: '/v1/me', headers: authHeader, payload: { confirmEmail: 'outro@exemplo.com', closeWorkspaces: true } });
-    expect(wrongDelete.statusCode).toBe(400);
+    const noProof = await context.app.inject({ method: 'DELETE', url: '/v1/me', headers: authHeader, payload: { closeWorkspaces: true } });
+    expect(noProof.statusCode).toBe(400);
+    const otherGoogle = await context.app.inject({
+      method: 'DELETE',
+      url: '/v1/me',
+      headers: authHeader,
+      payload: { googleCredential: token({ sub: 'outra-conta-google', email: 'outra@gmail.com', name: 'Outra' }), closeWorkspaces: true },
+    });
+    expect(otherGoogle.statusCode).toBe(401);
+
+    // "Esqueci minha senha" de conta só Google: e-mail explica e oferece criar senha.
+    await context.app.inject({ method: 'POST', url: '/v1/auth/forgot-password', payload: { email } });
+    const resetMail = context.mailer.lastOfKind('password_reset');
+    expect(resetMail?.subject).toContain('usa o Google');
+    expect(resetMail?.text).toContain('Continuar com o Google');
 
     const setPassword = await context.app.inject({ method: 'POST', url: '/v1/auth/change-password', headers: authHeader, payload: { newPassword: 'NovaSenhaForte#2026', revokeOtherSessions: false } });
     expect([200, 204]).toContain(setPassword.statusCode);
@@ -119,14 +132,15 @@ describe('Continuar com o Google (web)', () => {
     expect(loginNow.statusCode).toBe(200);
   });
 
-  it('exclusão da conta sem senha confirmando o e-mail', async () => {
+  it('exclusão da conta sem senha confirmando com a mesma conta Google', async () => {
     const email = uniqueEmail('excluir');
-    const created = await google(token({ sub: 'google-sub-4', email, name: 'Dani' }));
+    const profile = { sub: 'google-sub-4', email, name: 'Dani' };
+    const created = await google(token(profile));
     const del = await context.app.inject({
       method: 'DELETE',
       url: '/v1/me',
       headers: { authorization: `Bearer ${created.json().accessToken}` },
-      payload: { confirmEmail: email.toUpperCase(), closeWorkspaces: true },
+      payload: { googleCredential: token(profile), closeWorkspaces: true },
     });
     expect(del.statusCode).toBe(200);
   });
@@ -177,7 +191,7 @@ describe('Continuar com o Google (web)', () => {
     const h = { cookie: String(Array.isArray(raw) ? raw[0] : raw).split(';')[0] ?? '', 'x-requested-with': 'estoquesimples-admin' };
 
     const stats = (await context.app.inject({ method: 'GET', url: '/admin/api/users/signup-methods?days=30', headers: h })).json();
-    expect(stats).toMatchObject({ days: 30, email: 1, google: 1, googleClicks: 1 });
+    expect(stats).toMatchObject({ days: 30, email: 1, google: 1, googleClicks: 1, googleOneTap: 0, activatedEmail: 0, activatedGoogle: 0 });
     const onlyGoogle = (await context.app.inject({ method: 'GET', url: '/admin/api/users?signupMethod=google', headers: h })).json();
     expect(onlyGoogle.items).toHaveLength(1);
     expect(onlyGoogle.items[0].signupMethod).toBe('google');

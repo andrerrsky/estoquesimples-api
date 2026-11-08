@@ -828,13 +828,14 @@ export class AuthService {
     // limite por e-mail, só não manda outro link.
     if (this.services.throttle.hit('reset', email, this.env.EMAIL_ACTION_MAX_PER_HOUR, 3600) > 0) return;
     const found = await this.db
-      .select({ id: users.id, email: users.email, name: users.name })
+      .select({ id: users.id, email: users.email, name: users.name, passwordHash: users.passwordHash })
       .from(users)
       .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.deletedAt)))
       .limit(1);
 
     const user = found[0];
     if (!user) return;
+    const googleOnly = user.passwordHash === null;
 
     const token = generateToken();
     const expiresAt = addMinutes(new Date(), this.env.PASSWORD_RESET_TTL_MINUTES);
@@ -866,10 +867,13 @@ export class AuthService {
     await this.services.mailer.send({
       to: user.email,
       kind: 'password_reset',
-      subject: 'Redefinição de senha - Estoque Simples',
+      subject: googleOnly ? 'Sua conta usa o Google para entrar - Estoque Simples' : 'Redefinição de senha - Estoque Simples',
       text:
         `Olá, ${user.name}.\n\n` +
-        `Use o código abaixo para redefinir sua senha. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n` +
+        (googleOnly
+          ? 'Sua conta do Estoque Simples foi criada com o Google e ainda não tem senha. Para entrar, toque em "Continuar com o Google" na tela de entrada.\n\n' +
+            `Se preferir entrar também com e-mail e senha (por exemplo, no aplicativo Android), crie uma senha com o código abaixo. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n`
+          : `Use o código abaixo para redefinir sua senha. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n`) +
         `${token}\n\n` +
         webLink(this.env.WEB_APP_URL, `/redefinir-senha?token=${encodeURIComponent(token)}`, 'Ou redefina pelo navegador') +
         'Se você não pediu isso, ignore este e-mail: sua senha continua a mesma.',
