@@ -20,7 +20,8 @@ export const users = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
-    passwordHash: text('password_hash').notNull(),
+    /** Nulo para contas criadas com o Google (sem senha). */
+    passwordHash: text('password_hash'),
     name: text('name').notNull(),
     emailVerifiedAt: timestamp('email_verified_at', tz),
     permissionVersion: integer('permission_version').notNull().default(1),
@@ -30,6 +31,8 @@ export const users = pgTable(
     deletionRequestedAt: timestamp('deletion_requested_at', tz),
     /** Origem do cadastro web (UTMs, clique no anúncio, escolha de cookies). Ver `signup-attribution.ts`. */
     signupAttribution: jsonb('signup_attribution').$type<Record<string, string>>(),
+    /** Como a conta nasceu: 'email' ou 'google'. */
+    signupMethod: text('signup_method').notNull().default('email'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', tz),

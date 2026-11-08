@@ -28,6 +28,7 @@ function actions(overrides: Partial<Parameters<typeof createAuthActions>[0]['ses
       login: vi.fn(async () => ({ user: USER })),
       register: vi.fn(async () => ({ user: USER })),
       handoff: vi.fn(async () => ({ user: USER })),
+      google: vi.fn(async () => ({ user: USER, isNew: true })),
       ...overrides,
     },
     onAuthed,
@@ -114,5 +115,27 @@ describe('primeiro produto (sinal de ativação)', () => {
     expect(browser.events('product_first_created')).toHaveLength(1);
     expect(browser.events('product_created')).toHaveLength(3);
     expect(browser.events('product_updated')).toHaveLength(1);
+  });
+});
+
+describe('Continuar com o Google', () => {
+  it('conta nova: um sign_up com method google e as boas-vindas marcadas antes de a sessão valer', async () => {
+    const order: string[] = [];
+    const { loginWithGoogle, onAuthed } = actions();
+    onAuthed.mockImplementation(() => order.push('authed'));
+    const result = await loginWithGoogle('credencial', () => order.push('welcome'));
+    expect(result.isNew).toBe(true);
+    expect(order).toEqual(['welcome', 'authed']);
+    expect(browser.events('sign_up')).toHaveLength(1);
+    expect(browser.events('sign_up')[0]).toMatchObject({ method: 'google' });
+  });
+
+  it('conta existente: login, sem sign_up nem boas-vindas', async () => {
+    const onNew = vi.fn();
+    const { loginWithGoogle } = actions({ google: vi.fn(async () => ({ user: USER, isNew: false })) });
+    await loginWithGoogle('credencial', onNew);
+    expect(onNew).not.toHaveBeenCalled();
+    expect(browser.events('sign_up')).toHaveLength(0);
+    expect(browser.events('login')[0]).toMatchObject({ method: 'google' });
   });
 });

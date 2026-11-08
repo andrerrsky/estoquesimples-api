@@ -26,6 +26,7 @@ export interface UserListFilters extends PaginationQuery {
   emailVerified?: boolean;
   /** Só contas com aparelho (ou navegador) ativo nesta plataforma. */
   platform?: 'android' | 'ios' | 'web';
+  signupMethod?: 'email' | 'google';
   sort?: 'createdAt' | 'lastActivityAt' | 'name' | 'email';
   order?: 'asc' | 'desc';
 }
@@ -47,6 +48,8 @@ export interface UserListItem {
   origin: SignupOrigin | null;
   /** Já tem produto em alguma empresa de que é proprietária (ativação). */
   activated: boolean;
+  /** Como a conta foi criada: cadastro normal (e-mail e senha) ou Google. */
+  signupMethod: 'email' | 'google';
 }
 
 export interface SignupOrigin {
@@ -169,6 +172,7 @@ export class AdminUsersService {
       );
     }
     if (filters.status) conditions.push(sql`u.status = ${filters.status}`);
+    if (filters.signupMethod) conditions.push(sql`u.signup_method = ${filters.signupMethod}`);
     if (filters.emailVerified === true) conditions.push(sql`u.email_verified_at IS NOT NULL`);
     if (filters.emailVerified === false) conditions.push(sql`u.email_verified_at IS NULL`);
     if (filters.platform) {
@@ -196,8 +200,9 @@ export class AdminUsersService {
         platforms: string[];
         signup_attribution: Record<string, string> | null;
         activated: boolean;
+        signup_method: string;
       }>(sql`
-        SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until, u.signup_attribution,
+        SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until, u.signup_attribution, u.signup_method,
                EXISTS (
                  SELECT 1 FROM products p JOIN workspaces w ON w.id = p.workspace_id WHERE w.owner_user_id = u.id
                ) AS activated,
@@ -239,6 +244,7 @@ export class AdminUsersService {
         platforms: row.platforms ?? [],
         origin: signupOriginOf(row.signup_attribution),
         activated: row.activated,
+        signupMethod: row.signup_method === 'google' ? ('google' as const) : ('email' as const),
       })),
       page: filters.page,
       pageSize: filters.pageSize,
@@ -637,6 +643,27 @@ export class AdminUsersService {
       ORDER BY fp.first_product_at
     `);
     return rows.rows.map((row) => ({ gclid: row.gclid, convertedAt: new Date(row.first_product_at) }));
+  }
+
+  /**
+   * Cadastros por método nos últimos `days` dias (fuso de Brasília) e quantas
+   * vezes o botão "Continuar com o Google" foi usado na web (evento
+   * `signup.google_clicked`, contado por instalação: cliques repetidos da
+   * mesma pessoa contam uma vez por dia).
+   */
+  async signupMethods(days: number) {
+    const rows = await this.db.execute<{ email: number; google: number; google_clicks: number; google_logins: number; linked: number }>(sql`
+      SELECT
+        (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND signup_method = 'email' AND created_at > now() - make_interval(days => ${days})) AS email,
+        (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND signup_method = 'google' AND created_at > now() - make_interval(days => ${days})) AS google,
+        (SELECT count(DISTINCT (COALESCE(install_id, user_id::text), date_trunc('day', occurred_at)))::int FROM analytics_events
+          WHERE name = 'signup.google_clicked' AND occurred_at > now() - make_interval(days => ${days})) AS google_clicks,
+        (SELECT count(*)::int FROM analytics_events
+          WHERE name = 'user.logged_in' AND properties->>'method' = 'google' AND occurred_at > now() - make_interval(days => ${days})) AS google_logins,
+        (SELECT count(*)::int FROM audit_log WHERE action = 'user.google_linked' AND created_at > now() - make_interval(days => ${days})) AS linked
+    `);
+    const row = rows.rows[0] ?? { email: 0, google: 0, google_clicks: 0, google_logins: 0, linked: 0 };
+    return { days, email: row.email, google: row.google, googleClicks: row.google_clicks, googleLogins: row.google_logins, linked: row.linked };
   }
 
   async listNotes(target: { userId?: string; workspaceId?: string }) {

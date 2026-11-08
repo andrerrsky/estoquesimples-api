@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
-import { Badge, Card, DataTable, Empty, PageHeader, Pagination, PlatformBadges, Time, type Column } from '../components/ui';
+import { Badge, Card, DataTable, Empty, PageHeader, Pagination, PlatformBadges, StatTile, Time, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtNumber } from '../lib/format';
 import { USER_STATUS } from '../lib/labels';
@@ -26,6 +26,43 @@ interface UserRow {
   origin: { source: string | null; medium: string | null; campaign: string | null; content: string | null; hasClickId: boolean; consent: string | null } | null;
   /** Já cadastrou produto (ativação). */
   activated: boolean;
+  /** Como a conta foi criada. */
+  signupMethod: 'email' | 'google';
+}
+
+interface SignupMethods {
+  days: number;
+  email: number;
+  google: number;
+  googleClicks: number;
+  googleLogins: number;
+  linked: number;
+}
+
+/** Cadastros por método nos últimos 30 dias e uso do botão do Google. */
+function SignupMethodTiles() {
+  const query = useQuery({ queryKey: ['users', 'signup-methods'], queryFn: () => api.get<SignupMethods>('/users/signup-methods', { days: 30 }) });
+  const data = query.data;
+  const total = data ? data.email + data.google : 0;
+  const share = (part: number) => (total > 0 ? `${Math.round((part / total) * 100)}% dos cadastros` : 'nenhum cadastro ainda');
+  return (
+    <div className="grid grid--tiles">
+      <StatTile label="Cadastro normal (30 dias)" value={data ? fmtNumber(data.email) : '—'} foot={data ? share(data.email) : undefined} hint="Contas criadas com e-mail e senha." />
+      <StatTile label="Cadastro com Google (30 dias)" value={data ? fmtNumber(data.google) : '—'} foot={data ? share(data.google) : undefined} hint="Contas criadas pelo botão Continuar com o Google." tone="accent" />
+      <StatTile
+        label="Cliques no botão do Google"
+        value={data ? fmtNumber(data.googleClicks) : '—'}
+        foot={data ? (data.googleClicks > 0 ? `${Math.round((data.google / data.googleClicks) * 100)}% viraram cadastro` : 'ninguém clicou ainda') : undefined}
+        hint="Pessoas (por aparelho e dia) que tocaram em Continuar com o Google, para entrar ou criar conta."
+      />
+      <StatTile
+        label="Entradas com Google"
+        value={data ? fmtNumber(data.googleLogins) : '—'}
+        foot={data ? `${fmtNumber(data.linked)} conta(s) existente(s) vinculada(s)` : undefined}
+        hint="Logins pelo Google de contas que já existiam; vinculada = conta criada com e-mail que passou a entrar também com o Google."
+      />
+    </div>
+  );
 }
 
 function OriginCell({ origin }: { origin: UserRow['origin'] }) {
@@ -63,6 +100,7 @@ export function UsersPage() {
         status: values['status'],
         emailVerified: values['emailVerified'],
         platform: values['platform'],
+        signupMethod: values['signupMethod'],
         sort: sort.key,
         order: sort.order,
         page,
@@ -91,6 +129,7 @@ export function UsersPage() {
           <Badge tone={USER_STATUS[row.status]?.tone}>{USER_STATUS[row.status]?.label ?? row.status}</Badge>
           {!row.emailVerified && <Badge tone="warning">e-mail pendente</Badge>}
           {row.activated && <Badge tone="success">1º produto</Badge>}
+          {row.signupMethod === 'google' && <Badge tone="info">Google</Badge>}
           {row.lockedUntil && new Date(row.lockedUntil) > new Date() && <Badge tone="error">bloqueada</Badge>}
         </div>
       ),
@@ -138,6 +177,7 @@ export function UsersPage() {
           )
         }
       />
+      <SignupMethodTiles />
       <Card flush>
         <div className="filters" style={{ padding: '14px 18px' }}>
           <input
@@ -162,6 +202,11 @@ export function UsersPage() {
             <option value="">Plataforma: todas</option>
             <option value="android">Usa o app Android</option>
             <option value="web">Usa a web</option>
+          </select>
+          <select className="select select--sm" value={values['signupMethod'] ?? ''} onChange={(event) => set({ signupMethod: event.target.value })} aria-label="Cadastro via">
+            <option value="">Cadastro: todos</option>
+            <option value="email">Cadastro normal (e-mail)</option>
+            <option value="google">Cadastro com Google</option>
           </select>
         </div>
         <DataTable

@@ -11,6 +11,7 @@ import { Icon } from '../components/Icon';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
 import { originContent, setChosenSegment } from '../lib/attribution';
+import { setupGoogle } from '../lib/google-signin';
 import { applyRememberedLogin, readRememberedLogin } from '../lib/remembered-login';
 import { clearPublicBrand, setBrand, useBrand } from '../lib/brand';
 import { fmtDate } from '../lib/format';
@@ -155,7 +156,96 @@ function useStripTokenFromUrl(): void {
   }, []);
 }
 
+/** Client ID do Google se o login com Google estiver ligado; `undefined` enquanto consulta. */
+function useGoogleClientId(): string | null | undefined {
+  const [clientId, setClientId] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void sessionApi.config().then((config) => {
+      if (alive) setClientId(config.googleClientId);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return clientId;
+}
+
+/**
+ * "Continuar com o Google" + divisor "ou com e-mail". Serve para entrar e para
+ * criar conta (a API decide: conta ligada, mesmo e-mail ou conta nova). Com o
+ * login com Google desligado na API, não aparece nada (nem o divisor).
+ * `oneTap`: oferece a conta Google já conectada no navegador (só no cadastro).
+ */
+export function GoogleSignIn({ oneTap = false }: { oneTap?: boolean }) {
+  const { loginWithGoogle, status } = useAuth();
+  const clientId = useGoogleClientId();
+  const slot = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!clientId || !slot.current) return undefined;
+    let cancelled = false;
+    const onCredential = async (credential: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await loginWithGoogle(credential, () => setWelcomePending(true));
+      } catch (caught) {
+        setError(caught);
+        setBusy(false);
+      }
+    };
+    setupGoogle(clientId, (credential) => void onCredential(credential))
+      .then((id) => {
+        if (cancelled || !slot.current) return;
+        // Desenhar de novo no mesmo lugar acumula botões: limpa antes.
+        slot.current.replaceChildren();
+        const width = Math.round(Math.min(400, Math.max(240, slot.current.offsetWidth)));
+        id.renderButton(slot.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          logo_alignment: 'center',
+          width,
+          locale: 'pt-BR',
+          click_listener: () => track('signup.google_clicked', { page: window.location.pathname }),
+        });
+        if (oneTap && status === 'guest') id.prompt();
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      window.google?.accounts.id.cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  if (clientId === null || failed) return null;
+  return (
+    <div className="google-signin">
+      {error !== null && (
+        <Notice tone="error">{error instanceof ApiError && error.code === 'AUTH_ACCOUNT_SUSPENDED' ? 'Esta conta está suspensa. Fale com o suporte.' : errorMessage(error)}</Notice>
+      )}
+      <div className="google-signin__slot" aria-busy={busy || undefined}>
+        <div ref={slot} className="google-signin__button" />
+        {busy && <Spinner label="Entrando com o Google…" />}
+      </div>
+      <div className="divider-or" role="separator" aria-label="ou com e-mail">
+        <span>ou com e-mail</span>
+      </div>
+    </div>
+  );
+}
+
 export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: string; aside?: BrandAside; companyName?: string | null }) {
+  const googleOn = Boolean(useGoogleClientId());
   const { login } = useAuth();
   const brand = useBrand();
   const redirect = useRedirectIfAuthed();
@@ -194,8 +284,14 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
 
   return (
     <AuthLayout aside={aside} title="Entrar" subtitle={(brand?.displayName ?? companyName) ? `Acesse o estoque de ${brand?.displayName ?? companyName} com a sua conta.` : 'Use a mesma conta do aplicativo.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
+      {!brandSlug && <GoogleSignIn />}
       <form className="stack" onSubmit={submit}>
-        {error && <Notice tone="error">{error}</Notice>}
+        {error && (
+          <Notice tone="error">
+            {error}
+            {googleOn && ' Se você criou a conta com o Google, use "Continuar com o Google".'}
+          </Notice>
+        )}
         <Field label="E-mail">
           <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" autoFocus={saved === null} required />
         </Field>
@@ -356,6 +452,7 @@ export function RegisterPage() {
   if (redirect) return redirect;
   return (
     <AuthLayout title="Criar conta" subtitle="Grátis, sem cartão. Seu estoque fica guardado na nuvem." footer={<>Já tem conta? <Link to="/entrar">Entrar</Link></>}>
+      <GoogleSignIn oneTap />
       <RegisterForm />
     </AuthLayout>
   );
@@ -384,7 +481,14 @@ const SEGMENT_OPTIONS: Array<{ key: string; label: string; example: string }> = 
  * tela sai e o nome passa a ser editado só no estoque.
  */
 export function WelcomePage() {
-  const { status, user } = useAuth();
+  const { status, user, reloadUser } = useAuth();
+  const fromGoogle = user?.signupMethod === 'google';
+  // Do Google vêm nome e e-mail: o nome aparece preenchido para conferir.
+  const [personName, setPersonName] = useState(user?.name ?? '');
+  useEffect(() => {
+    if (user && personName === '') setPersonName(user.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
   const { workspaces, loading, refresh, select } = useWorkspace();
   const navigate = useNavigate();
   const fromAd = originContent();
@@ -432,6 +536,10 @@ export function WelcomePage() {
     setBusy(true);
     setError(null);
     try {
+      if (fromGoogle && personName.trim() && personName.trim() !== user?.name) {
+        await api.patch('/v1/me', { name: personName.trim() });
+        await reloadUser().catch(() => undefined);
+      }
       if (chosen !== owned.name) await api.patch(`/v1/workspaces/${owned.id}`, { name: chosen });
       await refresh();
       track('onboarding.name_set', { segment });
@@ -444,9 +552,28 @@ export function WelcomePage() {
 
   const first = user?.name.trim().split(/\s+/)[0];
   return (
-    <AuthLayout title={first ? `Bem-vindo, ${first}!` : 'Bem-vindo!'} subtitle="Sua conta está pronta. Só uma pergunta antes de começar.">
+    <AuthLayout
+      title={first ? `Bem-vindo, ${first}!` : 'Bem-vindo!'}
+      subtitle={fromGoogle ? 'Sua conta foi criada com o Google. Confira os dados e diga o nome da empresa.' : 'Sua conta está pronta. Só uma pergunta antes de começar.'}
+    >
       <form className="stack" onSubmit={submit}>
         {error !== null && <Notice tone="error">{errorMessage(error)}</Notice>}
+        {fromGoogle && user && (
+          <>
+            <div className="welcome-account" aria-label="Conta Google conectada">
+              <span className="welcome-account__icon" aria-hidden="true">
+                <Icon name="check" size={16} />
+              </span>
+              <span>
+                <strong>Conta Google conectada</strong>
+                <span className="welcome-account__email">{user.email}</span>
+              </span>
+            </div>
+            <Field label="Seu nome">
+              <input className="input" value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={120} autoComplete="name" />
+            </Field>
+          </>
+        )}
         <Field label="Como se chama a sua empresa?">
           <input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder={`Ex.: ${example}`} autoFocus enterKeyHint="go" />
         </Field>

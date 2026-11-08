@@ -120,6 +120,7 @@ function ProfileCard() {
           <div className="row row--wrap" style={{ marginTop: 6, gap: 8 }}>
             <span style={{ overflowWrap: 'anywhere' }}>{user.email}</span>
             {user.emailVerified ? <Badge tone="success">Confirmado</Badge> : <Badge tone="warning">Não confirmado</Badge>}
+            {user.signupMethod === 'google' && <Badge tone="info">Entra com o Google</Badge>}
           </div>
           <p className="caption" style={{ marginTop: 4 }}>O e-mail é o seu acesso e não pode ser trocado por aqui. Se precisar mudar, fale com o suporte.</p>
         </div>
@@ -180,7 +181,9 @@ function PasswordRules({ password, email }: { password: string; email: string })
 }
 
 function PasswordCard() {
-  const { user } = useAuth();
+  const { user, reloadUser } = useAuth();
+  // Conta criada com o Google: ainda sem senha; aqui ela cria a primeira.
+  const noPassword = user?.hasPassword === false;
   const toast = useToast();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState('');
@@ -198,11 +201,12 @@ function PasswordCard() {
       await api.post('/v1/auth/change-password', { currentPassword: current, newPassword: next, revokeOtherSessions: revokeOthers });
       setCurrent('');
       setNext('');
+      if (noPassword) void reloadUser().catch(() => undefined);
       // A API mantém a sessão de quem trocou a senha e, se pedido, encerra as
       // outras. Se algum dia esta também cair, a próxima chamada leva a pessoa
       // de volta à tela de entrada, onde ela usa a senha nova.
       void queryClient.invalidateQueries({ queryKey: ['account'] });
-      toast.success(revokeOthers ? 'Senha alterada. Os outros aparelhos foram desconectados.' : 'Senha alterada.');
+      toast.success(noPassword ? 'Senha criada. Agora você também pode entrar com e-mail e senha.' : revokeOthers ? 'Senha alterada. Os outros aparelhos foram desconectados.' : 'Senha alterada.');
     } catch (caught) {
       setError(caught);
     } finally {
@@ -216,12 +220,19 @@ function PasswordCard() {
   const weak = apiError?.details.filter((detail) => detail.field === 'newPassword').map((detail) => detail.message).join(' ') || undefined;
 
   return (
-    <Card title="Senha" subtitle="A mesma senha vale em todas as plataformas: aplicativo Android, navegador e web app.">
+    <Card
+      title={noPassword ? 'Criar senha' : 'Senha'}
+      subtitle={
+        noPassword
+          ? 'Você entra com o Google. Se quiser, crie uma senha para entrar também com e-mail, inclusive no aplicativo Android.'
+          : 'A mesma senha vale em todas as plataformas: aplicativo Android, navegador e web app.'
+      }
+    >
       <form className="stack" onSubmit={submit}>
         {error !== null && !wrongCurrent && !weak && <Notice tone="error">{errorMessage(error)}</Notice>}
         <div className="form-grid">
-          <PasswordInput label="Senha atual" value={current} onChange={setCurrent} autoComplete="current-password" error={wrongCurrent} />
-          <PasswordInput label="Nova senha" value={next} onChange={setNext} autoComplete="new-password" error={weak} />
+          {!noPassword && <PasswordInput label="Senha atual" value={current} onChange={setCurrent} autoComplete="current-password" error={wrongCurrent} />}
+          <PasswordInput label={noPassword ? 'Senha' : 'Nova senha'} value={next} onChange={setNext} autoComplete="new-password" error={weak} />
         </div>
         <PasswordRules password={next} email={user?.email ?? ''} />
         <label className="checkbox">
@@ -232,8 +243,8 @@ function PasswordCard() {
           Este navegador continua conectado. {revokeOthers ? 'Nos outros lugares será preciso entrar de novo, com a senha nova.' : 'Os outros lugares continuam conectados até a sessão deles terminar.'}
         </p>
         <div className="row row--end">
-          <button type="submit" className="btn btn--primary" disabled={busy || current === '' || next === ''}>
-            {busy ? 'Alterando…' : 'Alterar senha'}
+          <button type="submit" className="btn btn--primary" disabled={busy || (!noPassword && current === '') || next === ''}>
+            {busy ? 'Salvando…' : noPassword ? 'Criar senha' : 'Alterar senha'}
           </button>
         </div>
       </form>
@@ -455,7 +466,8 @@ interface DeletionPreview {
 }
 
 function DeleteAccountCard() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const noPassword = user?.hasPassword === false;
   const toast = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -476,9 +488,12 @@ function DeleteAccountCard() {
   const others = owned.reduce((total, item) => total + item.otherMembers, 0);
 
   const remove = async () => {
-    if (password === '') throw new Error('Digite sua senha para confirmar.');
+    if (password === '') throw new Error(noPassword ? 'Digite o e-mail da conta para confirmar.' : 'Digite sua senha para confirmar.');
     if (owned.length > 0 && !closeWorkspaces) throw new Error('Marque a caixa para excluir também as empresas.');
-    const result = await api.delete<{ message: string; recoverableUntil: string }>('/v1/me', { password, ...(owned.length > 0 ? { closeWorkspaces: true } : {}) });
+    const result = await api.delete<{ message: string; recoverableUntil: string }>('/v1/me', {
+      ...(noPassword ? { confirmEmail: password } : { password }),
+      ...(owned.length > 0 ? { closeWorkspaces: true } : {}),
+    });
     toast.push(`Conta marcada para exclusão. Se mudar de ideia, fale com o suporte até ${fmtDate(result.recoverableUntil)}.`, { duration: 15_000 });
     // A API já encerrou todas as sessões; isto limpa o que sobrou no navegador.
     await logout().catch(() => undefined);
@@ -546,9 +561,15 @@ function DeleteAccountCard() {
               {others > 0 ? ` e ${others} ${others === 1 ? 'pessoa perde' : 'pessoas perdem'} o acesso` : ''}.
             </label>
           )}
-          <Field label="Sua senha" hint="Pedimos a senha para ter certeza de que é você.">
-            <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" maxLength={200} />
-          </Field>
+          {noPassword ? (
+            <Field label="E-mail da conta" hint={`Digite ${user?.email ?? 'o e-mail da conta'} para confirmar que é você.`}>
+              <input className="input" type="email" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="off" maxLength={320} />
+            </Field>
+          ) : (
+            <Field label="Sua senha" hint="Pedimos a senha para ter certeza de que é você.">
+              <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" maxLength={200} />
+            </Field>
+          )}
         </div>
       </ConfirmDialog>
     </Card>

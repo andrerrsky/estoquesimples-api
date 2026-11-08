@@ -21,6 +21,7 @@ export const AnalyticsEventName = {
 
   // Conta (emitidos pela API; o app pode emitir os de intenção)
   LANDING_VIEWED: 'landing.viewed',
+  SIGNUP_GOOGLE_CLICKED: 'signup.google_clicked',
   SIGNUP_STARTED: 'signup.started',
   ONBOARDING_VIEWED: 'onboarding.viewed',
   ONBOARDING_NAME_SET: 'onboarding.name_set',
@@ -114,7 +115,8 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'screen.viewed', source: 'app', description: 'Tela exibida.', properties: { screen: 'nome da Activity/tela' } },
   { name: 'signup.started', source: 'app', description: 'Usuário abriu o cadastro.' },
   { name: 'landing.viewed', source: 'app', description: 'Página inicial aberta (web, sem cookie).', properties: { utm_source: 'origem', utm_medium: 'meio', utm_campaign: 'campanha', utm_content: 'anúncio', has_click_id: 'boolean' } },
-  { name: 'user.registered', source: 'server', description: 'Conta criada.', properties: { origin: 'direto | convite', utm_campaign: 'campanha (cadastro web vindo de campanha)', has_click_id: 'boolean' } },
+  { name: 'signup.google_clicked', source: 'app', description: 'Tocou em "Continuar com o Google" (web).', properties: { page: 'caminho da tela' } },
+  { name: 'user.registered', source: 'server', description: 'Conta criada.', properties: { origin: 'direto | convite', method: 'google (ausente = e-mail e senha)', utm_campaign: 'campanha (cadastro web vindo de campanha)', has_click_id: 'boolean' } },
   { name: 'onboarding.viewed', source: 'app', description: 'Tela de boas-vindas pós-cadastro web exibida.', properties: { segment: 'segmento do anúncio, se houver' } },
   { name: 'onboarding.name_set', source: 'app', description: 'Deu nome à empresa nas boas-vindas.', properties: { segment: 'segmento escolhido ou do anúncio' } },
   { name: 'onboarding.name_skipped', source: 'app', description: 'Pulou o nome da empresa nas boas-vindas (fica "Minha empresa").', properties: { segment: 'segmento escolhido ou do anúncio' } },

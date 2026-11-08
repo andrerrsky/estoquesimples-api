@@ -18,6 +18,7 @@ export interface AuthActionDeps {
     login(email: string, password: string): Promise<AuthResult>;
     register(name: string, email: string, password: string): Promise<AuthResult>;
     handoff(code: string): Promise<AuthResult>;
+    google(credential: string): Promise<AuthResult & { isNew: boolean }>;
   };
   /** Sessão aberta com esta pessoa. */
   onAuthed(user: User): void;
@@ -38,6 +39,19 @@ export function createAuthActions(deps: AuthActionDeps) {
       const auth = await deps.sessionApi.register(name, email, password);
       deps.onAuthed(auth.user);
       deps.report('signup.completed', { method: 'email' });
+    },
+    /**
+     * "Continuar com o Google". Conta criada agora → `signup.completed` (vira
+     * `sign_up` no GA, com `method: google`); conta existente → login.
+     * `onNew` roda antes de a sessão valer na tela (marca as boas-vindas).
+     */
+    async loginWithGoogle(credential: string, onNew?: () => void): Promise<{ isNew: boolean }> {
+      const auth = await deps.sessionApi.google(credential);
+      deps.onAccountSwitch();
+      if (auth.isNew) onNew?.();
+      deps.onAuthed(auth.user);
+      deps.report(auth.isNew ? 'signup.completed' : 'auth.login', { method: 'google' });
+      return { isNew: auth.isNew };
     },
     async loginWithAppCode(code: string): Promise<void> {
       const auth = await deps.sessionApi.handoff(code);

@@ -3,6 +3,7 @@ import type { TokenService } from '../auth/jwt.js';
 import type { PurchaseTokenCipher } from '../crypto/purchase-token.js';
 import type { Database, DbHandle } from '../db/client.js';
 import type { Mailer } from '../email/mailer.js';
+import type { GoogleVerifier } from '../../modules/auth/google-identity.js';
 import type { Logger } from '../observability/logger.js';
 import type { PlayStoreClient } from '../../modules/billing/play-client.js';
 import type { FcmClient } from '../../modules/push/fcm-client.js';
@@ -43,6 +44,8 @@ export interface AppServices {
    * o identificador de correlação.
    */
   logger?: Logger;
+  /** Verificação do token do Google (substituível nos testes); ver modules/auth/google-identity.ts. */
+  googleVerifier?: GoogleVerifier;
 }
 
 /** Identidade autenticada, anexada à request pelo preHandler de autenticação. */

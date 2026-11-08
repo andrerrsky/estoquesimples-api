@@ -38,6 +38,7 @@ const userListItemSchema = z.object({
     })
     .nullable(),
   activated: z.boolean(),
+  signupMethod: z.enum(['email', 'google']),
 });
 
 const noteSchema = z.object({
@@ -107,6 +108,21 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
   );
 
   routes.get(
+    '/users/signup-methods',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Cadastros por método (e-mail × Google) e uso do botão do Google',
+        hide: true,
+        querystring: z.object({ days: z.coerce.number().int().min(1).max(365).default(30) }),
+        response: { 200: z.object({ days: z.number(), email: z.number(), google: z.number(), googleClicks: z.number(), googleLogins: z.number(), linked: z.number() }) },
+      },
+    },
+    async (request) => service.signupMethods(request.query.days),
+  );
+
+  routes.get(
     '/users',
     {
       preHandler: requireAdmin('viewer'),
@@ -122,6 +138,7 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
             .optional()
             .transform((value) => (value === undefined ? undefined : value === 'true')),
           platform: z.enum(['android', 'ios', 'web']).optional(),
+          signupMethod: z.enum(['email', 'google']).optional(),
           sort: z.enum(['createdAt', 'lastActivityAt', 'name', 'email']).optional(),
           order: z.enum(['asc', 'desc']).optional(),
         }),

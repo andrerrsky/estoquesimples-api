@@ -162,6 +162,12 @@ ninguém concede papel igual ou superior ao seu; proprietário só muda por
 transferência (antigo dono vira administrador); remover/suspender derruba
 sessões na mesma transação.
 
+**Google (web)**: `POST /v1/auth/web/google` troca o ID token do Google
+Identity Services por uma sessão web: entra pela conta ligada
+(`user_identities`), liga a uma conta com o mesmo e-mail confirmado pelo Google
+ou cria a conta sem senha (`password_hash` nulo, `signup_method = 'google'`).
+Detalhes e regras em [docs/login-google.md](docs/login-google.md).
+
 **Painel admin (cookie)**: identidade própria em `platform_admins` (owner >
 support > viewer). Cookie httpOnly, `SameSite=Strict`, assinado
 (`ADMIN_COOKIE_SECRET`), `path=/admin`; token opaco com hash em

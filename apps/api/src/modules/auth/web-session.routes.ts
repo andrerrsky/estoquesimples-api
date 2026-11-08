@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { requireAuth, resolveAuth } from '../../platform/http/authenticate.js';
-import { AppError, ErrorCode, forbidden, unauthorized } from '../../platform/http/errors.js';
+import { AppError, ErrorCode, forbidden, notFound, unauthorized } from '../../platform/http/errors.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { acceptInviteBodySchema, inviteTokenParamsSchema } from '../invites/invites.schemas.js';
 import { InvitesService } from '../invites/invites.service.js';
@@ -20,6 +20,7 @@ import {
   type AuthSuccess,
 } from './auth.schemas.js';
 import { signupAttributionSchema } from './signup-attribution.js';
+import { createGoogleVerifier } from './google-identity.js';
 
 export const WEB_CSRF_HEADER = 'x-requested-with';
 export const WEB_CSRF_VALUE = 'estoquesimples-web';
@@ -29,6 +30,9 @@ const COOKIE_PATH = '/v1/auth/web';
 const webAuthSchema = authSuccessSchema.omit({ refreshToken: true });
 /** Cadastro web: o do app mais a origem da visita (ver `signup-attribution.ts`). */
 const webRegisterBodySchema = registerBodySchema.extend({ attribution: signupAttributionSchema.optional() }).strict();
+const webGoogleBodySchema = z
+  .object({ credential: z.string().min(20).max(4096), device: deviceInfoSchema.optional(), attribution: signupAttributionSchema.optional() })
+  .strict();
 const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema, 429: errorSchema };
 
 /**
@@ -97,6 +101,43 @@ export async function registerWebSessionRoutes(app: FastifyInstance): Promise<vo
       assertSameSite(request);
       const auth = await service.login({ ...request.body, device: webDevice(request.body.device) }, requestMeta(request));
       return startSession(reply, auth);
+    },
+  );
+
+  // Configuração pública da tela de entrada: se "Continuar com o Google" está disponível.
+  routes.get(
+    '/web/config',
+    { schema: { tags: ['auth'], summary: 'Opções da tela de entrada da web', response: { 200: z.object({ googleClientId: z.string().nullable() }) } } },
+    async () => ({ googleClientId: app.services.env.GOOGLE_OAUTH_CLIENT_ID ?? null }),
+  );
+
+  routes.post(
+    '/web/google',
+    {
+      ...strictLimit,
+      schema: {
+        tags: ['auth'],
+        summary: 'Entrar ou criar conta com o Google (web)',
+        description:
+          'Recebe o ID token do Google Identity Services. Entra na conta ligada a essa conta Google, liga o Google a uma conta existente com o mesmo e-mail (confirmado pelo Google) ou cria a conta sem senha. `isNew` = conta criada agora (a web abre as boas-vindas).',
+        body: webGoogleBodySchema,
+        response: { 200: webAuthSchema.extend({ isNew: z.boolean() }), ...errors, 404: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      assertSameSite(request);
+      const clientId = app.services.env.GOOGLE_OAUTH_CLIENT_ID;
+      if (!clientId) throw notFound('Recurso não encontrado');
+      const verifier = app.services.googleVerifier ?? createGoogleVerifier(clientId);
+      const profile = await verifier(request.body.credential);
+      const meta = requestMeta(request);
+      const { auth, isNew } = await service.loginWithGoogle(
+        profile,
+        { device: webDevice(request.body.device), ...(request.body.attribution ? { attribution: request.body.attribution } : {}) },
+        meta,
+      );
+      if (isNew) await startWebOnboarding(app.services, auth, meta);
+      return reply.send({ ...startSession(reply, auth), isNew });
     },
   );
 

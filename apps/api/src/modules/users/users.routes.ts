@@ -48,6 +48,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
             emailVerified: z.boolean(),
             status: z.string(),
             createdAt: z.string(),
+            hasPassword: z.boolean(),
+            signupMethod: z.enum(['email', 'google']),
           }),
           ...commonErrors,
         },
@@ -66,6 +68,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         emailVerified: user.emailVerifiedAt !== null,
         status: user.status,
         createdAt: user.createdAt.toISOString(),
+        hasPassword: user.passwordHash !== null,
+        signupMethod: user.signupMethod === 'google' ? ('google' as const) : ('email' as const),
       };
     },
   );
@@ -438,7 +442,10 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         security: [{ bearerAuth: [] }],
         body: z
           .object({
-            password: z.string().min(1).max(200),
+            /** Obrigatória para quem tem senha. */
+            password: z.string().min(1).max(200).optional(),
+            /** Contas sem senha (criadas com o Google) confirmam digitando o próprio e-mail. */
+            confirmEmail: z.string().trim().max(320).optional(),
             /** Exclui também as empresas de que a pessoa é dona (ver GET /me/deletion-preview). */
             closeWorkspaces: z.boolean().optional(),
           })
@@ -455,9 +462,13 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       const user = rows[0];
       if (!user) throw notFound('Usuário não encontrado.');
 
-      const ok = await verifyPassword(user.passwordHash, request.body.password);
-      if (!ok) {
-        throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
+      if (user.passwordHash) {
+        const ok = request.body.password ? await verifyPassword(user.passwordHash, request.body.password) : false;
+        if (!ok) throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
+      } else if ((request.body.confirmEmail ?? '').toLowerCase() !== user.email.toLowerCase()) {
+        throw new AppError(400, ErrorCode.VALIDATION_FAILED, 'Digite o e-mail da conta para confirmar.', {
+          details: [{ field: 'confirmEmail', message: 'Digite o e-mail da conta para confirmar.' }],
+        });
       }
 
       // Dono de empresa: sem `closeWorkspaces` recebe 409 LAST_OWNER com a

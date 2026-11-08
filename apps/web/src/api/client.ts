@@ -364,6 +364,8 @@ export async function download(path: string, filename: string, query?: QueryPara
 // Entrada e saída da sessão
 // ---------------------------------------------------------------------------
 
+let webConfig: Promise<{ googleClientId: string | null }> | null = null;
+
 export const sessionApi = {
   async login(email: string, password: string): Promise<WebAuth> {
     const auth = await parse<WebAuth>(await rawFetch('POST', '/v1/auth/web/login', { email, password, device: deviceInfo() }, CSRF));
@@ -378,6 +380,26 @@ export const sessionApi = {
     );
     setSession(auth);
     return auth;
+  },
+  /**
+   * "Continuar com o Google": troca o ID token do Google por uma sessão. A
+   * sessão só é aplicada depois de `beforeApply(isNew)` (a tela marca as
+   * boas-vindas antes de a navegação reagir à entrada).
+   */
+  async google(credential: string): Promise<WebAuth & { isNew: boolean }> {
+    const attribution = signupAttribution();
+    const auth = await parse<WebAuth & { isNew: boolean }>(
+      await rawFetch('POST', '/v1/auth/web/google', { credential, device: deviceInfo(), ...(attribution ? { attribution } : {}) }, CSRF),
+    );
+    setSession(auth);
+    return auth;
+  },
+  /** Opções públicas da tela de entrada (Client ID do Google, se ligado). Em cache por página. */
+  config(): Promise<{ googleClientId: string | null }> {
+    webConfig ??= rawFetch('GET', '/v1/auth/web/config')
+      .then((response) => parse<{ googleClientId: string | null }>(response))
+      .catch(() => ({ googleClientId: null }));
+    return webConfig;
   },
   /** Código de uso único vindo do app ("Abrir na web"): vira uma sessão web própria. */
   async handoff(code: string): Promise<WebAuth> {

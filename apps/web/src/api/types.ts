@@ -10,6 +10,9 @@ export interface User {
   emailVerified: boolean;
   status?: string;
   createdAt: string;
+  /** Contas criadas com o Google não têm senha até criarem uma. */
+  hasPassword?: boolean;
+  signupMethod?: 'email' | 'google';
 }
 
 export interface WebAuth {
