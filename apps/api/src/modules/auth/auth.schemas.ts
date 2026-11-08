@@ -74,7 +74,8 @@ export const resetPasswordBodySchema = z
 
 export const changePasswordBodySchema = z
   .object({
-    currentPassword: passwordSchema,
+    /** Vazia só para contas sem senha (criadas com o Google), que criam a primeira. */
+    currentPassword: z.string().max(200).default(''),
     newPassword: passwordSchema,
     // Por padrão desloga os outros aparelhos: se a troca foi motivada por
     // suspeita de acesso indevido, manter as outras sessões vivas anularia o efeito.
@@ -94,6 +95,9 @@ export const userPublicSchema = z.object({
   name: z.string(),
   emailVerified: z.boolean(),
   createdAt: z.string(),
+  /** Contas criadas com o Google não têm senha (até criarem uma). */
+  hasPassword: z.boolean(),
+  signupMethod: z.enum(['email', 'google']),
 });
 
 export const authSuccessSchema = z.object({

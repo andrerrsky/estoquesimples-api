@@ -172,7 +172,7 @@ describe('CSP da web', () => {
     for (const host of ['https://www.google.com', 'https://*.g.doubleclick.net', 'https://www.googleadservices.com', 'https://analytics.google.com']) {
       expect(connect).toContain(host);
     }
-    expect(csp).toContain("script-src 'self' https://www.googletagmanager.com;");
+    expect(csp).toContain("script-src 'self' https://www.googletagmanager.com https://accounts.google.com;");
   });
 });
 

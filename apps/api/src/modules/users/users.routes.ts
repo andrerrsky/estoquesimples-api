@@ -19,6 +19,7 @@ import { deviceInfoSchema, errorSchema, messageSchema } from '../auth/auth.schem
 import { requestMeta } from '../auth/auth.routes.js';
 import { ACCOUNT_RECOVERY_DAYS } from '../privacy/privacy.service.js';
 import { AccountClosureService } from './account-closure.service.js';
+import { createGoogleVerifier } from '../auth/google-identity.js';
 
 const commonErrors = {
   400: errorSchema,
@@ -48,6 +49,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
             emailVerified: z.boolean(),
             status: z.string(),
             createdAt: z.string(),
+            hasPassword: z.boolean(),
+            signupMethod: z.enum(['email', 'google']),
           }),
           ...commonErrors,
         },
@@ -66,6 +69,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         emailVerified: user.emailVerifiedAt !== null,
         status: user.status,
         createdAt: user.createdAt.toISOString(),
+        hasPassword: user.passwordHash !== null,
+        signupMethod: user.signupMethod === 'google' ? ('google' as const) : ('email' as const),
       };
     },
   );
@@ -438,7 +443,10 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
         security: [{ bearerAuth: [] }],
         body: z
           .object({
-            password: z.string().min(1).max(200),
+            /** Obrigatória para quem tem senha. */
+            password: z.string().min(1).max(200).optional(),
+            /** Contas sem senha (criadas com o Google) confirmam entrando de novo com o Google (ID token). */
+            googleCredential: z.string().min(20).max(4096).optional(),
             /** Exclui também as empresas de que a pessoa é dona (ver GET /me/deletion-preview). */
             closeWorkspaces: z.boolean().optional(),
           })
@@ -455,9 +463,22 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       const user = rows[0];
       if (!user) throw notFound('Usuário não encontrado.');
 
-      const ok = await verifyPassword(user.passwordHash, request.body.password);
-      if (!ok) {
-        throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
+      if (user.passwordHash) {
+        const ok = request.body.password ? await verifyPassword(user.passwordHash, request.body.password) : false;
+        if (!ok) throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha incorreta.');
+      } else {
+        // Sem senha: prova de identidade = entrar de novo com a mesma conta Google.
+        const clientId = app.services.env.GOOGLE_OAUTH_CLIENT_ID;
+        if (!request.body.googleCredential || !clientId) {
+          throw new AppError(400, ErrorCode.VALIDATION_FAILED, 'Confirme com o Google para excluir a conta.');
+        }
+        const profile = await (app.services.googleVerifier ?? createGoogleVerifier(clientId))(request.body.googleCredential);
+        const linked = await db.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM user_identities WHERE user_id = ${user.id} AND provider = 'google' AND provider_user_id = ${profile.sub}`,
+        );
+        if ((linked.rows[0]?.n ?? 0) === 0) {
+          throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Use a mesma conta Google desta conta.');
+        }
       }
 
       // Dono de empresa: sem `closeWorkspaces` recebe 409 LAST_OWNER com a

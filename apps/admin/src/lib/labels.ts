@@ -206,6 +206,7 @@ export const JOB_KIND: Record<string, string> = {
 export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'user.registered': { label: 'Conta criada', tone: 'success' },
   'user.logged_in': { label: 'Login', tone: 'neutral' },
+  'user.google_linked': { label: 'Conta Google vinculada', tone: 'info' },
   'user.login_failed': { label: 'Senha incorreta', tone: 'warning' },
   'user.account_locked': { label: 'Conta bloqueada por tentativas', tone: 'error' },
   'user.logged_out': { label: 'Logout', tone: 'neutral' },

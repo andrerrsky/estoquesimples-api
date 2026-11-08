@@ -36,6 +36,7 @@ import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
 import type { AuthSuccess, DeviceInfo } from './auth.schemas.js';
 import { attributionEventProperties, attributionToStore, type SignupAttribution } from './signup-attribution.js';
+import type { GoogleProfile } from './google-identity.js';
 
 export interface RequestMeta {
   ipAddress: string | null;
@@ -252,7 +253,9 @@ export class AuthService {
       throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'E-mail ou senha incorretos.');
     }
 
-    const passwordOk = await verifyPassword(user.passwordHash, input.password);
+    // Conta sem senha (criada com o Google): mesma resposta e mesmo custo de
+    // uma senha errada, para não revelar como a conta foi criada.
+    const passwordOk = user.passwordHash ? await verifyPassword(user.passwordHash, input.password) : (await verifyPasswordDummy(input.password), false);
     if (!passwordOk) {
       const lockSeconds = this.services.throttle.fail('login', input.email, ip);
       await this.registerFailedLogin(user.id, user.failedLoginAttempts + 1, lockSeconds, meta);
@@ -307,6 +310,160 @@ export class AuthService {
       properties: { platform: input.device?.platform ?? null },
     });
     return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // Continuar com o Google (web)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Entra, cria a conta ou liga o Google a uma conta existente, a partir do
+   * perfil já verificado (`google-identity.ts`). Sem duplicar contas:
+   *
+   * 1. Conta Google já ligada → entra nessa conta.
+   * 2. Senão, conta viva com o mesmo e-mail → liga o Google a ela e entra
+   *    (o Google garantiu que o e-mail é da pessoa; o e-mail fica confirmado).
+   *    `signup_method` continua o original.
+   * 3. Senão, cria a conta sem senha, com o e-mail já confirmado e
+   *    `signup_method = 'google'`.
+   *
+   * Duas entradas simultâneas da mesma conta Google na primeira vez: as
+   * restrições únicas do banco barram a segunda, que tenta de novo e cai no
+   * caso 1 ou 2.
+   */
+  async loginWithGoogle(
+    profile: GoogleProfile,
+    input: { device?: DeviceInfo; attribution?: SignupAttribution },
+    meta: RequestMeta,
+  ): Promise<{ auth: AuthSuccess; isNew: boolean; linked: boolean }> {
+    // E-mail sempre em minúsculas: é como a unicidade de `users` compara.
+    const normalized = { ...profile, email: profile.email.trim().toLowerCase() };
+    try {
+      return await this.googleOnce(normalized, input, meta);
+    } catch (error) {
+      if (isUniqueViolation(error)) return this.googleOnce(normalized, input, meta);
+      throw error;
+    }
+  }
+
+  private async googleOnce(
+    profile: GoogleProfile,
+    input: { device?: DeviceInfo; attribution?: SignupAttribution },
+    meta: RequestMeta,
+  ): Promise<{ auth: AuthSuccess; isNew: boolean; linked: boolean }> {
+    const attribution = attributionToStore(input.attribution, new Date());
+    const outcome = await this.db.transaction(async (tx) => {
+      const byIdentity = await tx.execute<{ id: string }>(sql`
+        SELECT u.id FROM user_identities i JOIN users u ON u.id = i.user_id
+        WHERE i.provider = 'google' AND i.provider_user_id = ${profile.sub} AND u.deleted_at IS NULL
+        LIMIT 1
+      `);
+      let userId = byIdentity.rows[0]?.id ?? null;
+      let isNew = false;
+      let linked = false;
+
+      if (!userId) {
+        const byEmail = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(sql`lower(${users.email}) = ${profile.email}`, isNull(users.deletedAt)))
+          .limit(1);
+        userId = byEmail[0]?.id ?? null;
+        if (userId) {
+          linked = true;
+        } else {
+          const inserted = await tx
+            .insert(users)
+            .values({
+              email: profile.email,
+              name: profile.name,
+              passwordHash: null,
+              signupMethod: 'google',
+              emailVerifiedAt: new Date(),
+              signupAttribution: attribution,
+            })
+            .returning({ id: users.id });
+          userId = inserted[0]!.id;
+          isNew = true;
+        }
+        // Vínculo de conta já excluída não pode prender a conta Google.
+        await tx.execute(sql`
+          DELETE FROM user_identities i USING users u
+          WHERE i.user_id = u.id AND u.deleted_at IS NOT NULL AND i.provider = 'google' AND i.provider_user_id = ${profile.sub}
+        `);
+        // Liga a conta Google. Se esta conta já tinha outra conta Google com o
+        // mesmo e-mail (conta Google recriada), passa a valer a atual.
+        await tx.execute(sql`
+          INSERT INTO user_identities (user_id, provider, provider_user_id, email)
+          VALUES (${userId}, 'google', ${profile.sub}, ${profile.email})
+          ON CONFLICT (user_id, provider) DO UPDATE SET provider_user_id = EXCLUDED.provider_user_id, email = EXCLUDED.email, last_login_at = now()
+        `);
+        if (linked) {
+          await tx.update(users).set({ emailVerifiedAt: sql`COALESCE(${users.emailVerifiedAt}, now())` }).where(eq(users.id, userId));
+          await recordAudit(tx, {
+            actorUserId: userId,
+            action: AuditAction.USER_GOOGLE_LINKED,
+            entityType: 'user',
+            entityId: userId,
+            ipAddress: meta.ipAddress,
+            userAgent: meta.userAgent,
+          });
+        }
+      } else {
+        await tx.execute(sql`
+          UPDATE user_identities SET last_login_at = now(), email = ${profile.email}
+          WHERE provider = 'google' AND provider_user_id = ${profile.sub}
+        `);
+      }
+
+      const found = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      const user = found[0]!;
+      return { user, isNew, linked };
+    });
+
+    const { user, isNew, linked } = outcome;
+    if (user.status === 'suspended') {
+      await this.recordLoginDenied(user.id, 'conta_suspensa', meta);
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
+    }
+    if (user.status === 'pending_deletion') {
+      await this.recordLoginDenied(user.id, 'exclusao_pendente', meta);
+      throw new AppError(
+        403,
+        ErrorCode.AUTH_ACCOUNT_DELETION_PENDING,
+        'A exclusão desta conta foi solicitada. Para recuperá-la dentro do prazo, fale com o suporte.',
+      );
+    }
+
+    const auth = await this.db.transaction(async (tx) => {
+      await tx.update(users).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(users.id, user.id));
+      const deviceId = input.device ? await this.upsertDevice(tx, user.id, input.device, meta) : null;
+      const session = await this.issueSession(tx, { userId: user.id, deviceId, meta });
+      await recordAudit(tx, {
+        actorUserId: user.id,
+        actorDeviceId: deviceId,
+        action: isNew ? AuditAction.USER_REGISTERED : AuditAction.USER_LOGGED_IN,
+        entityType: 'user',
+        entityId: user.id,
+        metadata: { method: 'google' },
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+      return this.buildAuthSuccess(user, session, deviceId);
+    });
+
+    const platform = input.device?.platform ?? null;
+    if (isNew) {
+      await trackServerEvent(this.services, {
+        name: 'user.registered',
+        userId: user.id,
+        deviceId: auth.deviceId,
+        properties: { origin: 'direto', platform, method: 'google', ...attributionEventProperties(attribution) },
+      });
+    } else {
+      await trackServerEvent(this.services, { name: 'user.logged_in', userId: user.id, deviceId: auth.deviceId, properties: { platform, method: 'google', linked } });
+    }
+    return { auth, isNew, linked };
   }
 
   // -------------------------------------------------------------------------
@@ -671,13 +828,14 @@ export class AuthService {
     // limite por e-mail, só não manda outro link.
     if (this.services.throttle.hit('reset', email, this.env.EMAIL_ACTION_MAX_PER_HOUR, 3600) > 0) return;
     const found = await this.db
-      .select({ id: users.id, email: users.email, name: users.name })
+      .select({ id: users.id, email: users.email, name: users.name, passwordHash: users.passwordHash })
       .from(users)
       .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.deletedAt)))
       .limit(1);
 
     const user = found[0];
     if (!user) return;
+    const googleOnly = user.passwordHash === null;
 
     const token = generateToken();
     const expiresAt = addMinutes(new Date(), this.env.PASSWORD_RESET_TTL_MINUTES);
@@ -709,10 +867,13 @@ export class AuthService {
     await this.services.mailer.send({
       to: user.email,
       kind: 'password_reset',
-      subject: 'Redefinição de senha - Estoque Simples',
+      subject: googleOnly ? 'Sua conta usa o Google para entrar - Estoque Simples' : 'Redefinição de senha - Estoque Simples',
       text:
         `Olá, ${user.name}.\n\n` +
-        `Use o código abaixo para redefinir sua senha. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n` +
+        (googleOnly
+          ? 'Sua conta do Estoque Simples foi criada com o Google e ainda não tem senha. Para entrar, toque em "Continuar com o Google" na tela de entrada.\n\n' +
+            `Se preferir entrar também com e-mail e senha (por exemplo, no aplicativo Android), crie uma senha com o código abaixo. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n`
+          : `Use o código abaixo para redefinir sua senha. Ele vale por ${this.env.PASSWORD_RESET_TTL_MINUTES} minutos e só pode ser usado uma vez.\n\n`) +
         `${token}\n\n` +
         webLink(this.env.WEB_APP_URL, `/redefinir-senha?token=${encodeURIComponent(token)}`, 'Ou redefina pelo navegador') +
         'Se você não pediu isso, ignore este e-mail: sua senha continua a mesma.',
@@ -794,9 +955,12 @@ export class AuthService {
     const user = found[0];
     if (!user) throw unauthorized(ErrorCode.AUTH_REQUIRED, 'Sessão inválida.');
 
-    const ok = await verifyPassword(user.passwordHash, input.currentPassword);
-    if (!ok) {
-      throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha atual incorreta.');
+    // Conta sem senha (criada com o Google): a sessão aberta basta para criar a primeira.
+    if (user.passwordHash) {
+      const ok = await verifyPassword(user.passwordHash, input.currentPassword);
+      if (!ok) {
+        throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Senha atual incorreta.');
+      }
     }
 
     const policy = checkPasswordPolicy(input.newPassword, user.email);
@@ -1062,6 +1226,8 @@ export class AuthService {
       name: user.name,
       emailVerified: user.emailVerifiedAt !== null,
       createdAt: user.createdAt.toISOString(),
+      hasPassword: user.passwordHash !== null,
+      signupMethod: user.signupMethod === 'google' ? ('google' as const) : ('email' as const),
     };
   }
 }
@@ -1109,4 +1275,16 @@ export async function bumpPermissionVersion(tx: Transaction, userId: string): Pr
  */
 export function webLink(baseUrl: string | undefined, path: string, label: string): string {
   return baseUrl ? `${label}: ${baseUrl}${path}\n\n` : '';
+}
+
+/** Violação de restrição única do Postgres (23505), também quando embrulhada pelo driver. */
+function isUniqueViolation(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    if ((current as { code?: string }).code === '23505') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }

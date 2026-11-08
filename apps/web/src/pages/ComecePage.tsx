@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Icon, Logo } from '../components/Icon';
 import { segmentContent } from '../lib/attribution';
 import { landingTitleFor, PLAY_RATING } from './LandingPage';
-import { RegisterForm, useRedirectIfAuthed } from './AuthPages';
+import { SignupChoices, useRedirectIfAuthed } from './AuthPages';
 import '../styles/comece.css';
 
 /**
@@ -79,7 +79,7 @@ export function ComecePage() {
             Crie sua conta grátis
           </h2>
           <p className="comece__card-sub">Sem cartão de crédito. Leva menos de um minuto.</p>
-          <RegisterForm autoFocus={false} submitLabel="Criar conta grátis" />
+          <SignupChoices autoFocus={false} submitLabel="Criar conta grátis" />
         </section>
 
         <section className="comece__shot" aria-hidden="true">

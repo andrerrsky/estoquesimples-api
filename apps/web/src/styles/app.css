@@ -705,7 +705,8 @@ button {
 
 .input::placeholder,
 .textarea::placeholder {
-  color: var(--text-faint);
+  /* ≥ 4,5:1 sobre o branco do campo (o --text-faint ficava em ~2,9:1). */
+  color: #6b7886;
 }
 .input:hover,
 .select:hover,
@@ -2215,8 +2216,21 @@ button {
   flex-wrap: wrap;
   gap: 8px;
 }
+.segment-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.segment-field > legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
 .segment-picker__chip {
-  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
   padding: 8px 14px;
   border: 1.5px solid var(--border);
   border-radius: 999px;
@@ -2237,4 +2251,95 @@ button {
 .segment-picker__chip:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+/* "Continuar com o Google" (botão oficial do Google) e o divisor "ou com e-mail". */
+.google-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.google-signin__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.google-signin__button {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 400px;
+  /* Altura fixa: enquanto o script do Google carrega ele desenha um botão
+     provisório e o definitivo por baixo; sem isto a página "pula". */
+  height: 44px;
+  overflow: hidden;
+}
+.google-signin__slot[aria-busy='true'] .google-signin__button {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.divider-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+.divider-or::before,
+.divider-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Boas-vindas de quem entrou com o Google: a conta conectada, para conferir. */
+.welcome-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--fs-supporting);
+}
+.welcome-account__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: #fff;
+}
+.welcome-account__who {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.welcome-app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.welcome-account__email {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.google-signin__note {
+  margin: -4px 0 0;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+  color: var(--text-muted);
+  text-align: center;
 }

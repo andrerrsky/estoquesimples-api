@@ -8,6 +8,7 @@ import type { Database, Transaction } from '../../platform/db/client.js';
 export const AuditAction = {
   USER_REGISTERED: 'user.registered',
   USER_LOGGED_IN: 'user.logged_in',
+  USER_GOOGLE_LINKED: 'user.google_linked',
   USER_LOGIN_FAILED: 'user.login_failed',
   USER_ACCOUNT_LOCKED: 'user.account_locked',
   USER_LOGGED_OUT: 'user.logged_out',
@@ -74,6 +75,7 @@ export const AuditAction = {
 export const SECURITY_USER_ACTIONS: readonly AuditActionValue[] = [
   AuditAction.USER_REGISTERED,
   AuditAction.USER_LOGGED_IN,
+  AuditAction.USER_GOOGLE_LINKED,
   AuditAction.USER_LOGIN_FAILED,
   AuditAction.USER_ACCOUNT_LOCKED,
   AuditAction.USER_LOGIN_BLOCKED,

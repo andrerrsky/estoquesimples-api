@@ -42,13 +42,18 @@ const GA_BEACONS = [
   'https://www.googleadservices.com',
 ].join(' ');
 
+// "Continuar com o Google" (Google Identity Services): script, folha de
+// estilo, botão (iframe) e One Tap vêm de accounts.google.com.
+const GOOGLE_SIGN_IN = 'https://accounts.google.com';
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' ${GA_SCRIPT}`,
-  "style-src 'self' 'unsafe-inline'",
+  `script-src 'self' ${GA_SCRIPT} ${GOOGLE_SIGN_IN}`,
+  `style-src 'self' 'unsafe-inline' ${GOOGLE_SIGN_IN}`,
   `img-src 'self' data: blob: ${GA_BEACONS}`,
   "font-src 'self'",
-  `connect-src 'self' ${GA_BEACONS}`,
+  `connect-src 'self' ${GA_BEACONS} ${GOOGLE_SIGN_IN}`,
+  `frame-src ${GOOGLE_SIGN_IN}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

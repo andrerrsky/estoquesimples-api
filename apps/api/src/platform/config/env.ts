@@ -147,6 +147,12 @@ const envSchema = z
      */
     ADS_UPLOAD_PASSWORD: z.string().min(24).optional(),
     /**
+     * Client ID do Google (OAuth, tipo "Aplicativo da Web") para "Continuar com
+     * o Google" na web. Não é segredo: vai também para a página. Sem ele, o
+     * botão não aparece e a rota responde 404.
+     */
+    GOOGLE_OAUTH_CLIENT_ID: z.string().regex(/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/).optional(),
+    /**
      * E-mails do ciclo de vida (modules/lifecycle). `dry_run` (padrão) decide
      * e registra quem receberia o quê, sem enviar; `send` envia; `off` não
      * roda. Só passar para `send` com o webhook do Resend configurado.

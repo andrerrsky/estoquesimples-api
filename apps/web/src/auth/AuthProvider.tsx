@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [status]);
 
-  const { login, register, loginWithAppCode } = useMemo(
+  const { login, register, loginWithAppCode, loginWithGoogle } = useMemo(
     () =>
       createAuthActions({
         sessionApi,
@@ -96,8 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, login, register, logout, reloadUser, loginWithAppCode }),
-    [status, user, login, register, logout, reloadUser, loginWithAppCode],
+    () => ({ status, user, login, register, logout, reloadUser, loginWithAppCode, loginWithGoogle }),
+    [status, user, login, register, logout, reloadUser, loginWithAppCode, loginWithGoogle],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

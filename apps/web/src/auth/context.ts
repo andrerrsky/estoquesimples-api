@@ -12,6 +12,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   /** Entra com o código de uso único que o app manda ao abrir a web. */
   loginWithAppCode: (code: string) => Promise<void>;
+  loginWithGoogle: (credential: string, onNew?: () => void) => Promise<{ isNew: boolean }>;
   /** Relê o perfil (nome alterado, e-mail confirmado). */
   reloadUser: () => Promise<void>;
 }
