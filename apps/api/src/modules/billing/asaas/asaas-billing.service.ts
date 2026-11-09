@@ -14,6 +14,7 @@ import type { AppServices } from '../../../platform/http/context.js';
 import { AppError, ErrorCode, conflict, notFound } from '../../../platform/http/errors.js';
 import { recordBillingEvent } from '../../../platform/observability/metrics.js';
 import { trackServerEvent } from '../../analytics/analytics.service.js';
+import { enqueueSubscriptionAlert } from '../subscription-alerts.js';
 import { AuditAction, recordAudit } from '../../audit/audit.service.js';
 import type { RequestMeta } from '../../auth/auth.service.js';
 import { NotificationService, NotificationType } from '../../notifications/notifications.service.js';
@@ -529,7 +530,7 @@ export class AsaasBillingService {
           entityType: 'subscription',
           entityId: current.id,
           metadata: { provider: 'asaas', from: previousState, to: derived.state },
-        });
+        });        await enqueueSubscriptionAlert(tx, { subscriptionId: current.id, from: previousState, to: derived.state });
       }
     });
 

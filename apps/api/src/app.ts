@@ -21,6 +21,7 @@ import { HttpAsaasClient, type AsaasClient } from './modules/billing/asaas/asaas
 import { registerAsaasJobs } from './modules/billing/asaas/asaas.jobs.js';
 import { registerPushJobs } from './modules/push/push.jobs.js';
 import { registerSupportJobs } from './modules/support/support.jobs.js';
+import { registerSubscriptionAlertJobs } from './modules/billing/subscription-alerts.js';
 import { registerImageJobs } from './modules/images/images.jobs.js';
 import { registerOnboardingJobs } from './modules/workspaces/onboarding.js';
 import { registerLifecycleJobs } from './modules/lifecycle/lifecycle.jobs.js';
@@ -112,6 +113,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
   registerPrivacyJobs(services);
   registerAsaasJobs(services);
   registerSupportJobs(services);
+  registerSubscriptionAlertJobs(services);
   registerImageJobs(services);
   registerOnboardingJobs(services);
   registerLifecycleJobs(services);

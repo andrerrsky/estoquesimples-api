@@ -116,14 +116,42 @@ function ignorable(message: string): boolean {
   return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ResizeObserver loop|Load failed$/i.test(message);
 }
 
+/** Erro de script de outro domínio, que o navegador esconde por segurança (mensagem genérica, sem arquivo). */
+export function isOpaqueCrossOriginError(message: string, filename?: string | null): boolean {
+  if (!/^(Uncaught )?Script error\.?$/i.test(message.trim())) return false;
+  if (!filename) return true;
+  try {
+    return new URL(filename, window.location.href).origin !== window.location.origin;
+  } catch {
+    return true;
+  }
+}
+
 export function installGlobalErrorReporting(): void {
   if (typeof window === 'undefined') return;
   window.addEventListener('error', (event) => {
     // Erro de recurso (imagem, script de terceiro) não tem `error`; só exceções.
     if (!event.error && !event.message) return;
+    // "Script error." sem detalhe é o que o navegador entrega quando quem falhou
+    // foi um script de OUTRO domínio: os que navegadores embutidos (Facebook,
+    // Instagram, TikTok) injetam na página, extensões, anúncios. Não há o que
+    // corrigir nem como saber o que foi, então não vira registro.
+    if (!event.error && isOpaqueCrossOriginError(String(event.message), event.filename)) return;
     const message = event.error instanceof Error ? event.error.message : String(event.message);
     if (ignorable(message)) return;
-    reportException(event.error ?? new Error(message));
+    if (event.error) {
+      reportException(event.error);
+      return;
+    }
+    // Sem objeto de erro: a pilha seria a deste arquivo, não a de quem falhou.
+    // Vai o arquivo, a linha e a coluna que o navegador informou.
+    reportError({
+      kind: 'exception',
+      code: 'Error',
+      message,
+      stack: null,
+      context: { file: (event.filename || '').slice(0, 300) || null, line: event.lineno || null, column: event.colno || null },
+    });
   });
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason as unknown;

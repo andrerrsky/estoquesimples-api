@@ -3,6 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { addCycle, deriveAsaasState, todayBrazil } from '../../src/modules/billing/asaas/asaas-state.js';
 import { documentType } from '../../src/modules/billing/asaas/document.js';
+import { SUBSCRIPTION_ADMIN_ALERT_JOB, sendSubscriptionAlert, subscriptionAlertKind } from '../../src/modules/billing/subscription-alerts.js';
+import { hashPassword } from '../../src/platform/auth/password.js';
+import { platformAdmins } from '../../src/platform/db/schema/index.js';
 import { AppError, ErrorCode } from '../../src/platform/http/errors.js';
 import { createTestApp, registerUser, resetDatabase, type RegisteredUser, type TestContext } from '../helpers/test-app.js';
 
@@ -249,5 +252,46 @@ describe('assinatura pela web (Asaas)', () => {
     await context.services.db.execute(sql`UPDATE plans SET web_price_monthly_cents = NULL, web_price_yearly_cents = NULL WHERE key = 'basico'`);
     expect((await overview(owner, ws)).checkoutAvailable).toBe(false);
     expect((await checkout(owner, ws)).statusCode).toBe(409);
+  });
+});
+
+describe('aviso aos administradores de assinatura confirmada', () => {
+  it('decide quando avisar: nova, reativada e nunca em renovação', () => {
+    expect(subscriptionAlertKind('pendente', 'ativa')).toBe('nova');
+    expect(subscriptionAlertKind(null, 'ativa')).toBe('nova');
+    expect(subscriptionAlertKind('suspensa', 'ativa')).toBe('reativada');
+    expect(subscriptionAlertKind('ativa', 'ativa')).toBeNull();
+    expect(subscriptionAlertKind('carencia', 'ativa')).toBeNull();
+    expect(subscriptionAlertKind('pendente', 'suspensa')).toBeNull();
+  });
+
+  it('pagamento confirmado enfileira um aviso, que vai só para os admins owner e não se repete', async () => {
+    await context.services.db.insert(platformAdmins).values([
+      { email: 'Dono@Exemplo.com.br', name: 'Dono', passwordHash: await hashPassword('PainelSeguro#2026'), role: 'owner' },
+      { email: 'suporte@exemplo.com.br', name: 'Suporte', passwordHash: await hashPassword('PainelSeguro#2026'), role: 'support' },
+    ]);
+    const owner = await registerUser(context);
+    const ws = await criarEmpresa(owner);
+    await checkout(owner, ws);
+    const payment = [...context.asaas.payments.values()][0]!;
+    context.asaas.setPaymentStatus(payment.id, 'RECEIVED');
+    await webhook('PAYMENT_RECEIVED', { payment });
+
+    const queued = await context.services.db.execute<{ payload: { subscriptionId: string; kind: 'nova'; from: string } }>(sql`SELECT payload FROM jobs WHERE kind = ${SUBSCRIPTION_ADMIN_ALERT_JOB}`);
+    expect(queued.rows).toHaveLength(1);
+    const job = queued.rows[0]!.payload;
+    expect(job).toMatchObject({ kind: 'nova', from: 'pendente' });
+
+    const sentBefore = context.mailer.sent.length;
+    expect(await sendSubscriptionAlert(context.services, job)).toEqual({ recipients: 1, sent: 1 });
+    const mail = context.mailer.lastOfKind('subscription_alert');
+    expect(mail?.to).toBe('dono@exemplo.com.br');
+    expect(mail?.subject).toContain('Nova assinatura confirmada: Loja Assinante');
+    expect(mail?.text).toContain('R$');
+    expect(mail?.text).toContain('Assinaturas ativas agora: 1');
+
+    // Webhook repetido ou reconciliação: não avisa duas vezes.
+    expect(await sendSubscriptionAlert(context.services, job)).toMatchObject({ sent: 0, skipped: 'já avisada' });
+    expect(context.mailer.sent.length).toBe(sentBefore + 1);
   });
 });

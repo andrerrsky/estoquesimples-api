@@ -45,6 +45,7 @@ export const AuditAction = {
 
   SUBSCRIPTION_LINKED: 'subscription.linked',
   SUBSCRIPTION_STATE_CHANGED: 'subscription.state_changed',
+  SUBSCRIPTION_ADMIN_NOTIFIED: 'subscription.admin_notified',
   SUBSCRIPTION_TOKEN_REJECTED: 'subscription.token_rejected',
   SUBSCRIPTION_RECONCILED: 'subscription.reconciled',
 

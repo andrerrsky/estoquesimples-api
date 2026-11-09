@@ -11,7 +11,7 @@ export interface EmailMessage {
   subject: string;
   text: string;
   /** Tipo lógico da mensagem, usado em logs e métricas. */
-  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert' | 'support_reply' | 'support_new_ticket' | 'onboarding_nudge' | 'lifecycle';
+  kind: 'password_reset' | 'email_verification' | 'invite' | 'security_alert' | 'support_reply' | 'support_new_ticket' | 'onboarding_nudge' | 'lifecycle' | 'subscription_alert';
   /** Nome do remetente (o endereço continua o de `EMAIL_FROM`). */
   fromName?: string;
   replyTo?: string;
