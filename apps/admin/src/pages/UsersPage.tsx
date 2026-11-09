@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import { Badge, Card, DataTable, Empty, PageHeader, Pagination, PlatformBadges, StatTile, Time, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtNumber } from '../lib/format';
-import { USER_STATUS } from '../lib/labels';
+import { ROLE_LABEL, SUBSCRIPTION_STATE, USER_STATUS } from '../lib/labels';
+import { Tip } from '../components/Tip';
 
 interface UserRow {
   id: string;
@@ -28,6 +29,96 @@ interface UserRow {
   activated: boolean;
   /** Como a conta foi criada. */
   signupMethod: 'email' | 'google';
+  /** Empresas de que participa: papel, dono, quem convidou e a assinatura que dá acesso. */
+  memberships: Membership[];
+}
+
+interface Membership {
+  workspaceId: string;
+  workspaceName: string;
+  role: string;
+  isOwner: boolean;
+  ownerId: string;
+  ownerName: string;
+  invitedById: string | null;
+  invitedByName: string | null;
+  subscription: { state: string; provider: string } | null;
+}
+
+const PROVIDER_NAME: Record<string, string> = { asaas: 'web (Asaas)', google_play: 'Google Play' };
+
+/** Não deixa o clique no link abrir a ficha da linha. */
+const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
+
+/**
+ * Assinatura: separa quem assinou (dono da empresa com plano) de quem só usa a
+ * assinatura de outra pessoa (equipe). Contar "com acesso" somava as duas.
+ */
+function SubscriptionCell({ row }: { row: UserRow }) {
+  const own = row.memberships.filter((item) => item.isOwner && item.subscription);
+  const viaTeam = row.memberships.filter((item) => !item.isOwner && item.subscription);
+  if (own.length === 0 && viaTeam.length === 0) return <span className="muted">—</span>;
+  return (
+    <div className="cell-tags">
+      {own.map((item) => (
+        <Tip
+          key={item.workspaceId}
+          content={
+            <>
+              <div className="event-tip__title">Assinante</div>
+              É dono da empresa <strong>{item.workspaceName}</strong>, que tem assinatura {SUBSCRIPTION_STATE[item.subscription!.state]?.label.toLowerCase() ?? item.subscription!.state} pelo {PROVIDER_NAME[item.subscription!.provider] ?? item.subscription!.provider}. Esta é a conta que paga.
+            </>
+          }
+        >
+          <Badge tone="success">assinante</Badge>
+        </Tip>
+      ))}
+      {viaTeam.map((item) => (
+        <div key={item.workspaceId}>
+          <Tip
+            content={
+              <>
+                <div className="event-tip__title">Acesso pela equipe, não é assinatura nova</div>
+                É {(ROLE_LABEL[item.role] ?? item.role).toLowerCase()} da empresa <strong>{item.workspaceName}</strong> e usa a assinatura dela, paga por {item.ownerName}.
+              </>
+            }
+          >
+            <Badge tone="info">pela equipe</Badge>
+          </Tip>
+          <div className="cell-sub">
+            de{' '}
+            <Link to={`/usuarios/${item.ownerId}`} onClick={stop}>
+              {item.ownerName}
+            </Link>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Quem entrou por convite numa equipe: aparece embaixo da origem do cadastro. */
+function InvitedTag({ row }: { row: UserRow }) {
+  const joined = row.memberships.filter((item) => !item.isOwner);
+  if (joined.length === 0) return null;
+  const first = joined[0]!;
+  const by = first.invitedByName ?? first.ownerName;
+  return (
+    <Tip
+      content={
+        <>
+          <div className="event-tip__title">Entrou por convite</div>
+          {joined.map((item) => (
+            <div key={item.workspaceId}>
+              {ROLE_LABEL[item.role] ?? item.role} em <strong>{item.workspaceName}</strong>, convidado por {item.invitedByName ?? item.ownerName}.
+            </div>
+          ))}
+        </>
+      }
+    >
+      <span className="cell-sub">convite de {by}{joined.length > 1 ? ` +${joined.length - 1}` : ''}</span>
+    </Tip>
+  );
 }
 
 interface SignupMethods {
@@ -157,7 +248,12 @@ export function UsersPage() {
     {
       key: 'origin',
       header: 'Origem',
-      render: (row) => <OriginCell origin={row.origin} />,
+      render: (row) => (
+        <div className="cell-tags">
+          <OriginCell origin={row.origin} />
+          <InvitedTag row={row} />
+        </div>
+      ),
     },
     {
       key: 'platforms',
@@ -173,7 +269,7 @@ export function UsersPage() {
     {
       key: 'sub',
       header: 'Assinatura',
-      render: (row) => (row.hasActiveSubscription ? <Badge tone="success">com acesso</Badge> : <span className="muted">—</span>),
+      render: (row) => <SubscriptionCell row={row} />,
     },
     { key: 'activity', header: 'Última atividade', sortKey: 'lastActivityAt', render: (row) => <Time value={row.lastActivityAt} /> },
     { key: 'created', header: 'Criada', sortKey: 'createdAt', render: (row) => <Time value={row.createdAt} /> },

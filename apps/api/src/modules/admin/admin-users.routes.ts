@@ -39,6 +39,19 @@ const userListItemSchema = z.object({
     .nullable(),
   activated: z.boolean(),
   signupMethod: z.enum(['email', 'google']),
+  memberships: z.array(
+    z.object({
+      workspaceId: z.string(),
+      workspaceName: z.string(),
+      role: z.string(),
+      isOwner: z.boolean(),
+      ownerId: z.string(),
+      ownerName: z.string(),
+      invitedById: z.string().nullable(),
+      invitedByName: z.string().nullable(),
+      subscription: z.object({ state: z.string(), provider: z.string() }).nullable(),
+    }),
+  ),
 });
 
 const noteSchema = z.object({

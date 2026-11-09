@@ -51,6 +51,24 @@ export interface UserListItem {
   activated: boolean;
   /** Como a conta foi criada: cadastro normal (e-mail e senha) ou Google. */
   signupMethod: 'email' | 'google';
+  /**
+   * Empresas ativas de que a conta participa, com o papel, o dono, quem
+   * convidou e a assinatura que dá acesso (nula = plano gratuito). Separa quem
+   * assinou (dono) de quem só usa a assinatura de outra pessoa (equipe).
+   */
+  memberships: UserMembership[];
+}
+
+export interface UserMembership {
+  workspaceId: string;
+  workspaceName: string;
+  role: string;
+  isOwner: boolean;
+  ownerId: string;
+  ownerName: string;
+  invitedById: string | null;
+  invitedByName: string | null;
+  subscription: { state: string; provider: string } | null;
 }
 
 export interface SignupOrigin {
@@ -222,6 +240,7 @@ export class AdminUsersService {
         signup_attribution: Record<string, string> | null;
         activated: boolean;
         signup_method: string;
+        memberships: UserMembership[] | null;
       }>(sql`
         SELECT u.id, u.email, u.name, u.status, u.email_verified_at, u.created_at, u.locked_until, u.signup_attribution, u.signup_method,
                EXISTS (
@@ -236,6 +255,24 @@ export class AdminUsersService {
                  WHERE wm.user_id = u.id AND wm.status = 'active'
                    AND sub.state IN ${sqlList(ENTITLED_STATES)}
                ) AS has_subscription,
+               (
+                 SELECT json_agg(json_build_object(
+                   'workspaceId', w.id, 'workspaceName', w.name, 'role', wm.role_key,
+                   'isOwner', w.owner_user_id = u.id, 'ownerId', o.id, 'ownerName', o.name,
+                   'invitedById', ib.id, 'invitedByName', ib.name,
+                   'subscription', CASE WHEN sub.state IS NULL THEN NULL ELSE json_build_object('state', sub.state, 'provider', sub.provider) END
+                 ) ORDER BY (w.owner_user_id = u.id) DESC, w.name)
+                 FROM workspace_members wm
+                 JOIN workspaces w ON w.id = wm.workspace_id AND w.deleted_at IS NULL
+                 JOIN users o ON o.id = w.owner_user_id
+                 LEFT JOIN users ib ON ib.id = wm.invited_by
+                 LEFT JOIN LATERAL (
+                   SELECT s.state, s.provider FROM subscriptions s
+                   WHERE s.workspace_id = w.id AND s.state IN ${sqlList(ENTITLED_STATES)}
+                   ORDER BY s.created_at DESC LIMIT 1
+                 ) sub ON true
+                 WHERE wm.user_id = u.id AND wm.status = 'active'
+               ) AS memberships,
                -- Uma conta pode usar o app e a web: a lista sai do que está
                -- registrado em devices (o navegador também é um "aparelho").
                ARRAY(
@@ -266,6 +303,7 @@ export class AdminUsersService {
         origin: signupOriginOf(row.signup_attribution),
         activated: row.activated,
         signupMethod: row.signup_method === 'google' ? ('google' as const) : ('email' as const),
+        memberships: row.memberships ?? [],
       })),
       page: filters.page,
       pageSize: filters.pageSize,
