@@ -199,4 +199,22 @@ describe('exclusão definitiva pelo painel (contas de teste)', () => {
     await context.services.db.execute(sql`UPDATE subscriptions SET workspace_id = ${unpaidWs}, purchaser_user_id = ${unpaid.userId} WHERE workspace_id = ${payingWs}`);
     expect((await purge(owner, unpaid.userId, unpaid.email)).statusCode).toBe(200);
   });
+
+  it('lista de usuários separa quem assinou (dono) de quem usa a assinatura da equipe', async () => {
+    const owner = await registerUser(context);
+    const member = await registerUser(context);
+    const workspaceId = await createWorkspace(owner, 'Loja do Anderson');
+    await context.services.db.insert(workspaceMembers).values({ workspaceId, userId: member.userId, roleKey: 'operador', status: 'active', invitedBy: owner.userId });
+    await context.services.db.execute(sql`
+      INSERT INTO subscriptions (workspace_id, purchaser_user_id, plan_key, provider, state, auto_renewing, purchase_token_hash, purchase_token_enc, google_product_id)
+      VALUES (${workspaceId}, ${owner.userId}, 'basico', 'google_play', 'ativa', true, ${randomUUID()}, 'v2:k1:teste', 'assinatura')
+    `);
+    const list = await context.app.inject({ method: 'GET', url: '/admin/api/users?pageSize=50', headers: await ownerSession() });
+    expect(list.statusCode).toBe(200);
+    const items = list.json().items as Array<{ id: string; memberships: Array<Record<string, unknown>> }>;
+    expect(items.find((item) => item.id === owner.userId)?.memberships).toMatchObject([{ workspaceId, isOwner: true, subscription: { state: 'ativa', provider: 'google_play' } }]);
+    expect(items.find((item) => item.id === member.userId)?.memberships).toMatchObject([
+      { workspaceId, isOwner: false, role: 'operador', ownerId: owner.userId, invitedById: owner.userId, subscription: { state: 'ativa' } },
+    ]);
+  });
 });

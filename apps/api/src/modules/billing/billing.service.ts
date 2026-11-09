@@ -14,6 +14,7 @@ import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/err
 import { recordBillingEvent } from '../../platform/observability/metrics.js';
 import { trackServerEvent } from '../analytics/analytics.service.js';
 import { AuditAction, recordAudit, recordAuditSafe } from '../audit/audit.service.js';
+import { enqueueSubscriptionAlert } from './subscription-alerts.js';
 import { loadEffectiveBranding, type BrandingView } from '../branding/branding-view.js';
 import type { RequestMeta } from '../auth/auth.service.js';
 import { AsaasBillingService } from './asaas/asaas-billing.service.js';
@@ -296,6 +297,9 @@ export class BillingService {
           'Esta assinatura já está vinculada a outra empresa.',
         );
       }
+
+      // Compra nova pelo app: avisa a equipe (o aviso de "nova" sai uma vez só por assinatura).
+      if (inserted[0]) await enqueueSubscriptionAlert(tx, { subscriptionId: inserted[0].id, from: null, to: parsed.state });
 
       await recordAudit(tx, {
         workspaceId,
@@ -684,7 +688,7 @@ export class BillingService {
           entityType: 'subscription',
           entityId: current.id,
           metadata: { from: previousState, to: state, notificationType },
-        });
+        });        await enqueueSubscriptionAlert(tx, { subscriptionId: current.id, from: previousState, to: state });
       }
     });
 

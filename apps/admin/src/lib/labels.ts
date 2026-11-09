@@ -241,6 +241,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'invite.accepted': { label: 'Convite aceito', tone: 'success' },
   'subscription.linked': { label: 'Assinatura vinculada', tone: 'success' },
   'subscription.state_changed': { label: 'Estado da assinatura mudou', tone: 'info' },
+  'subscription.admin_notified': { label: 'Equipe avisada por e-mail da assinatura', tone: 'success' },
   'subscription.token_rejected': { label: 'Comprovante recusado', tone: 'error' },
   'subscription.reconciled': { label: 'Assinatura reconciliada', tone: 'neutral' },
   'sync.initial_upload_started': { label: 'Carga inicial iniciada', tone: 'neutral' },
