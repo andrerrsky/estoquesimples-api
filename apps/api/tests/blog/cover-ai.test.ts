@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,11 +44,14 @@ describe('capa do post gerada pela IA', () => {
     const cookie = await ownerCookie();
     const foto = await sharp({ create: { width: 1536, height: 1024, channels: 3, background: { r: 120, g: 90, b: 60 } } }).png().toBuffer();
     const pedidosImagem: Array<{ model: string; size: string; responseFormat: boolean }> = [];
+    const promptsCena: string[] = [];
     const realFetch = globalThis.fetch;
     const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input instanceof Request ? input.url : input);
       if (url.startsWith('https://api.openai.com/v1/models')) return new Response(JSON.stringify({ data: [{ id: 'gpt-4o-mini' }, { id: 'dall-e-3' }, { id: 'gpt-image-1' }] }), { status: 200 });
       if (url.startsWith('https://api.openai.com/v1/chat/completions')) {
+        const pedido = JSON.parse(String(init?.body ?? '{}')) as { messages: Array<{ content: string }> };
+        promptsCena.push(pedido.messages[0]?.content ?? '');
         const cena = { scene: 'Hands of a shop owner counting bags of roasted coffee on a wooden shelf in a small Brazilian grocery store, morning light through the window, shallow depth of field.', alt: 'Mãos contando pacotes de café numa prateleira de mercearia' };
         return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(cena) } }] }), { status: 200 });
       }
@@ -114,6 +118,12 @@ describe('capa do post gerada pela IA', () => {
       const post = (await context.app.inject({ method: 'GET', url: `/admin/api/blog/posts/${postId}`, headers: { cookie } })).json() as { coverUrl: string; coverAuto: boolean; coverAlt: string };
       expect(post.coverAuto).toBe(false);
       expect(post.coverAlt).toBe('Mãos contando pacotes de café numa prateleira de mercearia');
+      // O sistema sorteou comércio, pessoa e enquadramento, mandou para o modelo e guardou para variar a próxima.
+      expect(promptsCena[0]).toContain('not only groceries');
+      expect(promptsCena[0]).toMatch(/Who appears: .+\. Framing: /);
+      const [salvo] = (await context.services.db.execute<{ style: { setting: string; person: string; framing: string } }>(sql`SELECT cover_style AS style FROM blog_posts WHERE id = ${postId}`)).rows;
+      expect(salvo?.style.setting && promptsCena[0]).toContain(`- ${salvo!.style.setting}: `);
+      expect(salvo?.style.person).toBeTruthy();
       expect(detail!.job.result?.['coverUrl']).toBe(post.coverUrl);
       const imagem = await context.app.inject({ method: 'GET', url: post.coverUrl });
       expect(imagem.statusCode).toBe(200);
@@ -140,6 +150,28 @@ describe('capa por IA sem modelo de imagem liberado', () => {
       await expect(new OpenAiClient('sk-teste', 'gpt-4o-mini').generateImage('foto', { model: 'gpt-image-1', quality: 'medium' })).rejects.toThrow(/não tem acesso a nenhum modelo de imagem.*Settings › Project › Limits/);
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+
+describe('variedade das capas', () => {
+  it('sorteia comércio, pessoa e enquadramento sem repetir as últimas capas', async () => {
+    const { pickCoverStyle, COVER_SETTINGS } = await import('../../src/modules/blog/blog-cover-style.js');
+    const recent = [
+      { setting: 'mercearia', person: 'homem_barba_40', framing: 'plano_medio' },
+      { setting: 'roupas', person: 'senhora_60', framing: 'detalhe' },
+      { setting: 'padaria', person: 'so_maos', framing: 'amplo' },
+    ];
+    for (let i = 0; i < 50; i += 1) {
+      const picked = pickCoverStyle(recent);
+      expect(picked.settings).toHaveLength(4);
+      expect(new Set(picked.settings).size).toBe(4);
+      for (const key of picked.settings) {
+        expect(COVER_SETTINGS[key]).toBeTruthy();
+        expect(['mercearia', 'roupas', 'padaria']).not.toContain(key);
+      }
+      expect(['homem_barba_40', 'senhora_60', 'so_maos']).not.toContain(picked.person);
+      expect(['plano_medio', 'detalhe']).not.toContain(picked.framing);
     }
   });
 });

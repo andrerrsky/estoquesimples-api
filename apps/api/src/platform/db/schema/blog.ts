@@ -27,6 +27,8 @@ export const blogPosts = pgTable(
     publishedAt: timestamp('published_at', tz),
     coverHash: text('cover_hash'),
     coverAlt: text('cover_alt'),
+    /** Estilo sorteado da capa gerada pela IA (comércio, pessoa, enquadramento), para variar as próximas. */
+    coverStyle: jsonb('cover_style').$type<{ setting: string; person: string; framing: string }>(),
     authorName: text('author_name').notNull().default('Equipe Estoque Simples'),
     readingMinutes: integer('reading_minutes').notNull().default(3),
     aiGenerated: boolean('ai_generated').notNull().default(false),
