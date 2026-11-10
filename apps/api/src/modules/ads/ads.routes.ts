@@ -49,7 +49,7 @@ export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       requireUploadPassword(request, reply);
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
-      const csv = offlineConversionsCsv(await service.offlineActivations(since));
+      const csv = offlineConversionsCsv(await service.offlineActivations(since), undefined, { placeholderWhenEmpty: true });
       return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
     },
   );
@@ -66,7 +66,7 @@ export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       requireUploadPassword(request, reply);
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
-      const csv = offlineConversionsCsv(await service.offlineSubscriptions(since), SUBSCRIPTION_CONVERSION_NAME);
+      const csv = offlineConversionsCsv(await service.offlineSubscriptions(since), SUBSCRIPTION_CONVERSION_NAME, { placeholderWhenEmpty: true });
       return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
     },
   );
