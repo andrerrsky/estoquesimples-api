@@ -111,9 +111,25 @@ export const ACTIVATION_CONVERSION_NAME = 'Ativação (offline)';
  */
 export const SUBSCRIPTION_CONVERSION_NAME = 'Assinatura (offline)';
 
+/**
+ * gclid da linha de exemplo dos dias sem conversão: a Central de dados do
+ * Google recusa o arquivo inteiro (erro 4000, "pelo menos uma linha de dados
+ * válidos") quando só há cabeçalho, e a conexão fica como Urgente. Com esta
+ * linha o arquivo é aceito e só ela é rejeitada (clique inexistente), sem
+ * contar conversão nenhuma.
+ */
+export const PLACEHOLDER_GCLID = 'SEM_CONVERSOES_NO_PERIODO';
+
 /** CSV no modelo "Conversões de cliques" do Google Ads (Ferramentas › Uploads). */
-export function offlineConversionsCsv(rows: OfflineConversionRow[], conversionName = ACTIVATION_CONVERSION_NAME): string {
+export function offlineConversionsCsv(
+  rows: OfflineConversionRow[],
+  conversionName = ACTIVATION_CONVERSION_NAME,
+  options: { placeholderWhenEmpty?: boolean; now?: Date } = {},
+): string {
   const lines = ['Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency'];
+  if (rows.length === 0 && options.placeholderWhenEmpty) {
+    rows = [{ gclid: PLACEHOLDER_GCLID, convertedAt: new Date((options.now ?? new Date()).getTime() - 7 * 3_600_000), valueBrl: 0 }];
+  }
   for (const row of rows) {
     const value = row.valueBrl ?? ACTIVATION_VALUE_BRL;
     lines.push([row.gclid, row.conversionName ?? conversionName, adsConversionTime(row.convertedAt), (Number.isInteger(value) ? String(value) : value.toFixed(2)), 'BRL'].map(csvCell).join(','));

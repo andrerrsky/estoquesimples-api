@@ -205,11 +205,14 @@ describe('upload programado do Google Ads', () => {
       expect(ok.statusCode).toBe(200);
       expect(ok.headers['content-type']).toContain('text/csv');
       expect(ok.body.split('\n')[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
+      // Sem conversão no período o arquivo nunca vai só com o cabeçalho (o Google recusa); leva a linha de exemplo.
+      expect(ok.body).toContain('SEM_CONVERSOES_NO_PERIODO,Ativação (offline),');
       // Assinaturas: endereço próprio, mesma autenticação.
       expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-subscriptions.csv' })).statusCode).toBe(401);
       const subs = await other.app.inject({ method: 'GET', url: '/v1/ads/offline-subscriptions.csv', headers: basic('googleads', password) });
       expect(subs.statusCode).toBe(200);
       expect(subs.body.split('\n')[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
+      expect(subs.body).toContain('SEM_CONVERSOES_NO_PERIODO,Assinatura (offline),');
     } finally {
       await other.close();
     }
