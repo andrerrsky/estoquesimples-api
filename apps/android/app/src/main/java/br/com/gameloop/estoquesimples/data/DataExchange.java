@@ -52,11 +52,26 @@ public final class DataExchange {
     private final SQLiteDatabase db;
     private final ProductRepository products;
     private final MovementRepository movements;
+    /**
+     * Trava pega a cada linha importada, e não durante o arquivo inteiro.
+     *
+     * A tela principal lê o banco sob a mesma trava na thread de interface;
+     * segurá-la durante uma planilha de milhares de linhas congelava o app
+     * ("não está respondendo", ANR na versão 29). Linha a linha, a interface
+     * consegue entrar entre uma gravação e outra. Cada linha já é atômica (o
+     * repositório grava produto, movimentação e fila na mesma transação).
+     */
+    private final Object rowLock;
 
     public DataExchange(SQLiteDatabase db) {
+        this(db, new Object());
+    }
+
+    public DataExchange(SQLiteDatabase db, Object rowLock) {
         this.db = db;
         this.products = new ProductRepository(db);
         this.movements = new MovementRepository(db);
+        this.rowLock = rowLock == null ? new Object() : rowLock;
     }
 
     /** Contagem e recado para a tela, sem dados demais. */
@@ -264,7 +279,9 @@ public final class DataExchange {
                 RowProduct row = columns == null
                         ? RowProduct.positional(rows.get(i))
                         : RowProduct.mapped(rows.get(i), columns);
-                applyProductRow(row, report, false);
+                synchronized (rowLock) {
+                    applyProductRow(row, report, false);
+                }
             } catch (Exception e) {
                 report.failed++;
                 report.line("✗ Linha " + (i + 1) + ": " + e.getMessage());
@@ -300,7 +317,10 @@ public final class DataExchange {
             try {
                 RowProduct row = RowProduct.fromJson(item);
                 String remoteId = row.id;
-                String localUuid = applyProductRow(row, report, hasLedger);
+                String localUuid;
+                synchronized (rowLock) {
+                    localUuid = applyProductRow(row, report, hasLedger);
+                }
                 if (localUuid != null && remoteId != null) {
                     uuidRemap.put(remoteId, localUuid);
                 }
@@ -321,15 +341,18 @@ public final class DataExchange {
                 String localProduct = remoteProduct == null
                         ? null
                         : uuidRemap.getOrDefault(remoteProduct, remoteProduct);
-                MovementRepository.Result result = movements.importLedgerEvent(
-                        emptyToNull(item.optString("id", null)),
-                        localProduct,
-                        emptyToNull(item.optString("productName", null)),
-                        item.optString("changeType", MovementRepository.AJUSTE),
-                        item.optDouble("quantity", 0d),
-                        emptyToNull(item.optString("note", null)),
-                        item.optLong("occurredAt", System.currentTimeMillis())
-                );
+                MovementRepository.Result result;
+                synchronized (rowLock) {
+                    result = movements.importLedgerEvent(
+                            emptyToNull(item.optString("id", null)),
+                            localProduct,
+                            emptyToNull(item.optString("productName", null)),
+                            item.optString("changeType", MovementRepository.AJUSTE),
+                            item.optDouble("quantity", 0d),
+                            emptyToNull(item.optString("note", null)),
+                            item.optLong("occurredAt", System.currentTimeMillis())
+                    );
+                }
                 if (result.success) {
                     report.movementsImported++;
                 } else {
@@ -357,9 +380,12 @@ public final class DataExchange {
                 double quantity = Quantities.parse(cell(fields, columns, "quantity", "quantidade"), 0d);
                 long occurredAt = parseLong(cell(fields, columns, "occurred_at", "occurredat", "timestamp"));
                 String note = cell(fields, columns, "note", "obs", "observacao");
-                MovementRepository.Result result = movements.importLedgerEvent(
-                        emptyToNull(id), emptyToNull(productId), emptyToNull(productName),
-                        type, quantity, emptyToNull(note), occurredAt);
+                MovementRepository.Result result;
+                synchronized (rowLock) {
+                    result = movements.importLedgerEvent(
+                            emptyToNull(id), emptyToNull(productId), emptyToNull(productName),
+                            type, quantity, emptyToNull(note), occurredAt);
+                }
                 if (result.success) {
                     report.movementsImported++;
                 } else {

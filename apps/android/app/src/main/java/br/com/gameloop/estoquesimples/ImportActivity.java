@@ -364,16 +364,17 @@ public class ImportActivity extends BaseActivity {
                             Toast.LENGTH_LONG).show());
                     return;
                 }
-                synchronized (MainActivity.DB_LOCK) {
-                    DataExchange exchange = new DataExchange(MainActivity.stock);
-                    if (text.startsWith("{")) {
-                        formato = "json";
-                        report = exchange.importJson(new JSONObject(text));
-                    } else {
-                        report = exchange.importCsv(
-                                new InputStreamReader(new java.io.ByteArrayInputStream(bytes),
-                                        StandardCharsets.UTF_8));
-                    }
+                // A trava do banco é pega linha a linha dentro da importação.
+                // Segurá-la pelo arquivo inteiro deixava a tela principal
+                // parada esperando e o Android acusava "não está respondendo".
+                DataExchange exchange = new DataExchange(MainActivity.stock, MainActivity.DB_LOCK);
+                if (text.startsWith("{")) {
+                    formato = "json";
+                    report = exchange.importJson(new JSONObject(text));
+                } else {
+                    report = exchange.importCsv(
+                            new InputStreamReader(new java.io.ByteArrayInputStream(bytes),
+                                    StandardCharsets.UTF_8));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Erro ao importar arquivo", e);
@@ -391,8 +392,7 @@ public class ImportActivity extends BaseActivity {
                     "format", formato, "count", done.created + done.updated, "failed", done.failed));
             main.post(() -> {
                 if (MainActivity.instance != null) {
-                    MainActivity.instance.markListDirty(true);
-                    MainActivity.instance.prepareList();
+                    MainActivity.instance.refreshAfterImport();
                 }
                 if (status != null) {
                     status.setText(LOG_PREFIX + done.asLog());

@@ -769,6 +769,26 @@ public class MainActivity extends BaseActivity {
      * Marca que a listagem precisa ser recarregada ao voltar para a Main.
      * Preferível a chamar {@link #updateList()} com a Activity pausada.
      */
+    /**
+     * Recarrega a lista depois de uma importação ou restauração.
+     *
+     * Antes a tela de importação chamava {@link #prepareList()}, que troca as
+     * listas por listas vazias e só recarrega no próximo onResume. Quem
+     * voltava para a Início enquanto a importação rodava via "Nenhum produto
+     * cadastrado" até sair e entrar de novo no app.
+     */
+    public void refreshAfterImport() {
+        markListDirty(true);
+        if (getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            pendingListRefresh = false;
+            if (searchView != null && pendingClearSearch) {
+                searchView.setQuery("", false);
+            }
+            pendingClearSearch = false;
+            updateList();
+        }
+    }
+
     public void markListDirty(boolean clearSearch) {
         pendingListRefresh = true;
         if (clearSearch) {
@@ -875,15 +895,17 @@ public class MainActivity extends BaseActivity {
         return min > 0 && amount <= min;
     }
 
-    private int countMatching(boolean lowOnly) {
+    /** {todos, estoque baixo} que casam com a busca, numa passada só. */
+    private int[] countMatching() {
         String q = fold(searchView != null ? searchView.getQuery().toString() : "");
-        int n = 0;
+        int all = 0;
+        int low = 0;
         for (int i = 0; i < names.size(); i++) {
             if (!matchesQuery(i, q)) continue;
-            if (lowOnly && !isLowStock(amounts.get(i), minStocks.get(i))) continue;
-            n++;
+            all++;
+            if (isLowStockAt(i)) low++;
         }
-        return n;
+        return new int[]{all, low};
     }
 
     /**
@@ -899,8 +921,9 @@ public class MainActivity extends BaseActivity {
             return;
         }
         // Contagens relativas ao que está sendo buscado.
-        int low = countMatching(true);
-        int all = countMatching(false);
+        int[] counts = countMatching();
+        int all = counts[0];
+        int low = counts[1];
         // A barra fica fixa enquanto houver produtos: sumir e voltar
         // conforme a busca parecia um defeito.
         if (names.isEmpty()) {
@@ -1004,7 +1027,7 @@ public class MainActivity extends BaseActivity {
             return;
         }
         boolean searching = query != null && !query.trim().isEmpty();
-        int hiddenByChip = lowStockOnly ? countMatching(false) : 0;
+        int hiddenByChip = lowStockOnly ? countMatching()[0] : 0;
         TextView clearLabel = findViewById(R.id.emptyActionClearLabel);
         if (lowStockOnly && hiddenByChip > 0) {
             // O chip "Estoque baixo" escondeu o que a busca achou: dizer isso,
@@ -1050,7 +1073,7 @@ public class MainActivity extends BaseActivity {
             String searchQuery = fold(query);
             
             for (int i = 0; i < names.size(); i++) {
-                if (lowStockOnly && !isLowStock(amounts.get(i), minStocks.get(i))
+                if (lowStockOnly && !isLowStockAt(i)
                         && !stickyNames.contains(names.get(i))) {
                     continue;
                 }
@@ -1084,12 +1107,70 @@ public class MainActivity extends BaseActivity {
      */
     static String fold(String text) {
         if (text == null) return "";
-        String base = java.text.Normalizer.normalize(text.trim(), java.text.Normalizer.Form.NFD);
-        return base.replaceAll("\\p{M}+", "").toLowerCase(java.util.Locale.ROOT);
+        String trimmed = text.trim();
+        // Texto só com ASCII (código de barras, SKU, a maioria das buscas)
+        // não tem acento a remover: pula a normalização.
+        boolean ascii = true;
+        for (int i = 0; i < trimmed.length(); i++) {
+            if (trimmed.charAt(i) > 0x7F) {
+                ascii = false;
+                break;
+            }
+        }
+        if (ascii) return trimmed.toLowerCase(java.util.Locale.ROOT);
+        String base = java.text.Normalizer.normalize(trimmed, java.text.Normalizer.Form.NFD);
+        // Padrão compilado uma vez: o replaceAll compilava a expressão a cada
+        // chamada, e a busca chamava isso milhares de vezes por tecla (ANR na
+        // versão 29 em quem tem muitos produtos).
+        return COMBINING_MARKS.matcher(base).replaceAll("").toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static final java.util.regex.Pattern COMBINING_MARKS =
+            java.util.regex.Pattern.compile("\\p{M}+");
+
+    /**
+     * Texto de busca já dobrado de cada produto (nome, categoria, SKU, código
+     * de barras, localização e descrição) e se está com estoque baixo,
+     * calculados uma vez quando a lista carrega. Antes isso era refeito para
+     * cada produto a cada tecla, três vezes (lista e os dois chips): com
+     * alguns milhares de produtos a busca travava a tela (ANR na versão 29).
+     */
+    private final ArrayList<String> searchKeys = new ArrayList<>();
+    private final ArrayList<Boolean> lowStockFlags = new ArrayList<>();
+
+    private void rebuildSearchIndex() {
+        searchKeys.clear();
+        lowStockFlags.clear();
+        searchKeys.ensureCapacity(names.size());
+        lowStockFlags.ensureCapacity(names.size());
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < names.size(); i++) {
+            sb.setLength(0);
+            // Separador de linha: a busca nunca contém, então um termo não
+            // casa "atravessando" dois campos.
+            sb.append(fold(names.get(i))).append('\n')
+                    .append(fold(categories.get(i))).append('\n')
+                    .append(fold(skus.get(i))).append('\n')
+                    .append(fold(barcodes.get(i))).append('\n')
+                    .append(fold(locations.get(i))).append('\n')
+                    .append(fold(descriptions.get(i)));
+            searchKeys.add(sb.toString());
+            lowStockFlags.add(isLowStock(amounts.get(i), minStocks.get(i)));
+        }
+    }
+
+    private boolean isLowStockAt(int i) {
+        if (i < lowStockFlags.size() && lowStockFlags.size() == names.size()) {
+            return lowStockFlags.get(i);
+        }
+        return isLowStock(amounts.get(i), minStocks.get(i));
     }
 
     private boolean matchesQuery(int i, String foldedQuery) {
         if (foldedQuery.isEmpty()) return true;
+        if (i < searchKeys.size() && searchKeys.size() == names.size()) {
+            return searchKeys.get(i).contains(foldedQuery);
+        }
         return fold(names.get(i)).contains(foldedQuery)
                 || fold(categories.get(i)).contains(foldedQuery)
                 || fold(skus.get(i)).contains(foldedQuery)
@@ -1212,6 +1293,7 @@ public class MainActivity extends BaseActivity {
             locations.addAll(newLocations);
             minStocks.addAll(newMinStocks);
             units.addAll(newUnits);
+            rebuildSearchIndex();
         } catch (Exception e) {
             Log.e("MainActivity", "Error loading product list", e);
             Toast.makeText(this, "Erro ao carregar lista de produtos", Toast.LENGTH_SHORT).show();
@@ -1237,6 +1319,8 @@ public class MainActivity extends BaseActivity {
         locations.clear();
         minStocks.clear();
         units.clear();
+        searchKeys.clear();
+        lowStockFlags.clear();
 
     }
 
