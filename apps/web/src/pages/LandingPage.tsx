@@ -5,7 +5,7 @@ import { Icon, Logo, type IconName } from '../components/Icon';
 import { SocialLinks } from '../components/SocialLinks';
 import { ROLE_LABEL } from '../lib/labels';
 import { fmtCents } from '../lib/format';
-import { cycleOptions, lowestPerMonth, maxSavingPct } from '../lib/pricing';
+import { cycleOptions, lowestPerMonth } from '../lib/pricing';
 import type { WebPricing } from '../api/types';
 
 import '../styles/pages-public.css';
@@ -786,15 +786,19 @@ export function LandingPage() {
                       <span className="badge badge--solid">Assinatura</span>
                     </div>
                     <p className="lp-plan__for">Para quem trabalha com mais gente.</p>
-                    {pricing && lowestPerMonth(pricing) !== null && (
-                      <div className="lp-plan__price">
-                        <span className="lp-plan__price-from">a partir de</span> {fmtCents(lowestPerMonth(pricing))}<small>/mês</small>
-                        <div className="lp-plan__price-sub">
-                          {cycleOptions(pricing).find((option) => option.cycle === 'MONTHLY') ? `${fmtCents(pricing.monthlyCents)} no mensal` : ''}
-                          {maxSavingPct(pricing) > 0 ? ` · economize até ${maxSavingPct(pricing)}% no semestral ou anual` : ''}
-                        </div>
-                      </div>
-                    )}
+                    {/* Altura reservada: o preço chega depois do JavaScript e o card não pula. */}
+                    <div className="lp-plan__price" aria-live="polite">
+                      {pricing && lowestPerMonth(pricing) !== null ? (
+                        <>
+                          <span className="lp-plan__price-from">a partir de</span> {fmtCents(lowestPerMonth(pricing))}<small>/mês</small>
+                          <div className="lp-plan__price-sub">
+                            {cycleOptions(pricing).map((option) => (option.months === 1 ? `${fmtCents(option.totalCents)} no mensal` : `${fmtCents(option.perMonthCents)}/mês no ${option.label.toLowerCase()}${option.savingPct > 0 ? ` (−${option.savingPct}%)` : ''}`)).join(' · ')}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="lp-plan__price-from">Pix, boleto ou cartão, por mês, semestre ou ano</span>
+                      )}
+                    </div>
                   </div>
                   <ul className="check-list">
                     <li><Icon name="check" /> Tudo do plano Gratuito</li>

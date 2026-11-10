@@ -681,6 +681,7 @@
 }
 .lp-plan__price {
   margin-top: 10px;
+  min-height: 74px;
   font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

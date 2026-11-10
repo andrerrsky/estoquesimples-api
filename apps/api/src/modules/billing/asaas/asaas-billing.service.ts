@@ -60,6 +60,15 @@ export function priceForCycle(pricing: WebPricing, cycle: AsaasCycle): number | 
   return pricing.monthlyCents;
 }
 
+/**
+ * Trava contra cadastro errado: um ciclo longo que custe menos da metade do
+ * mensal pelo mesmo tempo (ex.: o anual com o valor de um mês) não é vendido.
+ */
+function sane(total: number | null, monthly: number | null, months: number): number | null {
+  if (total === null || monthly === null) return total;
+  return total < monthly * months * 0.5 ? null : total;
+}
+
 const CYCLE_LABEL: Record<AsaasCycle, string> = { MONTHLY: 'mensal', SEMIANNUALLY: 'semestral', YEARLY: 'anual' };
 
 const cents = (value: number | null | undefined): number | null =>
@@ -109,7 +118,11 @@ export class AsaasBillingService {
     if (!plan || !plan.isActive) return { monthlyCents: null, semiannualCents: null, yearlyCents: null };
     // Cada valor é o total cobrado no ciclo (o semestral a cada 6 meses, o
     // anual uma vez por ano), não o equivalente mensal.
-    return { monthlyCents: plan.monthly, semiannualCents: plan.semiannual, yearlyCents: plan.yearly };
+    return {
+      monthlyCents: plan.monthly,
+      semiannualCents: sane(plan.semiannual, plan.monthly, 6),
+      yearlyCents: sane(plan.yearly, plan.monthly, 12),
+    };
   }
 
   private async liveSubscription(workspaceId: string): Promise<SubscriptionRow | null> {

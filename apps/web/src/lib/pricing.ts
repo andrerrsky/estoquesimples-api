@@ -33,6 +33,10 @@ export function cycleOptions(pricing: WebPricing | null | undefined): CycleOptio
   const options = CYCLES.flatMap((item) => {
     const total = pricing[item.key];
     if (total === null || total === undefined) return [];
+    // Trava contra cadastro errado (ex.: o "anual" com o valor de um mês):
+    // um ciclo longo que custe menos da metade do mensal pelo mesmo tempo
+    // não é oferecido.
+    if (item.months > 1 && monthly && total < monthly * item.months * 0.5) return [];
     const perMonth = Math.floor(total / item.months);
     const savingPct = monthly && item.months > 1 ? Math.max(0, Math.round((1 - total / (monthly * item.months)) * 100)) : 0;
     return [{ cycle: item.cycle, label: item.label, months: item.months, totalCents: total, perMonthCents: perMonth, savingPct, chargeUnit: item.chargeUnit, badge: null as string | null }];
@@ -40,7 +44,7 @@ export function cycleOptions(pricing: WebPricing | null | undefined): CycleOptio
   // Selos: o semestral é o do meio (não assusta pelo valor); o mais barato por mês é o "melhor preço".
   const cheapest = options.reduce<CycleOption | null>((best, option) => (best === null || option.perMonthCents < best.perMonthCents ? option : best), null);
   for (const option of options) {
-    if (option.cycle === 'SEMIANNUALLY' && options.length > 2) option.badge = 'Mais escolhido';
+    if (option.cycle === 'SEMIANNUALLY' && options.length > 2) option.badge = 'Recomendado';
     else if (cheapest && option === cheapest && option.months > 1) option.badge = 'Melhor preço';
   }
   return options;

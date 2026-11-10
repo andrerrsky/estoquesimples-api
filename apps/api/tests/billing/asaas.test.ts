@@ -25,7 +25,7 @@ beforeEach(async () => {
   await resetDatabase(context);
   context.asaas.reset();
   await context.services.db.execute(
-    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
+    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_semiannual_cents = NULL, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
   );
 });
 
@@ -169,6 +169,11 @@ describe('assinatura pela web (Asaas)', () => {
       const pub = await context.app.inject({ method: 'GET', url: '/v1/public/pricing' });
       expect(pub.statusCode).toBe(200);
       expect(pub.json()).toEqual({ available: true, monthlyCents: 2990, semiannualCents: 12990, yearlyCents: 29900 });
+
+      // Anual cadastrado com o valor de um mês: sai da venda em vez de ser cobrado.
+      await context.services.db.execute(sql`UPDATE plans SET web_price_yearly_cents = 1699 WHERE key = 'basico'`);
+      expect((await context.app.inject({ method: 'GET', url: '/v1/public/pricing' })).json()).toMatchObject({ yearlyCents: null });
+      await context.services.db.execute(sql`UPDATE plans SET web_price_yearly_cents = 29900 WHERE key = 'basico'`);
 
       const owner = await registerUser(context);
       const ws = await criarEmpresa(owner);

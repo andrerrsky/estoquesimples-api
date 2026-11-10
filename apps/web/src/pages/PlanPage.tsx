@@ -38,6 +38,22 @@ const ORIGIN_KEY = 'es_plano_origem';
  * equipe…). Fica na sessão para o checkout saber, mesmo depois de a URL
  * perder o parâmetro.
  */
+/**
+ * Conversão de compra, no máximo uma vez por cobrança neste navegador (duas
+ * abas ou a volta do Asaas não contam em dobro). `transaction_id` deixa o GA
+ * descartar repetições que escaparem.
+ */
+function trackPurchaseOnce(sub: { id: string; billingCycle: string | null; priceCents: number | null }): void {
+  const key = `es_compra_${sub.id}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    // sem armazenamento: registra assim mesmo; o transaction_id evita o dobro no GA
+  }
+  track('purchase.completed', { cycle: sub.billingCycle ?? 'MONTHLY', value: (sub.priceCents ?? 0) / 100, currency: 'BRL', transaction_id: sub.id, origin: originOf() });
+}
+
 function originOf(): string {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get('origem');
@@ -133,9 +149,7 @@ export function PlanPage() {
       void refresh();
       // Pagamento confirmado nesta visita: a conversão que o funil mede.
       const paid = data.subscription;
-      if (previous.state === 'pendente' && current === 'ativa' && paid?.provider === 'asaas') {
-        track('purchase.completed', { cycle: paid.billingCycle ?? 'MONTHLY', value: (paid.priceCents ?? 0) / 100, currency: 'BRL', origin: originOf() });
-      }
+      if (previous.state === 'pendente' && current === 'ativa' && paid?.provider === 'asaas') trackPurchaseOnce(paid);
     }
   }, [data, workspaceId, refresh]);
 
@@ -169,6 +183,15 @@ export function PlanPage() {
     },
     onError: (error) => toast.error(error),
   });
+
+  // Assinatura da web que ficou ativa nas últimas 24 h e ainda não foi
+  // contada neste navegador: quem volta do Asaas com o webhook já processado
+  // chega com ela ativa e a passagem de pendente para ativa não é vista.
+  useEffect(() => {
+    const paid = data?.subscription;
+    if (!paid || paid.provider !== 'asaas' || paid.state !== 'ativa' || !paid.startedAt) return;
+    if (Date.now() - new Date(paid.startedAt).getTime() < 86_400_000) trackPurchaseOnce(paid);
+  }, [data]);
 
   // Volta da página de pagamento (`?pagamento=concluido`): reconsulta uma vez
   // e limpa o endereço, para um recarregar não repetir a chamada.
@@ -935,6 +958,7 @@ function CheckoutDialog({
           <li><Icon name="check" /> Pix liberado na hora; o plano entra assim que o pagamento é confirmado.</li>
           <li><Icon name="check" /> Sem fidelidade: cancele quando quiser e use até o fim do período pago.</li>
         </ul>
+        {method === 'PIX' && <p className="caption">Pagou o Pix? Volte para esta aba: o plano é liberado sozinho em instantes.</p>}
 
         <div className="row row--end" style={{ flexWrap: 'wrap' }}>
           <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>Cancelar</button>

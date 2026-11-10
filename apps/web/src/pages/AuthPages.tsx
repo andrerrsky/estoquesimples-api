@@ -127,15 +127,38 @@ function setWelcomePending(pending: boolean): void {
   }
 }
 
+/** Destino pedido no cadastro (`?depois=/app/plano`), guardado para depois das boas-vindas. */
+const AFTER_WELCOME_KEY = 'es_depois_boas_vindas';
+
+function takeAfterWelcome(): string | null {
+  try {
+    const value = sessionStorage.getItem(AFTER_WELCOME_KEY);
+    sessionStorage.removeItem(AFTER_WELCOME_KEY);
+    return value && value.startsWith('/app/') ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function useRedirectIfAuthed(): ReactNode | null {
   const { status } = useAuth();
   const location = useLocation();
   if (status === 'loading') return <FullScreenLoading />;
   if (status === 'authed') {
-    if (welcomePending()) return <Navigate to="/boas-vindas" replace />;
     // Vem do estado da navegação ou, para links comuns (a página inicial
     // não usa o roteador), da URL: /criar-conta?depois=/app/plano.
     const from = (location.state as { from?: string } | null)?.from ?? new URLSearchParams(location.search).get('depois');
+    if (welcomePending()) {
+      // "Criar conta e assinar": as boas-vindas vêm antes, mas o destino não se perde.
+      if (from && from.startsWith('/app/')) {
+        try {
+          sessionStorage.setItem(AFTER_WELCOME_KEY, from);
+        } catch {
+          // sem armazenamento: segue para o estoque
+        }
+      }
+      return <Navigate to="/boas-vindas" replace />;
+    }
     return <Navigate to={from && from.startsWith('/app') ? from : '/app'} replace />;
   }
   return null;
@@ -670,7 +693,7 @@ export function WelcomePage() {
       await Promise.all([refresh(), reloadUser().catch(() => undefined)]);
       track(chosen ? 'onboarding.name_set' : 'onboarding.name_skipped', { segment, method: fromGoogle ? 'google' : 'email' });
       if (owned) select(owned.id);
-      navigate('/app/estoque?primeiro=1', { replace: true });
+      navigate(takeAfterWelcome() ?? '/app/estoque?primeiro=1', { replace: true });
     } catch (caught) {
       setError(caught);
       setBusy(false);

@@ -61,7 +61,7 @@ export async function registerAsaasRoutes(app: FastifyInstance): Promise<void> {
     },
     async (_request, reply) => {
       const pricing = await service.pricing();
-      reply.header('cache-control', 'public, max-age=300');
+      reply.header('cache-control', 'public, max-age=60');
       const available = app.services.asaas.configured
         && (pricing.monthlyCents !== null || pricing.semiannualCents !== null || pricing.yearlyCents !== null);
       return { available, ...pricing };

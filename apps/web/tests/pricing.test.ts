@@ -9,7 +9,7 @@ describe('preços do plano Equipe na web', () => {
     const options = cycleOptions(pricing);
     expect(options.map((o) => [o.cycle, o.perMonthCents, o.savingPct, o.badge])).toEqual([
       ['MONTHLY', 2499, 0, null],
-      ['SEMIANNUALLY', 2165, 13, 'Mais escolhido'],
+      ['SEMIANNUALLY', 2165, 13, 'Recomendado'],
       ['YEARLY', 1665, 33, 'Melhor preço'],
     ]);
     expect(defaultCycle(options)).toBe('SEMIANNUALLY');

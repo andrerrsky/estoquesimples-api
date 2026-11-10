@@ -176,7 +176,7 @@ beforeEach(async () => {
   context.asaas.reset();
   context.fcm.sent.length = 0;
   await context.services.db.execute(
-    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
+    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_semiannual_cents = NULL, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
   );
 });
 
