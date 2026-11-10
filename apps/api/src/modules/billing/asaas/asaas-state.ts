@@ -10,7 +10,15 @@
  * direitos, painel e app não precisem saber de onde a assinatura veio.
  */
 
-export type AsaasCycle = 'MONTHLY' | 'YEARLY';
+export type AsaasCycle = 'MONTHLY' | 'SEMIANNUALLY' | 'YEARLY';
+
+/** Meses de cada ciclo de cobrança da web. */
+export const CYCLE_MONTHS: Record<AsaasCycle, number> = { MONTHLY: 1, SEMIANNUALLY: 6, YEARLY: 12 };
+
+/** Ciclo conhecido a partir do texto gravado/recebido; o resto vira mensal. */
+export function toCycle(value: string | null | undefined): AsaasCycle {
+  return value === 'YEARLY' || value === 'SEMIANNUALLY' ? value : 'MONTHLY';
+}
 
 export interface AsaasSubscriptionSnapshot {
   /** ACTIVE | INACTIVE | EXPIRED. `null` quando o provedor não a conhece mais. */
@@ -56,7 +64,7 @@ export function isOpenStatus(status: string): boolean {
 /** Soma um ciclo a uma data YYYY-MM-DD, sem estourar o mês (31/01 → 28/02). */
 export function addCycle(date: string, cycle: AsaasCycle): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const months = cycle === 'YEARLY' ? 12 : 1;
+  const months = CYCLE_MONTHS[cycle];
   const targetMonthIndex = m - 1 + months;
   const year = y + Math.floor(targetMonthIndex / 12);
   const month = (targetMonthIndex % 12) + 1;

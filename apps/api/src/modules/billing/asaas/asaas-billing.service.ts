@@ -24,6 +24,7 @@ import {
   isOpenStatus,
   isPaidStatus,
   todayBrazil,
+  toCycle,
   type AsaasCycle,
   type DerivedState,
 } from './asaas-state.js';
@@ -45,6 +46,21 @@ export interface CheckoutInput {
 }
 
 type SubscriptionRow = typeof subscriptions.$inferSelect;
+
+/** Total cobrado em cada ciclo, em centavos; nulo = ciclo fora da venda. */
+export interface WebPricing {
+  monthlyCents: number | null;
+  semiannualCents: number | null;
+  yearlyCents: number | null;
+}
+
+export function priceForCycle(pricing: WebPricing, cycle: AsaasCycle): number | null {
+  if (cycle === 'YEARLY') return pricing.yearlyCents;
+  if (cycle === 'SEMIANNUALLY') return pricing.semiannualCents;
+  return pricing.monthlyCents;
+}
+
+const CYCLE_LABEL: Record<AsaasCycle, string> = { MONTHLY: 'mensal', SEMIANNUALLY: 'semestral', YEARLY: 'anual' };
 
 const cents = (value: number | null | undefined): number | null =>
   value === null || value === undefined ? null : Math.round(value * 100);
@@ -78,15 +94,22 @@ export class AsaasBillingService {
   // Visão da empresa (tela "Plano" da web)
   // -------------------------------------------------------------------------
 
-  async pricing(): Promise<{ monthlyCents: number | null; yearlyCents: number | null }> {
+  async pricing(): Promise<WebPricing> {
     const rows = await this.db
-      .select({ monthly: plans.webPriceMonthlyCents, yearly: plans.webPriceYearlyCents, isActive: plans.isActive })
+      .select({
+        monthly: plans.webPriceMonthlyCents,
+        semiannual: plans.webPriceSemiannualCents,
+        yearly: plans.webPriceYearlyCents,
+        isActive: plans.isActive,
+      })
       .from(plans)
       .where(eq(plans.key, WEB_PLAN_KEY))
       .limit(1);
     const plan = rows[0];
-    if (!plan || !plan.isActive) return { monthlyCents: null, yearlyCents: null };
-    return { monthlyCents: plan.monthly, yearlyCents: plan.yearly };
+    if (!plan || !plan.isActive) return { monthlyCents: null, semiannualCents: null, yearlyCents: null };
+    // Cada valor é o total cobrado no ciclo (o semestral a cada 6 meses, o
+    // anual uma vez por ano), não o equivalente mensal.
+    return { monthlyCents: plan.monthly, semiannualCents: plan.semiannual, yearlyCents: plan.yearly };
   }
 
   private async liveSubscription(workspaceId: string): Promise<SubscriptionRow | null> {
@@ -132,7 +155,7 @@ export class AsaasBillingService {
 
     return {
       // A web só vende quando há chave do Asaas e preço cadastrado no plano.
-      checkoutAvailable: this.asaas.configured && (pricing.monthlyCents !== null || pricing.yearlyCents !== null),
+      checkoutAvailable: this.asaas.configured && (pricing.monthlyCents !== null || pricing.semiannualCents !== null || pricing.yearlyCents !== null),
       pricing,
       graceDays: this.env.ASAAS_GRACE_DAYS,
       subscription: live
@@ -209,7 +232,7 @@ export class AsaasBillingService {
       });
     }
     const pricing = await this.pricing();
-    const priceCents = input.cycle === 'YEARLY' ? pricing.yearlyCents : pricing.monthlyCents;
+    const priceCents = priceForCycle(pricing, input.cycle);
     if (priceCents === null) {
       throw new AppError(409, ErrorCode.CONFLICT, 'Este ciclo de cobrança não está disponível no momento.');
     }
@@ -259,7 +282,7 @@ export class AsaasBillingService {
     const customerId = await this.ensureCustomer(workspaceId, userId, input, docType);
 
     const nextDueDate = carryPaidUntil && carryPaidUntil.getTime() > Date.now() ? todayBrazil(carryPaidUntil) : todayBrazil();
-    const cycleLabel = input.cycle === 'YEARLY' ? 'anual' : 'mensal';
+    const cycleLabel = CYCLE_LABEL[input.cycle];
 
     // Uma tentativa anterior pode ter criado a assinatura no Asaas e perdido
     // a resposta (timeout). Antes de criar outra, procura a que já existe.
@@ -481,7 +504,7 @@ export class AsaasBillingService {
       this.asaas.listSubscriptionPayments(current.providerSubscriptionId),
     ]);
 
-    const cycle: AsaasCycle = (remote?.cycle ?? current.billingCycle) === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
+    const cycle: AsaasCycle = toCycle(remote?.cycle ?? current.billingCycle);
     const raw = (current.raw ?? {}) as { carryPaidUntil?: string | null };
     const derived = deriveAsaasState({
       subscription: {

@@ -259,12 +259,12 @@ export function StockPage() {
       )}
 
       {limit !== null && used >= limit ? (
-        <Notice tone="warning" title={`Limite de ${limit} produtos do plano gratuito atingido`} action={<Link to="/app/plano" className="btn btn--secondary btn--sm">Ver planos</Link>}>
-          Para cadastrar mais produtos, assine o plano Equipe ou exclua produtos que não usa mais.
+        <Notice tone="warning" title={`Limite de ${limit} produtos do plano gratuito atingido`} action={<Link to="/app/plano?origem=limite_produtos" className="btn btn--primary btn--sm">Liberar produtos ilimitados</Link>}>
+          Com o plano Equipe você cadastra sem limite e coloca a equipe no mesmo estoque. Ou exclua produtos que não usa mais.
         </Notice>
       ) : limit !== null && used >= limit * 0.8 ? (
-        <Notice tone="info" action={<Link to="/app/plano" className="btn btn--secondary btn--sm">Ver planos</Link>}>
-          Você está usando {used} de {limit} produtos do plano gratuito.
+        <Notice tone="info" action={<Link to="/app/plano?origem=quase_limite" className="btn btn--secondary btn--sm">Ver o plano Equipe</Link>}>
+          Você está usando {used} de {limit} produtos do plano gratuito. No plano Equipe não há limite.
         </Notice>
       ) : null}
 

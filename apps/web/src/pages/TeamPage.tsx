@@ -193,7 +193,7 @@ export function TeamPage() {
         <Notice
           tone="warning"
           title="A empresa está no plano gratuito"
-          action={<Link to="/app/plano" className="btn btn--secondary btn--sm">Ver plano</Link>}
+          action={<Link to="/app/plano?origem=equipe" className="btn btn--secondary btn--sm">Ver plano</Link>}
         >
           As pessoas abaixo continuam na equipe, mas no plano gratuito só o proprietário acessa o estoque na nuvem. Com o plano Equipe
           todas voltam a ver e movimentar o estoque. Ninguém foi removido.
@@ -405,7 +405,7 @@ function TeamUpsell({ isOwner }: { isOwner: boolean }) {
             pode fazer. Todas veem o mesmo estoque, no celular e no computador, e cada movimentação fica registrada com o nome de quem fez.
           </p>
           <div className="row row--wrap">
-            <Link to="/app/plano" className="btn btn--primary">
+            <Link to="/app/plano?origem=equipe" className="btn btn--primary">
               Conhecer o plano Equipe
             </Link>
           </div>
@@ -492,7 +492,7 @@ function InviteDialog({ open, actorRole, onClose, onSent }: { open: boolean; act
             tone="error"
             action={
               apiError?.isPlanBlocked ? (
-                <Link to="/app/plano" className="btn btn--secondary btn--sm">Ver plano</Link>
+                <Link to="/app/plano?origem=equipe" className="btn btn--secondary btn--sm">Ver plano</Link>
               ) : apiError?.code === 'AUTH_EMAIL_NOT_VERIFIED' ? (
                 <Link to="/app/conta" className="btn btn--secondary btn--sm">Confirmar e-mail</Link>
               ) : undefined

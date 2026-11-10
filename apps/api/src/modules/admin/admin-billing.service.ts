@@ -113,7 +113,7 @@ export class AdminBillingService {
              count(*)::int AS total,
              count(*) FILTER (WHERE state IN ${sqlList(ENTITLED_STATES)})::int AS entitled,
              count(*) FILTER (WHERE state IN ('pendente', 'suspensa'))::int AS problem,
-             sum(CASE WHEN billing_cycle = 'YEARLY' THEN price_cents / 12.0 ELSE price_cents END)
+             sum(CASE billing_cycle WHEN 'YEARLY' THEN price_cents / 12.0 WHEN 'SEMIANNUALLY' THEN price_cents / 6.0 ELSE price_cents END)
                FILTER (WHERE state IN ('ativa', 'carencia') AND price_cents IS NOT NULL) AS mrr_cents
       FROM subscriptions GROUP BY provider
     `);
@@ -586,7 +586,10 @@ export class AdminBillingService {
       googleBasePlanId: plan.googleBasePlanId,
       // Preço cobrado pelo Asaas na web; nulo = ciclo não vendido na web.
       webPriceMonthlyCents: plan.webPriceMonthlyCents,
+      webPriceSemiannualCents: plan.webPriceSemiannualCents,
       webPriceYearlyCents: plan.webPriceYearlyCents,
+      googleOfferPriceCents: plan.googleOfferPriceCents,
+      googleOfferCycles: plan.googleOfferCycles,
       // O checkout da web vende um plano só (WEB_PLAN_KEY).
       soldOnWeb: plan.key === WEB_PLAN_KEY,
       isActive: plan.isActive,
@@ -612,7 +615,10 @@ export class AdminBillingService {
       isActive?: boolean;
       /** Centavos; `null` tira o ciclo da venda na web. */
       webPriceMonthlyCents?: number | null;
+      webPriceSemiannualCents?: number | null;
       webPriceYearlyCents?: number | null;
+      googleOfferPriceCents?: number | null;
+      googleOfferCycles?: number | null;
       reason: string;
     },
   ): Promise<void> {
@@ -638,9 +644,10 @@ export class AdminBillingService {
 
       // Preço da web: o checkout (Asaas) lê só o plano WEB_PLAN_KEY. Gravar
       // preço em outro plano seria configuração morta que parece valer.
-      const touchesWebPrice = input.webPriceMonthlyCents !== undefined || input.webPriceYearlyCents !== undefined;
+      const webPrices = [input.webPriceMonthlyCents, input.webPriceSemiannualCents, input.webPriceYearlyCents];
+      const touchesWebPrice = webPrices.some((value) => value !== undefined);
       if (touchesWebPrice && planKey !== WEB_PLAN_KEY) {
-        const wantsPrice = (input.webPriceMonthlyCents ?? null) !== null || (input.webPriceYearlyCents ?? null) !== null;
+        const wantsPrice = webPrices.some((value) => (value ?? null) !== null);
         if (wantsPrice) {
           throw badRequest(ErrorCode.VALIDATION_FAILED, `Só o plano "${WEB_PLAN_KEY}" é vendido pela web; os demais não têm preço web.`);
         }
@@ -649,9 +656,21 @@ export class AdminBillingService {
         patch.webPriceMonthlyCents = input.webPriceMonthlyCents;
         changes['webPriceMonthlyCents'] = { from: plan.webPriceMonthlyCents, to: input.webPriceMonthlyCents };
       }
+      if (input.webPriceSemiannualCents !== undefined && input.webPriceSemiannualCents !== plan.webPriceSemiannualCents) {
+        patch.webPriceSemiannualCents = input.webPriceSemiannualCents;
+        changes['webPriceSemiannualCents'] = { from: plan.webPriceSemiannualCents, to: input.webPriceSemiannualCents };
+      }
       if (input.webPriceYearlyCents !== undefined && input.webPriceYearlyCents !== plan.webPriceYearlyCents) {
         patch.webPriceYearlyCents = input.webPriceYearlyCents;
         changes['webPriceYearlyCents'] = { from: plan.webPriceYearlyCents, to: input.webPriceYearlyCents };
+      }
+      if (input.googleOfferPriceCents !== undefined && input.googleOfferPriceCents !== plan.googleOfferPriceCents) {
+        patch.googleOfferPriceCents = input.googleOfferPriceCents;
+        changes['googleOfferPriceCents'] = { from: plan.googleOfferPriceCents, to: input.googleOfferPriceCents };
+      }
+      if (input.googleOfferCycles !== undefined && input.googleOfferCycles !== plan.googleOfferCycles) {
+        patch.googleOfferCycles = input.googleOfferCycles;
+        changes['googleOfferCycles'] = { from: plan.googleOfferCycles, to: input.googleOfferCycles };
       }
       if (Object.keys(patch).length === 0) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Nada para alterar.');
 

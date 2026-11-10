@@ -214,7 +214,7 @@ describe('painel: preço da web nos planos', () => {
     const owner = await registerUser(context);
     const ws = await createWorkspace(owner, 'Loja do Preço');
     const pricing = await context.app.inject({ method: 'GET', url: `/v1/workspaces/${ws}/billing/web`, headers: owner.authHeader });
-    expect(pricing.json().pricing).toEqual({ monthlyCents: 3990, yearlyCents: null });
+    expect(pricing.json().pricing).toEqual({ monthlyCents: 3990, semiannualCents: null, yearlyCents: null });
   });
 
   it('valida centavos (inteiro, piso e teto), restringe ao plano da web e exige owner', async () => {

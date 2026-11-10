@@ -85,7 +85,7 @@ function Upsell() {
           </div>
 
           <div className="row row--wrap">
-            <Link to="/app/plano" className="btn btn--primary">
+            <Link to="/app/plano?origem=analise" className="btn btn--primary">
               Conhecer o plano Equipe
             </Link>
             <span className="caption">O plano também libera a equipe e produtos sem limite.</span>
