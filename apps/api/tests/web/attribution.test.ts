@@ -130,8 +130,19 @@ describe('exportação de ativações para o Google Ads', () => {
       }
       return user;
     };
-    await make('v2_accepted', 'GCLID_OK', 8);
-    await make('refused', 'GCLID_RECUSOU', 8);
+    const buyer = await make('v2_accepted', 'GCLID_OK', 8);
+    const refused = await make('refused', 'GCLID_RECUSOU', 8);
+    // Assinatura paga pela web de quem veio do anúncio: vira a conversão "Assinatura (offline)" com o valor cobrado.
+    const subscribe = async (user: typeof buyer, state: string, hoursAgo: number) => {
+      const ws = (await context.app.inject({ method: 'GET', url: '/v1/workspaces', headers: user.authHeader })).json();
+      const wsId = (ws.workspaces ?? ws)[0].id;
+      await context.services.db.execute(sql`
+        INSERT INTO subscriptions (workspace_id, plan_key, provider, state, started_at, billing_cycle, price_cents, provider_subscription_id, provider_customer_id, auto_renewing, acknowledged)
+        VALUES (${wsId}, 'basico', 'asaas', ${state}, now() - make_interval(hours => ${hoursAgo}), 'SEMIANNUALLY', 12990, ${`sub_${wsId}`}, 'cus_x', true, true)
+      `);
+    };
+    await subscribe(buyer, 'ativa', 7);
+    await subscribe(refused, 'ativa', 7);
     await make('v1_accepted', 'GCLID_TEXTO_ANTIGO', 8);
     await make('none', 'GCLID_SEM_ESCOLHA', 8);
     await make('v2_accepted', 'GCLID_CEDO', 2);
@@ -143,8 +154,9 @@ describe('exportação de ativações para o Google Ads', () => {
     expect(response.headers['content-type']).toContain('text/csv');
     const lines = response.body.trim().split('\n');
     expect(lines[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(3);
     expect(lines[1]).toMatch(/^GCLID_OK,Ativação \(offline\),\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}-03:00,12,BRL$/);
+    expect(lines[2]).toMatch(/^GCLID_OK,Assinatura \(offline\),\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}-03:00,129\.90,BRL$/);
   });
 
   it('formata o horário em Brasília e escapa células', () => {
@@ -193,6 +205,11 @@ describe('upload programado do Google Ads', () => {
       expect(ok.statusCode).toBe(200);
       expect(ok.headers['content-type']).toContain('text/csv');
       expect(ok.body.split('\n')[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
+      // Assinaturas: endereço próprio, mesma autenticação.
+      expect((await other.app.inject({ method: 'GET', url: '/v1/ads/offline-subscriptions.csv' })).statusCode).toBe(401);
+      const subs = await other.app.inject({ method: 'GET', url: '/v1/ads/offline-subscriptions.csv', headers: basic('googleads', password) });
+      expect(subs.statusCode).toBe(200);
+      expect(subs.body.split('\n')[0]).toBe('Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency');
     } finally {
       await other.close();
     }

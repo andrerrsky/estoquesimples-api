@@ -16,7 +16,8 @@ import { AppError, ErrorCode, badRequest, conflict, notFound } from '../../platf
 import { AuditAction, SECURITY_USER_ACTIONS, recordAudit } from '../audit/audit.service.js';
 import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
-import type { OfflineConversionRow } from '../auth/signup-attribution.js';
+import { SUBSCRIPTION_CONVERSION_NAME, type OfflineConversionRow } from '../auth/signup-attribution.js';
+import { googleRecurringCents } from './admin-finance.js';
 import { AdminAction, SECURITY_ADMIN_ACTIONS, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
 import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
@@ -805,6 +806,52 @@ export class AdminUsersService {
       ORDER BY fp.first_product_at
     `);
     return rows.rows.map((row) => ({ gclid: row.gclid, convertedAt: new Date(row.first_product_at) }));
+  }
+
+  /**
+   * Assinaturas pagas de quem chegou por anúncio (gclid no cadastro e aceite
+   * do aviso de cookies atual), app ou web, com o valor da primeira cobrança.
+   * Mesma janela e o mesmo atraso de 6 h das ativações: o Google deduplica
+   * por gclid + ação, então repetir a linha nos próximos dias não conta dobrado.
+   * Reembolsadas e ainda não pagas ficam de fora.
+   */
+  async offlineSubscriptions(since: Date): Promise<OfflineConversionRow[]> {
+    const rows = await this.db.execute<{
+      gclid: string; started_at: string; provider: string; price_cents: number | null;
+      raw: unknown; google_offer_id: string | null; offer_price: number | null;
+    }>(sql`
+      SELECT DISTINCT ON (s.id)
+             u.signup_attribution->>'gclid' AS gclid, s.started_at, s.provider, s.price_cents,
+             CASE WHEN s.provider = 'google_play' THEN s.raw ELSE NULL END AS raw,
+             s.google_offer_id, p.google_offer_price_cents AS offer_price
+      FROM subscriptions s
+      JOIN workspaces w ON w.id = s.workspace_id
+      JOIN users u ON u.id = COALESCE(s.purchaser_user_id, w.owner_user_id)
+      LEFT JOIN plans p ON p.key = s.plan_key
+      WHERE s.started_at IS NOT NULL
+        AND s.state IN ('ativa', 'carencia', 'cancelada_mas_ativa', 'expirada')
+        AND s.started_at >= ${since.toISOString()}::timestamptz
+        AND s.started_at < now() - interval '6 hours'
+        AND u.deleted_at IS NULL
+        AND u.signup_attribution->>'gclid' IS NOT NULL
+        AND u.signup_attribution->>'consent' = 'v2_accepted'
+      ORDER BY s.id
+    `);
+    return rows.rows
+      .map((row) => {
+        let cents = row.price_cents;
+        if (row.provider === 'google_play') {
+          const google = googleRecurringCents(row.raw);
+          cents = row.google_offer_id && row.offer_price !== null ? row.offer_price : google.cents;
+        }
+        return {
+          gclid: row.gclid,
+          convertedAt: new Date(row.started_at),
+          conversionName: SUBSCRIPTION_CONVERSION_NAME,
+          valueBrl: (cents ?? 0) / 100,
+        };
+      })
+      .sort((a, b) => a.convertedAt.getTime() - b.convertedAt.getTime());
   }
 
   /**

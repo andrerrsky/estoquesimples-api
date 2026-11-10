@@ -110,7 +110,7 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
     },
     async (request, reply) => {
       const since = new Date(Date.now() - request.query.days * 86_400_000);
-      const csv = offlineConversionsCsv(await service.offlineActivations(since));
+      const csv = offlineConversionsCsv([...(await service.offlineActivations(since)), ...(await service.offlineSubscriptions(since))]);
       const day = new Date().toISOString().slice(0, 10);
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')

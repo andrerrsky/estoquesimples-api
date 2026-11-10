@@ -4,7 +4,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { safeEquals } from '../../platform/auth/tokens.js';
 import { notFound, unauthorized, ErrorCode } from '../../platform/http/errors.js';
 import { AdminUsersService } from '../admin/admin-users.service.js';
-import { offlineConversionsCsv } from '../auth/signup-attribution.js';
+import { SUBSCRIPTION_CONVERSION_NAME, offlineConversionsCsv } from '../auth/signup-attribution.js';
 
 /** Usuário fixo do upload programado; a senha vem de `ADS_UPLOAD_PASSWORD`. */
 export const ADS_UPLOAD_USER = 'googleads';
@@ -50,6 +50,23 @@ export async function registerAdsRoutes(app: FastifyInstance): Promise<void> {
       requireUploadPassword(request, reply);
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
       const csv = offlineConversionsCsv(await service.offlineActivations(since));
+      return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
+    },
+  );
+
+  // Assinaturas pagas de quem veio por anúncio, com o valor da primeira
+  // cobrança. Endereço próprio porque, no Google Ads, cada ação de conversão
+  // tem a sua conexão HTTPS (a mesma autenticação desta).
+  routes.get(
+    '/ads/offline-subscriptions.csv',
+    {
+      config: { rateLimit: { max: 30, timeWindow: 60_000 } },
+      schema: { tags: ['ads'], summary: 'CSV de assinaturas para o upload programado do Google Ads', hide: true },
+    },
+    async (request, reply) => {
+      requireUploadPassword(request, reply);
+      const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
+      const csv = offlineConversionsCsv(await service.offlineSubscriptions(since), SUBSCRIPTION_CONVERSION_NAME);
       return reply.header('Content-Type', 'text/csv; charset=utf-8').header('Cache-Control', 'no-store').send(csv);
     },
   );

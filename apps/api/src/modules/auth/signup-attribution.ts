@@ -95,17 +95,28 @@ function csvCell(value: string): string {
 export interface OfflineConversionRow {
   gclid: string;
   convertedAt: Date;
+  /** Ação de conversão no Google Ads; sem ela vale a do CSV (ativação). */
+  conversionName?: string;
+  /** Valor em reais; sem ele vale o valor estimado da ativação. */
+  valueBrl?: number;
 }
 
 /** Valor estimado de uma ativação (ver docs/aquisicao-e-conversao.md). */
 export const ACTIVATION_VALUE_BRL = 12;
 export const ACTIVATION_CONVERSION_NAME = 'Ativação (offline)';
+/**
+ * Assinatura paga (app ou web) de quem chegou por anúncio, com o valor da
+ * primeira cobrança. Registrada pelo servidor: não depende de a pessoa
+ * voltar ao navegador nem do GA.
+ */
+export const SUBSCRIPTION_CONVERSION_NAME = 'Assinatura (offline)';
 
 /** CSV no modelo "Conversões de cliques" do Google Ads (Ferramentas › Uploads). */
 export function offlineConversionsCsv(rows: OfflineConversionRow[], conversionName = ACTIVATION_CONVERSION_NAME): string {
   const lines = ['Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency'];
   for (const row of rows) {
-    lines.push([row.gclid, conversionName, adsConversionTime(row.convertedAt), String(ACTIVATION_VALUE_BRL), 'BRL'].map(csvCell).join(','));
+    const value = row.valueBrl ?? ACTIVATION_VALUE_BRL;
+    lines.push([row.gclid, row.conversionName ?? conversionName, adsConversionTime(row.convertedAt), (Number.isInteger(value) ? String(value) : value.toFixed(2)), 'BRL'].map(csvCell).join(','));
   }
   return `${lines.join('\n')}\n`;
 }
