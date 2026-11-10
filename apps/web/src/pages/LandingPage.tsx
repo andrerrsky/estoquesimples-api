@@ -520,6 +520,13 @@ const SEGMENT_TITLES: Record<string, string> = {
   mercearia: 'Controle de estoque para mercearia e mercadinho.',
   cosmeticos: 'Controle de estoque para a sua loja de cosméticos.',
   planilha: 'Troque a planilha de estoque por um app grátis.',
+  // Campanha de Pesquisa (10/11/2026): grupos e sitelinks.
+  app: 'App de controle de estoque grátis, no celular e no computador.',
+  generico: 'Controle de estoque simples para pequenas lojas.',
+  sitelink_planilha: 'Troque a planilha de estoque por um app grátis.',
+  sitelink_codigo: 'Leia o código de barras e ache o produto na hora.',
+  sitelink_equipe: 'Toda a sua equipe no mesmo estoque.',
+  sitelink_comece: 'Comece grátis: seu estoque pronto em 2 minutos.',
 };
 
 export function landingTitleFor(content: string | null): string | null {
