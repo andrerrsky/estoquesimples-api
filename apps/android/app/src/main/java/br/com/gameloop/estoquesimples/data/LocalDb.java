@@ -49,7 +49,7 @@ public final class LocalDb extends SQLiteOpenHelper {
      * 7 — photo_hash / photo_base_hash: identificação da foto na nuvem (ver
      *     AGENTS.md, "Fotos dos produtos").
      */
-    public static final int VERSION = 7;
+    public static final int VERSION = 8;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
@@ -138,6 +138,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV5(db);
         upgradeToV6(db);
         upgradeToV7(db);
+        upgradeToV8(db);
     }
 
     @Override
@@ -161,6 +162,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 7) {
             upgradeToV7(db);
+        }
+        if (oldVersion < 8) {
+            upgradeToV8(db);
         }
     }
 
@@ -388,6 +392,23 @@ public final class LocalDb extends SQLiteOpenHelper {
     private void upgradeToV7(SQLiteDatabase db) {
         addColumnIfMissing(db, TABLE_PRODUCTS, "photo_hash", "TEXT");
         addColumnIfMissing(db, TABLE_PRODUCTS, "photo_base_hash", "TEXT");
+    }
+
+    /**
+     * Índices para achar produto por nome, SKU e código de barras.
+     *
+     * A importação procura cada linha da planilha por esses campos; sem
+     * índice, cada busca varria a tabela inteira e um arquivo grande levava
+     * minutos (ANR na versão 29). O de código de barras também atende à
+     * busca pela câmera.
+     */
+    private void upgradeToV8(SQLiteDatabase db) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_estoque_nome "
+                + "ON " + TABLE_PRODUCTS + " (name)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_estoque_sku "
+                + "ON " + TABLE_PRODUCTS + " (sku)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_estoque_barcode "
+                + "ON " + TABLE_PRODUCTS + " (barcode)");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {
