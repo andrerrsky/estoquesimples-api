@@ -411,6 +411,45 @@ Regras:
 - `signup.started` passou a significar **primeira digitação no formulário** (em `/criar-conta` e em `/comece`), com `page`. Antes saía ao abrir `/criar-conta`; números anteriores a 7/11 não são comparáveis.
 - Teste A/B opcional (só depois): sorteio 50/50 no servidor por visitante, gravado em `signup_attribution.variant`; métrica `signup.started ÷ landing.viewed`; decisão com P(variante melhor) ≥ 90% e ≥ 300 visitas por braço; duração máxima 12 semanas (sem conclusão, fica `/comece`).
 
+### Pesquisa: configuração aprovada em 10/11/2026 (substitui o lance e o teto abaixo)
+
+O Display foi pausado em 10/11 (R$ 64,24; 219 de 236 cliques vieram de sites de isca; 3 cadastros e 0 ativações). A ativação offline passou a ser a única conversão principal, e o `sign_up` ficou secundário. Revisão por especialista: nota 8 → 9 com estes ajustes.
+
+- **Campanhas:**
+  - "Estoque Simples | Pesquisa | App e controle": teto de R$ 25/dia, grupos App e Controle de estoque, `utm_campaign=pesquisa_app`.
+  - "Estoque Simples | Pesquisa | Planilha (teste)": teto de R$ 5/dia, `utm_campaign=pesquisa_planilha`.
+  - Sufixo: `utm_id={campaignid}&utm_term={keyword}&utm_matchtype={matchtype}`.
+  - O que limita o volume é a busca (cerca de 1 mil buscas por mês nos termos de app); gasto esperado de R$ 15–22/dia.
+- **Lance:** CPC manual por palavra.
+  - Exatas de app: R$ 2,50.
+  - Frases de app, "app de estoque" e "controle de estoque pelo celular": R$ 2,20.
+  - `[controle de estoque grátis]`: R$ 2,30.
+  - Frases de "grátis": R$ 2,00.
+  - `[controle de estoque]` e as frases do grupo Controle: R$ 1,80.
+  - Planilha: R$ 1,20.
+  - Passar para Maximizar conversões com 15 ativações no painel e ≥ 10 no Ads.
+- **Dia 7** (só com ≥ 50 cliques; senão, dia 10):
+  - CTR de grupo < 5%: reescrever os anúncios.
+  - `[controle de estoque]` com < 50% de termos relevantes: pausar.
+  - landing → signup.started < 15%: rever a landing.
+  - Termos de app com CTR bom e > 60% de impressões perdidas por classificação: +R$ 0,30, até R$ 2,80.
+- **Dia 14:**
+  - cadastro → 1º produto < 30%: corrigir o onboarding, sem mexer no lance.
+  - Principal com ≥ R$ 250 e 0 ativações: pausar o grupo que mais gastou.
+  - Planilha com ≥ R$ 60 e 0 cadastros: pausar.
+- **Dia 30 ou R$ 750**, decidindo só com ≥ 10 ativações:
+  - CPA ≤ R$ 30: seguir e subir o orçamento.
+  - R$ 30–60: mais 15 dias com lances −15%.
+  - Acima de R$ 60: pausar.
+  - Com menos de 10 ativações: pausar se ≥ R$ 450 e ≤ 3 ativações; senão, estender até o dia 45.
+  - Planilha: decidir pelo custo por cadastro (≤ R$ 15 segue).
+- **Ativações no Android:** quem instala pela Play não grava gclid nem UTM no app.
+  - Em `/comece` (só no Android), o link "Baixe na Google Play" leva as UTMs no `referrer` (evento `play.clicked`).
+  - Somar ao painel as instalações google/cpc da Play Console (Aquisição de usuários) até a Install Referrer API ficar pronta.
+- **Pré-requisitos:**
+  - Ação "Ativação (offline)" criada em 7/11 (≥ 24 h, ok).
+  - QA de ponta a ponta feito no lançamento do Display (7/11); repetir o passo 1 com `utm_campaign=pesquisa_app` depois de publicar.
+
 ### Campanha de Pesquisa (rascunho; publicar só depois do QA)
 
 - **Configuração:**

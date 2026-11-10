@@ -147,3 +147,13 @@ body:has(.comece) .cookie-consent {
     padding-bottom: 120px;
   }
 }
+
+.comece__play {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.comece__play a {
+  font-weight: 600;
+}
