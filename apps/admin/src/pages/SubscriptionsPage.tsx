@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { api, type Paginated } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { FinancePanel } from '../components/FinancePanel';
 import { Badge, Card, DataTable, Empty, Notice, PageHeader, Pagination, ProviderBadge, StatTile, Tabs, Time, useToast, errorMessage, type Column } from '../components/ui';
 import { useListParams, useSort } from '../lib/hooks';
 import { fmtCents, fmtNumber } from '../lib/format';
@@ -121,7 +122,7 @@ export function SubscriptionsPage() {
       render: (row) => (
         <>
           {PLAN_LABEL[row.planKey] ?? row.planKey}
-          {row.provider === 'asaas' && row.priceCents !== null && <span className="caption"> · {fmtCents(row.priceCents)}/{row.billingCycle === 'YEARLY' ? 'ano' : 'mês'}</span>}
+          {row.provider === 'asaas' && row.priceCents !== null && <span className="caption"> · {fmtCents(row.priceCents)}/{row.billingCycle === 'YEARLY' ? 'ano' : row.billingCycle === 'SEMIANNUALLY' ? '6 meses' : 'mês'}</span>}
           {!row.autoRenewing && ['ativa', 'carencia'].includes(row.state) && <span className="caption"> · renovação desligada</span>}
         </>
       ),
@@ -163,6 +164,8 @@ export function SubscriptionsPage() {
         <StatTile label="Sem verificação (48h)" value={fmtNumber(stats.data?.unverified48h)} foot="podem estar desatualizadas" tone={(stats.data?.unverified48h ?? 0) > 0 ? 'alert' : undefined} />
         <StatTile label="Notificações pendentes" value={fmtNumber(stats.data?.eventsPending)} foot={`${fmtNumber(play?.eventsPending ?? 0)} do Google · ${fmtNumber(web?.eventsPending ?? 0)} do Asaas, ainda não processadas`} tone={(stats.data?.eventsPending ?? 0) > 0 ? 'alert' : undefined} />
       </div>
+
+      <FinancePanel />
 
       <Tabs value={tab} onChange={(next) => set({ tab: next })} items={[{ key: 'subscriptions', label: 'Assinaturas' }, { key: 'events', label: 'Notificações dos provedores', count: stats.data?.eventsPending }]} />
 

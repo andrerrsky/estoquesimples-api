@@ -679,6 +679,31 @@
   margin-top: 4px;
   color: var(--text-muted);
 }
+.lp-plan__price {
+  margin-top: 10px;
+  min-height: 74px;
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.lp-plan__price small {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.lp-plan__price-from {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.lp-plan__price-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
 .lp-plan .check-list {
   line-height: 1.45;
 }

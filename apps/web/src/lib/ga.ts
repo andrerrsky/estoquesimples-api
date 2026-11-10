@@ -316,6 +316,7 @@ const RECOMMENDED: Record<string, string> = {
   'signup.completed': 'sign_up',
   'auth.login': 'login',
   'purchase.started': 'begin_checkout',
+  'purchase.completed': 'purchase',
   'help.searched': 'search',
   'platform.web_app_installed': 'app_install',
 };

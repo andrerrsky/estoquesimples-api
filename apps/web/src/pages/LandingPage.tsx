@@ -4,6 +4,9 @@ import { useAuthOptional } from '../auth/context';
 import { Icon, Logo, type IconName } from '../components/Icon';
 import { SocialLinks } from '../components/SocialLinks';
 import { ROLE_LABEL } from '../lib/labels';
+import { fmtCents } from '../lib/format';
+import { cycleOptions, lowestPerMonth } from '../lib/pricing';
+import type { WebPricing } from '../api/types';
 
 import '../styles/pages-public.css';
 import { openCookiePreferences } from '../lib/ga';
@@ -501,9 +504,10 @@ function useChatReady(): boolean {
  * resto da aplicação. Por isso os links são <a> comuns (não há roteador) e
  * nada aqui pode depender de `window` na renderização, só em efeitos.
  *
- * Tudo o que está escrito aqui existe no produto. Preço e limite de produtos
- * do plano gratuito ficam de fora de propósito: os dois são configuráveis no
- * servidor e aparecem dentro da aplicação, lidos da API.
+ * Tudo o que está escrito aqui existe no produto. O limite de produtos do
+ * plano gratuito fica de fora (configurável no servidor). O preço do plano
+ * Equipe vem da API pública (`/v1/public/pricing`) depois de carregar; sem
+ * resposta, o card continua sem valor, como antes.
  */
 /**
  * Título da página inicial por segmento, conforme o `utm_content` do anúncio:
@@ -522,10 +526,29 @@ export function landingTitleFor(content: string | null): string | null {
   return content ? (SEGMENT_TITLES[content] ?? null) : null;
 }
 
+/** Preço público do plano Equipe; só no navegador (o HTML pré-renderizado sai sem valor). */
+function usePublicPricing(): WebPricing | null {
+  const [pricing, setPricing] = useState<WebPricing | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/v1/public/pricing')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: (WebPricing & { available?: boolean }) | null) => {
+        if (alive && body?.available) setPricing(body);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return pricing;
+}
+
 export function LandingPage() {
   const fromShell = useAuthOptional()?.status === 'authed';
   const fromLanding = useContext(LandingSessionContext);
   const authed = fromLanding ?? fromShell;
+  const pricing = usePublicPricing();
 
   // O ano sai fixo do build e só é corrigido depois do mount: assim o HTML
   // pré-renderizado e o primeiro render do cliente são iguais na virada do ano.
@@ -763,6 +786,19 @@ export function LandingPage() {
                       <span className="badge badge--solid">Assinatura</span>
                     </div>
                     <p className="lp-plan__for">Para quem trabalha com mais gente.</p>
+                    {/* Altura reservada: o preço chega depois do JavaScript e o card não pula. */}
+                    <div className="lp-plan__price" aria-live="polite">
+                      {pricing && lowestPerMonth(pricing) !== null ? (
+                        <>
+                          <span className="lp-plan__price-from">a partir de</span> {fmtCents(lowestPerMonth(pricing))}<small>/mês</small>
+                          <div className="lp-plan__price-sub">
+                            {cycleOptions(pricing).map((option) => (option.months === 1 ? `${fmtCents(option.totalCents)} no mensal` : `${fmtCents(option.perMonthCents)}/mês no ${option.label.toLowerCase()}${option.savingPct > 0 ? ` (−${option.savingPct}%)` : ''}`)).join(' · ')}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="lp-plan__price-from">Pix, boleto ou cartão, por mês, semestre ou ano</span>
+                      )}
+                    </div>
                   </div>
                   <ul className="check-list">
                     <li><Icon name="check" /> Tudo do plano Gratuito</li>
@@ -785,11 +821,11 @@ export function LandingPage() {
                     <li><Icon name="check" /> Sua marca: cores, logotipo e página de entrada própria da empresa</li>
                     <li><Icon name="check" /> Mais espaço para fotos dos produtos</li>
                   </ul>
-                  <p className="lp-plan__note">Uma pessoa assina e toda a equipe usa. O valor está em Plano, na web, e em Plano Equipe, no aplicativo; você só assina quando quiser.</p>
+                  <p className="lp-plan__note">Uma pessoa assina e toda a equipe usa. Pix, boleto ou cartão; sem fidelidade. Comece grátis e assine só quando precisar.</p>
                   {authed ? (
                     <a href="/app/plano" className="btn btn--primary btn--block">Ver o plano Equipe</a>
                   ) : (
-                    <a href="/criar-conta?depois=/app/plano" className="btn btn--primary btn--block">Criar conta e ver valores</a>
+                    <a href="/criar-conta?depois=/app/plano" className="btn btn--primary btn--block">Criar conta e assinar</a>
                   )}
                 </div>
               </div>

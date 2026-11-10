@@ -25,7 +25,7 @@ beforeEach(async () => {
   await resetDatabase(context);
   context.asaas.reset();
   await context.services.db.execute(
-    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
+    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_semiannual_cents = NULL, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
   );
 });
 
@@ -109,7 +109,7 @@ describe('assinatura pela web (Asaas)', () => {
     const owner = await registerUser(context);
     const ws = await criarEmpresa(owner);
 
-    expect((await overview(owner, ws))).toMatchObject({ checkoutAvailable: true, pricing: { monthlyCents: 2990, yearlyCents: 29900 }, subscription: null });
+    expect((await overview(owner, ws))).toMatchObject({ checkoutAvailable: true, pricing: { monthlyCents: 2990, semiannualCents: null, yearlyCents: 29900 }, subscription: null });
 
     const invalid = await checkout(owner, ws, { ...checkoutBody, cpfCnpj: '123.456.789-00' });
     expect(invalid.statusCode).toBe(400);
@@ -161,6 +161,31 @@ describe('assinatura pela web (Asaas)', () => {
 
     const already = await checkout(owner, ws);
     expect(already.statusCode).toBe(409);
+  });
+
+  it('vende o semestral pelo total do ciclo e expõe o preço público', async () => {
+    await context.services.db.execute(sql`UPDATE plans SET web_price_semiannual_cents = 12990 WHERE key = 'basico'`);
+    try {
+      const pub = await context.app.inject({ method: 'GET', url: '/v1/public/pricing' });
+      expect(pub.statusCode).toBe(200);
+      expect(pub.json()).toEqual({ available: true, monthlyCents: 2990, semiannualCents: 12990, yearlyCents: 29900 });
+
+      // Anual cadastrado com o valor de um mês: sai da venda em vez de ser cobrado.
+      await context.services.db.execute(sql`UPDATE plans SET web_price_yearly_cents = 1699 WHERE key = 'basico'`);
+      expect((await context.app.inject({ method: 'GET', url: '/v1/public/pricing' })).json()).toMatchObject({ yearlyCents: null });
+      await context.services.db.execute(sql`UPDATE plans SET web_price_yearly_cents = 29900 WHERE key = 'basico'`);
+
+      const owner = await registerUser(context);
+      const ws = await criarEmpresa(owner);
+      const started = await checkout(owner, ws, { ...checkoutBody, cycle: 'SEMIANNUALLY' });
+      expect(started.statusCode).toBe(200);
+      expect(started.json()).toMatchObject({ state: 'pendente', payment: { valueCents: 12990 } });
+      const remote = [...context.asaas.subscriptions.values()].at(-1) as { cycle?: string; value?: number };
+      expect(remote).toMatchObject({ cycle: 'SEMIANNUALLY', value: 129.9 });
+      expect((await overview(owner, ws)).subscription).toMatchObject({ billingCycle: 'SEMIANNUALLY', priceCents: 12990 });
+    } finally {
+      await context.services.db.execute(sql`UPDATE plans SET web_price_semiannual_cents = NULL WHERE key = 'basico'`);
+    }
   });
 
   it('eventos fora de ordem convergem: o estado vem sempre da consulta ao provedor', async () => {

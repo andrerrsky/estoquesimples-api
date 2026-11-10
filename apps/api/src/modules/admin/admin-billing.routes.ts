@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { adminActor, requireAdmin } from './admin-auth.plugin.js';
+import { loadFinanceReport } from './admin-finance.js';
 import { AdminBillingService, SUBSCRIPTION_PROVIDERS, WEB_PRICE_MAX_CENTS, WEB_PRICE_MIN_CENTS } from './admin-billing.service.js';
 import {
   commonAdminErrors,
@@ -118,6 +119,21 @@ export async function registerAdminBillingRoutes(app: FastifyInstance): Promise<
   );
 
   routes.get(
+    '/billing/finance',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Relatório financeiro das assinaturas (receita, MRR, novas e saídas por mês)',
+        hide: true,
+        querystring: z.object({ months: z.coerce.number().int().min(3).max(36).default(12) }),
+        response: { 200: z.any(), ...commonAdminErrors },
+      },
+    },
+    async (request) => loadFinanceReport(app.services, request.query.months),
+  );
+
+  routes.get(
     '/billing/plans',
     {
       preHandler: requireAdmin('viewer'),
@@ -151,7 +167,10 @@ export async function registerAdminBillingRoutes(app: FastifyInstance): Promise<
             description: z.string().trim().max(500).optional(),
             isActive: z.boolean().optional(),
             webPriceMonthlyCents: webPriceSchema.optional(),
+            webPriceSemiannualCents: webPriceSchema.optional(),
             webPriceYearlyCents: webPriceSchema.optional(),
+            googleOfferPriceCents: z.number().int().min(0).max(WEB_PRICE_MAX_CENTS).nullable().optional(),
+            googleOfferCycles: z.number().int().min(1).max(24).nullable().optional(),
             reason: z.string().trim().min(3).max(500),
           })
           .strict(),

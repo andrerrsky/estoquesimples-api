@@ -194,7 +194,7 @@ export function BrandPage() {
             {!eligible && (
               <Notice tone="info" title="Recurso do plano Equipe">
                 A identidade visual personalizada está disponível enquanto a assinatura do plano Equipe estiver ativa. {data.config.slug ? 'O que você configurou fica guardado e volta a valer quando a empresa assinar de novo.' : ''}{' '}
-                <Link to="/app/plano">Ver plano</Link>
+                <Link to="/app/plano?origem=marca">Ver plano</Link>
               </Notice>
             )}
             {data.config.blocked && (

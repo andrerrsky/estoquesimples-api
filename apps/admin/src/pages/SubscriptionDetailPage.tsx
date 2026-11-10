@@ -209,7 +209,7 @@ export function SubscriptionDetailPage() {
                 items={[
                   { label: 'Ciclo', value: asaas.billingCycle ? BILLING_CYCLE[asaas.billingCycle] ?? asaas.billingCycle : '—' },
                   { label: 'Forma de pagamento', value: asaas.billingType ? BILLING_TYPE[asaas.billingType] ?? asaas.billingType : '—' },
-                  { label: 'Valor contratado', value: asaas.priceCents !== null ? `${fmtCents(asaas.priceCents)} / ${asaas.billingCycle === 'YEARLY' ? 'ano' : 'mês'}` : '—' },
+                  { label: 'Valor contratado', value: asaas.priceCents !== null ? `${fmtCents(asaas.priceCents)} / ${asaas.billingCycle === 'YEARLY' ? 'ano' : asaas.billingCycle === 'SEMIANNUALLY' ? '6 meses' : 'mês'}` : '—' },
                   { label: 'Próximo vencimento', value: fmtDay(asaas.nextDueDate) },
                   { label: 'Carência', value: sub.graceUntil ? <>até <Time value={sub.graceUntil} relative={false} /> ({asaas.graceDays} dias após o vencimento)</> : `${asaas.graceDays} dias após o vencimento, se atrasar` },
                   { label: 'Assinatura no Asaas', value: asaas.providerSubscriptionId ? <CopyId id={asaas.providerSubscriptionId} /> : '—' },

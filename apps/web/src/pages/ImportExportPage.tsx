@@ -327,7 +327,7 @@ export function ImportExportPage() {
                   <Notice
                     tone="warning"
                     title={typeof planLimit.extra['limit'] === 'number' ? `A planilha passa do limite de ${fmtInteger(planLimit.extra['limit'])} produtos do plano gratuito` : 'A planilha passa do limite de produtos do plano'}
-                    action={<Link to="/app/plano" className="btn btn--secondary btn--sm">Ver planos</Link>}
+                    action={<Link to="/app/plano?origem=importar" className="btn btn--primary btn--sm">Liberar produtos ilimitados</Link>}
                   >
                     {typeof planLimit.extra['current'] === 'number' && <>Com ela, a empresa ficaria com {fmtInteger(planLimit.extra['current'])} produtos. </>}
                     {outcome.sent === 0 ? 'Nenhuma linha foi importada.' : `As primeiras ${fmtInteger(outcome.sent)} linhas foram importadas; as demais, não.`} Assine o plano Equipe para cadastrar sem

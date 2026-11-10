@@ -42,7 +42,7 @@ export async function enqueueSubscriptionAlert(executor: Database | Transaction,
 
 const money = (cents: number | null) => (cents === null ? null : (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const dateBr = (date: Date | null) => (date ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short' }).format(date) : null);
-const CYCLE: Record<string, string> = { MONTHLY: 'mensal', YEARLY: 'anual' };
+const CYCLE: Record<string, string> = { MONTHLY: 'mensal', SEMIANNUALLY: 'semestral', YEARLY: 'anual' };
 const BILLING: Record<string, string> = { PIX: 'Pix', BOLETO: 'boleto', CREDIT_CARD: 'cartão de crédito', UNDEFINED: 'a escolher' };
 
 /** Envia o aviso. Lança se nenhum envio der certo, para a fila repetir. */

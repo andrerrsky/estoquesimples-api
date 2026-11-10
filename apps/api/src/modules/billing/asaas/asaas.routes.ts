@@ -22,7 +22,7 @@ const checkoutBodySchema = z
       .max(20)
       .regex(/^[\d\s()+-]{10,20}$/u, 'Telefone inválido.')
       .optional(),
-    cycle: z.enum(['MONTHLY', 'YEARLY']),
+    cycle: z.enum(['MONTHLY', 'SEMIANNUALLY', 'YEARLY']),
     billingType: z.enum(['UNDEFINED', 'PIX', 'BOLETO', 'CREDIT_CARD']).default('UNDEFINED'),
   })
   .strict();
@@ -40,6 +40,33 @@ export async function registerAsaasRoutes(app: FastifyInstance): Promise<void> {
   const { env } = app.services;
 
   const strict = { config: { rateLimit: { max: env.RATE_LIMIT_AUTH_MAX, timeWindow: env.RATE_LIMIT_WINDOW_MS } } };
+
+  // Preço público do plano Equipe para a landing e /precos: só o que está à
+  // venda na web (nada da empresa ou de quem pede). Cache curto no navegador.
+  routes.get(
+    '/public/pricing',
+    {
+      schema: {
+        tags: ['assinatura'],
+        summary: 'Preços do plano Equipe vendidos pela web (público)',
+        response: {
+          200: z.object({
+            available: z.boolean(),
+            monthlyCents: z.number().int().nullable(),
+            semiannualCents: z.number().int().nullable(),
+            yearlyCents: z.number().int().nullable(),
+          }),
+        },
+      },
+    },
+    async (_request, reply) => {
+      const pricing = await service.pricing();
+      reply.header('cache-control', 'public, max-age=60');
+      const available = app.services.asaas.configured
+        && (pricing.monthlyCents !== null || pricing.semiannualCents !== null || pricing.yearlyCents !== null);
+      return { available, ...pricing };
+    },
+  );
 
   routes.get(
     '/workspaces/:workspaceId/billing/web',

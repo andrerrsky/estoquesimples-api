@@ -12,7 +12,7 @@ import type { Logger } from '../../../platform/observability/logger.js';
  */
 
 export type AsaasBillingType = 'UNDEFINED' | 'BOLETO' | 'CREDIT_CARD' | 'PIX';
-export type AsaasCycle = 'MONTHLY' | 'YEARLY';
+export type AsaasCycle = 'MONTHLY' | 'SEMIANNUALLY' | 'YEARLY';
 
 export interface AsaasCustomer {
   id: string;

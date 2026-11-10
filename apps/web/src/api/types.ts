@@ -353,16 +353,25 @@ export interface PaymentView {
   receiptUrl: string | null;
 }
 
+export type BillingCycle = 'MONTHLY' | 'SEMIANNUALLY' | 'YEARLY';
+
+/** Total cobrado em cada ciclo, em centavos; `null` = ciclo fora da venda. */
+export interface WebPricing {
+  monthlyCents: number | null;
+  semiannualCents: number | null;
+  yearlyCents: number | null;
+}
+
 export interface BillingOverview {
   checkoutAvailable: boolean;
-  pricing: { monthlyCents: number | null; yearlyCents: number | null };
+  pricing: WebPricing;
   graceDays: number;
   subscription: {
     id: string;
     provider: 'asaas' | 'google_play';
     state: SubscriptionState;
     planKey: string;
-    billingCycle: 'MONTHLY' | 'YEARLY' | null;
+    billingCycle: BillingCycle | null;
     billingType: string | null;
     priceCents: number | null;
     autoRenewing: boolean;

@@ -27,7 +27,17 @@ export const plans = pgTable('plans', {
   googleBasePlanId: text('google_base_plan_id'),
   /** Preço da venda na web (Asaas), em centavos. Nulo = ciclo não vendido. */
   webPriceMonthlyCents: integer('web_price_monthly_cents'),
+  /** Total cobrado a cada 6 meses. */
+  webPriceSemiannualCents: integer('web_price_semiannual_cents'),
+  /** Total cobrado uma vez por ano (não o equivalente mensal). */
   webPriceYearlyCents: integer('web_price_yearly_cents'),
+  /**
+   * Oferta de entrada do Google Play (preço por mês e quantos meses), só para
+   * o relatório financeiro estimar o que cada assinatura do app paga: o
+   * Google não informa o valor da oferta na assinatura.
+   */
+  googleOfferPriceCents: integer('google_offer_price_cents'),
+  googleOfferCycles: integer('google_offer_cycles'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),

@@ -3,33 +3,70 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { api, ApiError, errorMessage } from '../api/client';
-import type { BillingOverview, CheckoutResult, PaymentView, SubscriptionState } from '../api/types';
+import type { BillingCycle, BillingOverview, CheckoutResult, PaymentView, SubscriptionState } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { Badge, Card, ConfirmDialog, Field, KeyValue, Meter, Modal, Notice, PageHeader, QueryState, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
 import { fmtCents, fmtDate, fmtInteger } from '../lib/format';
+import { chargeLine, cycleOptions, defaultCycle, maxSavingPct } from '../lib/pricing';
 import { BILLING_TYPE, PAYMENT_STATUS, SUBSCRIPTION_STATE, type Tone } from '../lib/labels';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
 
 import '../styles/pages-company.css';
 
-type Cycle = 'MONTHLY' | 'YEARLY';
+type Cycle = BillingCycle;
 type BillingMethod = 'UNDEFINED' | 'PIX' | 'BOLETO' | 'CREDIT_CARD';
 type Subscription = NonNullable<BillingOverview['subscription']>;
 
-const CYCLE_LABEL: Record<string, string> = { MONTHLY: 'Mensal', YEARLY: 'Anual' };
-const CYCLE_UNIT: Record<string, string> = { MONTHLY: 'por mês', YEARLY: 'por ano' };
+const CYCLE_LABEL: Record<string, string> = { MONTHLY: 'Mensal', SEMIANNUALLY: 'Semestral', YEARLY: 'Anual' };
+const CYCLE_UNIT: Record<string, string> = { MONTHLY: 'por mês', SEMIANNUALLY: 'a cada 6 meses', YEARLY: 'por ano' };
 const PROVIDER_LABEL: Record<string, string> = { asaas: 'Pela web', google_play: 'Google Play' };
 
 const METHODS: Array<{ key: BillingMethod; label: string; hint: string }> = [
-  { key: 'PIX', label: 'Pix', hint: 'QR Code ou copia e cola na página da fatura.' },
-  { key: 'BOLETO', label: 'Boleto', hint: 'A confirmação pode levar alguns dias úteis.' },
-  { key: 'CREDIT_CARD', label: 'Cartão de crédito', hint: 'Digitado na página segura do Asaas.' },
-  { key: 'UNDEFINED', label: 'Escolher na fatura', hint: 'Você decide na hora de pagar.' },
+  { key: 'PIX', label: 'Pix', hint: 'Liberado na hora. A cada renovação chega uma nova cobrança Pix por e-mail.' },
+  { key: 'CREDIT_CARD', label: 'Cartão de crédito', hint: 'Renova sozinho. Digitado na página segura do Asaas.' },
+  { key: 'BOLETO', label: 'Boleto', hint: 'A confirmação pode levar até 3 dias úteis.' },
 ];
 
 const onlyDigits = (value: string): string => value.replace(/\D+/g, '');
+
+const ORIGIN_KEY = 'es_plano_origem';
+
+/**
+ * De onde a pessoa veio para o plano (`?origem=limite_produtos`, aviso da
+ * equipe…). Fica na sessão para o checkout saber, mesmo depois de a URL
+ * perder o parâmetro.
+ */
+/**
+ * Conversão de compra, no máximo uma vez por cobrança neste navegador (duas
+ * abas ou a volta do Asaas não contam em dobro). `transaction_id` deixa o GA
+ * descartar repetições que escaparem.
+ */
+function trackPurchaseOnce(sub: { id: string; billingCycle: string | null; priceCents: number | null }): void {
+  const key = `es_compra_${sub.id}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    // sem armazenamento: registra assim mesmo; o transaction_id evita o dobro no GA
+  }
+  track('purchase.completed', { cycle: sub.billingCycle ?? 'MONTHLY', value: (sub.priceCents ?? 0) / 100, currency: 'BRL', transaction_id: sub.id, origin: originOf() });
+}
+
+function originOf(): string {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('origem');
+    if (fromUrl) {
+      const clean = fromUrl.replace(/[^a-z0-9_]/gi, '').slice(0, 40) || 'plano';
+      sessionStorage.setItem(ORIGIN_KEY, clean);
+      return clean;
+    }
+    return sessionStorage.getItem(ORIGIN_KEY) ?? 'plano';
+  } catch {
+    return 'plano';
+  }
+}
 
 /** CPF (000.000.000-00) até 11 dígitos; a partir do 12º vira CNPJ (00.000.000/0000-00). */
 function maskDocument(value: string): string {
@@ -108,14 +145,19 @@ export function PlanPage() {
     const current = data.subscription?.state ?? null;
     const previous = seen.current;
     seen.current = { workspaceId, state: current };
-    if (previous && previous.workspaceId === workspaceId && previous.state !== current) void refresh();
+    if (previous && previous.workspaceId === workspaceId && previous.state !== current) {
+      void refresh();
+      // Pagamento confirmado nesta visita: a conversão que o funil mede.
+      const paid = data.subscription;
+      if (previous.state === 'pendente' && current === 'ativa' && paid?.provider === 'asaas') trackPurchaseOnce(paid);
+    }
   }, [data, workspaceId, refresh]);
 
   const tracked = useRef(false);
   useEffect(() => {
     if (tracked.current || !entitlement) return;
     tracked.current = true;
-    if (!entitlement.active) track('paywall.viewed', { trigger: 'web_plan' });
+    if (!entitlement.active) track('paywall.viewed', { trigger: originOf() === 'plano' ? 'web_plan' : originOf() });
   }, [entitlement]);
 
   const afterChange = async (fresh?: BillingOverview) => {
@@ -141,6 +183,15 @@ export function PlanPage() {
     },
     onError: (error) => toast.error(error),
   });
+
+  // Assinatura da web que ficou ativa nas últimas 24 h e ainda não foi
+  // contada neste navegador: quem volta do Asaas com o webhook já processado
+  // chega com ela ativa e a passagem de pendente para ativa não é vista.
+  useEffect(() => {
+    const paid = data?.subscription;
+    if (!paid || paid.provider !== 'asaas' || paid.state !== 'ativa' || !paid.startedAt) return;
+    if (Date.now() - new Date(paid.startedAt).getTime() < 86_400_000) trackPurchaseOnce(paid);
+  }, [data]);
 
   // Volta da página de pagamento (`?pagamento=concluido`): reconsulta uma vez
   // e limpa o endereço, para um recarregar não repetir a chamada.
@@ -218,7 +269,12 @@ export function PlanPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Plano" subtitle={`Assinatura de ${workspace.name}. O plano é da empresa: vale para todas as pessoas da equipe.`} />
+      <PageHeader
+        title={entitlement?.active ? 'Plano' : 'Coloque sua equipe no mesmo estoque'}
+        subtitle={entitlement?.active
+          ? `Assinatura de ${workspace.name}. O plano é da empresa: vale para todas as pessoas da equipe.`
+          : `Plano de ${workspace.name}. Com o Equipe, funcionários e sócios lançam do próprio celular, sem limite de produtos. Uma assinatura vale para a empresa toda.`}
+      />
 
       {!canManage && (
         <Notice tone="info">
@@ -548,9 +604,11 @@ function PlanComparison({
   paidProductLimit: number | null;
   action: ReactNode;
 }) {
-  const monthly = pricing?.monthlyCents ?? null;
-  const yearly = pricing?.yearlyCents ?? null;
-  const saving = monthly !== null && yearly !== null ? monthly * 12 - yearly : 0;
+  const options = cycleOptions(pricing);
+  const monthlyOption = options.find((option) => option.cycle === 'MONTHLY') ?? null;
+  const discounted = options.filter((option) => option.months > 1);
+  const headline = monthlyOption ?? options[0] ?? null;
+  const saving = maxSavingPct(pricing);
 
   return (
     <div className="grid grid--2">
@@ -578,22 +636,19 @@ function PlanComparison({
           <span className="plan-card__name">Equipe</span>
           {current === 'paid' && <Badge tone="solid">Plano atual</Badge>}
         </div>
-        {monthly !== null ? (
+        {headline && (
           <div>
             <div className="plan-card__price">
-              {fmtCents(monthly)} <small>por mês</small>
+              {fmtCents(headline.perMonthCents)} <small>por mês{headline.months > 1 ? ` no ${headline.label.toLowerCase()}` : ''}</small>
             </div>
-            {yearly !== null && (
+            {discounted.length > 0 && headline.months === 1 && (
               <div className="caption" style={{ marginTop: 2 }}>
-                ou {fmtCents(yearly)} por ano{saving > 0 ? ` (${fmtCents(saving)} a menos que 12 mensalidades)` : ''}
+                {discounted.map((option) => `${option.label}: ${fmtCents(option.perMonthCents)}/mês`).join(' · ')}
+                {saving > 0 ? ` · economize até ${saving}%` : ''}
               </div>
             )}
           </div>
-        ) : yearly !== null ? (
-          <div className="plan-card__price">
-            {fmtCents(yearly)} <small>por ano</small>
-          </div>
-        ) : null}
+        )}
         <ul className="check-list">
           <li><Icon name="check" /> {paidProductLimit !== null ? `Até ${fmtInteger(paidProductLimit)} produtos na nuvem` : 'Produtos sem limite'}</li>
           <li><Icon name="check" /> Equipe com papéis: administrador, gerente, operador e somente consulta</li>
@@ -604,8 +659,8 @@ function PlanComparison({
         </ul>
         <div className="plan-card__foot">
           {action}
-          {pricing && (monthly !== null || yearly !== null) && current !== 'paid' && (
-            <p className="caption">Pagamento por Pix, boleto ou cartão, na página do Asaas. Cancele quando quiser, por aqui mesmo.</p>
+          {options.length > 0 && current !== 'paid' && (
+            <p className="caption">Pix, boleto ou cartão, na página segura do Asaas. Sem fidelidade: cancele por aqui e use até o fim do período pago. Nada é apagado.</p>
           )}
         </div>
       </section>
@@ -729,11 +784,9 @@ function CheckoutDialog({
   const { user } = useAuth();
   const groupId = useId();
   const { pricing, customer, subscription } = overview;
-  const monthly = pricing.monthlyCents;
-  const yearly = pricing.yearlyCents;
-  const saving = monthly !== null && yearly !== null ? monthly * 12 - yearly : 0;
+  const options = cycleOptions(pricing);
 
-  const [cycle, setCycle] = useState<Cycle>('MONTHLY');
+  const [cycle, setCycle] = useState<Cycle>(() => defaultCycle(options));
   const [method, setMethod] = useState<BillingMethod>('PIX');
   const [name, setName] = useState('');
   const [cpfCnpj, setCpfCnpj] = useState('');
@@ -742,13 +795,15 @@ function CheckoutDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [invalid, setInvalid] = useState<{ name?: string; document?: string; phone?: string }>({});
+  const price = options.find((option) => option.cycle === cycle)?.totalCents ?? null;
 
   useEffect(() => {
     if (!open) return;
     // Pedido ainda não pago: parte da escolha anterior, que é o que a pessoa quer trocar.
     const pending = subscription?.state === 'pendente' ? subscription : null;
-    const wanted: Cycle = pending?.billingCycle === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
-    setCycle(wanted === 'YEARLY' ? (yearly !== null ? 'YEARLY' : 'MONTHLY') : monthly !== null ? 'MONTHLY' : 'YEARLY');
+    const wanted = options.find((option) => option.cycle === pending?.billingCycle)?.cycle;
+    setCycle(wanted ?? defaultCycle(options));
+    track('checkout.opened', { origin: originOf() });
     setMethod(METHODS.find((item) => item.key === pending?.billingType)?.key ?? 'PIX');
     setName(customer?.name ?? user?.name ?? '');
     setCpfCnpj('');
@@ -774,7 +829,10 @@ function CheckoutDialog({
     if (digits.length !== 11 && digits.length !== 14) problems.document = 'Informe os 11 dígitos do CPF ou os 14 do CNPJ.';
     if (phoneDigits.length > 0 && phoneDigits.length < 10) problems.phone = 'Informe o telefone com DDD.';
     setInvalid(problems);
-    if (Object.keys(problems).length > 0) return;
+    if (Object.keys(problems).length > 0) {
+      track('checkout.failed', { reason: `validation:${Object.keys(problems).join(',')}` });
+      return;
+    }
 
     // A aba da fatura é aberta já no clique, antes da chamada: depois de uma
     // espera de rede o navegador trataria a abertura como pop-up e bloquearia
@@ -793,7 +851,7 @@ function CheckoutDialog({
     }
 
     setBusy(true);
-    track('purchase.started', { cycle, billingType: method });
+    track('purchase.started', { cycle, billingType: method, value: (price ?? 0) / 100, currency: 'BRL', origin: originOf() });
     try {
       const result = await api.post<CheckoutResult>(`${base}/billing/web/checkout`, {
         name: name.trim(),
@@ -810,6 +868,7 @@ function CheckoutDialog({
     } catch (caught) {
       tab?.close();
       setError(caught);
+      track('checkout.failed', { reason: caught instanceof ApiError ? caught.code ?? `http_${caught.status}` : 'network' });
     } finally {
       setBusy(false);
     }
@@ -824,11 +883,10 @@ function CheckoutDialog({
   };
   // Erro que a API atribuiu a um campo aparece no campo; os demais, no aviso do topo.
   const hasFieldError = apiError !== null && ['name', 'cpfCnpj', 'email', 'mobilePhone'].some((field) => apiError.fieldError(field) !== undefined);
-  const price = cycle === 'YEARLY' ? yearly : monthly;
   const paidUntil = subscription?.state === 'cancelada_mas_ativa' ? subscription.currentPeriodEnd : null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Assinar o plano Equipe" description="Escolha como quer pagar. A fatura abre em outra aba, na página do Asaas." wide>
+    <Modal open={open} onClose={onClose} title="Assinar o plano Equipe" description="Escolha o plano e a forma de pagamento. A fatura abre em outra aba, na página segura do Asaas." wide>
       <form className="stack" onSubmit={submit} noValidate>
         {error !== null && !hasFieldError && <Notice tone="error">{errorMessage(error)}</Notice>}
         {paidUntil && (
@@ -837,27 +895,21 @@ function CheckoutDialog({
           </Notice>
         )}
 
-        <fieldset className="option-list option-list--grid">
-          <legend className="field__label">Ciclo de cobrança</legend>
-          {monthly !== null && (
-            <label className={`option ${cycle === 'MONTHLY' ? 'option--selected' : ''}`}>
-              <input type="radio" name={`${groupId}-cycle`} checked={cycle === 'MONTHLY'} onChange={() => setCycle('MONTHLY')} />
+        <fieldset className={`option-list option-list--grid ${options.length === 3 ? 'option-list--cycles' : ''}`}>
+          <legend className="field__label">Plano</legend>
+          {options.map((option) => (
+            <label key={option.cycle} className={`option ${cycle === option.cycle ? 'option--selected' : ''}`}>
+              <input type="radio" name={`${groupId}-cycle`} checked={cycle === option.cycle} onChange={() => setCycle(option.cycle)} />
               <span className="option__body">
-                <span className="option__title">Mensal</span>
-                <span className="option__sub">{fmtCents(monthly)} por mês</span>
+                <span className="option__title">
+                  {option.label}
+                  {option.badge && <span className="option__badge">{option.badge}</span>}
+                </span>
+                <span className="option__price">{fmtCents(option.perMonthCents)}<small>/mês</small></span>
+                <span className="option__sub">{chargeLine(option)}</span>
               </span>
             </label>
-          )}
-          {yearly !== null && (
-            <label className={`option ${cycle === 'YEARLY' ? 'option--selected' : ''}`}>
-              <input type="radio" name={`${groupId}-cycle`} checked={cycle === 'YEARLY'} onChange={() => setCycle('YEARLY')} />
-              <span className="option__body">
-                <span className="option__title">Anual</span>
-                <span className="option__sub">{fmtCents(yearly)} por ano</span>
-                {saving > 0 && <span className="option__note">{fmtCents(saving)} a menos que 12 mensalidades</span>}
-              </span>
-            </label>
-          )}
+          ))}
         </fieldset>
 
         <fieldset className="option-list option-list--grid">
@@ -880,7 +932,7 @@ function CheckoutDialog({
           <Field
             label="CPF ou CNPJ"
             error={fieldErrors.document}
-            hint={customer ? `Da última vez: ${customer.documentType} ${customer.documentHint}. Por segurança, o número não fica guardado aqui; digite de novo.` : 'Exigido para emitir a cobrança.'}
+            hint={customer ? `Da última vez: ${customer.documentType} ${customer.documentHint}. Por segurança, o número não fica guardado aqui; digite de novo.` : 'O Asaas exige CPF ou CNPJ para emitir a cobrança e o recibo. Não fica guardado aqui.'}
             full
           >
             <input
@@ -901,10 +953,12 @@ function CheckoutDialog({
           </Field>
         </div>
 
-        <p className="caption">
-          O pagamento é feito na página do Asaas, que processa a cobrança. Dados de cartão não passam pelo Estoque Simples. O plano é
-          liberado quando o pagamento for confirmado.
-        </p>
+        <ul className="trust-list">
+          <li><Icon name="check" /> Pagamento seguro na página do Asaas: dados de cartão não passam pelo Estoque Simples.</li>
+          <li><Icon name="check" /> Pix liberado na hora; o plano entra assim que o pagamento é confirmado.</li>
+          <li><Icon name="check" /> Sem fidelidade: cancele quando quiser e use até o fim do período pago.</li>
+        </ul>
+        {method === 'PIX' && <p className="caption">Pagou o Pix? Volte para esta aba: o plano é liberado sozinho em instantes.</p>}
 
         <div className="row row--end" style={{ flexWrap: 'wrap' }}>
           <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>Cancelar</button>

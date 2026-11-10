@@ -72,6 +72,7 @@ export function providerLabel(provider: string | null | undefined): string {
 
 export const BILLING_CYCLE: Record<string, string> = {
   MONTHLY: 'Mensal',
+  SEMIANNUALLY: 'Semestral',
   YEARLY: 'Anual',
 };
 

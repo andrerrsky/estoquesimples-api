@@ -14,7 +14,13 @@ interface Plan {
   googleBasePlanId: string | null;
   /** Preço cobrado pelo Asaas na web, em centavos; null = ciclo não vendido. */
   webPriceMonthlyCents: number | null;
+  /** Total cobrado a cada 6 meses. */
+  webPriceSemiannualCents: number | null;
+  /** Total cobrado uma vez por ano. */
   webPriceYearlyCents: number | null;
+  /** Oferta de entrada do Google Play: só para o relatório financeiro. */
+  googleOfferPriceCents: number | null;
+  googleOfferCycles: number | null;
   /** O checkout da web vende um plano só; os demais não têm preço web. */
   soldOnWeb: boolean;
   isActive: boolean;
@@ -49,16 +55,39 @@ interface Draft {
   isActive: boolean;
   /** Em reais, como digitado ("29,90"); vazio = não vendido na web. */
   webMonthly: string;
+  webSemiannual: string;
   webYearly: string;
+  googleOffer: string;
+  googleOfferCycles: string;
   enabled: boolean;
   limit: string;
 }
 
-const EMPTY_DRAFT: Draft = { name: '', description: '', isActive: true, webMonthly: '', webYearly: '', enabled: true, limit: '' };
+const EMPTY_DRAFT: Draft = { name: '', description: '', isActive: true, webMonthly: '', webSemiannual: '', webYearly: '', googleOffer: '', googleOfferCycles: '', enabled: true, limit: '' };
+
+/** Ciclos da web: o valor cadastrado é o total cobrado no ciclo. */
+const WEB_CYCLES = [
+  { key: 'webMonthly', field: 'webPriceMonthlyCents', label: 'Mensal', months: 1, unit: 'por mês' },
+  { key: 'webSemiannual', field: 'webPriceSemiannualCents', label: 'Semestral', months: 6, unit: 'a cada 6 meses' },
+  { key: 'webYearly', field: 'webPriceYearlyCents', label: 'Anual', months: 12, unit: 'por ano' },
+] as const;
+
+/** "R$ 129,90 a cada 6 meses · R$ 21,65/mês · 13% a menos que o mensal". */
+function cycleSummary(totalCents: number, months: number, unit: string, monthlyCents: number | null): string {
+  if (months === 1) return `${fmtCents(totalCents)} ${unit}.`;
+  // Para baixo: nunca anunciar um centavo a mais do que o cobrado.
+  const perMonth = Math.floor(totalCents / months);
+  const parts = [`${fmtCents(totalCents)} ${unit}`, `${fmtCents(perMonth)}/mês`];
+  if (monthlyCents) {
+    const saving = Math.round((1 - totalCents / (monthlyCents * months)) * 100);
+    parts.push(saving > 0 ? `${saving}% a menos que o mensal` : 'não sai mais barato que o mensal: confira');
+  }
+  return parts.join(' · ') + '.';
+}
 
 /** Situação da venda na web: preço sozinho não basta, precisa da chave e do plano ativo. */
 function webSaleStatus(plan: Plan, asaasConfigured: boolean): { label: string; tone: 'success' | 'warning' | 'neutral' } {
-  if (plan.webPriceMonthlyCents === null && plan.webPriceYearlyCents === null) return { label: 'não vendido na web', tone: 'neutral' };
+  if (plan.webPriceMonthlyCents === null && plan.webPriceSemiannualCents === null && plan.webPriceYearlyCents === null) return { label: 'não vendido na web', tone: 'neutral' };
   if (!plan.isActive) return { label: 'plano inativo: checkout desligado', tone: 'warning' };
   if (!asaasConfigured) return { label: 'Asaas não configurado: checkout desligado', tone: 'warning' };
   return { label: 'à venda na web', tone: 'success' };
@@ -76,7 +105,7 @@ export function PlansPage() {
   const asaasConfigured = query.data?.asaasConfigured ?? false;
 
   const openPlan = (plan: Plan) => {
-    setDraft({ ...EMPTY_DRAFT, name: plan.name, description: plan.description, isActive: plan.isActive, webMonthly: centsToInput(plan.webPriceMonthlyCents), webYearly: centsToInput(plan.webPriceYearlyCents) });
+    setDraft({ ...EMPTY_DRAFT, name: plan.name, description: plan.description, isActive: plan.isActive, webMonthly: centsToInput(plan.webPriceMonthlyCents), webSemiannual: centsToInput(plan.webPriceSemiannualCents), webYearly: centsToInput(plan.webPriceYearlyCents), googleOffer: centsToInput(plan.googleOfferPriceCents), googleOfferCycles: plan.googleOfferCycles === null ? '' : String(plan.googleOfferCycles) });
     setDialog({ kind: 'plan', plan });
   };
   const openFeature = (plan: Plan, feature: { key: string; enabled: boolean; limit: number | null }) => {
@@ -95,7 +124,6 @@ export function PlansPage() {
   };
 
   const monthlyPreview = parseReaisToCents(draft.webMonthly);
-  const yearlyPreview = parseReaisToCents(draft.webYearly);
 
   return (
     <div className="page">
@@ -140,17 +168,35 @@ export function PlansPage() {
                   <dd>
                     {plan.soldOnWeb ? (
                       <div className="stack stack--tight">
-                        <div>
-                          Mensal: {plan.webPriceMonthlyCents !== null ? <strong>{fmtCents(plan.webPriceMonthlyCents)}</strong> : <span className="muted">não vendido</span>}
-                          {' · '}
-                          Anual: {plan.webPriceYearlyCents !== null ? <strong>{fmtCents(plan.webPriceYearlyCents)}</strong> : <span className="muted">não vendido</span>}
-                        </div>
+                        {WEB_CYCLES.map((cycle) => {
+                          const value = plan[cycle.field];
+                          return (
+                            <div key={cycle.key}>
+                              {cycle.label}:{' '}
+                              {value !== null ? (
+                                <><strong>{fmtCents(value)}</strong> <span className="caption">{cycleSummary(value, cycle.months, cycle.unit, plan.webPriceMonthlyCents).replace(`${fmtCents(value)} `, '')}</span></>
+                              ) : (
+                                <span className="muted">não vendido</span>
+                              )}
+                            </div>
+                          );
+                        })}
                         <div><Badge tone={sale.tone}>{sale.label}</Badge></div>
                       </div>
                     ) : (
                       <span className="muted">este plano não é vendido na web</span>
                     )}
                   </dd>
+                  {plan.googleProductId && (
+                    <>
+                      <dt>Oferta de entrada (Play)</dt>
+                      <dd>
+                        {plan.googleOfferPriceCents !== null && plan.googleOfferCycles !== null
+                          ? <>{fmtCents(plan.googleOfferPriceCents)}/mês nos {plan.googleOfferCycles} primeiros meses <span className="caption">· usado no relatório financeiro</span></>
+                          : <span className="muted">não informada (o relatório usa o preço cheio)</span>}
+                      </dd>
+                    </>
+                  )}
                   <dt>Assinaturas com acesso</dt>
                   <dd>
                     {fmtNumber(plan.activeSubscriptions)}
@@ -185,8 +231,16 @@ export function PlansPage() {
           if (dialog?.kind !== 'plan') return;
           const body: Record<string, unknown> = { name: draft.name, description: draft.description, isActive: draft.isActive, reason };
           if (dialog.plan.soldOnWeb) {
-            body['webPriceMonthlyCents'] = readPrice(draft.webMonthly, 'Preço mensal na web');
-            body['webPriceYearlyCents'] = readPrice(draft.webYearly, 'Preço anual na web');
+            for (const cycle of WEB_CYCLES) body[cycle.field] = readPrice(draft[cycle.key], `Preço ${cycle.label.toLowerCase()} na web`);
+          }
+          if (dialog.plan.googleProductId) {
+            const offer = parseReaisToCents(draft.googleOffer);
+            if (offer === undefined) throw new Error('Oferta do Google Play: valor inválido. Use 19,99.');
+            const cycles = draft.googleOfferCycles.trim() === '' ? null : Number(draft.googleOfferCycles);
+            if (cycles !== null && (!Number.isInteger(cycles) || cycles < 1 || cycles > 24)) throw new Error('Meses da oferta: de 1 a 24.');
+            if ((offer === null) !== (cycles === null)) throw new Error('Informe o preço e os meses da oferta juntos (ou deixe os dois vazios).');
+            body['googleOfferPriceCents'] = offer;
+            body['googleOfferCycles'] = cycles;
           }
           await api.patch(`/billing/plans/${dialog.plan.key}`, body);
           toast.push('Plano atualizado.', 'success');
@@ -200,26 +254,39 @@ export function PlansPage() {
           <>
             <div className="caption">Preço na web (cobrado pelo Asaas). O preço do app Android é alterado no Google Play Console, não aqui.</div>
             <div className="form-grid">
-              <label className="field">
-                <span className="field__label">Mensal na web (R$)</span>
-                <input className="input" inputMode="decimal" placeholder="vazio = não vendido" value={draft.webMonthly} onChange={(event) => setDraft({ ...draft, webMonthly: event.target.value })} maxLength={14} />
-                <span className={monthlyPreview === undefined ? 'field__error' : 'field__hint'}>
-                  {monthlyPreview === undefined ? 'Valor inválido: use 29,90.' : monthlyPreview === null ? 'Ciclo mensal não vendido na web.' : `${fmtCents(monthlyPreview)} por mês.`}
-                </span>
-              </label>
-              <label className="field">
-                <span className="field__label">Anual na web (R$)</span>
-                <input className="input" inputMode="decimal" placeholder="vazio = não vendido" value={draft.webYearly} onChange={(event) => setDraft({ ...draft, webYearly: event.target.value })} maxLength={14} />
-                <span className={yearlyPreview === undefined ? 'field__error' : 'field__hint'}>
-                  {yearlyPreview === undefined
-                    ? 'Valor inválido: use 299,00.'
-                    : yearlyPreview === null
-                      ? 'Ciclo anual não vendido na web.'
-                      : `${fmtCents(yearlyPreview)} por ano · equivale a ${fmtCents(Math.round(yearlyPreview / 12))}/mês${monthlyPreview && yearlyPreview < monthlyPreview ? ' · menor que o mensal: confira' : ''}.`}
-                </span>
-              </label>
+              {WEB_CYCLES.map((cycle) => {
+                const preview = parseReaisToCents(draft[cycle.key]);
+                return (
+                  <label key={cycle.key} className="field">
+                    <span className="field__label">{cycle.label} na web (R$, total {cycle.unit})</span>
+                    <input className="input" inputMode="decimal" placeholder="vazio = não vendido" value={draft[cycle.key]} onChange={(event) => setDraft({ ...draft, [cycle.key]: event.target.value })} maxLength={14} />
+                    <span className={preview === undefined ? 'field__error' : 'field__hint'}>
+                      {preview === undefined
+                        ? 'Valor inválido: use 129,90.'
+                        : preview === null
+                          ? `Ciclo ${cycle.label.toLowerCase()} não vendido na web.`
+                          : cycleSummary(preview, cycle.months, cycle.unit, monthlyPreview ?? null)}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
             <div className="field__hint">Vale para novas contratações; assinaturas existentes continuam com o valor contratado. A mudança fica na auditoria com o motivo.</div>
+          </>
+        )}
+        {dialog?.kind === 'plan' && dialog.plan.googleProductId && (
+          <>
+            <div className="caption">Oferta de entrada do Google Play (a mesma da Play Console). Não muda o preço do app: só faz o relatório financeiro estimar o que cada assinatura paga nos primeiros meses.</div>
+            <div className="form-grid">
+              <label className="field">
+                <span className="field__label">Preço da oferta (R$ por mês)</span>
+                <input className="input" inputMode="decimal" placeholder="vazio = sem oferta" value={draft.googleOffer} onChange={(event) => setDraft({ ...draft, googleOffer: event.target.value })} maxLength={14} />
+              </label>
+              <label className="field">
+                <span className="field__label">Por quantos meses</span>
+                <input className="input" type="number" min={1} max={24} placeholder="ex.: 2" value={draft.googleOfferCycles} onChange={(event) => setDraft({ ...draft, googleOfferCycles: event.target.value })} />
+              </label>
+            </div>
           </>
         )}
       </ConfirmDialog>

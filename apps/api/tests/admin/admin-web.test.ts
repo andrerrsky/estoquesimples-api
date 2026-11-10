@@ -176,7 +176,7 @@ beforeEach(async () => {
   context.asaas.reset();
   context.fcm.sent.length = 0;
   await context.services.db.execute(
-    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
+    sql`UPDATE plans SET web_price_monthly_cents = 2990, web_price_semiannual_cents = NULL, web_price_yearly_cents = 29900 WHERE key = 'basico'`,
   );
 });
 
@@ -214,7 +214,7 @@ describe('painel: preço da web nos planos', () => {
     const owner = await registerUser(context);
     const ws = await createWorkspace(owner, 'Loja do Preço');
     const pricing = await context.app.inject({ method: 'GET', url: `/v1/workspaces/${ws}/billing/web`, headers: owner.authHeader });
-    expect(pricing.json().pricing).toEqual({ monthlyCents: 3990, yearlyCents: null });
+    expect(pricing.json().pricing).toEqual({ monthlyCents: 3990, semiannualCents: null, yearlyCents: null });
   });
 
   it('valida centavos (inteiro, piso e teto), restringe ao plano da web e exige owner', async () => {
