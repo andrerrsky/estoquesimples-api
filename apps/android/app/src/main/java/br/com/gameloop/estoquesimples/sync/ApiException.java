@@ -17,6 +17,8 @@ public class ApiException extends Exception {
     public static final String PERMISSAO_DESATUALIZADA = "AUTH_PERMISSION_STALE";
     public static final String SEM_PERMISSAO = "FORBIDDEN";
     public static final String EMAIL_NAO_CONFIRMADO = "AUTH_EMAIL_NOT_VERIFIED";
+    /** Conta bloqueada pelo suporte: no login (403) ou com a sessão encerrada (401). */
+    public static final String CONTA_BLOQUEADA = "AUTH_ACCOUNT_SUSPENDED";
     public static final String ASSINATURA_INATIVA = "SUBSCRIPTION_INACTIVE";
     /** Código atual da API; o anterior fica como alias por aparelhos antigos. */
     public static final String ASSINATURA_OBRIGATORIA = "SUBSCRIPTION_REQUIRED";
@@ -116,6 +118,11 @@ public class ApiException extends Exception {
         return PERMISSAO_DESATUALIZADA.equals(code);
     }
 
+    /** A conta foi bloqueada pelo suporte: nenhuma nova tentativa vai entrar. */
+    public boolean isAccountBlocked() {
+        return CONTA_BLOQUEADA.equals(code);
+    }
+
     /** O acesso precisa ser renovado antes de qualquer nova tentativa. */
     public boolean needsReauth() {
         return statusCode == 401 && !isPermissionStale();
@@ -133,6 +140,11 @@ public class ApiException extends Exception {
 
     /** Mensagem pronta para exibição, sem jargão de protocolo. */
     public String userMessage() {
+        if (isAccountBlocked()) {
+            // O motivo fica só no painel; aqui, o caminho para falar com alguém.
+            return "Esta conta foi bloqueada. Se você acha que é um engano, fale com o "
+                    + "suporte no menu: Ajuda e suporte \u203a Falar com o suporte. Seus dados continuam no aparelho.";
+        }
         if (SEM_REDE.equals(code)) {
             return "Sem conexão. Suas alterações estão salvas no aparelho e serão "
                     + "enviadas quando a internet voltar.";

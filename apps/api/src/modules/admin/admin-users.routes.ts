@@ -288,7 +288,7 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
       summary: 'Suspende a conta e encerra as sessões',
       run: async (actor, userId, reason) => {
         await service.suspend(actor, userId, reason);
-        return 'Conta suspensa.';
+        return 'Conta bloqueada. As sessões foram encerradas.';
       },
     },
     {
@@ -296,7 +296,7 @@ export async function registerAdminUsersRoutes(app: FastifyInstance): Promise<vo
       summary: 'Reativa uma conta suspensa',
       run: async (actor, userId, reason) => {
         await service.reactivate(actor, userId, reason);
-        return 'Conta reativada.';
+        return 'Conta desbloqueada.';
       },
     },
     {

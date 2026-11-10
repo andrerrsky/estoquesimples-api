@@ -44,6 +44,7 @@ interface UserDetail {
   updatedAt: string;
   deletionRequestedAt: string | null;
   lockedUntil: string | null;
+  suspension: { reason: string | null; at: string; by: string } | null;
   failedLoginAttempts: number;
   permissionVersion: number;
   lastActivityAt: string | null;
@@ -149,8 +150,8 @@ export function UserDetailPage() {
                 'sep',
                 { label: 'Encerrar todas as sessões', icon: 'logout', onClick: () => setDialog('revoke') },
                 user.status === 'suspended'
-                  ? { label: 'Reativar conta', icon: 'play', onClick: () => setDialog('reactivate') }
-                  : { label: 'Suspender conta', icon: 'pause', danger: true, disabled: user.status === 'pending_deletion', onClick: () => setDialog('suspend') },
+                  ? { label: 'Desbloquear conta', icon: 'play', onClick: () => setDialog('reactivate') }
+                  : { label: 'Bloquear conta', icon: 'pause', danger: true, disabled: user.status === 'pending_deletion', onClick: () => setDialog('suspend') },
                 ...(user.status === 'pending_deletion'
                   ? [{ label: 'Cancelar exclusão da conta', icon: 'refresh' as const, onClick: () => setDialog('cancelDeletion') }]
                   : []),
@@ -163,6 +164,16 @@ export function UserDetailPage() {
         }
       />
 
+      {user.status === 'suspended' && (
+        <Notice tone="error" title="Conta bloqueada pelo suporte">
+          {user.suspension ? (
+            <>
+              Motivo: <strong>{user.suspension.reason ?? 'não informado'}</strong>. Bloqueada <Time value={user.suspension.at} relative={false} /> por {user.suspension.by}.{' '}
+            </>
+          ) : null}
+          A pessoa não entra (senha ou Google) e quem estava logado sai na próxima chamada, com o aviso de conta bloqueada e o caminho para o suporte. O motivo não aparece para ela.
+        </Notice>
+      )}
       {user.status === 'pending_deletion' && (
         <Notice tone="warning" title="Exclusão solicitada pelo próprio usuário">
           Pedida em <Time value={user.deletionRequestedAt} relative={false} />. As sessões foram encerradas e a conta não entra mais. Ainda não existe rotina que apague os dados definitivamente; cancelar reativa a conta.
@@ -350,13 +361,13 @@ export function UserDetailPage() {
       <ConfirmDialog
         open={dialog === 'suspend'}
         onClose={() => setDialog(null)}
-        title="Suspender conta"
-        description="A pessoa perde o acesso imediatamente em todos os aparelhos. Os dados locais no celular não são afetados. Pode ser revertido."
-        confirmLabel="Suspender"
+        title="Bloquear conta"
+        description="A pessoa perde o acesso imediatamente em todos os aparelhos e vê que a conta foi bloqueada, com o caminho para o suporte. O motivo fica só aqui no painel (ex.: e-mail falso ou de teste, suspeita de abuso ou teste de vulnerabilidade). Os dados locais no celular não são afetados. Pode ser revertido."
+        confirmLabel="Bloquear"
         danger
         onConfirm={act('suspend')}
       />
-      <ConfirmDialog open={dialog === 'reactivate'} onClose={() => setDialog(null)} title="Reativar conta" description="A pessoa volta a poder entrar com a senha atual." confirmLabel="Reativar" onConfirm={act('reactivate')} />
+      <ConfirmDialog open={dialog === 'reactivate'} onClose={() => setDialog(null)} title="Desbloquear conta" description="A pessoa volta a poder entrar com a senha atual ou o Google." confirmLabel="Desbloquear" onConfirm={act('reactivate')} />
       <ConfirmDialog
         open={dialog === 'verify'}
         onClose={() => setDialog(null)}

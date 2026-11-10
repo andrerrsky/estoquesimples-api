@@ -8,7 +8,7 @@ export type Tone = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'brand
 
 export const USER_STATUS: Record<string, { label: string; tone: Tone }> = {
   active: { label: 'Ativa', tone: 'success' },
-  suspended: { label: 'Suspensa', tone: 'error' },
+  suspended: { label: 'Bloqueada', tone: 'error' },
   pending_deletion: { label: 'Exclusão pendente', tone: 'warning' },
 };
 

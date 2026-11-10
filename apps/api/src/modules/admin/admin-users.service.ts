@@ -4,6 +4,7 @@ import { AccountClosureService } from '../users/account-closure.service.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
 import {
   adminAccountNotes,
+  adminAuditLog,
   devices,
   sessions,
   subscriptions,
@@ -107,6 +108,8 @@ export interface UserDetail {
   failedLoginAttempts: number;
   permissionVersion: number;
   lastActivityAt: string | null;
+  /** Bloqueio atual pelo suporte: motivo, quando e por quem (do registro do painel). */
+  suspension: { reason: string | null; at: string; by: string } | null;
   platforms: string[];
   workspaces: Array<{
     id: string;
@@ -380,6 +383,7 @@ export class AdminUsersService {
     ]);
 
     const c = counts.rows[0];
+    const suspension = user.status === 'suspended' ? await this.lastSuspension(userId) : null;
     return {
       id: user.id,
       email: user.email,
@@ -394,6 +398,7 @@ export class AdminUsersService {
       failedLoginAttempts: user.failedLoginAttempts,
       permissionVersion: user.permissionVersion,
       lastActivityAt: activity.rows[0]?.last ? new Date(activity.rows[0].last).toISOString() : null,
+      suspension,
       platforms: [...new Set(deviceRows.filter((row) => row.revokedAt === null).map((row) => row.platform))].sort(),
       workspaces: memberships.rows.map((row) => ({
         id: row.id,
@@ -495,6 +500,20 @@ export class AdminUsersService {
         metadata: { changes, reason: input.reason },
       });
     });
+  }
+
+  /** O último bloqueio registrado no painel (a conta pode ter sido suspensa e reativada antes). */
+  private async lastSuspension(userId: string): Promise<UserDetail['suspension']> {
+    const rows = await this.db
+      .select({ metadata: adminAuditLog.metadata, at: adminAuditLog.createdAt, by: adminAuditLog.adminEmail })
+      .from(adminAuditLog)
+      .where(and(eq(adminAuditLog.action, AdminAction.USER_SUSPENDED), eq(adminAuditLog.targetType, 'user'), eq(adminAuditLog.targetId, userId)))
+      .orderBy(desc(adminAuditLog.createdAt))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    const reason = (row.metadata as { reason?: unknown } | null)?.reason;
+    return { reason: typeof reason === 'string' ? reason : null, at: row.at.toISOString(), by: row.by };
   }
 
   async suspend(actor: AdminActor, userId: string, reason: string): Promise<void> {

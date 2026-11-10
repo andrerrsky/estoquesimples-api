@@ -152,9 +152,26 @@ describe('painel administrativo: suporte a contas', () => {
     });
     expect(suspend.statusCode).toBe(200);
 
-    // O token do cliente deixa de valer imediatamente.
+    // O token do cliente deixa de valer imediatamente, e a resposta diz que
+    // foi o bloqueio (não "sessão expirada"): o app explica e leva ao suporte.
     const me = await context.app.inject({ method: 'GET', url: '/v1/me', headers: user.authHeader });
     expect(me.statusCode).toBe(401);
+    expect(me.json().error.code).toBe('AUTH_ACCOUNT_SUSPENDED');
+
+    const refresh = await context.app.inject({ method: 'POST', url: '/v1/auth/refresh', payload: { refreshToken: user.refreshToken } });
+    expect(refresh.statusCode).toBe(401);
+    expect(refresh.json().error.code).toBe('AUTH_ACCOUNT_SUSPENDED');
+    // O motivo fica no painel; a pessoa só sabe que a conta foi bloqueada.
+    expect(refresh.json().error.message).toContain('bloqueada');
+    expect(refresh.json().error.message).not.toContain('Uso indevido');
+
+    const login = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/login',
+      payload: { email: user.email, password: user.password },
+    });
+    expect(login.statusCode).toBe(403);
+    expect(login.json().error.code).toBe('AUTH_ACCOUNT_SUSPENDED');
 
     const detail = await context.app.inject({
       method: 'GET',
@@ -164,6 +181,7 @@ describe('painel administrativo: suporte a contas', () => {
     expect(detail.statusCode).toBe(200);
     expect(detail.json().status).toBe('suspended');
     expect(detail.json().sessions).toHaveLength(0);
+    expect(detail.json().suspension).toMatchObject({ reason: 'Uso indevido relatado', by: support });
 
     const timeline = await context.app.inject({
       method: 'GET',
