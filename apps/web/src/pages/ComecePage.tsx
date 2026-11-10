@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { Icon, Logo } from '../components/Icon';
 import { segmentContent } from '../lib/attribution';
+import { track } from '../lib/analytics';
 import { landingTitleFor, PLAY_RATING } from './LandingPage';
 import { SignupChoices, useRedirectIfAuthed } from './AuthPages';
 import '../styles/comece.css';
@@ -31,10 +32,34 @@ const FAQ = [
   { q: 'Já tenho uma planilha. Perco tudo?', a: 'Não: depois de criar a conta, use "Importar planilha" e traga a lista inteira de uma vez.' },
 ];
 
+const PLAY_APP = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
+
+/**
+ * Link da Play Store com a origem do anúncio no `referrer`: quem busca
+ * "aplicativo" no Android costuma instalar pela loja, e o app ainda não lê a
+ * Install Referrer API. Assim a Play Console mostra as instalações por
+ * campanha (Aquisição de usuários › origem google / cpc), para somar ao painel.
+ */
+export function playUrlWithReferrer(search: string): string {
+  const params = new URLSearchParams(search);
+  const referrer = new URLSearchParams();
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']) {
+    const value = params.get(key);
+    if (value) referrer.set(key, value.slice(0, 100));
+  }
+  if (!referrer.has('utm_source')) referrer.set('utm_source', 'site');
+  if (!referrer.has('utm_medium')) referrer.set('utm_medium', 'comece');
+  return `${PLAY_APP}&referrer=${encodeURIComponent(referrer.toString())}`;
+}
+
 export function ComecePage() {
   const redirect = useRedirectIfAuthed();
   // Título do segmento só depois do mount (a primeira pintura usa o padrão).
   const [title, setTitle] = useState('Controle de estoque simples, no celular e no computador.');
+  const [playUrl, setPlayUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (/Android/i.test(navigator.userAgent)) setPlayUrl(playUrlWithReferrer(window.location.search));
+  }, []);
   useEffect(() => {
     const fromUrl = landingTitleFor(new URLSearchParams(window.location.search).get('utm_content'));
     const fromOrigin = landingTitleFor(segmentContent());
@@ -80,6 +105,14 @@ export function ComecePage() {
           </h2>
           <p className="comece__card-sub">Sem cartão de crédito. Leva menos de um minuto.</p>
           <SignupChoices autoFocus={false} submitLabel="Criar conta grátis" />
+          {playUrl && (
+            <p className="comece__play">
+              Prefere o app?{' '}
+              <a href={playUrl} rel="noopener" onClick={() => track('play.clicked', { page: 'comece' })}>
+                Baixe na Google Play
+              </a>
+            </p>
+          )}
         </section>
 
         <section className="comece__shot" aria-hidden="true">
