@@ -81,6 +81,21 @@
 .chat--loading {
   background: var(--surface-content);
 }
+/* Celular, aberto a pedido: o balão ocupa a largura da tela e o botão some. */
+.chat-dock--sheet {
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  align-items: stretch;
+}
+.chat-dock--sheet .chat {
+  width: 100%;
+  height: min(620px, calc(100dvh - 24px));
+}
+.chat-dock--sheet .chat-launcher {
+  display: none;
+}
+
 @keyframes chat-in {
   from {
     opacity: 0;

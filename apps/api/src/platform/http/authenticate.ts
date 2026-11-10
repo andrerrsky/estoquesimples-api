@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 
 import { sessions, users } from '../db/schema/index.js';
-import { ErrorCode, unauthorized } from './errors.js';
+import { ACCOUNT_SUSPENDED_MESSAGE, ErrorCode, unauthorized } from './errors.js';
 import type { AppServices, AuthContext } from './context.js';
 
 /**
@@ -52,6 +52,11 @@ export async function resolveAuth(
   if (!row) {
     throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão não encontrada.');
   }
+  // Antes do estado da sessão: bloquear a conta encerra todas as sessões, e
+  // quem estava logado precisa saber que foi isso, não que a sessão expirou.
+  if (row.status === 'suspended' && !row.deletedAt) {
+    throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
+  }
   if (row.sessionRevokedAt) {
     throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão encerrada. Faça login novamente.');
   }
@@ -60,9 +65,6 @@ export async function resolveAuth(
   }
   if (row.deletedAt || row.status === 'pending_deletion') {
     throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Conta indisponível.');
-  }
-  if (row.status === 'suspended') {
-    throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
   }
 
   // Mudança de papel ou de participação invalida os tokens já emitidos.

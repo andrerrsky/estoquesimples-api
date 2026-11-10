@@ -13,6 +13,7 @@ import {
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import {
+  ACCOUNT_SUSPENDED_MESSAGE,
   AppError,
   ErrorCode,
   badRequest,
@@ -265,7 +266,7 @@ export class AuthService {
     // Depois da senha: quem não a sabe não descobre que a conta existe e está suspensa.
     if (user.status === 'suspended') {
       await this.recordLoginDenied(user.id, 'conta_suspensa', meta);
-      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
     }
     this.services.throttle.succeed('login', input.email, ip);
 
@@ -424,7 +425,7 @@ export class AuthService {
     const { user, isNew, linked } = outcome;
     if (user.status === 'suspended') {
       await this.recordLoginDenied(user.id, 'conta_suspensa', meta);
-      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, 'Conta suspensa.');
+      throw new AppError(403, ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
     }
     if (user.status === 'pending_deletion') {
       await this.recordLoginDenied(user.id, 'exclusao_pendente', meta);
@@ -670,15 +671,19 @@ export class AuthService {
           .limit(1);
 
         const session = sessionRows[0];
+        const userRows = session ? await tx.select().from(users).where(eq(users.id, session.userId)).limit(1) : [];
+        const user = userRows[0];
+        // Bloquear a conta encerra as sessões: quem estava logado fica sabendo
+        // que foi o bloqueio, e não que a sessão "expirou".
+        if (user && !user.deletedAt && user.status === 'suspended') {
+          throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
+        }
         if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
           throw unauthorized(
             ErrorCode.AUTH_SESSION_REVOKED,
             'Sessão encerrada. Faça login novamente.',
           );
         }
-
-        const userRows = await tx.select().from(users).where(eq(users.id, session.userId)).limit(1);
-        const user = userRows[0];
         if (!user || user.deletedAt || user.status !== 'active') {
           throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Conta indisponível.');
         }

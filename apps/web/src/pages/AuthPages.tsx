@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { api, ApiError, errorMessage, sessionApi } from '../api/client';
+import { ACCOUNT_SUSPENDED, api, ApiError, clearAccountBlocked, errorMessage, sessionApi, wasAccountBlocked } from '../api/client';
 import type { BrandLogo, BrandTheme, InvitePreview } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { FullScreenLoading } from '../components/AppShell';
 import { BrandMark } from '../components/BrandMark';
 import { Icon } from '../components/Icon';
+import { openSupportChat } from '../components/SupportChat';
 import { Field, Notice, Spinner } from '../components/ui';
 import { track } from '../lib/analytics';
 import { originContent, setChosenSegment } from '../lib/attribution';
@@ -316,14 +317,15 @@ export function GoogleSignIn({
   const errorText =
     error === null
       ? null
-      : error instanceof ApiError && error.code === 'AUTH_ACCOUNT_SUSPENDED'
-        ? 'Esta conta está suspensa. Fale com o suporte.'
+      : error instanceof ApiError && error.code === ACCOUNT_SUSPENDED
+        ? null
         : errorMessage(error);
+  const blocked = error instanceof ApiError && error.code === ACCOUNT_SUSPENDED;
   return (
     <div className="google-signin">
-      {errorText && (
+      {(errorText || blocked) && (
         <div ref={errorRef} tabIndex={-1} role="alert">
-          <Notice tone="error">{errorText}</Notice>
+          {blocked ? <AccountBlockedNotice /> : <Notice tone="error">{errorText}</Notice>}
         </div>
       )}
       <div className="google-signin__slot" aria-busy={busy || undefined}>
@@ -407,6 +409,9 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
   const [remember, setRemember] = useState(saved !== null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sessão que caiu por bloqueio da conta, ou login recusado pelo mesmo motivo.
+  const [blocked, setBlocked] = useState(wasAccountBlocked);
+  useEffect(() => clearAccountBlocked(), []);
 
   if (redirect) return redirect;
 
@@ -414,6 +419,7 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setBlocked(false);
     try {
       await login(email.trim(), password);
       // Só depois de entrar: um login recusado não guarda nem apaga nada.
@@ -426,6 +432,10 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
         }
       }
     } catch (caught) {
+      if (caught instanceof ApiError && caught.code === ACCOUNT_SUSPENDED) {
+        setBlocked(true);
+        return;
+      }
       setError(caught instanceof ApiError && caught.code === 'AUTH_ACCOUNT_LOCKED' ? 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.' : errorMessage(caught));
     } finally {
       setBusy(false);
@@ -436,6 +446,7 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
     <AuthLayout aside={aside} title="Entrar" subtitle={(brand?.displayName ?? companyName) ? `Acesse o estoque de ${brand?.displayName ?? companyName} com a sua conta.` : 'Entre com o Google ou com o e-mail e a senha.'} footer={<>Ainda não tem conta? <Link to="/criar-conta">Criar conta grátis</Link></>}>
       {!brandSlug && <GoogleSignIn />}
       <form className="stack" onSubmit={submit}>
+        {blocked && <AccountBlockedNotice />}
         {error && (
           <Notice tone="error">
             {error}
@@ -456,6 +467,26 @@ export function LoginPage({ brandSlug, aside, companyName }: { brandSlug?: strin
         <Link to="/esqueci-a-senha" style={{ textAlign: 'center', fontSize: 'var(--fs-supporting)' }}>Esqueci minha senha</Link>
       </form>
     </AuthLayout>
+  );
+}
+
+/**
+ * Conta bloqueada pelo suporte. Não diz o motivo (fica no painel) e oferece o
+ * chat de suporte, que funciona sem login: a pessoa não tem outro caminho.
+ */
+function AccountBlockedNotice() {
+  return (
+    <Notice
+      tone="error"
+      title="Esta conta foi bloqueada"
+      action={
+        <button type="button" className="btn btn--secondary btn--sm" onClick={openSupportChat}>
+          Falar com o suporte
+        </button>
+      }
+    >
+      Não é possível entrar com ela. Se você acha que é um engano, fale com o suporte do Estoque Simples.
+    </Notice>
   );
 }
 

@@ -65,15 +65,37 @@ function useDesktop(): boolean {
  * conversa que ele abre. Só em telas de computador: no celular o balão
  * tomaria a tela inteira, e a área de suporte já está a um toque no menu.
  */
+const OPEN_EVENT = 'es:abrir-suporte';
+
+/**
+ * Abre o chat de suporte de qualquer tela, inclusive no celular e sem login
+ * (ex.: a tela de entrada de uma conta bloqueada, em que a área de suporte não
+ * está ao alcance).
+ */
+export function openSupportChat(): void {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
 export function SupportChat({ initialOpen = false }: { initialOpen?: boolean } = {}) {
   const { status } = useAuth();
   const location = useLocation();
   const desktop = useDesktop();
   const [open, setOpen] = useState(initialOpen);
+  // Aberto a pedido (`openSupportChat`): vale também em tela pequena.
+  const [summoned, setSummoned] = useState(false);
   const launcher = useRef<HTMLButtonElement | null>(null);
 
+  useEffect(() => {
+    const onOpen = () => {
+      setSummoned(true);
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, []);
+
   // Na própria área de suporte o chat seria a mesma conversa duas vezes.
-  const hidden = !desktop || location.pathname.startsWith('/app/suporte');
+  const hidden = (!desktop && !summoned) || location.pathname.startsWith('/app/suporte');
   const authed = status === 'authed';
 
   // Resposta nova com o balão fechado: um ponto no botão. Visitante só
@@ -97,12 +119,16 @@ export function SupportChat({ initialOpen = false }: { initialOpen?: boolean } =
 
   const close = () => {
     setOpen(false);
+    if (!desktop) {
+      setSummoned(false);
+      return;
+    }
     launcher.current?.focus();
   };
   const count = open ? 0 : (unread.data ?? 0);
 
   return (
-    <div className="chat-dock no-print">
+    <div className={`chat-dock no-print${desktop ? '' : ' chat-dock--sheet'}`}>
       {open && (
         <Suspense fallback={<section className="chat chat--loading" aria-busy="true" />}>
           <Panel onClose={close} />

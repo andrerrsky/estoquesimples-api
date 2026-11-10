@@ -169,6 +169,50 @@ async function parse<T>(response: Response): Promise<T> {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+export const ACCOUNT_SUSPENDED = 'AUTH_ACCOUNT_SUSPENDED';
+
+/**
+ * Conta bloqueada pelo suporte com a pessoa logada: a sessão cai como qualquer
+ * outra, e este marcador faz a tela de entrada explicar o motivo em vez de só
+ * pedir login de novo. Vale só para esta aba e é lido uma vez.
+ */
+const BLOCKED_HINT = 'es_conta_bloqueada';
+
+function markAccountBlocked(): void {
+  try {
+    sessionStorage.setItem(BLOCKED_HINT, '1');
+  } catch {
+    // sem sessionStorage: a tela de entrada aparece sem o aviso
+  }
+}
+
+/** Se a última sessão desta aba caiu porque a conta foi bloqueada. */
+export function wasAccountBlocked(): boolean {
+  try {
+    return sessionStorage.getItem(BLOCKED_HINT) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** O aviso já foi mostrado (ou a pessoa entrou de novo): some na próxima visita. */
+export function clearAccountBlocked(): void {
+  try {
+    sessionStorage.removeItem(BLOCKED_HINT);
+  } catch {
+    // nada a limpar
+  }
+}
+
+async function errorCode(response: Response): Promise<string | null> {
+  try {
+    const body = (await response.clone().json()) as { error?: { code?: string } };
+    return body.error?.code ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Renova a sessão a partir do cookie.
  *
@@ -192,6 +236,7 @@ export function refreshSession(): Promise<WebAuth | null> {
         continue;
       }
       if (response.status === 401 || response.status === 403) {
+        if ((await errorCode(response)) === ACCOUNT_SUSPENDED) markAccountBlocked();
         setSession(null);
         return null;
       }

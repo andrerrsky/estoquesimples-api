@@ -1374,7 +1374,7 @@ public class AccountActivity extends BaseActivity {
         // 401 ao entrar significa credencial recusada. A mensagem genérica de
         // 401 ("Sua sessão expirou") é para quem já estava logado — dita a quem
         // acabou de digitar a senha, sugere um problema que não existe.
-        if (e.getStatusCode() == 401 && !registerMode) {
+        if (e.getStatusCode() == 401 && !registerMode && !e.isAccountBlocked()) {
             return "E-mail ou senha incorretos. Confira e tente de novo.";
         }
         return e.userMessage();

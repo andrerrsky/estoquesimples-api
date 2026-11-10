@@ -142,3 +142,11 @@ export const tooManyRequests = (message: string, retryAfterSeconds?: number) =>
 
 export const upgradeRequired = (message: string, extra?: Record<string, unknown>) =>
   new AppError(426, ErrorCode.SYNC_PROTOCOL_UNSUPPORTED, message, extra ? { extra } : {});
+
+/**
+ * O que a pessoa lê quando a conta foi bloqueada pelo suporte (login, renovação
+ * ou qualquer chamada com uma sessão que caiu por isso). O motivo fica só no
+ * painel: dizer "e-mail falso" a quem testa o sistema só ensina o que mudar.
+ */
+export const ACCOUNT_SUSPENDED_MESSAGE =
+  'Esta conta foi bloqueada. Se você acha que é um engano, fale com o suporte do Estoque Simples.';
