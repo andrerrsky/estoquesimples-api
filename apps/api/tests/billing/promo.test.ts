@@ -404,10 +404,10 @@ describe('e-mails da promoção', () => {
     expect(launch).toMatchObject({ decided: 1, sent: 1 });
     const [mail] = lifecycleMails();
     expect(mail?.to).toBe(free.email);
-    expect(mail?.subject).toBe('Black Friday: Estoque Simples com 40% off');
-    expect(mail?.text.split('\n')[0]).toBe('Plano anual por R$ 119,90, só até 01/12');
+    expect(mail?.subject).toBe('Black Friday: Estoque Simples por R$ 9,99/mês');
+    expect(mail?.text.split('\n')[0]).toBe('Anual de R$ 199,90 por R$ 119,90 à vista com o cupom BF26. Até 01/12.');
     expect(mail?.text).toContain('Oi, Ana!');
-    expect(mail?.text).toContain('De R$ 199,90 por R$ 119,90 no ano — menos de R$ 10 por mês.');
+    expect(mail?.text).toContain('Plano Equipe por R$ 9,99/mês no anual: R$ 119,90 à vista, de R$ 199,90 (40% off).');
     expect(mail?.text).toMatch(/Ativar com desconto: https:\/\/web\.test\/black-friday\?cupom=BF26&utm_source=email&utm_medium=lifecycle&utm_campaign=bf2026&utm_content=bf2026_launch&le=[0-9a-f-]{36}/);
     expect(mail?.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
 
@@ -417,11 +417,11 @@ describe('e-mails da promoção', () => {
     expect((await service.run(at('2026-11-23T16:00:00Z'))).decided).toBe(0);
 
     await service.run(at('2026-11-27T14:00:00Z'));
-    expect(lifecycleMails().at(-1)?.subject).toBe('É hoje: Black Friday do Estoque Simples com 40% off');
+    expect(lifecycleMails().at(-1)?.subject).toBe('Reta final: anual a R$ 9,99/mês');
     await service.run(at('2026-12-01T14:00:00Z'));
     const last = lifecycleMails().at(-1)!;
-    expect(last.subject).toBe('Último dia: Estoque Simples com 40% off');
-    expect(last.text.split('\n')[0]).toBe('Plano anual por R$ 119,90, só até hoje (01/12)');
+    expect(last.subject).toBe('Último dia: R$ 9,99/mês no anual');
+    expect(last.text.split('\n')[0]).toBe('O cupom BF26 vale até 23h59 de hoje (01/12). Depois o anual volta a R$ 199,90.');
     expect(lifecycleMails().map((m) => m.to)).toEqual([free.email, free.email, free.email]);
 
     // Cupom desligado: a campanha para.

@@ -44,11 +44,11 @@ export function PromoBar() {
       <p className="promo-bar__text">
         <span className="promo-bar__tag">{label}<span className="sr-only">:</span></span>
         <span className="promo-bar__long">
-          plano Equipe anual com {texts.yearlyPct}% off — De <s>{texts.yearlyFull}</s> por <strong>{texts.yearlyPromo}</strong> (equivale a {texts.yearlyPerMonth}/mês).
-          {until ? ` Até ${until}.` : ''}
+          plano Equipe anual por <strong>{texts.yearlyPerMonth}/mês</strong> ({texts.yearlyPromo} à vista, de <s>{texts.yearlyFull}</s>). Cupom {offer.code}
+          {until ? ` até ${until}.` : '.'}
         </span>
         <span className="promo-bar__short">
-          Equipe anual por <strong>{texts.yearlyPromo}</strong> ({texts.yearlyPerMonth}/mês){until ? `. Até ${until}` : ''}
+          Anual por <strong>{texts.yearlyPerMonth}/mês</strong> ({texts.yearlyPromo} à vista){until ? `. Até ${until}` : ''}
         </span>
       </p>
       <Link

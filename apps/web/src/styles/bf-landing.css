@@ -318,8 +318,14 @@
   font-variant-numeric: tabular-nums;
 }
 .bfx-tag__cents {
+  display: flex;
+  flex-direction: column;
   margin-top: 0.2em;
   font-size: 2rem;
+}
+.bfx-tag__suffix {
+  font-size: 1.1rem;
+  letter-spacing: 0;
 }
 .bfx-tag__per {
   margin: 8px 0 0;
