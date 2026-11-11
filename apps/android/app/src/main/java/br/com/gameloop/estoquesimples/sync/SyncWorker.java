@@ -263,6 +263,11 @@ public final class SyncWorker extends Worker {
             } catch (Exception ignored) {
                 // sem o aviso na tela inicial a tela de conta ainda explica
             }
+        } else if (e.getStatusCode() > 0) {
+            // O servidor respondeu e o problema agora é outro: o plano deixou
+            // de ser o bloqueio (ex.: a pessoa assinou). Manter a faixa de
+            // limite faria o aviso errado ficar na tela até uma sync dar certo.
+            br.com.gameloop.estoquesimples.SyncBlock.clearPlanBlock(context);
         }
 
         if (e.isTransient()) {

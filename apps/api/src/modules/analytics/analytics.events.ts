@@ -165,7 +165,7 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'play.clicked', source: 'app', description: 'Clicou no link da Google Play numa página do site (com a origem do anúncio no referrer).', properties: { page: 'página de onde saiu' } },
   { name: 'checkout.opened', source: 'app', description: 'Janela de assinatura da web aberta (escolha de ciclo e pagamento).', properties: { origin: 'de onde veio (plano, limite_produtos, equipe…)' } },
   { name: 'checkout.failed', source: 'app', description: 'Contratação pela web não gerou a fatura (erro de validação ou da API).', properties: { reason: 'campo ou código do erro' } },
-  { name: 'purchase.completed', source: 'app', description: 'Pagamento da assinatura confirmado e plano Equipe liberado na web.', properties: { cycle: 'MONTHLY | SEMIANNUALLY | YEARLY', value: 'valor cobrado em reais' } },
+  { name: 'purchase.completed', source: 'app', description: 'Pagamento da assinatura confirmado e plano Equipe liberado (web pelo Asaas; Android quando a compra da Google Play é vinculada).', properties: { cycle: 'MONTHLY | SEMIANNUALLY | YEARLY (web)', value: 'valor cobrado em reais (web)', source: 'app | background (Android: na tela ou pela tarefa em segundo plano)' } },
   { name: 'purchase.failed', source: 'app', description: 'Compra não concluída.', properties: { reason: 'código do Billing' } },
   { name: 'subscription.linked', source: 'server', description: 'Assinatura vinculada à empresa.', properties: { planKey: 'plano', state: 'estado' } },
   { name: 'subscription.state_changed', source: 'server', description: 'Estado da assinatura mudou.', properties: { from: 'estado', to: 'estado' } },

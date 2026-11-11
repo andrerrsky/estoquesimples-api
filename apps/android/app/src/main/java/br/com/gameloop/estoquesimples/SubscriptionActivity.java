@@ -725,6 +725,12 @@ public class SubscriptionActivity extends BaseActivity {
                 JSONObject entitlement = new SubscriptionClient(this).link(purchaseToken);
                 entitlements.apply(entitlement);
                 pending.clear();
+                // A faixa "Sincronização pausada: limite do plano" só saía na
+                // próxima sincronização bem-sucedida. Se ela falhasse por outro
+                // motivo, quem acabou de pagar continuava vendo o aviso de
+                // limite e achava que a compra não tinha valido.
+                SyncBlock.clearPlanBlock(this);
+                Analytics.track(this, "purchase.completed", Analytics.props("source", "app"));
                 SyncBootstrap.start(this);
 
                 main.post(() -> {
