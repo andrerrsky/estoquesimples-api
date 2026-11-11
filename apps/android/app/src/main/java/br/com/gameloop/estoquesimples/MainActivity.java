@@ -684,6 +684,7 @@ public class MainActivity extends BaseActivity {
 
         updateConflictsBanner();
         updatePlanBanner();
+        updatePromoCard();
 
         br.com.gameloop.estoquesimples.sync.SyncStatus.addListener(syncListener);
         onSyncChanged(br.com.gameloop.estoquesimples.sync.SyncStatus.current());
@@ -734,6 +735,84 @@ public class MainActivity extends BaseActivity {
                 startActivity(new Intent(this, AccountActivity.class));
             }
         });
+    }
+
+    /** O evento de exibição do cartão sai uma vez por processo, não a cada volta à tela. */
+    private static boolean promoViewTracked;
+
+    /**
+     * Cartão discreto da oferta de Black Friday da Google Play.
+     *
+     * Só aparece na vigência (horário de Brasília), para quem não assina e
+     * pode comprar (sem conta ou proprietário), quando a Play devolve a oferta
+     * {@code bf2026} para esta conta Google e se não foi fechado (volta uma
+     * vez em 01/12). A consulta à Play roda em segundo plano com cache curto
+     * ({@link br.com.gameloop.estoquesimples.billing.PromoAvailability}); a
+     * tela nunca espera por ela. Com o aviso de plano na tela, o cartão fica
+     * de fora: aquele aviso já leva à mesma tela de assinatura.
+     */
+    private void updatePromoCard() {
+        View card = findViewById(R.id.promoCard);
+        if (card == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        br.com.gameloop.estoquesimples.sync.SessionManager sessao =
+                br.com.gameloop.estoquesimples.sync.SessionManager.get(this);
+        boolean podeComprar = !sessao.isSignedIn() || "proprietario".equals(sessao.role());
+        boolean assinante = new br.com.gameloop.estoquesimples.sync.EntitlementManager(this).isPaid();
+        long fechadoEm = br.com.gameloop.estoquesimples.billing.PromoAvailability.dismissedAt(this);
+        View planBanner = findViewById(R.id.planBanner);
+        boolean avisoDePlano = planBanner != null && planBanner.getVisibility() == View.VISIBLE;
+
+        // Primeiro o que não depende da Play: fora disso, nem abre conexão.
+        if (avisoDePlano || !br.com.gameloop.estoquesimples.billing.PromoRules.shouldShowCard(
+                now, true, assinante, podeComprar, fechadoEm)) {
+            card.setVisibility(View.GONE);
+            return;
+        }
+        if (!br.com.gameloop.estoquesimples.billing.PromoAvailability.isFresh(this, now)) {
+            card.setVisibility(View.GONE);
+            br.com.gameloop.estoquesimples.billing.PromoAvailability.refresh(this, () -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    updatePromoCard();
+                }
+            });
+            return;
+        }
+        String subtitulo = br.com.gameloop.estoquesimples.billing.PromoAvailability.cachedSubtitle(this);
+        if (subtitulo == null) {
+            card.setVisibility(View.GONE);
+            return;
+        }
+        TextView texto = findViewById(R.id.promoCardSubtitle);
+        if (texto != null) {
+            texto.setText(subtitulo);
+        }
+        card.setVisibility(View.VISIBLE);
+        card.setOnClickListener(v -> {
+            Analytics.track(this, "promo.banner_clicked", promoProps());
+            SubscriptionActivity.openWithOffer(this, "promo_card",
+                    br.com.gameloop.estoquesimples.billing.PromoRules.TAG_BF2026);
+        });
+        View fechar = findViewById(R.id.promoCardClose);
+        if (fechar != null) {
+            fechar.setOnClickListener(v -> {
+                br.com.gameloop.estoquesimples.billing.PromoAvailability.dismiss(this,
+                        System.currentTimeMillis());
+                Analytics.track(this, "promo.banner_dismissed", promoProps());
+                card.setVisibility(View.GONE);
+            });
+        }
+        if (!promoViewTracked) {
+            promoViewTracked = true;
+            Analytics.track(this, "promo.banner_viewed", promoProps());
+        }
+    }
+
+    private static java.util.Map<String, Object> promoProps() {
+        return Analytics.props("surface", "android_cartao",
+                "campaign", br.com.gameloop.estoquesimples.billing.PromoRules.CAMPAIGN_BF2026);
     }
 
     private void updateConflictsBanner() {
@@ -1532,6 +1611,7 @@ public class MainActivity extends BaseActivity {
             updateList();
             updateConflictsBanner();
             updatePlanBanner();
+            updatePromoCard();
         }
         android.view.View pill = findViewById(R.id.syncPill);
         boolean pillVisivel = pill != null && pill.getVisibility() == android.view.View.VISIBLE;

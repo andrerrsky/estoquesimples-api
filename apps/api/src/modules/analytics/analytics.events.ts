@@ -80,6 +80,14 @@ export const AnalyticsEventName = {
   SUBSCRIPTION_CHECKOUT_STARTED: 'subscription.checkout_started',
   SUBSCRIPTION_CANCEL_REQUESTED: 'subscription.cancel_requested',
 
+  // Promoções (Black Friday 2026: docs/black-friday-2026.md)
+  PROMO_BANNER_VIEWED: 'promo.banner_viewed',
+  PROMO_BANNER_CLICKED: 'promo.banner_clicked',
+  PROMO_BANNER_DISMISSED: 'promo.banner_dismissed',
+  PROMO_LANDING_VIEWED: 'promo.landing_viewed',
+  COUPON_APPLIED: 'coupon.applied',
+  COUPON_REDEEMED: 'coupon.redeemed',
+
   // Notificações
   LOW_STOCK_NOTIFIED: 'low_stock.notified',
   NOTIFICATION_OPENED: 'notification.opened',
@@ -192,6 +200,12 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'brand.login_viewed', source: 'app', description: 'Abriu a tela de entrada personalizada de uma empresa (sem identificar a empresa no evento).' },
   { name: 'brand.applied', source: 'app', description: 'Cliente aplicou a identidade visual da empresa.', properties: { platform: 'web | android' } },
   { name: 'subscription.cancel_requested', source: 'server', description: 'Proprietário cancelou a renovação pela web.', properties: { provider: 'asaas' } },
+  { name: 'promo.banner_viewed', source: 'app', description: 'Faixa ou cartão de promoção exibido (web ou Android).', properties: { surface: 'web_topo | web_plano | web_limite | android_cartao', campaign: 'código da campanha (ex.: BF26)' } },
+  { name: 'promo.banner_clicked', source: 'app', description: 'Tocou na faixa ou no cartão de promoção.', properties: { surface: 'web_topo | web_plano | web_limite | android_cartao', campaign: 'código da campanha' } },
+  { name: 'promo.banner_dismissed', source: 'app', description: 'Fechou a faixa ou o cartão de promoção.', properties: { surface: 'web_topo | web_plano | web_limite | android_cartao', campaign: 'código da campanha' } },
+  { name: 'promo.landing_viewed', source: 'app', description: 'Abriu a página pública da campanha (/black-friday).', properties: { campaign: 'código da campanha', coupon: 'cupom do link, se houver' } },
+  { name: 'coupon.applied', source: 'app', description: 'Aplicou um cupom na contratação pela web (antes de pagar).', properties: { code: 'código do cupom', cycle: 'MONTHLY | YEARLY' } },
+  { name: 'coupon.redeemed', source: 'server', description: 'Cupom resgatado: a 1ª cobrança da assinatura com cupom foi paga.', properties: { code: 'código do cupom', cycle: 'MONTHLY | YEARLY', valueCents: 'valor promocional pago, em centavos' } },
 ];
 
 /** Formato aceito para nomes de evento (o mesmo CHECK do banco). */

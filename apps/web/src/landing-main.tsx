@@ -8,6 +8,7 @@ import { CookieConsent } from './components/CookieConsent';
 import { reloadForNewVersion } from './lib/chunks';
 import { captureFirstTouch, sendLandingViewed } from './lib/attribution';
 import { bootGa, installGaClickTracking } from './lib/ga';
+import { captureCouponFromUrl } from './lib/promo';
 import { LandingPage, LandingSessionContext } from './pages/LandingPage';
 
 /**
@@ -62,6 +63,7 @@ function Landing() {
     setMounted(true);
     // Origem da visita e o primeiro degrau do funil, no analytics próprio (sem cookie).
     captureFirstTouch();
+    captureCouponFromUrl(window.location.search);
     sendLandingViewed();
     bootGa();
     return installGaClickTracking();

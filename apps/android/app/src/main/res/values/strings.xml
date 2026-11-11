@@ -98,4 +98,10 @@
     <string name="report_btn_category">Por categoria</string>
     <string name="report_btn_financial">Financeiro / valor de inventário</string>
     <string name="about_version">Versão %1$s</string>
+
+    <!-- Oferta promocional da Google Play (Black Friday). Valores vêm do Billing. -->
+    <string name="promo_card_badge">BLACK FRIDAY</string>
+    <string name="promo_card_title">Oferta de Black Friday</string>
+    <string name="promo_card_cta">Ver oferta</string>
+    <string name="promo_card_close">Fechar oferta</string>
 </resources>

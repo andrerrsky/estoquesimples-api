@@ -204,7 +204,8 @@ describe('funil de e-mails do ciclo de vida', () => {
     const list = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/emails', headers: h })).json();
     expect(list.items[0]).toMatchObject({ kind: 'activation_d1', status: 'sent' });
     const templates = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/templates', headers: h })).json();
-    expect(templates.items).toHaveLength(7);
+    // 7 do funil + 3 avisos de cupom + 3 da Black Friday.
+    expect(templates.items).toHaveLength(13);
   });
 });
 

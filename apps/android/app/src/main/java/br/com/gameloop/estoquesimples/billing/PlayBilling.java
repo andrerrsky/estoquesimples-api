@@ -16,6 +16,7 @@ import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
+import com.android.billingclient.api.QueryProductDetailsResult;
 import com.android.billingclient.api.QueryPurchasesParams;
 
 import java.nio.charset.StandardCharsets;
@@ -68,13 +69,27 @@ public final class PlayBilling implements PurchasesUpdatedListener {
         public final String offerToken;
         public final String formattedPrice;
         public final String billingPeriod;
+        /** Tag promocional da oferta escolhida (ex.: {@code bf2026}); nula na oferta comum. */
+        @Nullable
+        public final String promoTag;
+        /** Fase promocional e preço final, quando a oferta é promocional e legível. */
+        @Nullable
+        public final PromoRules.Summary promoSummary;
 
         Offer(ProductDetails productDetails, String offerToken,
-              String formattedPrice, String billingPeriod) {
+              String formattedPrice, String billingPeriod,
+              @Nullable String promoTag, @Nullable PromoRules.Summary promoSummary) {
             this.productDetails = productDetails;
             this.offerToken = offerToken;
             this.formattedPrice = formattedPrice;
             this.billingPeriod = billingPeriod;
+            this.promoTag = promoTag;
+            this.promoSummary = promoSummary;
+        }
+
+        /** É a oferta promocional com a tag pedida e com texto montável. */
+        public boolean isPromo(@NonNull String tag) {
+            return tag.equals(promoTag) && promoSummary != null;
         }
     }
 
@@ -139,7 +154,12 @@ public final class PlayBilling implements PurchasesUpdatedListener {
         return billingClient != null && billingClient.isReady();
     }
 
+    /** Consulta a oferta preferindo a de Black Friday ({@link PromoRules#TAG_BF2026}). */
     public void queryOffer(@NonNull OfferCallback callback) {
+        queryOffer(PromoRules.TAG_BF2026, callback);
+    }
+
+    public void queryOffer(@Nullable String preferredTag, @NonNull OfferCallback callback) {
         if (!isReady()) {
             callback.onOffer(null, "Loja ainda não está pronta.");
             return;
@@ -156,26 +176,45 @@ public final class PlayBilling implements PurchasesUpdatedListener {
                 .setProductList(productList)
                 .build();
 
-        billingClient.queryProductDetailsAsync(params, (billingResult, queryResult) -> {
-            if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                callback.onOffer(null, "Não foi possível carregar o preço da assinatura.");
-                return;
-            }
+        try {
+            billingClient.queryProductDetailsAsync(params, (billingResult, queryResult) ->
+                    deliverOffer(billingResult, queryResult, preferredTag, callback));
+        } catch (Exception e) {
+            // Billing desconectado no meio do caminho: vira erro na tela, nunca crash.
+            Log.w(TAG, "falha ao consultar produto", e);
+            callback.onOffer(null, "Não foi possível carregar o preço da assinatura.");
+        }
+    }
 
-            List<ProductDetails> detailsList = queryResult.getProductDetailsList();
-            if (detailsList == null || detailsList.isEmpty()) {
-                callback.onOffer(null, "Assinatura indisponível nesta região ou conta Google.");
-                return;
-            }
+    private static void deliverOffer(@NonNull BillingResult billingResult,
+                                     @Nullable QueryProductDetailsResult queryResult,
+                                     @Nullable String preferredTag,
+                                     @NonNull OfferCallback callback) {
+        if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
+                || queryResult == null) {
+            callback.onOffer(null, "Não foi possível carregar o preço da assinatura.");
+            return;
+        }
 
-            ProductDetails details = detailsList.get(0);
-            Offer offer = findBasePlanOffer(details);
-            if (offer == null) {
-                callback.onOffer(null, "Plano indisponível nesta região ou conta Google.");
-                return;
-            }
-            callback.onOffer(offer, null);
-        });
+        List<ProductDetails> detailsList = queryResult.getProductDetailsList();
+        if (detailsList == null || detailsList.isEmpty()) {
+            callback.onOffer(null, "Assinatura indisponível nesta região ou conta Google.");
+            return;
+        }
+
+        ProductDetails details = detailsList.get(0);
+        Offer offer;
+        try {
+            offer = findBasePlanOffer(details, preferredTag);
+        } catch (Exception e) {
+            Log.w(TAG, "oferta com formato inesperado", e);
+            offer = null;
+        }
+        if (offer == null) {
+            callback.onOffer(null, "Plano indisponível nesta região ou conta Google.");
+            return;
+        }
+        callback.onOffer(offer, null);
     }
 
     /**
@@ -198,7 +237,21 @@ public final class PlayBilling implements PurchasesUpdatedListener {
             flowBuilder.setObfuscatedAccountId(obfuscatedAccountId);
         }
 
-        return billingClient.launchBillingFlow(activity, flowBuilder.build());
+        if (billingClient == null) {
+            return BillingResult.newBuilder()
+                    .setResponseCode(BillingClient.BillingResponseCode.SERVICE_DISCONNECTED)
+                    .setDebugMessage("Loja desconectada.")
+                    .build();
+        }
+        try {
+            return billingClient.launchBillingFlow(activity, flowBuilder.build());
+        } catch (Exception e) {
+            Log.w(TAG, "falha ao abrir a compra", e);
+            return BillingResult.newBuilder()
+                    .setResponseCode(BillingClient.BillingResponseCode.ERROR)
+                    .setDebugMessage("Loja indisponível no momento.")
+                    .build();
+        }
     }
 
     public void queryPurchases(@NonNull PurchasesCallback callback) {
@@ -355,32 +408,48 @@ public final class PlayBilling implements PurchasesUpdatedListener {
     }
 
     @Nullable
-    private static Offer findBasePlanOffer(@NonNull ProductDetails details) {
+    private static Offer findBasePlanOffer(@NonNull ProductDetails details,
+                                           @Nullable String preferredTag) {
         List<ProductDetails.SubscriptionOfferDetails> offers =
                 details.getSubscriptionOfferDetails();
         if (offers == null) {
             return null;
         }
-        for (ProductDetails.SubscriptionOfferDetails offerDetails : offers) {
-            if (!Constants.SUBSCRIPTION_BASE_PLAN_ID.equals(offerDetails.getBasePlanId())) {
-                continue;
-            }
-            // Preferir a oferta sem offerId (preço base), se houver várias.
-            String offerToken = offerDetails.getOfferToken();
-            if (offerToken == null || offerToken.isEmpty()) {
-                continue;
-            }
-            String price = "";
-            String period = "";
-            List<ProductDetails.PricingPhase> phases =
-                    offerDetails.getPricingPhases().getPricingPhaseList();
-            if (phases != null && !phases.isEmpty()) {
-                ProductDetails.PricingPhase phase = phases.get(0);
-                price = phase.getFormattedPrice();
-                period = phase.getBillingPeriod();
-            }
-            return new Offer(details, offerToken, price, period);
+        List<PromoRules.OfferInfo> infos = new ArrayList<>(offers.size());
+        for (ProductDetails.SubscriptionOfferDetails o : offers) {
+            infos.add(new PromoRules.OfferInfo(o.getBasePlanId(), o.getOfferId(),
+                    o.getOfferToken(), o.getOfferTags()));
         }
-        return null;
+        int index = PromoRules.chooseOffer(infos, Constants.SUBSCRIPTION_BASE_PLAN_ID, preferredTag);
+        if (index < 0) {
+            return null;
+        }
+        ProductDetails.SubscriptionOfferDetails chosen = offers.get(index);
+        List<PromoRules.Phase> phases = toPhases(chosen);
+        String price = "";
+        String period = "";
+        if (!phases.isEmpty()) {
+            price = phases.get(0).formattedPrice;
+            period = phases.get(0).billingPeriod;
+        }
+        String tag = preferredTag != null && infos.get(index).tags.contains(preferredTag)
+                ? preferredTag : null;
+        PromoRules.Summary summary = tag != null ? PromoRules.summarize(phases) : null;
+        return new Offer(details, chosen.getOfferToken(), price, period, tag, summary);
+    }
+
+    @NonNull
+    private static List<PromoRules.Phase> toPhases(
+            @NonNull ProductDetails.SubscriptionOfferDetails offer) {
+        List<PromoRules.Phase> result = new ArrayList<>();
+        if (offer.getPricingPhases() == null
+                || offer.getPricingPhases().getPricingPhaseList() == null) {
+            return result;
+        }
+        for (ProductDetails.PricingPhase p : offer.getPricingPhases().getPricingPhaseList()) {
+            result.add(new PromoRules.Phase(p.getPriceAmountMicros(), p.getFormattedPrice(),
+                    p.getBillingPeriod(), p.getBillingCycleCount(), p.getRecurrenceMode()));
+        }
+        return result;
     }
 }

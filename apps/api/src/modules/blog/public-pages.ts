@@ -66,12 +66,22 @@ const PAGES: Record<string, PublicPage> = {
     description: 'Crie a sua conta grátis no Estoque Simples, sem cartão. A mesma conta vale no app Android e na versão web.',
     crumb: 'Criar conta',
   },
+  // Landing da campanha (docs/black-friday-2026.md). Indexável durante e
+  // depois da campanha: a página diz se a oferta está vigente, terminou ou vai começar.
+  '/black-friday': {
+    title: 'Black Friday Estoque Simples: plano anual com 40% off',
+    description: 'Black Friday do Estoque Simples: plano Equipe anual de R$ 199,90 por R$ 119,90 (equivale a R$ 9,99/mês) ou 1º mês por R$ 12,49. De 20/11 a 01/12/2026.',
+    crumb: 'Black Friday',
+  },
   '/entrar': {
     title: 'Entrar | Estoque Simples',
     description: 'Entre no Estoque Simples com a mesma conta do aplicativo Android para ver e movimentar o seu estoque no navegador.',
     crumb: 'Entrar',
   },
 };
+
+/** Caminhos com cabeçalho próprio (indexáveis); o servidor monta o HTML de cada um no boot. */
+export const PUBLIC_APP_PATHS: readonly string[] = Object.keys(PAGES);
 
 export function isPublicAppPage(path: string): boolean {
   return Object.hasOwn(PAGES, path);

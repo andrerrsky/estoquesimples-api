@@ -13,6 +13,7 @@ import { CookieConsent } from './components/CookieConsent';
 import './styles/pages-blog.css';
 import { captureFirstTouch, reportLifecycleClick } from './lib/attribution';
 import { bootGa, installGaClickTracking } from './lib/ga';
+import { captureCouponFromUrl } from './lib/promo';
 
 /**
  * Rotas. As telas internas são carregadas sob demanda: quem só visita a
@@ -47,6 +48,7 @@ const BlogPostPage = page(() => import('./pages/BlogPage'), 'BlogPostPage');
 const RegisterPage = page(() => import('./pages/AuthPages'), 'RegisterPage');
 const WelcomePage = page(() => import('./pages/AuthPages'), 'WelcomePage');
 const ComecePage = page(() => import('./pages/ComecePage'), 'ComecePage');
+const BlackFridayPage = page(() => import('./pages/BlackFridayPage'), 'BlackFridayPage');
 const ForgotPasswordPage = page(() => import('./pages/AuthPages'), 'ForgotPasswordPage');
 const ResetPasswordPage = page(() => import('./pages/AuthPages'), 'ResetPasswordPage');
 const VerifyEmailPage = page(() => import('./pages/AuthPages'), 'VerifyEmailPage');
@@ -91,10 +93,14 @@ function Root() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   // iPhone/iPad: a tela nova não herda o zoom que o Safari deu num campo da anterior.
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   useEffect(() => {
     resetZoom();
   }, [pathname]);
+  // `?cupom=BF26` em qualquer página fica guardado até o fim da campanha (ver lib/promo.ts).
+  useEffect(() => {
+    captureCouponFromUrl(search);
+  }, [search]);
 
   // Avisos do web app: reenvia a inscrição (se ligada aqui) quando a sessão
   // muda, para ela ficar ligada à conta certa; e o toque numa notificação com
@@ -153,6 +159,7 @@ export const router = createBrowserRouter([
       { path: '/:slug/entrar', element: <Suspense fallback={<FullScreenLoading />}><BrandedLoginPage /></Suspense> },
       { path: '/criar-conta', element: <Suspense fallback={<FullScreenLoading />}><RegisterPage /></Suspense> },
       { path: '/comece', element: <Suspense fallback={<FullScreenLoading />}><ComecePage /></Suspense> },
+      { path: '/black-friday', element: <Suspense fallback={<FullScreenLoading />}><BlackFridayPage /></Suspense> },
       { path: '/boas-vindas', element: <Suspense fallback={<FullScreenLoading />}><WelcomePage /></Suspense> },
       { path: '/esqueci-a-senha', element: <Suspense fallback={<FullScreenLoading />}><ForgotPasswordPage /></Suspense> },
       { path: '/redefinir-senha', element: <Suspense fallback={<FullScreenLoading />}><ResetPasswordPage /></Suspense> },

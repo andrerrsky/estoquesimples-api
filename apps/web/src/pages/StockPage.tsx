@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api, errorMessage } from '../api/client';
@@ -14,6 +14,8 @@ import { track } from '../lib/analytics';
 import { fmtMoney, fmtQuantity, parseNumber, plural } from '../lib/format';
 import { segmentContent } from '../lib/attribution';
 import { ProductImage } from '../lib/product-image';
+import { promoTexts, saveCoupon } from '../lib/promo';
+import { useWorkspaceOffer } from '../lib/use-promo';
 import { inventoryKeys, SYNC_HEADERS, useDebounced, useInvalidateInventory } from '../lib/inventory';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
 
@@ -189,6 +191,15 @@ export function StockPage() {
 
   const limit = entitlement?.limits.products ?? null;
   const used = entitlement?.usage.products ?? 0;
+  // Campanha ativa e empresa elegível: o aviso do limite vira a oferta.
+  const offer = useWorkspaceOffer();
+  const atLimit = limit !== null && used >= limit;
+  const offerSeen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!atLimit || !offer || offerSeen.current === offer.code) return;
+    offerSeen.current = offer.code;
+    track('promo.banner_viewed', { surface: 'web_limite', campaign: offer.code });
+  }, [atLimit, offer]);
 
   const rowMenu = (product: Product): Array<MenuItem | 'sep'> => [
     { label: 'Ver detalhes', icon: 'eye', onClick: () => setDetailId(product.id) },
@@ -259,7 +270,26 @@ export function StockPage() {
       )}
 
       {limit !== null && used >= limit ? (
-        <Notice tone="warning" title={`Limite de ${limit} produtos do plano gratuito atingido`} action={<Link to="/app/plano?origem=limite_produtos" className="btn btn--primary btn--sm">Liberar produtos ilimitados</Link>}>
+        <Notice
+          tone="warning"
+          title={`Limite de ${limit} produtos do plano gratuito atingido`}
+          action={
+            offer ? (
+              <Link
+                to={`/app/plano?cupom=${encodeURIComponent(offer.code)}&origem=limite_produtos`}
+                className="btn btn--primary btn--sm"
+                onClick={() => {
+                  saveCoupon(offer.code, offer.promo.endsAt);
+                  track('promo.banner_clicked', { surface: 'web_limite', campaign: offer.code });
+                }}
+              >
+                Black Friday: produtos ilimitados por {promoTexts(offer.promo).yearlyPerMonth}/mês no plano anual
+              </Link>
+            ) : (
+              <Link to="/app/plano?origem=limite_produtos" className="btn btn--primary btn--sm">Liberar produtos ilimitados</Link>
+            )
+          }
+        >
           Com o plano Equipe você cadastra sem limite e coloca a equipe no mesmo estoque. Ou exclua produtos que não usa mais.
         </Notice>
       ) : limit !== null && used >= limit * 0.8 ? (

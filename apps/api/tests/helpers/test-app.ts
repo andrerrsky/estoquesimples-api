@@ -66,6 +66,8 @@ const SEED_TABLES = new Set([
   'role_permissions',
   'plans',
   'plan_features',
+  // Cupom BF26 vem da migration 0036; os testes de promoção limpam os seus.
+  'coupons',
 ]);
 
 /**

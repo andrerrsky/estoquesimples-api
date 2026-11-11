@@ -73,6 +73,22 @@ export interface CreateSubscriptionInput {
   successUrl?: string | null;
 }
 
+export interface UpdateSubscriptionInput {
+  /** Novo valor de cada cobrança, em reais. */
+  value: number;
+  /** Aplica o novo valor também às cobranças já geradas e ainda em aberto. */
+  updatePendingPayments: boolean;
+}
+
+/** QR Code do PIX de uma cobrança (`GET /payments/{id}/pixQrCode`). */
+export interface AsaasPixQrCode {
+  /** Imagem PNG em base64. */
+  encodedImage: string;
+  /** Código "copia e cola". */
+  payload: string;
+  expirationDate: string | null;
+}
+
 export interface AsaasClient {
   readonly configured: boolean;
   readonly environment: 'sandbox' | 'production';
@@ -84,6 +100,8 @@ export interface AsaasClient {
   listCustomerSubscriptions(customerId: string): Promise<AsaasSubscription[]>;
   listSubscriptionPayments(subscriptionId: string): Promise<AsaasPayment[]>;
   deleteSubscription(id: string): Promise<void>;
+  updateSubscription(id: string, input: UpdateSubscriptionInput): Promise<AsaasSubscription>;
+  getPixQrCode(paymentId: string): Promise<AsaasPixQrCode>;
 }
 
 const BASE_URL = {
@@ -285,6 +303,23 @@ export class HttpAsaasClient implements AsaasClient {
   async deleteSubscription(id: string): Promise<void> {
     await this.request('DELETE', `/subscriptions/${encodeURIComponent(id)}`, { allowNotFound: true });
   }
+
+  async updateSubscription(id: string, input: UpdateSubscriptionInput): Promise<AsaasSubscription> {
+    // A API v3 atualiza assinatura por POST (não PUT) no próprio recurso.
+    const updated = await this.request<AsaasSubscription>('POST', `/subscriptions/${encodeURIComponent(id)}`, {
+      body: { value: input.value, updatePendingPayments: input.updatePendingPayments },
+    });
+    if (!updated) throw new AppError(503, ErrorCode.BILLING_UNAVAILABLE, 'O provedor de pagamento não confirmou a atualização da assinatura.');
+    return updated;
+  }
+
+  async getPixQrCode(paymentId: string): Promise<AsaasPixQrCode> {
+    const qr = await this.request<AsaasPixQrCode>('GET', `/payments/${encodeURIComponent(paymentId)}/pixQrCode`);
+    if (!qr?.encodedImage || !qr.payload) {
+      throw new AppError(503, ErrorCode.BILLING_UNAVAILABLE, 'O provedor de pagamento não gerou o QR Code do PIX. Tente de novo em instantes.');
+    }
+    return { encodedImage: qr.encodedImage, payload: qr.payload, expirationDate: qr.expirationDate ?? null };
+  }
 }
 
 /**
@@ -298,6 +333,8 @@ export class FakeAsaasClient implements AsaasClient {
   readonly customers = new Map<string, AsaasCustomer>();
   readonly subscriptions = new Map<string, AsaasSubscription>();
   readonly payments = new Map<string, AsaasPayment>();
+  /** Chamadas a `updateSubscription`, na ordem (para os testes conferirem). */
+  readonly subscriptionUpdates: Array<{ id: string } & UpdateSubscriptionInput> = [];
   /** Quando preenchido, a próxima chamada falha com este erro (uma vez). */
   failNext: AppError | null = null;
   private sequence = 0;
@@ -307,6 +344,7 @@ export class FakeAsaasClient implements AsaasClient {
     this.customers.clear();
     this.subscriptions.clear();
     this.payments.clear();
+    this.subscriptionUpdates.length = 0;
     this.failNext = null;
     this.sequence = 0;
   }
@@ -430,5 +468,33 @@ export class FakeAsaasClient implements AsaasClient {
         payment.deleted = true;
       }
     }
+  }
+
+  async updateSubscription(id: string, input: UpdateSubscriptionInput): Promise<AsaasSubscription> {
+    this.maybeFail();
+    const subscription = this.subscriptions.get(id);
+    if (!subscription || subscription.deleted) throw new AppError(404, ErrorCode.NOT_FOUND, 'Registro não encontrado no provedor de pagamento.');
+    this.subscriptionUpdates.push({ id, ...input });
+    subscription.value = input.value;
+    if (input.updatePendingPayments) {
+      for (const payment of this.payments.values()) {
+        if (payment.subscription === id && !payment.deleted && (payment.status === 'PENDING' || payment.status === 'OVERDUE')) {
+          payment.value = input.value;
+          payment.netValue = input.value;
+        }
+      }
+    }
+    return subscription;
+  }
+
+  async getPixQrCode(paymentId: string): Promise<AsaasPixQrCode> {
+    this.maybeFail();
+    const payment = this.payments.get(paymentId);
+    if (!payment || payment.deleted) throw new AppError(404, ErrorCode.NOT_FOUND, 'Registro não encontrado no provedor de pagamento.');
+    return {
+      encodedImage: Buffer.from(`png-${paymentId}`).toString('base64'),
+      payload: `00020126580014br.gov.bcb.pix0136${paymentId}5204000053039865406${payment.value.toFixed(2)}`,
+      expirationDate: `${payment.dueDate ?? '2099-12-31'} 23:59:59`,
+    };
   }
 }

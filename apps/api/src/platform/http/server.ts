@@ -23,6 +23,7 @@ import { registerAnalyticsRoutes } from '../../modules/analytics/analytics.route
 import { registerAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { registerWebSessionRoutes } from '../../modules/auth/web-session.routes.js';
 import { registerAsaasRoutes } from '../../modules/billing/asaas/asaas.routes.js';
+import { registerPromotionRoutes } from '../../modules/promotions/promotions.routes.js';
 import { registerBrandingRoutes } from '../../modules/branding/branding.routes.js';
 import { registerImageRoutes } from '../../modules/images/images.routes.js';
 import { registerInventoryRoutes } from '../../modules/inventory/inventory.routes.js';
@@ -231,6 +232,7 @@ export async function buildServer(services: AppServices): Promise<FastifyInstanc
   await app.register(registerInventoryRoutes, { prefix: '/v1' });
   await app.register(registerNotificationRoutes, { prefix: '/v1' });
   await app.register(registerAsaasRoutes, { prefix: '/v1' });
+  await app.register(registerPromotionRoutes, { prefix: '/v1' });
   await app.register(registerImageRoutes, { prefix: '/v1' });
   await app.register(registerBrandingRoutes, { prefix: '/v1' });
 

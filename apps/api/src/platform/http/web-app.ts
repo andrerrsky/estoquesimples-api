@@ -7,7 +7,7 @@ import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { resolveAppDist } from './app-dist.js';
 import { BlogPages, isBlogPagePath } from '../../modules/blog/blog-pages.js';
 import { INDEXNOW_KEY } from '../../modules/blog/indexnow.js';
-import { isPublicAppPage, privateAppHtml, publicPageHtml } from '../../modules/blog/public-pages.js';
+import { isPublicAppPage, privateAppHtml, PUBLIC_APP_PATHS, publicPageHtml } from '../../modules/blog/public-pages.js';
 import { ErrorCode } from './errors.js';
 
 /**
@@ -230,7 +230,7 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     return { ...index, cacheControl, etag: etagFor(raw), raw, gzip: gzipSync(raw, { level: 6 }), brotli: null };
   };
   const publicPages = new Map<string, StaticFile>();
-  for (const path of ['/ajuda', '/plataformas', '/termos', '/privacidade', '/criar-conta', '/entrar']) {
+  for (const path of PUBLIC_APP_PATHS) {
     const html = distDir ? publicPageHtml(indexTemplate, path) : null;
     if (html) publicPages.set(path, htmlFile(html, 'no-cache'));
   }

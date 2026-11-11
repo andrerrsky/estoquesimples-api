@@ -1,0 +1,7 @@
+<pt-BR>
+Novidades desta versão:
+• Oferta de Black Friday no plano Equipe para novos assinantes, por tempo limitado, com o valor e a duração mostrados na própria tela de assinatura
+• O plano Equipe libera sua equipe no mesmo estoque, sem teto de produtos, e a Análise Avançada
+• Tela de assinatura mais clara sobre o valor depois do período promocional
+• Correções e melhorias gerais de estabilidade
+</pt-BR>

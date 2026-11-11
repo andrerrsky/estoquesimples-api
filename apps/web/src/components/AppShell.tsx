@@ -10,6 +10,7 @@ import { initials } from '../lib/format';
 import { ROLE_LABEL } from '../lib/labels';
 import { useWorkspace } from '../workspace/WorkspaceProvider';
 import { BrandMark } from './BrandMark';
+import { PromoBar } from './PromoBar';
 import { Icon, type IconName } from './Icon';
 import { SyncButton } from './SyncButton';
 import { Empty, Menu, Meter, Modal, Notice, Skeleton, Spinner } from './ui';
@@ -188,6 +189,7 @@ export function AppShell() {
       </aside>
 
       <div className="main">
+        {workspaceId && <PromoBar />}
         <header className={`topbar no-print ${scrolled ? 'topbar--scrolled' : ''}`}>
           <Link to="/app/estoque" className="topbar__brand">
             <BrandMark size={28} name={false} />

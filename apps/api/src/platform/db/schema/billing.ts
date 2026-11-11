@@ -99,6 +99,10 @@ export const subscriptions = pgTable(
       onDelete: 'set null',
     }),
     latestNotificationType: integer('latest_notification_type'),
+    /** Cupom aplicado na contratação pela web (migration 0036). */
+    couponId: uuid('coupon_id').references((): AnyPgColumn => coupons.id, { onDelete: 'set null' }),
+    /** Quando o valor no Asaas voltou ao preço cheio depois dos ciclos promocionais. */
+    promoRestoredAt: timestamp('promo_restored_at', tz),
     lastVerifiedAt: timestamp('last_verified_at', tz).notNull().defaultNow(),
     raw: jsonb('raw').notNull().default({}),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
@@ -203,6 +207,59 @@ export const billingPayments = pgTable(
   ],
 );
 
+/** Cupom promocional da web (migration 0036). Preço cheio vem sempre de `plans`. */
+export const coupons = pgTable(
+  'coupons',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    label: text('label').notNull(),
+    startsAt: timestamp('starts_at', tz).notNull(),
+    /** Inclusivo (23:59:59 do último dia). */
+    endsAt: timestamp('ends_at', tz).notNull(),
+    active: boolean('active').notNull().default(true),
+    yearlyPriceCents: integer('yearly_price_cents'),
+    monthlyFirstCents: integer('monthly_first_cents'),
+    monthlyPromoCycles: integer('monthly_promo_cycles').notNull().default(1),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('coupons_code_unique').on(table.code)],
+);
+
+/** Uso de um cupom: `reservado` no checkout, `resgatado` com a 1ª cobrança paga. */
+export const couponRedemptions = pgTable(
+  'coupon_redemptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    couponId: uuid('coupon_id')
+      .notNull()
+      .references(() => coupons.id, { onDelete: 'restrict' }),
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'set null' }),
+    subscriptionId: uuid('subscription_id').references(() => subscriptions.id, { onDelete: 'set null' }),
+    /** SHA-256 hex do CPF/CNPJ só com dígitos. */
+    documentHash: text('document_hash').notNull(),
+    state: text('state').notNull().default('reservado'),
+    cycle: text('cycle').notNull(),
+    valueCents: integer('value_cents').notNull(),
+    redeemedAt: timestamp('redeemed_at', tz),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('coupon_redemptions_one_per_workspace')
+      .on(table.couponId, table.workspaceId)
+      .where(sql`${table.state} = 'resgatado'`),
+    uniqueIndex('coupon_redemptions_one_per_document')
+      .on(table.couponId, table.documentHash)
+      .where(sql`${table.state} = 'resgatado'`),
+    uniqueIndex('coupon_redemptions_subscription_unique')
+      .on(table.subscriptionId)
+      .where(sql`${table.subscriptionId} IS NOT NULL`),
+  ],
+);
+
+export type Coupon = typeof coupons.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type BillingPayment = typeof billingPayments.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
