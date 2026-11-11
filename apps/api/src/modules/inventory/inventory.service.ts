@@ -42,7 +42,7 @@ interface Operation {
   payload: Record<string, unknown>;
 }
 
-const EDITABLE_FIELDS = ['name', 'description', 'unitValue', 'minStock', 'unit', 'category', 'supplier', 'location', 'sku', 'barcode', 'photoHash'] as const;
+const EDITABLE_FIELDS = ['name', 'description', 'unitValue', 'unitCost', 'minStock', 'unit', 'category', 'supplier', 'location', 'sku', 'barcode', 'photoHash'] as const;
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
 const MOVEMENT_LABEL: Record<string, string> = {
@@ -71,6 +71,8 @@ const foldText = (value: string): string =>
     .toLowerCase();
 
 const num = (value: unknown): number => (value === null || value === undefined ? 0 : Number(value));
+/** Número que pode faltar de verdade (custo não informado não é custo zero). */
+const numOrNull = (value: unknown): number | null => (value === null || value === undefined ? null : Number(value));
 const text = (value: unknown): string | null => (value === null || value === undefined || value === '' ? null : String(value));
 const iso = (value: unknown): string | null => (value ? new Date(value as string).toISOString() : null);
 
@@ -89,6 +91,7 @@ function productView(row: Row) {
     description: text(row['description']),
     quantity,
     unitValue: num(row['unit_value']),
+    unitCost: numOrNull(row['unit_cost']),
     minStock,
     unit: text(row['unit']),
     category: text(row['category']),
@@ -297,6 +300,11 @@ export class InventoryService {
       tx.execute<Row>(sql`
         SELECT count(*)::int AS products,
                coalesce(sum(p.quantity_cache * p.unit_value), 0) AS stock_value,
+               -- Custo e lucro só contam produtos com custo informado: um
+               -- custo ausente tratado como zero inflaria o lucro.
+               coalesce(sum(p.quantity_cache * p.unit_cost) FILTER (WHERE p.unit_cost IS NOT NULL), 0) AS stock_cost_value,
+               coalesce(sum(p.quantity_cache * (p.unit_value - p.unit_cost)) FILTER (WHERE p.unit_cost IS NOT NULL), 0) AS potential_profit,
+               count(*) FILTER (WHERE p.unit_cost IS NULL)::int AS without_cost,
                count(*) FILTER (WHERE ${LOW_STOCK_SQL})::int AS to_restock,
                count(*) FILTER (WHERE p.quantity_cache <= 0)::int AS out_of_stock
         FROM products p WHERE ${active}
@@ -332,6 +340,10 @@ export class InventoryService {
           count(*) FILTER (WHERE m.type IN ('entrada','compra','saida','venda') AND m.quantity < 0)::int AS exits,
           coalesce(sum(-m.quantity) FILTER (WHERE m.type IN ('entrada','compra','saida','venda') AND m.quantity < 0), 0) AS exits_quantity,
           coalesce(sum(-m.quantity * coalesce(p.unit_value, 0)) FILTER (WHERE m.type IN ('entrada','compra','saida','venda') AND m.quantity < 0), 0) AS exits_value,
+          -- Lucro estimado das saídas: (preço − custo) atuais do produto. Saída
+          -- de produto sem custo fica de fora e aparece à parte, em valor.
+          coalesce(sum(-m.quantity * (p.unit_value - p.unit_cost)) FILTER (WHERE m.type IN ('entrada','compra','saida','venda') AND m.quantity < 0 AND p.unit_cost IS NOT NULL), 0) AS exits_profit,
+          coalesce(sum(-m.quantity * coalesce(p.unit_value, 0)) FILTER (WHERE m.type IN ('entrada','compra','saida','venda') AND m.quantity < 0 AND p.unit_cost IS NULL), 0) AS exits_value_without_cost,
           count(*) FILTER (WHERE m.type NOT IN ('entrada','compra','saida','venda'))::int AS others,
           coalesce(sum(m.quantity * coalesce(p.unit_value, 0)) FILTER (WHERE m.type NOT IN ('entrada','compra','saida','venda')), 0) AS others_value
         FROM stock_movements m
@@ -358,6 +370,12 @@ export class InventoryService {
       period,
       products: num(t['products']),
       stockValue: num(t['stock_value']),
+      /** Valor do estoque pelo preço de custo (só produtos com custo). */
+      stockCostValue: num(t['stock_cost_value']),
+      /** Quanto o estoque atual renderia de lucro vendido pelo preço atual. */
+      potentialProfit: num(t['potential_profit']),
+      /** Produtos ativos sem custo informado (ficam fora das duas contas acima). */
+      productsWithoutCost: num(t['without_cost']),
       toRestock: num(t['to_restock']),
       outOfStock: num(t['out_of_stock']),
       itemsByUnit: byUnit.rows.map((row) => ({ unit: String(row['unit']), quantity: num(row['quantity']) })),
@@ -386,7 +404,13 @@ export class InventoryService {
       })),
       movements: {
         entries: { count: num(mv['entries']), quantity: num(mv['entries_quantity']), value: num(mv['entries_value']) },
-        exits: { count: num(mv['exits']), quantity: num(mv['exits_quantity']), value: num(mv['exits_value']) },
+        exits: {
+          count: num(mv['exits']),
+          quantity: num(mv['exits_quantity']),
+          value: num(mv['exits_value']),
+          estimatedProfit: num(mv['exits_profit']),
+          valueWithoutCost: num(mv['exits_value_without_cost']),
+        },
         others: { count: num(mv['others']), value: num(mv['others_value']) },
       },
       daily: daily.rows.map((row) => ({ day: String(row['day']), entries: num(row['entries']), exits: num(row['exits']) })),
@@ -551,6 +575,7 @@ export class InventoryService {
       description: 'description' in overrides ? overrides.description : row['description'],
       quantity: num(row['quantity_cache']),
       unitValue: 'unitValue' in overrides ? overrides.unitValue : num(row['unit_value']),
+      unitCost: 'unitCost' in overrides ? overrides.unitCost : numOrNull(row['unit_cost']),
       minStock: 'minStock' in overrides ? overrides.minStock : num(row['min_stock']),
       unit: 'unit' in overrides ? overrides.unit : row['unit'],
       category: 'category' in overrides ? overrides.category : row['category'],
@@ -568,6 +593,8 @@ export class InventoryService {
     switch (field) {
       case 'unitValue':
         return num(row['unit_value']);
+      case 'unitCost':
+        return numOrNull(row['unit_cost']);
       case 'minStock':
         return num(row['min_stock']);
       case 'photoHash':
@@ -615,6 +642,7 @@ export class InventoryService {
         description: body.description || null,
         quantity: body.quantity,
         unitValue: body.unitValue,
+        ...(body.unitCost !== undefined && body.unitCost !== null ? { unitCost: body.unitCost } : {}),
         minStock: body.minStock,
         unit,
         category: body.category || null,
@@ -986,7 +1014,9 @@ export class InventoryService {
         const consider = (field: EditableField, incoming: string | number | null | undefined) => {
           if (incoming === undefined || incoming === null) return;
           const current = this.currentValue(match, field);
-          const same = typeof incoming === 'number' ? Number(current ?? 0) === incoming : (current ?? '') === incoming;
+          // Custo nulo ("não informado") e custo zero são coisas diferentes:
+          // `current ?? 0` faria a planilha com custo 0 parecer sem alteração.
+          const same = typeof incoming === 'number' ? current !== null && Number(current) === incoming : (current ?? '') === incoming;
           if (same) return;
           changes[field] = incoming;
           previous[field] = current;
@@ -995,6 +1025,8 @@ export class InventoryService {
         if (name && name !== match['name'] && !byName.has(name.toLowerCase())) consider('name', name);
         consider('description', clean(row.description));
         consider('unitValue', row.unitValue);
+        // Coluna de custo vazia não apaga o custo cadastrado (como as demais).
+        consider('unitCost', row.unitCost);
         consider('minStock', row.minStock);
         consider('unit', clean(row.unit));
         consider('category', clean(row.category));
@@ -1052,6 +1084,7 @@ export class InventoryService {
           description: clean(row.description),
           quantity,
           unitValue: row.unitValue ?? 0,
+          ...(row.unitCost !== undefined ? { unitCost: row.unitCost } : {}),
           minStock: row.minStock ?? 0,
           unit: clean(row.unit) ?? 'un',
           category: clean(row.category),
@@ -1076,7 +1109,7 @@ export class InventoryService {
         line.opIds.push(movementOp);
       }
       // Linhas repetidas no mesmo arquivo caem no produto recém-criado.
-      byName.set(name.toLowerCase(), { id, name, rev: 0, quantity_cache: quantity, unit_value: row.unitValue ?? 0, min_stock: row.minStock ?? 0 });
+      byName.set(name.toLowerCase(), { id, name, rev: 0, quantity_cache: quantity, unit_value: row.unitValue ?? 0, unit_cost: row.unitCost ?? null, min_stock: row.minStock ?? 0 });
       lines.push(line);
     });
 

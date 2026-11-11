@@ -320,6 +320,10 @@ export class InitialUploadService {
               location: entry.location ?? null,
               sku: entry.sku ?? null,
               barcode: entry.barcode ?? null,
+              // Só quando o aparelho informou; sem custo a coluna fica nula.
+              ...(entry.unitCost !== undefined && entry.unitCost !== null
+                ? { unitCost: String(entry.unitCost) }
+                : {}),
               rev: entry.rev,
               changeSeq: seq,
               deletedAt: entry.deletedAt ? new Date(entry.deletedAt) : null,

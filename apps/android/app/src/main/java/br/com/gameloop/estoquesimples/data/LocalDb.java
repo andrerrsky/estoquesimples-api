@@ -49,7 +49,7 @@ public final class LocalDb extends SQLiteOpenHelper {
      * 7 — photo_hash / photo_base_hash: identificação da foto na nuvem (ver
      *     AGENTS.md, "Fotos dos produtos").
      */
-    public static final int VERSION = 8;
+    public static final int VERSION = 9;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
@@ -139,6 +139,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV6(db);
         upgradeToV7(db);
         upgradeToV8(db);
+        upgradeToV9(db);
     }
 
     @Override
@@ -165,6 +166,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 8) {
             upgradeToV8(db);
+        }
+        if (oldVersion < 9) {
+            upgradeToV9(db);
         }
     }
 
@@ -409,6 +413,17 @@ public final class LocalDb extends SQLiteOpenHelper {
                 + "ON " + TABLE_PRODUCTS + " (sku)");
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_estoque_barcode "
                 + "ON " + TABLE_PRODUCTS + " (barcode)");
+    }
+
+    /**
+     * Preço de custo do produto (versão 31).
+     *
+     * Nulo = "não informado", diferente de custo zero (brinde, amostra). Sem
+     * custo o produto simplesmente fica fora da margem e do lucro, em vez de
+     * aparecer com 100% de margem.
+     */
+    private void upgradeToV9(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_PRODUCTS, "cost", "TEXT");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {

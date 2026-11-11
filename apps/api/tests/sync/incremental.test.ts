@@ -753,3 +753,95 @@ describe('leitura incremental', () => {
     expect(registro?.cursor).toBe(cursor);
   });
 });
+
+describe('preço de custo', () => {
+  async function custoGravado(produtoId: string): Promise<string | null> {
+    const [produto] = await context.services.db.select().from(products).where(eq(products.id, produtoId));
+    return produto?.unitCost ?? null;
+  }
+
+  it('número grava, ausente (app antigo) preserva, null limpa, e a leitura devolve o custo', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+    const produtoId = randomUUID();
+
+    const criado = await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, payload: { name: 'Café', unitValue: 20, unitCost: 12.5 } }),
+    ]);
+    expect(criado.json().results[0]).toMatchObject({ status: 'aplicada', rev: 0 });
+    expect(Number(await custoGravado(produtoId))).toBe(12.5);
+
+    // Versão antiga do app edita o nome sem conhecer o campo: o custo fica.
+    const antigo = await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, baseRev: 0, payload: { name: 'Café torrado', unitValue: 20, rev: 0 } }),
+    ]);
+    expect(antigo.json().results[0]).toMatchObject({ status: 'aplicada', rev: 1 });
+    expect(Number(await custoGravado(produtoId))).toBe(12.5);
+
+    const lido = await pull(user, workspaceId);
+    const produto = (lido.json().changes as Array<{ entity: string; data: { id: string; unitCost?: number | null } }>).find(
+      (change) => change.entity === 'produto' && change.data.id === produtoId,
+    );
+    expect(produto?.data.unitCost).toBe(12.5);
+
+    const novo = await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, baseRev: 1, payload: { name: 'Café torrado', unitValue: 20, unitCost: 13, rev: 1 } }),
+    ]);
+    expect(novo.json().results[0]).toMatchObject({ status: 'aplicada', rev: 2 });
+    expect(Number(await custoGravado(produtoId))).toBe(13);
+
+    const limpo = await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, baseRev: 2, payload: { name: 'Café torrado', unitValue: 20, unitCost: null, rev: 2 } }),
+    ]);
+    expect(limpo.json().results[0]).toMatchObject({ status: 'aplicada', rev: 3 });
+    expect(await custoGravado(produtoId)).toBeNull();
+
+    const semCusto = await pull(user, workspaceId);
+    const depois = (semCusto.json().changes as Array<{ entity: string; data: { id: string; unitCost?: number | null } }>).find(
+      (change) => change.entity === 'produto' && change.data.id === produtoId,
+    );
+    expect(depois?.data.unitCost).toBeNull();
+  });
+
+  it('na mesclagem o custo é campo descritivo: edição de outro campo não o apaga e custo novo é mesclado', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+    const produtoId = randomUUID();
+
+    await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, payload: { name: 'Leite', unitValue: 6, unitCost: 4 } }),
+    ]);
+    await push(user, workspaceId, [
+      upsertProduto({ entityId: produtoId, baseRev: 0, payload: { name: 'Leite', unitValue: 6, unitCost: 4, category: 'Laticínios' } }),
+    ]);
+
+    // Aparelho antigo, versão vencida, mexe só na descrição (sem unitCost).
+    const antigo = await push(user, workspaceId, [
+      upsertProduto({
+        entityId: produtoId,
+        baseRev: 0,
+        payload: { name: 'Leite', unitValue: 6, description: 'Integral', previous: { description: null } },
+      }),
+    ]);
+    expect(antigo.json().results[0].status).toBe('aplicada');
+    expect(Number(await custoGravado(produtoId))).toBe(4);
+
+    // Aparelho novo, versão vencida, altera o custo: mescla sem conflito.
+    const novo = await push(user, workspaceId, [
+      upsertProduto({
+        entityId: produtoId,
+        baseRev: 0,
+        payload: { name: 'Leite', unitValue: 6, unitCost: 4.5, previous: { unitCost: 4 } },
+      }),
+    ]);
+    expect(novo.json().results[0].status).toBe('aplicada');
+    expect(Number(await custoGravado(produtoId))).toBe(4.5);
+  });
+
+  it('recusa custo negativo', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+    const resposta = await push(user, workspaceId, [upsertProduto({ payload: { unitCost: -1 } })]);
+    expect(resposta.statusCode).toBe(400);
+  });
+});

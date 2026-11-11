@@ -55,6 +55,10 @@ const CAMPOS_MESCLAVEIS = new Set([
   // Ponteiro da foto: em edição concorrente prevalece o do servidor, e a
   // imagem perdedora some na coleta de lixo.
   'photoHash',
+  // Custo é dado interno de quem compra, não decide a venda como o preço:
+  // em edição concorrente prevalece o do servidor e o descartado fica no
+  // registro de conflitos.
+  'unitCost',
 ]);
 
 const CAMPOS_COMPARAVEIS = new Set([...CAMPOS_DE_DECISAO, ...CAMPOS_MESCLAVEIS]);
@@ -577,7 +581,13 @@ export class SyncService {
     atual: ProdutoRow,
   ): Promise<OperationResult> {
     const partida = payload.previous ?? {};
-    const alterados = Object.keys(partida).filter((campo) => CAMPOS_COMPARAVEIS.has(campo));
+    const alterados = Object.keys(partida).filter(
+      (campo) =>
+        CAMPOS_COMPARAVEIS.has(campo) &&
+        // Custo ausente no payload é "não mexi", mesmo que `previous` o cite:
+        // tratá-lo como alterado gravaria nulo por cima do custo cadastrado.
+        !(campo === 'unitCost' && payload.unitCost === undefined),
+    );
 
     // Aparelho de uma versão que ainda não informa o ponto de partida. Sem
     // isso, mesclar seria adivinhação: o estado do servidor volta e o app
@@ -684,6 +694,8 @@ export class SyncService {
         return atual.barcode;
       case 'photoHash':
         return atual.photoHash;
+      case 'unitCost':
+        return atual.unitCost === null ? null : Number(atual.unitCost);
       default:
         return null;
     }
@@ -725,6 +737,9 @@ export class SyncService {
         return { barcode: payload.barcode ?? null };
       case 'photoHash':
         return { photoHash: payload.photoHash ?? null };
+      case 'unitCost':
+        if (payload.unitCost === undefined) return {};
+        return { unitCost: payload.unitCost === null ? null : String(payload.unitCost) };
       default:
         return {};
     }
@@ -794,6 +809,10 @@ export class SyncService {
       barcode: payload.barcode ?? null,
       // Só quando o aparelho informou (null remove): ver `productInputSchema`.
       ...(payload.photoHash !== undefined ? { photoHash: payload.photoHash } : {}),
+      // Idem para o custo: versões antigas do app não o enviam.
+      ...(payload.unitCost !== undefined
+        ? { unitCost: payload.unitCost === null ? null : String(payload.unitCost) }
+        : {}),
     };
   }
 
@@ -1079,6 +1098,7 @@ export class SyncService {
         sku: row.sku,
         barcode: row.barcode,
         photoHash: row.photoHash,
+        unitCost: row.unitCost === null ? null : Number(row.unitCost),
         rev: row.rev,
         updatedAt: row.updatedAt.getTime(),
         deletedAt: row.deletedAt ? row.deletedAt.getTime() : null,

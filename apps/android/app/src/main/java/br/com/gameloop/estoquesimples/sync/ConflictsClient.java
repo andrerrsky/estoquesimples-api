@@ -62,6 +62,8 @@ public final class ConflictsClient {
                     return "nome";
                 case "unitValue":
                     return "preço";
+                case "unitCost":
+                    return "preço de custo";
                 case "minStock":
                     return "estoque mínimo";
                 case "description":

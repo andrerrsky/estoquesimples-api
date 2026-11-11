@@ -12,6 +12,10 @@
         app:actionLayout="@layout/action_sync_indicator"
         app:showAsAction="always" />
     <item
+        android:id="@+id/menu_reorder"
+        android:title="Lista de reposição"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_analytics"
         android:title="Análise de Estoque"
         app:showAsAction="never" />

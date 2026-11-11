@@ -54,6 +54,8 @@ export const AnalyticsEventName = {
   // Relatórios, importação e exportação
   REPORT_GENERATED: 'report.generated',
   ANALYSIS_VIEWED: 'analysis.viewed',
+  REORDER_VIEWED: 'reorder.viewed',
+  REORDER_SHARED: 'reorder.shared',
   IMPORT_COMPLETED: 'import.completed',
   EXPORT_COMPLETED: 'export.completed',
   BACKUP_CREATED: 'backup.created',
@@ -148,6 +150,8 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'low_stock.filter_used', source: 'app', description: 'Filtro "Estoque baixo" acionado.' },
   { name: 'report.generated', source: 'app', description: 'Relatório gerado.', properties: { format: 'pdf | texto' } },
   { name: 'analysis.viewed', source: 'app', description: 'Análise de estoque aberta.' },
+  { name: 'reorder.viewed', source: 'app', description: 'Lista de reposição aberta.', properties: { origin: 'menu | relatorios | notificacao', items: 'quantidade', suppliers: 'quantidade' } },
+  { name: 'reorder.shared', source: 'app', description: 'Pedido de reposição enviado (WhatsApp ou outro app).', properties: { kind: 'fornecedor | todos' } },
   { name: 'import.completed', source: 'app', description: 'Importação concluída.', properties: { format: 'csv | backup', count: 'itens' } },
   { name: 'export.completed', source: 'both', description: 'Exportação concluída.', properties: { format: 'csv | json | pdf' } },
   { name: 'backup.created', source: 'app', description: 'Backup local criado.' },

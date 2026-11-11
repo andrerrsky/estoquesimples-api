@@ -31,6 +31,7 @@ const COLUMN_LABEL: Record<keyof ImportRow, string> = {
   description: 'Descrição',
   quantity: 'Quantidade',
   unitValue: 'Valor unitário',
+  unitCost: 'Preço de custo',
   minStock: 'Estoque mínimo',
   unit: 'Unidade',
   category: 'Categoria',
@@ -45,8 +46,8 @@ const COLUMN_LABEL: Record<keyof ImportRow, string> = {
  * (`lib/csv.ts`) e que a exportação de produtos usa. Ponto e vírgula e BOM
  * para o Excel em português abrir direto, com acentos e colunas no lugar.
  */
-const TEMPLATE_HEADER = ['nome', 'descricao', 'quantidade', 'valor', 'categoria', 'sku', 'codigo_barras', 'fornecedor', 'localizacao', 'estoque_minimo', 'unidade'];
-const TEMPLATE_EXAMPLE = ['Camiseta básica P', 'Algodão, cor branca', '10', '29,90', 'Roupas', 'CAM-P-01', '7890000000017', 'Fornecedor Exemplo', 'Prateleira A', '2', 'un'];
+const TEMPLATE_HEADER = ['nome', 'descricao', 'quantidade', 'valor', 'custo', 'categoria', 'sku', 'codigo_barras', 'fornecedor', 'localizacao', 'estoque_minimo', 'unidade'];
+const TEMPLATE_EXAMPLE = ['Camiseta básica P', 'Algodão, cor branca', '10', '29,90', '15,00', 'Roupas', 'CAM-P-01', '7890000000017', 'Fornecedor Exemplo', 'Prateleira A', '2', 'un'];
 
 interface Picked {
   fileName: string;
@@ -282,7 +283,7 @@ export function ImportExportPage() {
                         <thead>
                           <tr>
                             {sheet.columns.map((column) => (
-                              <th key={column} className={column === 'quantity' || column === 'unitValue' || column === 'minStock' ? 'num' : undefined}>
+                              <th key={column} className={column === 'quantity' || column === 'unitValue' || column === 'unitCost' || column === 'minStock' ? 'num' : undefined}>
                                 {COLUMN_LABEL[column]}
                               </th>
                             ))}
@@ -292,7 +293,7 @@ export function ImportExportPage() {
                           {sheet.rows.slice(0, PREVIEW_ROWS).map((row, index) => (
                             <tr key={index}>
                               {sheet.columns.map((column) => (
-                                <td key={column} className={column === 'quantity' || column === 'unitValue' || column === 'minStock' ? 'num' : undefined} title={cell(row, column)}>
+                                <td key={column} className={column === 'quantity' || column === 'unitValue' || column === 'unitCost' || column === 'minStock' ? 'num' : undefined} title={cell(row, column)}>
                                   {cell(row, column) || <span className="faint">—</span>}
                                 </td>
                               ))}

@@ -93,6 +93,7 @@ export const TICKET_CATEGORY: Array<{ key: string; label: string }> = [
 export const FIELD_LABEL: Record<string, string> = {
   name: 'nome',
   unitValue: 'preço',
+  unitCost: 'preço de custo',
   minStock: 'estoque mínimo',
   description: 'descrição',
   category: 'categoria',

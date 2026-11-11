@@ -38,6 +38,7 @@ final class SyncPayloads {
             {"name", "name"},
             {"description", "description"},
             {"value", "unitValue"},
+            {"cost", "unitCost"},
             {"min_stock", "minStock"},
             {"unit", "unit"},
             {"category", "category"},
@@ -55,7 +56,7 @@ final class SyncPayloads {
      * passaria por numérica sem ninguém perceber.
      */
     private static final Set<String> COLUNAS_NUMERICAS =
-            new HashSet<>(Arrays.asList("value", "min_stock"));
+            new HashSet<>(Arrays.asList("value", "cost", "min_stock"));
 
     /**
      * Valores que os campos prestes a mudar têm agora.
@@ -125,6 +126,11 @@ final class SyncPayloads {
             json.put("description", product.description);
             json.put("quantity", product.amountAsNumber());
             json.put("unitValue", Quantities.parse(product.value));
+            // Sempre presente: este app conhece o custo, então "nulo" quer dizer
+            // "sem custo". (Versões antigas não mandam o campo, e o servidor
+            // mantém o que tinha.)
+            Double custo = product.costAsNumber();
+            json.put("unitCost", custo == null ? JSONObject.NULL : custo);
             json.put("category", product.category);
             json.put("sku", product.sku);
             json.put("barcode", product.barcode);

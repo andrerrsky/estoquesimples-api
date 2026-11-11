@@ -49,6 +49,15 @@ public class NotificationHelper {
         }
     }
 
+    /** Abre a lista de reposição por cima da tela inicial (voltar leva ao app). */
+    private PendingIntent reorderIntent() {
+        Intent reorder = new Intent(context, ReorderActivity.class);
+        reorder.putExtra("origem", "notificacao");
+        return androidx.core.app.TaskStackBuilder.create(context)
+                .addNextIntentWithParentStack(reorder)
+                .getPendingIntent(1, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     /**
      * Mostra uma notificação de estoque baixo
      * @param productNames Lista de produtos com estoque baixo
@@ -84,6 +93,8 @@ public class NotificationHelper {
             .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
+            // Atalho direto para o pedido: o alerta deixa de ser só um aviso.
+            .addAction(0, "Montar pedido", reorderIntent())
             .setAutoCancel(true)
             .setVibrate(new long[]{0, 500, 250, 500})
             .setCategory(NotificationCompat.CATEGORY_REMINDER);

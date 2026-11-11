@@ -60,6 +60,7 @@ public class EditActivity extends BaseActivity {
     private TextView name;
     private TextView amount;
     private TextView value;
+    private TextView cost;
     private Spinner currencySpinner;
     private TextInputLayout nameLayout;
     private TextInputLayout amountLayout;
@@ -153,6 +154,7 @@ public class EditActivity extends BaseActivity {
         name = (TextView) findViewById(R.id.editName);
         amount = (TextView) findViewById(R.id.editAmount);
         value = (TextView) findViewById(R.id.editValue);
+        cost = (TextView) findViewById(R.id.editCost);
         description = (TextView) findViewById(R.id.editDescription);
         category = (TextView) findViewById(R.id.editCategory);
         sku = (TextView) findViewById(R.id.editSku);
@@ -513,7 +515,7 @@ public class EditActivity extends BaseActivity {
         Cursor cursor = null;
         try {
             cursor = MainActivity.stock.rawQuery(
-                "SELECT description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit "
+                "SELECT description, amount, value, photo, category, sku, barcode, supplier, location, min_stock, unit, cost "
                     + "FROM Estoque WHERE uuid=?",
                 new String[]{productUuid}
             );
@@ -530,6 +532,7 @@ public class EditActivity extends BaseActivity {
                 String columnLocation = cursor.getString(8);
                 String columnMinStock = cursor.getString(9);
                 String columnUnit = cursor.getString(10);
+                String columnCost = cursor.getString(11);
 
                 // Usar valores padrão para campos nulos
                 description.setText(columnDescription != null ? columnDescription : "");
@@ -548,6 +551,10 @@ public class EditActivity extends BaseActivity {
                 // "49.9" cru do banco virava um campo que não parecia dinheiro;
                 // o mesmo formato da lista ("49,90") deixa claro o que se edita.
                 value.setText(CurrencyHelper.formatNumber(CurrencyHelper.parseCurrency(columnValue, 0.0)));
+                if (cost != null) {
+                    cost.setText(CostField.forEdit(columnCost));
+                    CostField.bind(this, findViewById(R.id.editCostLayout), cost, value);
+                }
                 category.setText(columnCategory != null ? columnCategory : "");
                 sku.setText(columnSku != null ? columnSku : "");
                 barcode.setText(columnBarcode != null ? columnBarcode : "");
@@ -703,6 +710,14 @@ public class EditActivity extends BaseActivity {
             updateValues.put("name", name.getText().toString().trim());
             String valorDigitado = value.getText().toString().trim();
             updateValues.put("value", valorDigitado.isEmpty() ? "0" : CurrencyHelper.sanitizeForStorage(valorDigitado));
+            if (cost != null) {
+                String custoDigitado = CostField.forStorage(cost);
+                if (custoDigitado == null) {
+                    updateValues.putNull("cost");
+                } else {
+                    updateValues.put("cost", custoDigitado);
+                }
+            }
             updateValues.put("description", description != null ? description.getText().toString().trim() : "");
             
             // Novos campos com verificação null

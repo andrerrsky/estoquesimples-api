@@ -16,7 +16,10 @@ public final class AppMenu {
 
     public static boolean handle(Activity activity, MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.menu_analytics) {
+        if (id == R.id.menu_reorder) {
+            ReorderActivity.open(activity, "menu");
+            return true;
+        } else if (id == R.id.menu_analytics) {
             activity.startActivity(new Intent(activity, AnalyticsActivity.class));
             return true;
         } else if (id == R.id.menu_account) {

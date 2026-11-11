@@ -74,6 +74,7 @@ interface CampoProduto {
   supplier?: string | null;
   location?: string | null;
   unit?: string | null;
+  unitCost?: number | null;
 }
 
 const BASE: Required<Pick<CampoProduto, 'name' | 'unitValue' | 'minStock'>> & CampoProduto = {
@@ -305,6 +306,42 @@ describe('merge por campo', () => {
 
     expect(response.json().results[0].status).toBe('conflito');
     expect((await listarConflitos(user, workspaceId)).json().pending).toBe(1);
+  });
+});
+
+describe('custo em edição concorrente', () => {
+  it('prevalece o custo do servidor, e "meu" reaplica o descartado, inclusive nulo', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produtoId = randomUUID();
+    await push(user, workspaceId, [upsert(produtoId, { unitCost: 10 })]);
+    await push(user, workspaceId, [upsert(produtoId, { unitCost: 11 }, { baseRev: 0, previous: { unitCost: 10 } })]);
+
+    // O outro aparelho, offline, apagou o custo partindo do mesmo valor.
+    const response = await push(user, workspaceId, [
+      upsert(produtoId, { unitCost: null }, { baseRev: 0, previous: { unitCost: 10 } }),
+    ]);
+    expect(response.json().results[0].status).toBe('aplicada');
+
+    const lerCusto = async () => {
+      const [produto] = await context.services.db.select().from(products).where(eq(products.id, produtoId));
+      return produto?.unitCost ?? null;
+    };
+    expect(Number(await lerCusto())).toBe(11);
+
+    const [registro] = await context.services.db.select().from(conflictLog).where(eq(conflictLog.entityId, produtoId));
+    expect(registro).toMatchObject({ field: 'unitCost', status: 'automatico', keptValue: 11, discardedValue: null });
+
+    const resolvido = await context.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/conflicts/${registro!.id}/resolve`,
+      headers: { ...user.authHeader, ...PROTOCOL },
+      payload: { escolha: 'meu' },
+    });
+    expect(resolvido.statusCode).toBe(200);
+    // Nulo é "custo não informado", não custo zero.
+    expect(await lerCusto()).toBeNull();
   });
 });
 

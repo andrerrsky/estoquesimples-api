@@ -128,7 +128,8 @@ describe('carga inicial', () => {
     const user = await registerUser(context);
     const workspaceId = await setupWorkspace(user);
 
-    const p1 = produto();
+    // p1 vem de uma versão do app que já conhece o custo; p2, de uma antiga.
+    const p1 = produto({ unitCost: 3.25 });
     const p2 = produto();
 
     const start = await startUpload(user, workspaceId, 2, 1);
@@ -164,6 +165,8 @@ describe('carga inicial', () => {
       .from(products)
       .where(eq(products.workspaceId, workspaceId));
     expect(gravados).toHaveLength(2);
+    const custos = Object.fromEntries(gravados.map((p) => [p.id, p.unitCost === null ? null : Number(p.unitCost)]));
+    expect(custos).toEqual({ [p1.id]: 3.25, [p2.id]: null });
   });
 
   it('reenviar o mesmo lote não duplica nem soma duas vezes', async () => {

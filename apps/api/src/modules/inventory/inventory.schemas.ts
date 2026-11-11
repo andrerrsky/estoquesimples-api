@@ -24,6 +24,8 @@ export const productFieldsSchema = z.object({
   name: z.string().trim().min(1, 'Informe o nome do produto.').max(200),
   description: optionalText(2000),
   unitValue: quantity.nonnegative().max(999_999_999).default(0),
+  /** Preço de custo por unidade; `null` = não informado (fica fora das contas de lucro). */
+  unitCost: quantity.nonnegative('O custo não pode ser negativo.').max(999_999_999).nullish(),
   minStock: quantity.nonnegative().max(999_999_999).default(0),
   unit: optionalText(30),
   category: optionalText(120),
@@ -124,6 +126,7 @@ export const importRowSchema = z
     description: z.string().max(2000).optional(),
     quantity: quantity.optional(),
     unitValue: quantity.nonnegative().optional(),
+    unitCost: quantity.nonnegative().optional(),
     minStock: quantity.nonnegative().optional(),
     unit: z.string().max(30).optional(),
     category: z.string().max(120).optional(),

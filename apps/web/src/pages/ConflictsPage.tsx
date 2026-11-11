@@ -41,7 +41,7 @@ const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 function formatValue(field: string | null, value: unknown, currency: string): ReactNode {
   if (isBlank(value)) return <span className="faint">(vazio)</span>;
   if (typeof value === 'object') return <span className="faint">—</span>;
-  if (field === 'unitValue') return fmtMoney(Number(value), currency);
+  if (field === 'unitValue' || field === 'unitCost') return fmtMoney(Number(value), currency);
   if (field === 'minStock') return fmtQuantity(Number(value));
   return String(value);
 }
@@ -49,7 +49,7 @@ function formatValue(field: string | null, value: unknown, currency: string): Re
 /** Dois valores são "o mesmo" para quem lê? (vazio = nulo; "3" = 3 nos campos numéricos) */
 function sameValue(field: string, a: unknown, b: unknown): boolean {
   if (isBlank(a) && isBlank(b)) return true;
-  if (field === 'unitValue' || field === 'minStock') return Number(a ?? 0) === Number(b ?? 0);
+  if (field === 'unitValue' || field === 'unitCost' || field === 'minStock') return Number(a ?? 0) === Number(b ?? 0);
   return String(a ?? '') === String(b ?? '');
 }
 

@@ -11,6 +11,8 @@ public final class Product {
     public String description;
     public String amount;
     public String value;
+    /** Preço de custo; nulo ou vazio = não informado. */
+    public String cost;
     public String photo;
     /** SHA-256 da imagem na nuvem que {@link #photo} representa; nulo = ainda não enviada. */
     public String photoHash;
@@ -35,6 +37,7 @@ public final class Product {
         product.description = getString(cursor, "description");
         product.amount = getString(cursor, "amount");
         product.value = getString(cursor, "value");
+        product.cost = getString(cursor, "cost");
         product.photo = getString(cursor, "photo");
         product.photoHash = getString(cursor, "photo_hash");
         product.photoBaseHash = getString(cursor, "photo_base_hash");
@@ -54,6 +57,19 @@ public final class Product {
                 : null;
 
         return product;
+    }
+
+    /** Custo como número, ou {@code null} quando não foi informado. */
+    public Double costAsNumber() {
+        return costOf(cost);
+    }
+
+    /** Custo guardado (texto do banco) como número; vazio = não informado. */
+    public static Double costOf(String stored) {
+        if (stored == null || stored.trim().isEmpty()) {
+            return null;
+        }
+        return Quantities.parse(stored, 0d);
     }
 
     public boolean isDeleted() {
