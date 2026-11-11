@@ -48,7 +48,8 @@ export interface DerivedState {
 }
 
 /** Pagamento feito: confirmado (cartão/boleto compensando) ou já recebido. */
-const PAID = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED']);
+export const PAID_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED'] as const;
+const PAID = new Set<string>(PAID_STATUSES);
 const REFUNDED = new Set(['REFUNDED', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS']);
 const DISPUTED = new Set(['CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE', 'AWAITING_CHARGEBACK_REVERSAL']);
 const OPEN = new Set(['PENDING', 'OVERDUE', 'AWAITING_RISK_ANALYSIS']);

@@ -43,6 +43,8 @@ import br.com.gameloop.estoquesimples.billing.LegacyProBilling;
 import br.com.gameloop.estoquesimples.billing.LinkPurchaseWorker;
 import br.com.gameloop.estoquesimples.billing.PendingPurchase;
 import br.com.gameloop.estoquesimples.billing.PlayBilling;
+import br.com.gameloop.estoquesimples.billing.PromoAvailability;
+import br.com.gameloop.estoquesimples.billing.PromoRules;
 import br.com.gameloop.estoquesimples.sync.ApiException;
 import br.com.gameloop.estoquesimples.sync.EntitlementManager;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
@@ -88,6 +90,11 @@ public class SubscriptionActivity extends BaseActivity {
     private TextView stateView;
     private View priceView;
     private TextView priceAmountView;
+    private TextView promoBadgeView;
+    private TextView promoDetailView;
+    /** Tag da oferta com que a compra desta visita foi aberta; vai no evento de compra. */
+    @Nullable
+    private String purchaseOfferTag;
     private TextView noticeView;
     private TextView messageView;
     private TextView legacyProTitle;
@@ -119,9 +126,28 @@ public class SubscriptionActivity extends BaseActivity {
         open(context, "unknown");
     }
 
+    /** Oferta promocional pedida por quem abriu a tela (ex.: cartão de Black Friday). */
+    private static final String EXTRA_OFERTA = "br.com.gameloop.estoquesimples.PAYWALL_OFFER_TAG";
+
     public static void open(Context context, String origin) {
         context.startActivity(new Intent(context, SubscriptionActivity.class)
                 .putExtra(EXTRA_ORIGEM, origin));
+    }
+
+    /** Abre a tela já preferindo a oferta com a tag dada, se a Play a devolver. */
+    public static void openWithOffer(Context context, String origin, String offerTag) {
+        context.startActivity(new Intent(context, SubscriptionActivity.class)
+                .putExtra(EXTRA_ORIGEM, origin)
+                .putExtra(EXTRA_OFERTA, offerTag));
+    }
+
+    /**
+     * Oferta a preferir: a pedida no Intent ou, sem pedido, a de Black Friday.
+     * Fora da vigência a Play não devolve a oferta e vale a de sempre.
+     */
+    private String preferredOfferTag() {
+        String pedida = getIntent() != null ? getIntent().getStringExtra(EXTRA_OFERTA) : null;
+        return pedida != null && !pedida.isEmpty() ? pedida : PromoRules.TAG_BF2026;
     }
 
     @Override
@@ -165,6 +191,8 @@ public class SubscriptionActivity extends BaseActivity {
         stateView = findViewById(R.id.subscriptionState);
         priceView = findViewById(R.id.subscriptionPrice);
         priceAmountView = findViewById(R.id.subscriptionPriceAmount);
+        promoBadgeView = findViewById(R.id.subscriptionPromoBadge);
+        promoDetailView = findViewById(R.id.subscriptionPromoDetail);
         noticeView = findViewById(R.id.subscriptionNotice);
         messageView = findViewById(R.id.messageView);
         progress = findViewById(R.id.progress);
@@ -420,7 +448,7 @@ public class SubscriptionActivity extends BaseActivity {
         if (playBilling == null) {
             return;
         }
-        playBilling.queryOffer((offer, error) -> main.post(() -> {
+        playBilling.queryOffer(preferredOfferTag(), (offer, error) -> main.post(() -> {
             if (isFinishing()) {
                 return;
             }
@@ -440,9 +468,22 @@ public class SubscriptionActivity extends BaseActivity {
                 priceView.setVisibility(View.VISIBLE);
                 priceAmountView.setText(buildPriceDisplay(offer.formattedPrice));
                 subscribeButton.setText(getString(R.string.subscription_cta_with_price,
-                        offer.formattedPrice));
+                        PromoRules.normalizePrice(offer.formattedPrice)));
             }
+            renderPromo(offer);
         }));
+    }
+
+    /** Selo e "nos N primeiros meses. Depois, R$ X/mês." quando a oferta é promocional. */
+    private void renderPromo(@Nullable PlayBilling.Offer offer) {
+        String tag = offer != null ? offer.promoTag : null;
+        PromoRules.Summary resumo = offer != null ? offer.promoSummary : null;
+        boolean promo = tag != null && resumo != null;
+        promoBadgeView.setVisibility(promo ? View.VISIBLE : View.GONE);
+        promoDetailView.setVisibility(promo ? View.VISIBLE : View.GONE);
+        if (promo) {
+            promoDetailView.setText(resumo.detailText());
+        }
     }
 
     /**
@@ -454,13 +495,9 @@ public class SubscriptionActivity extends BaseActivity {
      * do esperado, cai de volta no texto plano, sem quebrar a tela.
      */
     private CharSequence buildPriceDisplay(String formattedPrice) {
-        String trimmed = formattedPrice.trim();
         // A Play Store devolve o preço no idioma do aparelho; num aparelho em
         // inglês vem "R$19.99". Para real, o formato é sempre "R$ 19,99".
-        Matcher real = Pattern.compile("^R\\$\\s*([0-9]+)\\.([0-9]{2})$").matcher(trimmed);
-        if (real.matches()) {
-            trimmed = "R$ " + real.group(1) + "," + real.group(2);
-        }
+        String trimmed = PromoRules.normalizePrice(formattedPrice);
         Matcher matcher = PRICE_PATTERN.matcher(trimmed);
         String prefix = "";
         String amount = trimmed;
@@ -582,8 +619,20 @@ public class SubscriptionActivity extends BaseActivity {
             showMessage("Não foi possível abrir a compra: " + result.getDebugMessage());
             retryButton.setVisibility(View.VISIBLE);
         } else {
-            Analytics.track(this, "purchase.started");
+            // A oferta da compra vai junto nos eventos (`offer` = bf2026).
+            purchaseOfferTag = currentOffer.promoTag;
+            Analytics.track(this, "purchase.started", offerProps());
         }
+    }
+
+    /** Propriedade `offer` quando a compra foi aberta com uma oferta promocional. */
+    @NonNull
+    private java.util.Map<String, Object> offerProps(Object... extras) {
+        java.util.Map<String, Object> props = Analytics.props(extras);
+        if (purchaseOfferTag != null) {
+            props.put("offer", purchaseOfferTag);
+        }
+        return props;
     }
 
     private void onPurchasesUpdated(@NonNull BillingResult billingResult,
@@ -730,7 +779,8 @@ public class SubscriptionActivity extends BaseActivity {
                 // motivo, quem acabou de pagar continuava vendo o aviso de
                 // limite e achava que a compra não tinha valido.
                 SyncBlock.clearPlanBlock(this);
-                Analytics.track(this, "purchase.completed", Analytics.props("source", "app"));
+                Analytics.track(this, "purchase.completed", offerProps("source", "app"));
+                PromoAvailability.invalidate(this);
                 SyncBootstrap.start(this);
 
                 main.post(() -> {

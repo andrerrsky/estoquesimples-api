@@ -18,6 +18,14 @@ export const LIFECYCLE_KINDS = [
   'reengage_14d',
   'limit_40',
   'limit_50',
+  // Aviso antes da 1ª cobrança cheia de assinatura com cupom (transacional).
+  'promo_renewal_monthly_d7',
+  'promo_renewal_yearly_d15',
+  'promo_renewal_yearly_d3',
+  // Campanha Black Friday 2026 para a base grátis (docs/black-friday-2026.md).
+  'bf2026_launch',
+  'bf2026_today',
+  'bf2026_last_day',
 ] as const;
 export type LifecycleKind = (typeof LIFECYCLE_KINDS)[number];
 
@@ -29,6 +37,42 @@ export const LIFECYCLE_LABELS: Record<LifecycleKind, string> = {
   reengage_14d: 'Reengajamento · 14 dias sem uso',
   limit_40: 'Plano grátis · 40 de 50 produtos',
   limit_50: 'Plano grátis · limite atingido',
+  promo_renewal_monthly_d7: 'Cupom · mensal, 7 dias antes da 1ª mensalidade cheia',
+  promo_renewal_yearly_d15: 'Cupom · anual, 15 dias antes da renovação',
+  promo_renewal_yearly_d3: 'Cupom · anual, 3 dias antes da renovação',
+  bf2026_launch: 'Black Friday · 20/11 (lançamento)',
+  bf2026_today: 'Black Friday · 27/11 (é hoje)',
+  bf2026_last_day: 'Black Friday · 01/12 (último dia)',
+};
+
+/** Avisos de assinatura: saem mesmo para quem não recebe as dicas (só uma vez por marco). */
+export const TRANSACTIONAL_KINDS: ReadonlySet<LifecycleKind> = new Set(['promo_renewal_monthly_d7', 'promo_renewal_yearly_d15', 'promo_renewal_yearly_d3']);
+
+/** Dados da oferta ou da assinatura com cupom, para os e-mails de promoção. */
+export interface PromoTemplateContext {
+  label: string;
+  code: string;
+  /** Preço cheio do anual e do mensal (de `plans`). */
+  yearlyFullCents: number;
+  yearlyPromoCents: number;
+  monthlyFullCents: number;
+  /** Último dia da campanha (inclusivo). */
+  endsAt: Date;
+  /** Data da próxima cobrança (YYYY-MM-DD) e o valor cheio dela, nos avisos de renovação. */
+  nextDueDate?: string | null;
+  nextChargeCents?: number | null;
+}
+
+/** Exemplo do painel (aba Textos): os números da Black Friday 2026. */
+export const SAMPLE_PROMO: PromoTemplateContext = {
+  label: 'Black Friday',
+  code: 'BF26',
+  yearlyFullCents: 19990,
+  yearlyPromoCents: 11990,
+  monthlyFullCents: 2499,
+  endsAt: new Date('2026-12-02T02:59:59Z'),
+  nextDueDate: '2026-12-20',
+  nextChargeCents: 2499,
 };
 
 export interface TemplateContext {
@@ -40,6 +84,8 @@ export interface TemplateContext {
   /** Monta um link rastreável para um caminho da aplicação web. */
   link: (path: string) => string;
   unsubscribeUrl: string;
+  /** Só nos e-mails de promoção; sem ele, valem os números de exemplo. */
+  promo?: PromoTemplateContext | null;
 }
 
 export interface RenderedEmail {
@@ -56,6 +102,81 @@ function footer(ctx: TemplateContext): string {
     '\n\n—\nAndré\nEstoque Simples · estoquesimples.com.br\n\n' +
     `Você recebe estas mensagens porque criou uma conta no Estoque Simples. Para não receber mais: ${ctx.unsubscribeUrl}`
   );
+}
+
+/** Rodapé dos avisos de assinatura: sem descadastro (não é propaganda). */
+function transactionalFooter(): string {
+  return (
+    '\n\n—\nAndré\nEstoque Simples · estoquesimples.com.br\n\n' +
+    'Este é um aviso sobre a assinatura da sua empresa: ele chega mesmo para quem não recebe as dicas por e-mail.'
+  );
+}
+
+const brl = (cents: number): string =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100).replace(/\u00a0/g, ' ');
+
+const dayMonth = (date: Date): string =>
+  new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(date);
+
+/** "2026-12-20" → "20/12/2026". */
+const dateBr = (value: string | null | undefined): string => {
+  if (!value) return 'a próxima data de cobrança';
+  const [y, m, d] = value.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+function campaignEmail(kind: 'bf2026_launch' | 'bf2026_today' | 'bf2026_last_day', ctx: TemplateContext): RenderedEmail {
+  const p = ctx.promo ?? SAMPLE_PROMO;
+  const off = Math.round((1 - p.yearlyPromoCents / p.yearlyFullCents) * 100);
+  const until = dayMonth(p.endsAt);
+  const perMonth = p.yearlyPromoCents / 12 < 1000 ? 'menos de R$ 10 por mês' : `cerca de ${brl(Math.round(p.yearlyPromoCents / 12))} por mês`;
+  const subject =
+    kind === 'bf2026_launch'
+      ? `${p.label}: Estoque Simples com ${off}% off`
+      : kind === 'bf2026_today'
+        ? `É hoje: ${p.label} do Estoque Simples com ${off}% off`
+        : `Último dia: Estoque Simples com ${off}% off`;
+  // Texto simples não tem pré-cabeçalho: a 1ª linha é o que aparece na prévia da caixa de entrada.
+  const preheader =
+    kind === 'bf2026_last_day'
+      ? `Plano anual por ${brl(p.yearlyPromoCents)}, só até hoje (${until})`
+      : `Plano anual por ${brl(p.yearlyPromoCents)}, só até ${until}`;
+  const opening =
+    kind === 'bf2026_today'
+      ? `É hoje a ${p.label}. `
+      : kind === 'bf2026_last_day'
+        ? `Último dia da ${p.label}: o desconto acaba hoje à meia-noite. `
+        : '';
+  return {
+    subject,
+    text:
+      `${preheader}\n\n` +
+      `${hello(ctx)}\n\n` +
+      opening +
+      `Produtos ilimitados, sua equipe e seus aparelhos sincronizados. De ${brl(p.yearlyFullCents)} por ${brl(p.yearlyPromoCents)} no ano — ${perMonth}.\n\n` +
+      `Ativar com desconto: ${ctx.link(`/black-friday?cupom=${encodeURIComponent(p.code)}`)}` +
+      footer(ctx),
+  };
+}
+
+function renewalEmail(kind: 'promo_renewal_monthly_d7' | 'promo_renewal_yearly_d15' | 'promo_renewal_yearly_d3', ctx: TemplateContext): RenderedEmail {
+  const p = ctx.promo ?? SAMPLE_PROMO;
+  const monthly = kind === 'promo_renewal_monthly_d7';
+  const value = brl(p.nextChargeCents ?? (monthly ? p.monthlyFullCents : p.yearlyFullCents));
+  const when = dateBr(p.nextDueDate);
+  const company = ctx.workspaceName ? ` da ${ctx.workspaceName}` : '';
+  return {
+    subject: monthly ? `Sua próxima mensalidade do plano Equipe: ${value} em ${when}` : `Seu plano Equipe renova em ${when} por ${value}`,
+    text:
+      `${hello(ctx)}\n\n` +
+      (monthly
+        ? `O desconto da ${p.label} valeu para o 1º mês do plano Equipe${company}. A próxima mensalidade, em ${when}, será de ${value} (o preço normal), na mesma forma de pagamento.\n\n`
+        : `O plano Equipe${company} foi contratado com o desconto da ${p.label} e renova em ${when} por ${value} ao ano (o preço normal), na mesma forma de pagamento.\n\n`) +
+      'Para continuar, não precisa fazer nada. Se preferir cancelar a renovação, é só abrir Plano; o acesso continua até o fim do período já pago.\n\n' +
+      `Ver o plano: ${ctx.link('/app/plano')}\n\n` +
+      'Ficou alguma dúvida? É só responder este e-mail.' +
+      transactionalFooter(),
+  };
 }
 
 function confirmPs(ctx: TemplateContext): string {
@@ -143,6 +264,14 @@ export function renderLifecycleEmail(kind: LifecycleKind, ctx: TemplateContext):
           'Tem alguma dúvida sobre o plano? Responda este e-mail.' +
           footer(ctx),
       };
+    case 'promo_renewal_monthly_d7':
+    case 'promo_renewal_yearly_d15':
+    case 'promo_renewal_yearly_d3':
+      return renewalEmail(kind, ctx);
+    case 'bf2026_launch':
+    case 'bf2026_today':
+    case 'bf2026_last_day':
+      return campaignEmail(kind, ctx);
     case 'limit_50':
       return {
         subject: 'Seu estoque chegou ao limite do plano grátis',

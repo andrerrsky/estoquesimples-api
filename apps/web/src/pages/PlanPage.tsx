@@ -3,21 +3,34 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { api, ApiError, errorMessage } from '../api/client';
-import type { BillingCycle, BillingOverview, CheckoutResult, PaymentView, SubscriptionState } from '../api/types';
+import { checkout, getCoupon, getPix } from '../api/promo';
+import type { BillingCycle, BillingOverview, CheckoutResult, PaymentView, PromoPrices, SubscriptionState, WorkspacePromo } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
+import { PromoOffers } from '../components/PromoOffers';
 import { Badge, Card, ConfirmDialog, Field, KeyValue, Meter, Modal, Notice, PageHeader, QueryState, useToast } from '../components/ui';
 import { track } from '../lib/analytics';
 import { fmtCents, fmtDate, fmtInteger } from '../lib/format';
 import { chargeLine, cycleOptions, defaultCycle, maxSavingPct } from '../lib/pricing';
 import { BILLING_TYPE, PAYMENT_STATUS, SUBSCRIPTION_STATE, type Tone } from '../lib/labels';
+import { clearCoupon, couponErrorMessage, endDayLabel, hasPrices, normalizeCoupon, promoPhase, promoTexts, readCoupon, saveCoupon } from '../lib/promo';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
 
 import '../styles/pages-company.css';
+import '../styles/promo.css';
 
 type Cycle = BillingCycle;
 type BillingMethod = 'UNDEFINED' | 'PIX' | 'BOLETO' | 'CREDIT_CARD';
 type Subscription = NonNullable<BillingOverview['subscription']>;
+/** Campanha ativa e com preços, para a empresa elegível. */
+type Offer = WorkspacePromo & PromoPrices;
+/** Ciclos aceitos com cupom (docs/black-friday-2026.md). */
+const COUPON_CYCLES: ReadonlySet<Cycle> = new Set(['MONTHLY', 'YEARLY']);
+/** Pix na página: reconsulta a cada 5 s por até 15 min. */
+const PIX_POLL_MS = 5_000;
+/** A cada quantas conferências automáticas pedir reconsulta ao Asaas (~30 s). */
+const PIX_REFRESH_EVERY = 6;
+const PIX_TIMEOUT_MS = 15 * 60_000;
 
 const CYCLE_LABEL: Record<string, string> = { MONTHLY: 'Mensal', SEMIANNUALLY: 'Semestral', YEARLY: 'Anual' };
 const CYCLE_UNIT: Record<string, string> = { MONTHLY: 'por mês', SEMIANNUALLY: 'a cada 6 meses', YEARLY: 'por ano' };
@@ -127,6 +140,10 @@ export function PlanPage() {
   });
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  /** Ciclo já escolhido no cartão da campanha. */
+  const [presetCycle, setPresetCycle] = useState<Cycle | null>(null);
+  /** QR Code do Pix aberto na página (`fallbackUrl`: fatura, se o Pix não carregar). */
+  const [pix, setPix] = useState<{ fallbackUrl: string | null } | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   /** Fatura recém-criada cuja aba o navegador não deixou abrir. */
   const [blockedInvoice, setBlockedInvoice] = useState<string | null>(null);
@@ -150,6 +167,8 @@ export function PlanPage() {
       // Pagamento confirmado nesta visita: a conversão que o funil mede.
       const paid = data.subscription;
       if (previous.state === 'pendente' && current === 'ativa' && paid?.provider === 'asaas') trackPurchaseOnce(paid);
+      // Pago: o cupom guardado já cumpriu o papel.
+      if (current === 'ativa') clearCoupon();
     }
   }, [data, workspaceId, refresh]);
 
@@ -223,13 +242,25 @@ export function PlanPage() {
     );
   };
 
-  const onCheckoutDone = async (result: CheckoutResult, opened: boolean) => {
+  const onCheckoutDone = async (result: CheckoutResult, opened: boolean, method: BillingMethod) => {
     setCheckoutOpen(false);
     const url = safeUrl(result.payment?.invoiceUrl);
-    setBlockedInvoice(!opened && url ? url : null);
+    // Pix: o QR Code aparece aqui mesmo; cartão e boleto seguem na fatura do Asaas.
+    if (method === 'PIX' && result.payment) {
+      setBlockedInvoice(null);
+      setPix({ fallbackUrl: url });
+    } else {
+      setPix(null);
+      setBlockedInvoice(!opened && url ? url : null);
+    }
     await afterChange();
     if (!result.payment) toast.success('Assinatura registrada. A primeira cobrança aparece aqui quando for gerada.');
     else if (opened) toast.push('A fatura abriu em outra aba. Depois de pagar, volte para esta página.');
+  };
+
+  const openCheckout = (cycle: Cycle | null = null) => {
+    setPresetCycle(cycle);
+    setCheckoutOpen(true);
   };
 
   const checkoutAvailable = data?.checkoutAvailable ?? false;
@@ -267,6 +298,25 @@ export function PlanPage() {
 
   const loadingOverview = canView && (overview.isLoading || (overview.error !== null && !data));
 
+  // Campanha (Black Friday): só para quem pode contratar agora e com a empresa elegível.
+  const promo = data?.promo ?? null;
+  const offer: Offer | null =
+    promo && promo.active && promo.eligible && hasPrices(promo) && promoPhase(promo) === 'active' && (canSubscribe || canChangePending) ? (promo as Offer) : null;
+  const offerCode = offer?.code ?? null;
+  const offerSeen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!offerCode || offerSeen.current === offerCode) return;
+    offerSeen.current = offerCode;
+    track('promo.banner_viewed', { surface: 'web_plano', campaign: offerCode });
+  }, [offerCode]);
+  const pickOffer = (cycle: Cycle) => {
+    if (!offer?.code) return;
+    saveCoupon(offer.code, offer.endsAt);
+    track('promo.banner_clicked', { surface: 'web_plano', campaign: offer.code, cycle });
+    openCheckout(cycle);
+  };
+  const showPix = pix !== null;
+
   return (
     <div className="page">
       <PageHeader
@@ -298,6 +348,18 @@ export function PlanPage() {
         </Notice>
       )}
 
+      {offer && <PromoCard offer={offer} onPick={pickOffer} />}
+
+      {showPix && (
+        <PixPanel
+          workspaceId={workspaceId}
+          base={base}
+          fallbackUrl={pix?.fallbackUrl ?? safeUrl(openPayment?.invoiceUrl)}
+          onPaid={(fresh) => void afterChange(fresh)}
+          onClose={() => setPix(null)}
+        />
+      )}
+
       <Card>
         <div className="plan-current">
           <div className="stack">
@@ -319,7 +381,7 @@ export function PlanPage() {
             {(canCancel || canChangePending) && (
               <div className="row row--wrap">
                 {canChangePending && (
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => setCheckoutOpen(true)}>
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => openCheckout()}>
                     Trocar ciclo ou forma de pagamento
                   </button>
                 )}
@@ -395,8 +457,14 @@ export function PlanPage() {
             </Notice>
           )}
 
-          {sub && !byGoogle && openPayment && (
-            <PaymentPanel payment={openPayment} sub={sub} refreshing={sync.isPending} onRefresh={() => sync.mutate()} />
+          {sub && !byGoogle && openPayment && !showPix && (
+            <PaymentPanel
+              payment={openPayment}
+              sub={sub}
+              refreshing={sync.isPending}
+              onRefresh={() => sync.mutate()}
+              onShowPix={openPayment.billingType === 'PIX' && sub.state === 'pendente' ? () => setPix({ fallbackUrl: safeUrl(openPayment.invoiceUrl) }) : undefined}
+            />
           )}
 
           {data && !data.checkoutAvailable && !sub && (
@@ -414,7 +482,7 @@ export function PlanPage() {
             paidProductLimit={!onFreePlan ? productLimit : null}
             action={
               canSubscribe ? (
-                <button type="button" className="btn btn--primary btn--lg btn--block" onClick={() => setCheckoutOpen(true)}>
+                <button type="button" className="btn btn--primary btn--lg btn--block" onClick={() => openCheckout()}>
                   {sub?.state === 'cancelada_mas_ativa' ? 'Assinar de novo' : 'Assinar o plano Equipe'}
                 </button>
               ) : isPaid ? (
@@ -435,7 +503,14 @@ export function PlanPage() {
       )}
 
       {data && (
-        <CheckoutDialog open={checkoutOpen} overview={data} onClose={() => setCheckoutOpen(false)} onDone={(result, opened) => void onCheckoutDone(result, opened)} />
+        <CheckoutDialog
+          open={checkoutOpen}
+          overview={data}
+          offer={offer}
+          presetCycle={presetCycle}
+          onClose={() => setCheckoutOpen(false)}
+          onDone={(result, opened, method) => void onCheckoutDone(result, opened, method)}
+        />
       )}
 
       <ConfirmDialog
@@ -548,7 +623,20 @@ function StateNotice({
 }
 
 /** Cobrança em aberto: valor, vencimento e o caminho para pagar. */
-function PaymentPanel({ payment, sub, refreshing, onRefresh }: { payment: PaymentView; sub: Subscription; refreshing: boolean; onRefresh: () => void }) {
+function PaymentPanel({
+  payment,
+  sub,
+  refreshing,
+  onRefresh,
+  onShowPix,
+}: {
+  payment: PaymentView;
+  sub: Subscription;
+  refreshing: boolean;
+  onRefresh: () => void;
+  /** Cobrança Pix do pedido: mostra o QR Code aqui mesmo. */
+  onShowPix?: () => void;
+}) {
   const url = safeUrl(payment.invoiceUrl);
   const late = payment.status === 'OVERDUE' || sub.state === 'carencia' || sub.state === 'suspensa';
   const title = late ? 'Fatura vencida' : sub.state === 'pendente' ? 'Fatura da assinatura' : 'Próxima fatura';
@@ -567,8 +655,13 @@ function PaymentPanel({ payment, sub, refreshing, onRefresh }: { payment: Paymen
         </div>
       </div>
       <div className="pay-panel__actions">
+        {onShowPix && (
+          <button type="button" className="btn btn--primary" onClick={onShowPix}>
+            Mostrar QR Code do Pix
+          </button>
+        )}
         {url ? (
-          <a className="btn btn--primary" href={url} target="_blank" rel="noopener noreferrer">
+          <a className={`btn ${onShowPix ? 'btn--secondary' : 'btn--primary'}`} href={url} target="_blank" rel="noopener noreferrer">
             <Icon name="external" size={16} /> Abrir fatura
           </a>
         ) : (
@@ -579,6 +672,209 @@ function PaymentPanel({ payment, sub, refreshing, onRefresh }: { payment: Paymen
         </button>
       </div>
     </section>
+  );
+}
+
+/** Cartão da campanha no topo da página Plano: as duas ofertas, anual em destaque. */
+function PromoCard({ offer, onPick }: { offer: Offer; onPick: (cycle: Cycle) => void }) {
+  const until = endDayLabel(offer.endsAt);
+  const t = promoTexts(offer);
+  return (
+    <section className="promo-card" aria-labelledby="promo-card-title">
+      <div className="stack" style={{ gap: 6 }}>
+        <div className="promo-card__head">
+          <span className="promo-bar__tag">{offer.label ?? 'Black Friday'}</span>
+          {until && <span className="promo-card__sub">Até {until}</span>}
+        </div>
+        <h2 id="promo-card-title" className="promo-card__title">
+          Plano Equipe anual com {t.yearlyPct}% off
+        </h2>
+        <p className="promo-card__sub">Produtos ilimitados, equipe no mesmo estoque e análise avançada. Vale no app e na web.</p>
+      </div>
+      <PromoOffers
+        prices={offer}
+        yearlyAction={
+          <button type="button" className="btn btn--promo btn--block" onClick={() => onPick('YEARLY')}>
+            Garantir o anual por {t.yearlyPromo}
+          </button>
+        }
+        monthlyAction={
+          <button type="button" className="btn btn--promo-ghost btn--block" onClick={() => onPick('MONTHLY')}>
+            Começar no mensal
+          </button>
+        }
+      />
+      <p className="promo-card__sub">O semestral continua disponível pelo preço normal, sem cupom.</p>
+    </section>
+  );
+}
+
+/**
+ * Pix na própria página: QR Code e "copia e cola" da cobrança em aberto. A
+ * cada 5 s (aba visível, até 15 min) reconsulta o provedor; "Já paguei"
+ * confere na hora. Se o Pix não carregar, cai no link da fatura do Asaas.
+ */
+function PixPanel({
+  workspaceId,
+  base,
+  fallbackUrl,
+  onPaid,
+  onClose,
+}: {
+  workspaceId: string;
+  base: string;
+  fallbackUrl: string | null;
+  onPaid: (fresh: BillingOverview) => void;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const pix = useQuery({ queryKey: ['billing', workspaceId, 'pix'], queryFn: () => getPix(workspaceId), retry: 1, staleTime: 5 * 60_000 });
+  const [paid, setPaid] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [startedAt, setStartedAt] = useState(() => Date.now());
+  const [timedOut, setTimedOut] = useState(false);
+  const inFlight = useRef(false);
+  const onPaidRef = useRef(onPaid);
+  onPaidRef.current = onPaid;
+
+  // A conferência automática lê a visão da empresa (atualizada pelo webhook
+  // do Asaas, sem o limite estrito por minuto) e só a cada ~30 s pede ao
+  // servidor que reconsulte o Asaas, para o caso de o webhook atrasar.
+  const ticks = useRef(0);
+  const check = async (manual: boolean): Promise<void> => {
+    if (inFlight.current || paid) return;
+    inFlight.current = true;
+    if (manual) setChecking(true);
+    try {
+      ticks.current += 1;
+      const askProvider = manual || ticks.current % PIX_REFRESH_EVERY === 0;
+      const fresh = askProvider
+        ? await api.post<BillingOverview>(`${base}/billing/web/refresh`)
+        : await api.get<BillingOverview>(`${base}/billing/web`);
+      const state = fresh.subscription?.state;
+      if (state === 'ativa' || state === 'cancelada_mas_ativa') {
+        setPaid(true);
+        onPaidRef.current(fresh);
+      } else if (manual) {
+        toast.push('Ainda não recebemos a confirmação do Pix. Pode levar alguns segundos; esta página confere sozinha.');
+      }
+    } catch (error) {
+      // Na conferência automática, falha (limite por minuto, rede) só espera a próxima.
+      if (manual) toast.error(error);
+    } finally {
+      inFlight.current = false;
+      if (manual) setChecking(false);
+    }
+  };
+
+  const hasPix = pix.data !== undefined;
+  useEffect(() => {
+    if (!hasPix || paid || timedOut) return;
+    const timer = setInterval(() => {
+      if (Date.now() - startedAt > PIX_TIMEOUT_MS) {
+        setTimedOut(true);
+        return;
+      }
+      if (document.visibilityState === 'hidden') return;
+      void check(false);
+    }, PIX_POLL_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPix, paid, timedOut, startedAt]);
+
+  const copy = async () => {
+    const payload = pix.data?.payload;
+    if (!payload) return;
+    try {
+      await navigator.clipboard.writeText(payload);
+      toast.success('Código Pix copiado. Cole no app do seu banco, em Pix › Copia e cola.');
+    } catch {
+      const field = document.getElementById('pix-copia-e-cola') as HTMLTextAreaElement | null;
+      field?.select();
+      toast.push('Selecionamos o código: copie com Ctrl+C (ou toque e segure, no celular).');
+    }
+  };
+
+  if (paid) {
+    return (
+      <Notice tone="success" title="Pagamento confirmado" action={<button type="button" className="btn btn--secondary btn--sm" onClick={onClose}>Fechar</button>}>
+        O Pix foi recebido e o plano Equipe já está ativo para toda a empresa.
+      </Notice>
+    );
+  }
+
+  if (pix.isLoading) {
+    return (
+      <Card title="Pague com Pix">
+        <p className="muted">Gerando o QR Code…</p>
+      </Card>
+    );
+  }
+
+  if (pix.error || !pix.data) {
+    return (
+      <Notice
+        tone="warning"
+        title="Não foi possível mostrar o QR Code aqui"
+        action={
+          fallbackUrl ? (
+            <a className="btn btn--primary btn--sm" href={fallbackUrl} target="_blank" rel="noopener noreferrer">
+              <Icon name="external" size={15} /> Abrir fatura
+            </a>
+          ) : undefined
+        }
+      >
+        {fallbackUrl ? 'Abra a fatura para pagar com Pix na página segura do Asaas. Depois de pagar, volte para esta página.' : 'A fatura aparece nesta página em instantes. Atualize se ela não aparecer.'}
+      </Notice>
+    );
+  }
+
+  const charge = pix.data;
+  const src = charge.encodedImage.startsWith('data:') ? charge.encodedImage : `data:image/png;base64,${charge.encodedImage}`;
+  return (
+    <Card title="Pague com Pix" subtitle={`${fmtCents(charge.valueCents)}${charge.expirationDate ? ` · vence em ${fmtDate(charge.expirationDate)}` : ''}`}>
+      <div className="pix-panel">
+        <img className="pix-panel__qr" src={src} alt="QR Code do Pix" width={220} height={220} />
+        <div className="pix-panel__body">
+          <p style={{ margin: 0 }}>Abra o app do seu banco, escolha Pix e leia o QR Code, ou copie o código abaixo.</p>
+          <label className="field__label" htmlFor="pix-copia-e-cola">Pix copia e cola</label>
+          <textarea id="pix-copia-e-cola" className="input pix-panel__code" readOnly value={charge.payload} onFocus={(event) => event.currentTarget.select()} />
+          <div className="pix-panel__actions">
+            <button type="button" className="btn btn--primary" onClick={() => void copy()}>
+              <Icon name="copy" size={16} /> Copiar código
+            </button>
+            <button type="button" className="btn btn--secondary" onClick={() => void check(true)} disabled={checking}>
+              {checking ? 'Conferindo…' : 'Já paguei'}
+            </button>
+          </div>
+          {timedOut ? (
+            <p className="caption">
+              Paramos de conferir sozinhos depois de 15 minutos. Se já pagou, toque em "Já paguei".{' '}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  setStartedAt(Date.now());
+                  setTimedOut(false);
+                }}
+              >
+                Voltar a conferir
+              </button>
+            </p>
+          ) : (
+            <p className="caption">Esta página confere o pagamento sozinha. O plano é liberado assim que o Pix cair.</p>
+          )}
+          {fallbackUrl && (
+            <p className="caption">
+              Prefere outra forma?{' '}
+              <a href={fallbackUrl} target="_blank" rel="noopener noreferrer">
+                Abrir a fatura no Asaas
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -660,7 +956,7 @@ function PlanComparison({
         <div className="plan-card__foot">
           {action}
           {options.length > 0 && current !== 'paid' && (
-            <p className="caption">Pix, boleto ou cartão, na página segura do Asaas. Sem fidelidade: cancele por aqui e use até o fim do período pago. Nada é apagado.</p>
+            <p className="caption">Pix aqui mesmo; boleto ou cartão na página segura do Asaas. Sem fidelidade: cancele por aqui e use até o fim do período pago. Nada é apagado.</p>
           )}
         </div>
       </section>
@@ -764,23 +1060,37 @@ function HistoryCard({ history }: { history: BillingOverview['history'] }) {
   );
 }
 
+/** Cupom aplicado no checkout, com os preços que ele dá. */
+interface AppliedCoupon {
+  code: string;
+  prices: PromoPrices;
+}
+
 /**
  * Contratação: ciclo, forma de pagamento e dados do pagador (o Asaas exige
- * CPF ou CNPJ). A API cria a assinatura e devolve a fatura hospedada, que
- * abre em outra aba.
+ * CPF ou CNPJ). A API cria a assinatura; cartão e boleto abrem a fatura
+ * hospedada em outra aba, e o Pix mostra o QR Code na própria página.
+ *
+ * Cupom: o guardado neste navegador (link `?cupom=`) já vem aplicado; há
+ * também o campo "Tenho um cupom". Os preços com cupom são só exibição: quem
+ * valida e cobra é a API, que recusa com mensagem pronta (409).
  */
 function CheckoutDialog({
   open,
   overview,
+  offer,
+  presetCycle,
   onClose,
   onDone,
 }: {
   open: boolean;
   overview: BillingOverview;
+  offer: Offer | null;
+  presetCycle: Cycle | null;
   onClose: () => void;
-  onDone: (result: CheckoutResult, opened: boolean) => void;
+  onDone: (result: CheckoutResult, opened: boolean, method: BillingMethod) => void;
 }) {
-  const { base } = useCurrentWorkspace();
+  const { workspaceId } = useCurrentWorkspace();
   const { user } = useAuth();
   const groupId = useId();
   const { pricing, customer, subscription } = overview;
@@ -795,14 +1105,36 @@ function CheckoutDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [invalid, setInvalid] = useState<{ name?: string; document?: string; phone?: string }>({});
-  const price = options.find((option) => option.cycle === cycle)?.totalCents ?? null;
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+
+  const couponFits = coupon !== null && COUPON_CYCLES.has(cycle);
+  const promoPrice = (target: Cycle): number | null =>
+    coupon && COUPON_CYCLES.has(target) ? (target === 'YEARLY' ? coupon.prices.yearly.promoCents : coupon.prices.monthly.firstCents) : null;
+  const price = promoPrice(cycle) ?? options.find((option) => option.cycle === cycle)?.totalCents ?? null;
+
+  const applyCoupon = (applied: AppliedCoupon, forCycle: Cycle) => {
+    setCoupon(applied);
+    setCouponError(null);
+    setCouponOpen(false);
+    setCouponInput('');
+    saveCoupon(applied.code, offer?.code === applied.code ? offer.endsAt : null);
+    track('coupon.applied', { code: applied.code, cycle: forCycle });
+  };
 
   useEffect(() => {
     if (!open) return;
     // Pedido ainda não pago: parte da escolha anterior, que é o que a pessoa quer trocar.
     const pending = subscription?.state === 'pendente' ? subscription : null;
-    const wanted = options.find((option) => option.cycle === pending?.billingCycle)?.cycle;
-    setCycle(wanted ?? defaultCycle(options));
+    const wanted = options.find((option) => option.cycle === (presetCycle ?? pending?.billingCycle))?.cycle;
+    // Cupom guardado pelo link da campanha: já vem aplicado (anual, o destaque, se nada foi escolhido).
+    const stored = readCoupon();
+    const autoCoupon = offer?.code && stored === offer.code ? { code: offer.code, prices: offer } : null;
+    const startCycle = wanted ?? (autoCoupon && options.some((option) => option.cycle === 'YEARLY') ? 'YEARLY' : defaultCycle(options));
+    setCycle(startCycle);
     track('checkout.opened', { origin: originOf() });
     setMethod(METHODS.find((item) => item.key === pending?.billingType)?.key ?? 'PIX');
     setName(customer?.name ?? user?.name ?? '');
@@ -812,8 +1144,42 @@ function CheckoutDialog({
     setBusy(false);
     setError(null);
     setInvalid({});
+    setCoupon(null);
+    setCouponOpen(false);
+    setCouponInput('');
+    setCouponError(null);
+    if (autoCoupon) applyCoupon(autoCoupon, startCycle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const checkCoupon = async () => {
+    const code = normalizeCoupon(couponInput);
+    if (!code) {
+      setCouponError('Digite o código do cupom, só com letras e números (ex.: BF26).');
+      return;
+    }
+    // O cupom da campanha em vigor já tem os preços aqui; os outros, a API confere.
+    if (offer?.code === code) {
+      applyCoupon({ code, prices: offer }, cycle);
+      return;
+    }
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const result = await getCoupon(code);
+      if (result.valid && hasPrices(result)) applyCoupon({ code, prices: result }, cycle);
+      else setCouponError(couponErrorMessage(result.valid ? 'invalido' : result.reason));
+    } catch (caught) {
+      setCouponError(caught instanceof ApiError && caught.status === 404 ? couponErrorMessage('invalido') : errorMessage(caught));
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCoupon(null);
+    clearCoupon();
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -834,12 +1200,13 @@ function CheckoutDialog({
       return;
     }
 
-    // A aba da fatura é aberta já no clique, antes da chamada: depois de uma
-    // espera de rede o navegador trataria a abertura como pop-up e bloquearia
-    // (e com `noopener` o `window.open` não devolve nada que permita saber).
-    // Ela nasce em branco, sem vínculo com esta página (`opener = null`), e
-    // recebe o endereço da fatura quando a API responde.
-    const tab = window.open('', '_blank');
+    // Cartão e boleto: a aba da fatura é aberta já no clique, antes da
+    // chamada: depois de uma espera de rede o navegador trataria a abertura
+    // como pop-up e bloquearia (e com `noopener` o `window.open` não devolve
+    // nada que permita saber). Ela nasce em branco, sem vínculo com esta
+    // página (`opener = null`), e recebe o endereço da fatura quando a API
+    // responde. No Pix não há aba: o QR Code aparece na página.
+    const tab = method === 'PIX' ? null : window.open('', '_blank');
     if (tab) {
       try {
         tab.opener = null;
@@ -851,20 +1218,21 @@ function CheckoutDialog({
     }
 
     setBusy(true);
-    track('purchase.started', { cycle, billingType: method, value: (price ?? 0) / 100, currency: 'BRL', origin: originOf() });
+    track('purchase.started', { cycle, billingType: method, value: (price ?? 0) / 100, currency: 'BRL', origin: originOf(), ...(couponFits && coupon ? { coupon: coupon.code } : {}) });
     try {
-      const result = await api.post<CheckoutResult>(`${base}/billing/web/checkout`, {
+      const result = await checkout(workspaceId, {
         name: name.trim(),
         cpfCnpj: digits,
         cycle,
         billingType: method,
         ...(email.trim() ? { email: email.trim() } : {}),
         ...(phoneDigits ? { mobilePhone: phoneDigits } : {}),
+        ...(couponFits && coupon ? { coupon: coupon.code } : {}),
       });
       const url = safeUrl(result.payment?.invoiceUrl);
       if (tab && url) tab.location.replace(url);
       else tab?.close();
-      onDone(result, tab !== null && url !== null);
+      onDone(result, tab !== null && url !== null, method);
     } catch (caught) {
       tab?.close();
       setError(caught);
@@ -884,9 +1252,16 @@ function CheckoutDialog({
   // Erro que a API atribuiu a um campo aparece no campo; os demais, no aviso do topo.
   const hasFieldError = apiError !== null && ['name', 'cpfCnpj', 'email', 'mobilePhone'].some((field) => apiError.fieldError(field) !== undefined);
   const paidUntil = subscription?.state === 'cancelada_mas_ativa' ? subscription.currentPeriodEnd : null;
+  const couponTexts = coupon ? promoTexts(coupon.prices) : null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Assinar o plano Equipe" description="Escolha o plano e a forma de pagamento. A fatura abre em outra aba, na página segura do Asaas." wide>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Assinar o plano Equipe"
+      description="Escolha o plano e a forma de pagamento. No Pix, o QR Code aparece aqui mesmo; cartão e boleto abrem na página segura do Asaas."
+      wide
+    >
       <form className="stack" onSubmit={submit} noValidate>
         {error !== null && !hasFieldError && <Notice tone="error">{errorMessage(error)}</Notice>}
         {paidUntil && (
@@ -897,20 +1272,83 @@ function CheckoutDialog({
 
         <fieldset className={`option-list option-list--grid ${options.length === 3 ? 'option-list--cycles' : ''}`}>
           <legend className="field__label">Plano</legend>
-          {options.map((option) => (
-            <label key={option.cycle} className={`option ${cycle === option.cycle ? 'option--selected' : ''}`}>
-              <input type="radio" name={`${groupId}-cycle`} checked={cycle === option.cycle} onChange={() => setCycle(option.cycle)} />
-              <span className="option__body">
-                <span className="option__title">
-                  {option.label}
-                  {option.badge && <span className="option__badge">{option.badge}</span>}
+          {options.map((option) => {
+            const promo = promoPrice(option.cycle);
+            return (
+              <label key={option.cycle} className={`option ${cycle === option.cycle ? 'option--selected' : ''}`}>
+                <input type="radio" name={`${groupId}-cycle`} checked={cycle === option.cycle} onChange={() => setCycle(option.cycle)} />
+                <span className="option__body">
+                  <span className="option__title">
+                    {option.label}
+                    {promo !== null ? <span className="option__badge">Cupom {coupon?.code}</span> : option.badge && <span className="option__badge">{option.badge}</span>}
+                  </span>
+                  {promo !== null && couponTexts && option.cycle === 'YEARLY' ? (
+                    <>
+                      <span className="option__was">De {fmtCents(option.totalCents)}</span>
+                      <span className="option__price">{fmtCents(promo)}<small>/ano</small></span>
+                      <span className="option__sub">Equivale a {couponTexts.yearlyPerMonth}/mês. {couponTexts.yearlyRenewal}</span>
+                    </>
+                  ) : promo !== null && couponTexts ? (
+                    <>
+                      <span className="option__was">De {fmtCents(option.totalCents)}</span>
+                      <span className="option__price">{fmtCents(promo)}<small> no {couponTexts.monthlyFirstLabel}</small></span>
+                      <span className="option__sub">Depois {couponTexts.monthlyFull}/mês, com aviso antes.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="option__price">{fmtCents(option.perMonthCents)}<small>/mês</small></span>
+                      <span className="option__sub">{chargeLine(option)}{coupon && !COUPON_CYCLES.has(option.cycle) ? ' Sem cupom.' : ''}</span>
+                    </>
+                  )}
                 </span>
-                <span className="option__price">{fmtCents(option.perMonthCents)}<small>/mês</small></span>
-                <span className="option__sub">{chargeLine(option)}</span>
-              </span>
-            </label>
-          ))}
+              </label>
+            );
+          })}
         </fieldset>
+
+        {coupon ? (
+          <div className="coupon-applied" role="status">
+            <Icon name="check" size={16} />
+            <span>
+              Cupom <strong>{coupon.code}</strong> aplicado
+              {couponFits ? '.' : ': vale só no mensal e no anual.'}
+            </span>
+            <button type="button" className="link-button" onClick={removeCoupon}>Remover</button>
+          </div>
+        ) : couponOpen ? (
+          <Field label="Cupom" error={couponError ?? undefined}>
+            <div className="coupon-box">
+              <input
+                className="input"
+                value={couponInput}
+                onChange={(event) => {
+                  setCouponInput(event.target.value);
+                  setCouponError(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void checkCoupon();
+                  }
+                }}
+                maxLength={32}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="Ex.: BF26"
+                aria-invalid={couponError ? true : undefined}
+                autoFocus
+              />
+              <button type="button" className="btn btn--secondary" onClick={() => void checkCoupon()} disabled={couponBusy}>
+                {couponBusy ? 'Conferindo…' : 'Aplicar'}
+              </button>
+            </div>
+          </Field>
+        ) : (
+          <button type="button" className="link-button" style={{ alignSelf: 'flex-start' }} onClick={() => setCouponOpen(true)}>
+            Tenho um cupom
+          </button>
+        )}
 
         <fieldset className="option-list option-list--grid">
           <legend className="field__label">Forma de pagamento</legend>
@@ -954,16 +1392,16 @@ function CheckoutDialog({
         </div>
 
         <ul className="trust-list">
-          <li><Icon name="check" /> Pagamento seguro na página do Asaas: dados de cartão não passam pelo Estoque Simples.</li>
+          <li><Icon name="check" /> Pagamento seguro pelo Asaas: dados de cartão não passam pelo Estoque Simples.</li>
           <li><Icon name="check" /> Pix liberado na hora; o plano entra assim que o pagamento é confirmado.</li>
           <li><Icon name="check" /> Sem fidelidade: cancele quando quiser e use até o fim do período pago.</li>
         </ul>
-        {method === 'PIX' && <p className="caption">Pagou o Pix? Volte para esta aba: o plano é liberado sozinho em instantes.</p>}
+        {method === 'PIX' && <p className="caption">O QR Code do Pix aparece nesta página, e o plano é liberado sozinho assim que o pagamento cai.</p>}
 
         <div className="row row--end" style={{ flexWrap: 'wrap' }}>
           <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>Cancelar</button>
           <button type="submit" className="btn btn--primary" disabled={busy || price === null}>
-            {busy ? 'Gerando fatura…' : price !== null ? `Ir para o pagamento · ${fmtCents(price)}` : 'Ir para o pagamento'}
+            {busy ? (method === 'PIX' ? 'Gerando o Pix…' : 'Gerando fatura…') : `${method === 'PIX' ? 'Gerar Pix' : 'Ir para o pagamento'}${price !== null ? ` · ${fmtCents(price)}` : ''}`}
           </button>
         </div>
       </form>

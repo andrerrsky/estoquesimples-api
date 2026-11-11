@@ -129,6 +129,26 @@
                 android:textAppearance="@style/TextAppearance.Estoque.Caption"
                 android:textColor="@color/color_text_muted" />
 
+            <!-- Selo e detalhe da oferta promocional (Black Friday); textos das
+                 fases de preço da Play, montados em PromoRules. -->
+            <TextView
+                android:id="@+id/subscriptionPromoBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_badge_promo"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="@string/promo_card_badge"
+                android:textColor="@color/color_text_on_brand"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/subscriptionPriceAmount"
                 android:layout_width="match_parent"
@@ -136,6 +156,15 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/subscriptionPromoDetail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting"
+                android:visibility="gone" />
 
         </LinearLayout>
 

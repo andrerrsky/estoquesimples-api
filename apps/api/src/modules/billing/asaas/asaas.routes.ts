@@ -24,6 +24,13 @@ const checkoutBodySchema = z
       .optional(),
     cycle: z.enum(['MONTHLY', 'SEMIANNUALLY', 'YEARLY']),
     billingType: z.enum(['UNDEFINED', 'PIX', 'BOLETO', 'CREDIT_CARD']).default('UNDEFINED'),
+    /** Cupom promocional (docs/black-friday-2026.md). Vazio = sem cupom. */
+    coupon: z
+      .string()
+      .trim()
+      .max(32)
+      .transform((value) => value.toUpperCase())
+      .optional(),
   })
   .strict();
 
@@ -104,6 +111,37 @@ export async function registerAsaasRoutes(app: FastifyInstance): Promise<void> {
       const auth = requireAuth(request);
       const context = requireWorkspaceContext(request);
       return service.startCheckout(context.workspaceId, auth.userId, request.body, requestMeta(request));
+    },
+  );
+
+  routes.get(
+    '/workspaces/:workspaceId/billing/web/pix',
+    {
+      ...strict,
+      preHandler: [app.authenticate, requireWorkspace('assinatura.ver')],
+      schema: {
+        tags: ['assinatura'],
+        summary: 'QR Code PIX da cobrança em aberto (para pagar na própria página)',
+        description:
+          'Devolve a imagem (PNG em base64) e o "copia e cola" da cobrança PIX em aberto da assinatura. ' +
+          'A confirmação do pagamento continua vindo do Asaas: reconsulte com `POST .../refresh`.',
+        security: [{ bearerAuth: [] }],
+        params: z.object({ workspaceId: z.string().uuid() }),
+        response: {
+          200: z.object({
+            paymentId: z.string().uuid(),
+            valueCents: z.number().int(),
+            encodedImage: z.string(),
+            payload: z.string(),
+            expirationDate: z.string().nullable(),
+          }),
+          ...errors,
+        },
+      },
+    },
+    async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      return service.pixQrCode(requireWorkspaceContext(request).workspaceId);
     },
   );
 

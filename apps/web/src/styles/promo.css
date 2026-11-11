@@ -1,0 +1,465 @@
+/* ==========================================================================
+   Campanha (Black Friday): faixa do topo, cartão da página Plano, Pix na
+   página e a landing /black-friday. Fundo escuro com um destaque âmbar; o
+   resto (raios, espaços, tipografia, botões) é o do design system.
+   ========================================================================== */
+:root {
+  --promo-ink: #0e1621;
+  --promo-ink-2: #17212e;
+  --promo-on: #ffffff;
+  --promo-on-muted: rgba(255, 255, 255, 0.72);
+  --promo-accent: #ffb547;
+  --promo-on-accent: #1a1204;
+}
+
+/* ---- Faixa do topo ------------------------------------------------------ */
+.promo-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px var(--page-x);
+  background: linear-gradient(90deg, var(--promo-ink) 0%, var(--promo-ink-2) 100%);
+  color: var(--promo-on);
+  font-size: var(--fs-label);
+  line-height: 1.35;
+}
+.promo-bar__text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.promo-bar__tag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--promo-accent);
+  color: var(--promo-on-accent);
+  font-weight: 700;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.promo-bar s {
+  color: var(--promo-on-muted);
+}
+.promo-bar strong {
+  color: var(--promo-accent);
+}
+.promo-bar__short {
+  display: none;
+}
+.promo-bar__cta {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-control);
+  background: var(--promo-accent);
+  color: var(--promo-on-accent);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: filter var(--transition);
+}
+.promo-bar__cta:hover {
+  filter: brightness(1.06);
+  text-decoration: none;
+}
+.promo-bar__cta:focus-visible,
+.promo-bar__close:focus-visible {
+  outline: 2px solid var(--promo-accent);
+  outline-offset: 2px;
+}
+.promo-bar__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  border: none;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--promo-on-muted);
+  cursor: pointer;
+}
+.promo-bar__close:hover {
+  color: var(--promo-on);
+  background: rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 860px) {
+  .promo-bar {
+    gap: 8px;
+  }
+  .promo-bar__long {
+    display: none;
+  }
+  .promo-bar__short {
+    display: inline;
+  }
+  .promo-bar__cta {
+    padding: 6px 10px;
+  }
+}
+
+/* ---- Cartão da página Plano ---------------------------------------------- */
+.promo-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, var(--promo-ink) 0%, var(--promo-ink-2) 100%);
+  color: var(--promo-on);
+}
+.promo-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.promo-card__title {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: 1.2;
+}
+.promo-card__sub {
+  margin: 0;
+  color: var(--promo-on-muted);
+  font-size: var(--fs-supporting);
+}
+.promo-offers {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 12px;
+}
+@media (max-width: 860px) {
+  .promo-offers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.promo-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--promo-on);
+}
+.promo-offer--featured {
+  background: rgba(255, 181, 71, 0.1);
+  border: 2px solid var(--promo-accent);
+}
+.promo-offer__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.promo-offer__pill {
+  padding: 2px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--promo-accent);
+  color: var(--promo-on-accent);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+}
+.promo-offer__from {
+  color: var(--promo-on-muted);
+  font-size: var(--fs-supporting);
+}
+.promo-offer__price {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.promo-offer__price small {
+  font-size: var(--fs-supporting);
+  font-weight: 600;
+}
+.promo-offer__equiv {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  color: var(--promo-accent);
+}
+.promo-offer__fine {
+  margin: 0;
+  color: var(--promo-on-muted);
+  font-size: var(--fs-label);
+}
+.promo-offer .btn {
+  margin-top: auto;
+}
+.btn.btn--promo {
+  background: var(--promo-accent);
+  border-color: var(--promo-accent);
+  color: var(--promo-on-accent);
+  font-weight: 700;
+}
+.btn.btn--promo:hover {
+  filter: brightness(1.06);
+}
+.btn.btn--promo-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--promo-on);
+}
+.btn.btn--promo-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Preço com cupom dentro do checkout. */
+.option__was {
+  color: var(--text-faint);
+  font-size: var(--fs-caption);
+  text-decoration: line-through;
+}
+.coupon-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.coupon-box .input {
+  flex: 1 1 160px;
+  text-transform: uppercase;
+}
+.coupon-applied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: var(--fs-supporting);
+}
+.coupon-applied strong {
+  color: var(--text);
+}
+
+/* ---- Pix na própria página ---------------------------------------------- */
+.pix-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .pix-panel {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+}
+.pix-panel__qr {
+  width: 220px;
+  height: 220px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: #ffffff;
+  image-rendering: pixelated;
+}
+.pix-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+.pix-panel__code {
+  width: 100%;
+  min-height: 72px;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  word-break: break-all;
+}
+.pix-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 860px) {
+  .pix-panel__actions {
+    justify-content: center;
+  }
+}
+
+/* ---- Landing /black-friday ----------------------------------------------- */
+.bf {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+}
+.bf__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--promo-ink);
+  color: var(--promo-on);
+}
+.bf__top a {
+  color: var(--promo-on);
+}
+.bf__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.bf__hero {
+  padding: 40px 16px 48px;
+  background: linear-gradient(180deg, var(--promo-ink) 0%, var(--promo-ink-2) 100%);
+  color: var(--promo-on);
+  text-align: center;
+}
+.bf__wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+.bf__eyebrow {
+  justify-self: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--promo-accent);
+  color: var(--promo-on-accent);
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bf__title {
+  margin: 0;
+  font-size: clamp(1.9rem, 7vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.bf__headline {
+  margin: 0;
+  font-size: clamp(1.1rem, 4vw, 1.5rem);
+  color: var(--promo-on-muted);
+}
+.bf__headline s {
+  color: var(--promo-on-muted);
+}
+.bf__headline strong {
+  color: var(--promo-accent);
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  display: inline-block;
+  letter-spacing: -0.02em;
+}
+.bf__countdown {
+  justify-self: center;
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.bf__countdown li {
+  min-width: 64px;
+  padding: 8px 6px;
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+.bf__countdown strong {
+  display: block;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.bf__countdown span {
+  font-size: var(--fs-caption);
+  color: var(--promo-on-muted);
+}
+.bf__status {
+  margin: 0;
+  font-weight: 700;
+  color: var(--promo-accent);
+}
+.bf__main {
+  max-width: 1000px;
+  width: 100%;
+  margin: -24px auto 0;
+  padding: 0 16px 48px;
+  display: grid;
+  gap: 32px;
+}
+.bf .promo-offers {
+  text-align: left;
+}
+.bf .promo-offer {
+  background: var(--promo-ink);
+}
+.bf .promo-offer--featured {
+  background: linear-gradient(160deg, #2a2010 0%, var(--promo-ink) 60%);
+}
+.bf__section-title {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+.bf__benefits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bf__benefits li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-content);
+  line-height: 1.4;
+}
+.bf__benefits svg {
+  flex: none;
+  color: var(--brand);
+  margin-top: 1px;
+}
+.bf__faq details {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.bf__faq summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.bf__faq p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.bf__ended {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-content);
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.bf__foot {
+  padding: 20px 16px 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}

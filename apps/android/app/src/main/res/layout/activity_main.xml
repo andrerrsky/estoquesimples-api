@@ -158,11 +158,89 @@
 
     </LinearLayout>
 
+    <!-- Cartão da oferta promocional da Google Play (Black Friday). Discreto,
+         fechável; o texto vem do Billing (MainActivity.updatePromoCard). -->
+    <LinearLayout
+        android:id="@+id/promoCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/planBanner"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_surface"
+        android:orientation="horizontal"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingStart="@dimen/group_padding_compact"
+        android:paddingEnd="4dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge_promo"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="@string/promo_card_badge"
+                android:textColor="@color/color_text_on_brand"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/promo_card_title"
+                android:textAppearance="@style/TextAppearance.Estoque.Section" />
+
+            <TextView
+                android:id="@+id/promoCardSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.Estoque.Supporting" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/promo_card_cta"
+                android:textAppearance="@style/TextAppearance.Estoque.Label"
+                android:textColor="@color/color_accent" />
+
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/promoCardClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/promo_card_close"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_close" />
+
+    </LinearLayout>
+
     <ListView
         android:id="@+id/listView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/planBanner"
+        android:layout_below="@+id/promoCard"
         android:layout_above="@+id/bottomNavigation"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
@@ -190,7 +268,7 @@
         android:id="@+id/empty_list_item"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@+id/planBanner"
+        android:layout_below="@+id/promoCard"
         android:layout_above="@+id/bottomNavigation"
         android:visibility="gone"
         android:orientation="vertical"

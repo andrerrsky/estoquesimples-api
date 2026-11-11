@@ -136,4 +136,13 @@ describe('cabeçalho das páginas públicas da aplicação', () => {
     expect(isPublicAppPage('/app/estoque')).toBe(false);
     expect(publicPageHtml(template, '/app/estoque')).toBeNull();
   });
+
+  it('a landing da Black Friday é indexável, com título, descrição e canonical próprios', () => {
+    expect(isPublicAppPage('/black-friday')).toBe(true);
+    const html = publicPageHtml(template, '/black-friday')!;
+    expect(html).toContain('<title>Black Friday Estoque Simples: plano anual com 40% off</title>');
+    expect(html).toContain('<link rel="canonical" href="https://estoquesimples.com.br/black-friday" />');
+    expect(html).toContain('R$ 119,90');
+    expect(html).not.toContain('noindex');
+  });
 });

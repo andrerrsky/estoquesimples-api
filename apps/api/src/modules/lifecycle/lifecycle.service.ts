@@ -5,7 +5,16 @@ import { MailerRateLimitError } from '../../platform/email/mailer.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { sqlList } from '../admin/admin-series.js';
 import { LIVE_STATES } from '../billing/billing.service.js';
-import { LIFECYCLE_KINDS, renderLifecycleEmail, type LifecycleKind } from './lifecycle.templates.js';
+import { AsaasBillingService } from '../billing/asaas/asaas-billing.service.js';
+import { PAID_STATUSES, todayBrazil } from '../billing/asaas/asaas-state.js';
+import { isCouponCurrent, PromotionsService } from '../promotions/promotions.service.js';
+import {
+  LIFECYCLE_KINDS,
+  renderLifecycleEmail,
+  TRANSACTIONAL_KINDS,
+  type LifecycleKind,
+  type PromoTemplateContext,
+} from './lifecycle.templates.js';
 
 /**
  * Funil de e-mails do ciclo de vida: totalmente automático, decidido a cada
@@ -29,7 +38,36 @@ const BUSINESS_START_HOUR = 9;
 const BUSINESS_END_HOUR = 20;
 
 /** Ordem de prioridade quando mais de um passo vence para a mesma pessoa. */
-const PRIORITY: LifecycleKind[] = ['activation_d8', 'activation_d4', 'activation_d1', 'limit_50', 'limit_40', 'confirm_email', 'reengage_14d'];
+const PRIORITY: LifecycleKind[] = [
+  // Avisos de assinatura com cupom primeiro: são transacionais e têm data.
+  'promo_renewal_yearly_d3',
+  'promo_renewal_monthly_d7',
+  'promo_renewal_yearly_d15',
+  'activation_d8',
+  'activation_d4',
+  'activation_d1',
+  'limit_50',
+  'limit_40',
+  'confirm_email',
+  'reengage_14d',
+  // Campanha por último: quem tem outro passo nesta rodada recebe a campanha
+  // na rodada seguinte do mesmo dia.
+  'bf2026_last_day',
+  'bf2026_today',
+  'bf2026_launch',
+];
+
+/**
+ * Campanha Black Friday 2026 (docs/black-friday-2026.md): um envio por data,
+ * a partir das 10 h de Brasília, enquanto o cupom estiver vigente.
+ */
+export const BF2026_COUPON = 'BF26';
+export const BF2026_SENDS: Record<string, LifecycleKind> = {
+  '2026-11-20': 'bf2026_launch',
+  '2026-11-27': 'bf2026_today',
+  '2026-12-01': 'bf2026_last_day',
+};
+const CAMPAIGN_START_HOUR = 10;
 
 export interface LifecycleCandidate {
   kind: LifecycleKind;
@@ -42,6 +80,8 @@ export interface LifecycleCandidate {
   productCount: number;
   lowStockCount: number | null;
   dedupeKey: string;
+  /** Dados da oferta (campanha) ou da assinatura com cupom (aviso de renovação). */
+  promo?: PromoTemplateContext | null;
 }
 
 export interface LifecycleRunResult {
@@ -71,7 +111,7 @@ export class LifecycleService {
   }
 
   /** Quem deve receber cada passo agora (antes dos limites de cota). */
-  async candidates(): Promise<LifecycleCandidate[]> {
+  async candidates(now: Date = new Date()): Promise<LifecycleCandidate[]> {
     const start = this.services.env.LIFECYCLE_ACTIVATION_START.toISOString();
     const activation = (kind: LifecycleKind, fromHours: number, toHours: number): SQL => sql`
       SELECT ${kind}::text AS kind, u.id AS user_id, u.email, u.name, (u.email_verified_at IS NOT NULL) AS email_verified,
@@ -139,13 +179,8 @@ export class LifecycleService {
         AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.workspace_id = w.id AND s.state IN ${sqlList(LIVE_STATES)})
     `);
 
-    const seen = new Set<string>();
-    const byPriority = [...rows.rows].sort((a, b) => PRIORITY.indexOf(a.kind) - PRIORITY.indexOf(b.kind));
-    const out: LifecycleCandidate[] = [];
-    for (const row of byPriority) {
-      if (seen.has(row.user_id) || !LIFECYCLE_KINDS.includes(row.kind)) continue;
-      seen.add(row.user_id);
-      out.push({
+    const all: LifecycleCandidate[] = [
+      ...rows.rows.map((row) => ({
         kind: row.kind,
         userId: row.user_id,
         email: row.email,
@@ -156,9 +191,172 @@ export class LifecycleService {
         productCount: row.product_count,
         lowStockCount: row.low_stock_count,
         dedupeKey: row.dedupe_key,
+      })),
+      ...(await this.renewalCandidates(now)),
+      ...(await this.campaignCandidates(now)),
+    ];
+
+    const seen = new Set<string>();
+    const byPriority = all.sort((a, b) => PRIORITY.indexOf(a.kind) - PRIORITY.indexOf(b.kind));
+    const out: LifecycleCandidate[] = [];
+    for (const candidate of byPriority) {
+      if (seen.has(candidate.userId) || !LIFECYCLE_KINDS.includes(candidate.kind)) continue;
+      seen.add(candidate.userId);
+      out.push(candidate);
+    }
+    return out;
+  }
+
+  /**
+   * Aviso antes da 1ª cobrança cheia de uma assinatura com cupom: mensal 7
+   * dias antes da 2ª mensalidade; anual 15 e 3 dias antes da renovação.
+   * Transacional: sai mesmo para quem descadastrou das dicas (não para conta
+   * suspensa/excluída nem endereço com bounce/spam), uma vez por marco.
+   */
+  async renewalCandidates(now: Date = new Date()): Promise<LifecycleCandidate[]> {
+    const today = todayBrazil(now);
+    const rows = await this.db.execute<{
+      subscription_id: string;
+      billing_cycle: string;
+      next_due_date: string;
+      days: number;
+      paid: number;
+      monthly_promo_cycles: number;
+      code: string;
+      label: string;
+      starts_at: string;
+      ends_at: string;
+      yearly_price_cents: number | null;
+      user_id: string;
+      email: string;
+      name: string;
+      email_verified: boolean;
+      workspace_id: string;
+      workspace_name: string;
+    }>(sql`
+      SELECT s.id AS subscription_id, s.billing_cycle, s.next_due_date::text AS next_due_date,
+             (s.next_due_date - ${today}::date)::int AS days,
+             (SELECT count(*)::int FROM billing_payments bp
+               WHERE bp.subscription_id = s.id AND NOT bp.deleted AND bp.status IN ${sqlList(PAID_STATUSES)}) AS paid,
+             c.monthly_promo_cycles, c.code, c.label, c.starts_at, c.ends_at, c.yearly_price_cents,
+             u.id AS user_id, u.email, u.name, (u.email_verified_at IS NOT NULL) AS email_verified,
+             w.id AS workspace_id, w.name AS workspace_name
+      FROM subscriptions s
+      JOIN coupons c ON c.id = s.coupon_id
+      JOIN workspaces w ON w.id = s.workspace_id
+      JOIN users u ON u.id = COALESCE(w.owner_user_id, s.purchaser_user_id)
+      WHERE s.provider = 'asaas' AND s.state IN ('ativa', 'carencia') AND s.auto_renewing AND s.canceled_at IS NULL
+        AND s.billing_cycle IN ('MONTHLY', 'YEARLY')
+        AND s.next_due_date > ${today}::date AND s.next_due_date <= ${today}::date + 15
+        AND w.deleted_at IS NULL
+        AND u.status = 'active' AND u.deleted_at IS NULL AND u.email_suppressed_at IS NULL
+    `);
+    if (rows.rows.length === 0) return [];
+
+    const pricing = await new AsaasBillingService(this.services).pricing();
+    const out: LifecycleCandidate[] = [];
+    for (const row of rows.rows) {
+      const yearly = row.billing_cycle === 'YEARLY';
+      // Só antes da 1ª cobrança cheia: pagos exatamente os ciclos promocionais.
+      if (row.paid !== (yearly ? 1 : row.monthly_promo_cycles)) continue;
+      const kind: LifecycleKind | null = yearly
+        ? row.days <= 3
+          ? 'promo_renewal_yearly_d3'
+          : 'promo_renewal_yearly_d15'
+        : row.days <= 7
+          ? 'promo_renewal_monthly_d7'
+          : null;
+      if (!kind) continue;
+      const full = yearly ? pricing.yearlyCents : pricing.monthlyCents;
+      out.push({
+        kind,
+        userId: row.user_id,
+        email: row.email,
+        name: row.name,
+        emailVerified: row.email_verified,
+        workspaceId: row.workspace_id,
+        workspaceName: row.workspace_name,
+        productCount: 0,
+        lowStockCount: null,
+        dedupeKey: `${kind}:${row.subscription_id}:${row.next_due_date}`,
+        promo: {
+          label: row.label,
+          code: row.code,
+          yearlyFullCents: pricing.yearlyCents ?? 0,
+          yearlyPromoCents: row.yearly_price_cents ?? 0,
+          monthlyFullCents: pricing.monthlyCents ?? 0,
+          endsAt: new Date(row.ends_at),
+          nextDueDate: row.next_due_date,
+          nextChargeCents: full,
+        },
       });
     }
     return out;
+  }
+
+  /**
+   * Campanha Black Friday para a base grátis, nas datas de `BF2026_SENDS`.
+   *
+   * Público: conta ativa que recebe os e-mails do ciclo de vida (o projeto
+   * não tem consentimento explícito de marketing; ver o doc da campanha),
+   * dona de ao menos uma empresa e sem assinatura viva em nenhuma empresa de
+   * que participa. Um envio por pessoa por data (`dedupe_key`). Ignora o
+   * intervalo de 48 h do funil: é uma campanha com data marcada.
+   */
+  async campaignCandidates(now: Date = new Date()): Promise<LifecycleCandidate[]> {
+    const kind = BF2026_SENDS[todayBrazil(now)];
+    if (!kind || brasiliaHour(now) < CAMPAIGN_START_HOUR) return [];
+    const coupon = await new PromotionsService(this.services).findByCode(BF2026_COUPON);
+    if (!coupon || !isCouponCurrent(coupon, now) || coupon.yearlyPriceCents === null) return [];
+    const pricing = await new AsaasBillingService(this.services).pricing();
+    if (pricing.yearlyCents === null || pricing.yearlyCents <= coupon.yearlyPriceCents) return [];
+
+    const rows = await this.db.execute<{
+      user_id: string;
+      email: string;
+      name: string;
+      email_verified: boolean;
+      workspace_id: string;
+      workspace_name: string;
+    }>(sql`
+      SELECT u.id AS user_id, u.email, u.name, (u.email_verified_at IS NOT NULL) AS email_verified, w.id AS workspace_id, w.name AS workspace_name
+      FROM users u
+      JOIN LATERAL (
+        SELECT w.id, w.name FROM workspaces w
+        WHERE w.owner_user_id = u.id AND w.deleted_at IS NULL
+        ORDER BY w.created_at LIMIT 1
+      ) w ON true
+      WHERE ${ELIGIBLE}
+        AND NOT EXISTS (
+          SELECT 1 FROM workspace_members m JOIN subscriptions s ON s.workspace_id = m.workspace_id
+          WHERE m.user_id = u.id AND m.status = 'active' AND s.state IN ${sqlList(LIVE_STATES)}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM workspaces w2 JOIN subscriptions s ON s.workspace_id = w2.id
+          WHERE w2.owner_user_id = u.id AND s.state IN ${sqlList(LIVE_STATES)}
+        )
+    `);
+    const promo: PromoTemplateContext = {
+      label: coupon.label,
+      code: coupon.code,
+      yearlyFullCents: pricing.yearlyCents,
+      yearlyPromoCents: coupon.yearlyPriceCents,
+      monthlyFullCents: pricing.monthlyCents ?? 0,
+      endsAt: coupon.endsAt,
+    };
+    return rows.rows.map((row) => ({
+      kind,
+      userId: row.user_id,
+      email: row.email,
+      name: row.name,
+      emailVerified: row.email_verified,
+      workspaceId: row.workspace_id,
+      workspaceName: row.workspace_name,
+      productCount: 0,
+      lowStockCount: null,
+      dedupeKey: `${kind}:${row.user_id}`,
+      promo,
+    }));
   }
 
   private baseUrl(): string {
@@ -171,6 +369,17 @@ export class LifecycleService {
     url.searchParams.set('utm_source', 'lifecycle');
     url.searchParams.set('utm_medium', 'email');
     url.searchParams.set('utm_campaign', 'ciclo_de_vida');
+    url.searchParams.set('utm_content', kind);
+    url.searchParams.set('le', emailId);
+    return url.toString();
+  }
+
+  /** Link da campanha: UTMs da campanha (GA), o tipo e o id do envio (`le`). */
+  campaignLink(path: string, kind: LifecycleKind, emailId: string): string {
+    const url = new URL(path, this.baseUrl());
+    url.searchParams.set('utm_source', 'email');
+    url.searchParams.set('utm_medium', 'lifecycle');
+    url.searchParams.set('utm_campaign', 'bf2026');
     url.searchParams.set('utm_content', kind);
     url.searchParams.set('le', emailId);
     return url.toString();
@@ -199,7 +408,7 @@ export class LifecycleService {
     if (budget <= 0) return { ...result, skipped: 'quota' };
 
     const replyTo = env.LIFECYCLE_REPLY_TO ?? env.SUPPORT_NOTIFY_EMAILS[0];
-    for (const candidate of await this.candidates()) {
+    for (const candidate of await this.candidates(now)) {
       if (budget <= 0) break;
       const claimed = await this.db.execute<{ id: string }>(sql`
         INSERT INTO lifecycle_emails (user_id, workspace_id, kind, dedupe_key, status)
@@ -219,9 +428,12 @@ export class LifecycleService {
         emailVerified: candidate.emailVerified,
         productCount: candidate.productCount,
         lowStockCount: candidate.lowStockCount,
-        link: (path) => this.trackedLink(path, candidate.kind, id),
+        link: (path) =>
+          candidate.kind.startsWith('bf2026_') ? this.campaignLink(path, candidate.kind, id) : this.trackedLink(path, candidate.kind, id),
         unsubscribeUrl: this.unsubscribeUrl(id),
+        promo: candidate.promo ?? null,
       });
+      const transactional = TRANSACTIONAL_KINDS.has(candidate.kind);
       try {
         const sent = await this.services.mailer.send({
           to: candidate.email,
@@ -230,10 +442,15 @@ export class LifecycleService {
           text: rendered.text,
           fromName: env.LIFECYCLE_FROM_NAME,
           ...(replyTo ? { replyTo } : {}),
-          headers: {
-            'List-Unsubscribe': `<${this.unsubscribeUrl(id)}>`,
-            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-          },
+          // Aviso de assinatura não leva descadastro: não é propaganda.
+          ...(transactional
+            ? {}
+            : {
+                headers: {
+                  'List-Unsubscribe': `<${this.unsubscribeUrl(id)}>`,
+                  'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                },
+              }),
         });
         const providerId = sent && typeof sent === 'object' ? sent.id ?? null : null;
         await this.db.execute(sql`UPDATE lifecycle_emails SET provider_id = ${providerId} WHERE id = ${id}`);

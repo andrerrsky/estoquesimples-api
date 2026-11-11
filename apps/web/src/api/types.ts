@@ -379,9 +379,55 @@ export interface WebPricing {
   yearlyCents: number | null;
 }
 
+/** Preços da campanha em destaque (Black Friday), em centavos. */
+export interface PromoPrices {
+  yearly: { fullCents: number; promoCents: number; monthlyEquivalentCents: number };
+  monthly: { fullCents: number; firstCents: number; promoCycles: number };
+}
+
+/**
+ * `GET /v1/public/promo`. Sem campanha: `{ active: false, upcoming: false }`;
+ * fora da vigência vêm também as datas e os preços (`upcoming` = ainda não começou).
+ */
+export interface PublicPromo extends Partial<PromoPrices> {
+  active: boolean;
+  upcoming: boolean;
+  code?: string;
+  label?: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
+/** A campanha vista por uma empresa (`promo` do overview de billing). */
+export type WorkspacePromo = PublicPromo & { eligible: boolean; ineligibleReason: string | null };
+
+export type CouponReason = 'invalido' | 'expirado' | 'ainda_nao_comecou';
+
+/** `GET /v1/public/coupons/:code`. */
+export interface CouponCheck extends Partial<PromoPrices> {
+  valid: boolean;
+  reason: CouponReason | null;
+  code?: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
+/** `GET /v1/workspaces/:id/billing/web/pix`: cobrança Pix em aberto. */
+export interface PixCharge {
+  paymentId: string;
+  valueCents: number;
+  /** PNG em base64, sem o prefixo `data:`. */
+  encodedImage: string;
+  /** Pix "copia e cola". */
+  payload: string;
+  expirationDate: string | null;
+}
+
 export interface BillingOverview {
   checkoutAvailable: boolean;
   pricing: WebPricing;
+  /** Campanha ativa para esta empresa; `null` (ou ausente) sem campanha. */
+  promo?: WorkspacePromo | null;
   graceDays: number;
   subscription: {
     id: string;

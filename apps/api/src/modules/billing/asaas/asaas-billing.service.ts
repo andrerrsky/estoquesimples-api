@@ -29,6 +29,7 @@ import {
   type DerivedState,
 } from './asaas-state.js';
 import { documentHint, documentType, onlyDigits } from './document.js';
+import { PromotionsService, type PromoCycle } from '../../promotions/promotions.service.js';
 
 /** Plano vendido na web. O mesmo plano pago do Google Play. */
 export const WEB_PLAN_KEY = 'basico';
@@ -43,6 +44,8 @@ export interface CheckoutInput {
   mobilePhone?: string | null | undefined;
   cycle: AsaasCycle;
   billingType: AsaasBillingType;
+  /** Cupom promocional (já normalizado ou não: o serviço normaliza). */
+  coupon?: string | null | undefined;
 }
 
 type SubscriptionRow = typeof subscriptions.$inferSelect;
@@ -99,6 +102,10 @@ export class AsaasBillingService {
     return this.services.env;
   }
 
+  private get promotions() {
+    return new PromotionsService(this.services);
+  }
+
   // -------------------------------------------------------------------------
   // Visão da empresa (tela "Plano" da web)
   // -------------------------------------------------------------------------
@@ -134,8 +141,8 @@ export class AsaasBillingService {
     return rows[0] ?? null;
   }
 
-  async overview(workspaceId: string) {
-    const [pricing, live, customerRows, paymentRows, history] = await Promise.all([
+  async overview(workspaceId: string, now: Date = new Date()) {
+    const [pricing, live, customerRows, paymentRows, history, featured] = await Promise.all([
       this.pricing(),
       this.liveSubscription(workspaceId),
       this.db.select().from(billingCustomers).where(eq(billingCustomers.workspaceId, workspaceId)).limit(1),
@@ -160,8 +167,14 @@ export class AsaasBillingService {
         .where(eq(subscriptions.workspaceId, workspaceId))
         .orderBy(desc(subscriptions.createdAt))
         .limit(10),
+      this.promotions.featured(now),
     ]);
     const customer = customerRows[0];
+    // Campanha vigente com a elegibilidade desta empresa; nula fora da vigência.
+    const promo =
+      featured && this.promotions.reasonFor(featured, now) === null
+        ? { ...this.promotions.view(featured, pricing, now), ...(await this.promotions.eligibility(featured, workspaceId, live)) }
+        : null;
     const openPayment = live?.provider === 'asaas'
       ? paymentRows.filter((p) => p.subscriptionId === live.id && isOpenStatus(p.status)).sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0]
       : undefined;
@@ -195,6 +208,7 @@ export class AsaasBillingService {
         ? { name: customer.name, email: customer.email, documentType: customer.documentType, documentHint: customer.documentHint }
         : null,
       payments: paymentRows.map((row) => this.paymentView(row)),
+      promo,
       history: history.map((row) => ({
         id: row.id,
         provider: row.provider,
@@ -245,10 +259,15 @@ export class AsaasBillingService {
       });
     }
     const pricing = await this.pricing();
-    const priceCents = priceForCycle(pricing, input.cycle);
-    if (priceCents === null) {
+    const fullPriceCents = priceForCycle(pricing, input.cycle);
+    if (fullPriceCents === null) {
       throw new AppError(409, ErrorCode.CONFLICT, 'Este ciclo de cobrança não está disponível no momento.');
     }
+    const couponCode = input.coupon?.trim() ? input.coupon.trim().toUpperCase() : null;
+    // Código e ciclo antes de qualquer chamada ao Asaas; vigência e uso
+    // depois de saber se é a retomada de uma pendente com o mesmo cupom.
+    const coupon = couponCode ? await this.promotions.requireForCycle(couponCode, input.cycle) : null;
+    const priceCents = coupon ? coupon.promoCents : fullPriceCents;
 
     // Estado atual junto ao provedor antes de decidir: a linha local pode
     // estar um webhook atrasada.
@@ -259,18 +278,26 @@ export class AsaasBillingService {
     }
 
     let carryPaidUntil: Date | null = null;
+    if (live?.provider === 'google_play') {
+      throw conflict(
+        ErrorCode.CONFLICT,
+        'Esta empresa já tem assinatura pelo Google Play. Gerencie por lá (Play Store > Pagamentos e assinaturas).',
+      );
+    }
+    if (live?.provider === 'asaas' && live.state === 'pendente') {
+      const sameChoice =
+        live.billingCycle === input.cycle && live.billingType === input.billingType && (live.couponId ?? null) === (coupon?.id ?? null);
+      // Retomar a pendente com o mesmo cupom vale mesmo depois do fim da
+      // campanha: o valor já foi fixado na fatura que a pessoa tem em mãos.
+      if (sameChoice) return this.checkoutResult(live);
+    }
+    if (coupon) {
+      await this.promotions.assertUsable(coupon, { workspaceId, cpfCnpj: input.cpfCnpj, live });
+    }
     if (live) {
-      if (live.provider === 'google_play') {
-        throw conflict(
-          ErrorCode.CONFLICT,
-          'Esta empresa já tem assinatura pelo Google Play. Gerencie por lá (Play Store > Pagamentos e assinaturas).',
-        );
-      }
       if (live.state === 'pendente') {
-        const sameChoice = live.billingCycle === input.cycle && live.billingType === input.billingType;
-        if (sameChoice) return this.checkoutResult(live);
-        // Mudou de ideia sobre ciclo ou forma de pagamento antes de pagar:
-        // a pendente é cancelada e uma nova nasce com a escolha atual.
+        // Mudou de ideia sobre ciclo, forma de pagamento ou cupom antes de
+        // pagar: a pendente é cancelada e uma nova nasce com a escolha atual.
         await this.cancelAtProvider(live.providerSubscriptionId);
         await this.refreshSubscription(live.id);
       } else if (live.state === 'cancelada_mas_ativa') {
@@ -299,9 +326,15 @@ export class AsaasBillingService {
 
     // Uma tentativa anterior pode ter criado a assinatura no Asaas e perdido
     // a resposta (timeout). Antes de criar outra, procura a que já existe.
-    const existing = (await this.asaas.listCustomerSubscriptions(customerId)).find(
+    let existing = (await this.asaas.listCustomerSubscriptions(customerId)).find(
       (item) => !item.deleted && item.status === 'ACTIVE' && item.externalReference === workspaceId,
     );
+    if (existing && (cents(existing.value) !== priceCents || existing.cycle !== input.cycle)) {
+      // Sobra de outra escolha (com ou sem cupom, outro ciclo): reaproveitar
+      // cobraria o valor errado. Sai do Asaas e nasce a assinatura certa.
+      await this.cancelAtProvider(existing.id);
+      existing = undefined;
+    }
     const remote: AsaasSubscription =
       existing ??
       (await this.asaas.createSubscription({
@@ -329,7 +362,10 @@ export class AsaasBillingService {
             providerCustomerId: customerId,
             billingCycle: input.cycle,
             billingType: remote.billingType,
+            // Valor cobrado agora (o promocional, com cupom); volta ao cheio
+            // depois dos ciclos promocionais (PromotionsService.afterRefresh).
             priceCents,
+            couponId: coupon?.id ?? null,
             nextDueDate: remote.nextDueDate,
             state: 'pendente',
             autoRenewing: true,
@@ -340,6 +376,16 @@ export class AsaasBillingService {
           .onConflictDoNothing({ target: [subscriptions.provider, subscriptions.providerSubscriptionId], where: sql`${subscriptions.providerSubscriptionId} IS NOT NULL` })
           .returning();
         const createdRow = created[0];
+        if (createdRow && coupon) {
+          await this.promotions.reserve(tx, {
+            couponId: coupon.id,
+            workspaceId,
+            subscriptionId: createdRow.id,
+            cpfCnpj: input.cpfCnpj,
+            cycle: input.cycle as PromoCycle,
+            valueCents: priceCents,
+          });
+        }
         if (createdRow) {
           await recordAudit(tx, {
             workspaceId,
@@ -347,7 +393,7 @@ export class AsaasBillingService {
             action: AuditAction.SUBSCRIPTION_LINKED,
             entityType: 'subscription',
             entityId: createdRow.id,
-            metadata: { provider: 'asaas', planKey: WEB_PLAN_KEY, cycle: input.cycle, billingType: input.billingType },
+            metadata: { provider: 'asaas', planKey: WEB_PLAN_KEY, cycle: input.cycle, billingType: input.billingType, ...(coupon ? { coupon: coupon.code } : {}) },
             ipAddress: meta.ipAddress,
             userAgent: meta.userAgent,
           });
@@ -369,7 +415,7 @@ export class AsaasBillingService {
       name: 'subscription.checkout_started',
       userId,
       workspaceId,
-      properties: { provider: 'asaas', cycle: input.cycle, billingType: input.billingType },
+      properties: { provider: 'asaas', cycle: input.cycle, billingType: input.billingType, ...(coupon ? { coupon: coupon.code } : {}) },
     });
 
     // Já busca as cobranças: a primeira nasce junto com a assinatura.
@@ -438,6 +484,44 @@ export class AsaasBillingService {
       })
       .onConflictDoNothing();
     return remote.id;
+  }
+
+  // -------------------------------------------------------------------------
+  // PIX na própria página
+  // -------------------------------------------------------------------------
+
+  /**
+   * QR Code da cobrança PIX em aberto da assinatura viva, para a web mostrar
+   * sem mandar a pessoa à fatura do Asaas. A confirmação continua vindo do
+   * Asaas (webhook ou `refresh`), nunca da página.
+   */
+  async pixQrCode(workspaceId: string) {
+    const live = await this.liveSubscription(workspaceId);
+    if (!live || live.provider !== 'asaas') throw notFound('Não há cobrança PIX em aberto nesta empresa.');
+    const rows = await this.db
+      .select()
+      .from(billingPayments)
+      .where(
+        and(
+          eq(billingPayments.subscriptionId, live.id),
+          eq(billingPayments.deleted, false),
+          inArray(billingPayments.status, ['PENDING', 'OVERDUE']),
+          // "Pergunte ao cliente" (UNDEFINED) também aceita PIX na fatura.
+          inArray(billingPayments.billingType, ['PIX', 'UNDEFINED']),
+        ),
+      )
+      .orderBy(billingPayments.dueDate)
+      .limit(1);
+    const payment = rows[0];
+    if (!payment) throw notFound('Não há cobrança PIX em aberto nesta empresa.');
+    const qr = await this.asaas.getPixQrCode(payment.providerPaymentId);
+    return {
+      paymentId: payment.id,
+      valueCents: payment.valueCents,
+      encodedImage: qr.encodedImage,
+      payload: qr.payload,
+      expirationDate: qr.expirationDate,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -578,6 +662,23 @@ export class AsaasBillingService {
         properties: { provider: 'asaas', from: previousState, to: derived.state },
       });
       await this.notifyTransition(current, previousState, derived);
+    }
+
+    // Cupom: resgate na 1ª cobrança paga e volta ao preço cheio depois dos
+    // ciclos promocionais. Nunca derruba a reconsulta (tenta de novo na próxima).
+    if (current.couponId && derived.state !== 'reembolsada') {
+      try {
+        await this.promotions.afterRefresh({
+          subscription: current,
+          cycle,
+          remote,
+          payments,
+          fullPriceCents: priceForCycle(await this.pricing(), cycle),
+          asaas: this.asaas,
+        });
+      } catch (error) {
+        this.services.logger?.error({ err: error, subscriptionId }, 'falha ao aplicar as regras do cupom após a reconsulta');
+      }
     }
 
     // Reembolso com a assinatura ainda ativa no Asaas: sem isto ele seguiria
