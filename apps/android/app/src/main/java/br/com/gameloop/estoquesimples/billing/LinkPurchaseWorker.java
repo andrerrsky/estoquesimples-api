@@ -123,6 +123,9 @@ public final class LinkPurchaseWorker extends Worker {
             JSONObject entitlement = new SubscriptionClient(context).link(token);
             new EntitlementManager(context).apply(entitlement);
             pending.clear();
+            br.com.gameloop.estoquesimples.SyncBlock.clearPlanBlock(context);
+            br.com.gameloop.estoquesimples.analytics.Analytics.track(context, "purchase.completed",
+                    br.com.gameloop.estoquesimples.analytics.Analytics.props("source", "background"));
             SyncBootstrap.start(context);
             Log.i(TAG, "assinatura vinculada; sincronização será reavaliada");
             return Result.success();
