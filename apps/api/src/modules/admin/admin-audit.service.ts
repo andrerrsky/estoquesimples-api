@@ -49,6 +49,10 @@ export const AdminAction = {
   SUBSCRIPTION_EVENT_RETRIED: 'subscription.event_retried',
   PLAN_UPDATED: 'plan.updated',
   PLAN_FEATURE_UPDATED: 'plan.feature_updated',
+  COUPON_CREATED: 'coupon.created',
+  COUPON_ACTIVATED: 'coupon.activated',
+  COUPON_DEACTIVATED: 'coupon.deactivated',
+  COUPON_PERIOD_CHANGED: 'coupon.period_changed',
 
   NOTE_CREATED: 'note.created',
   NOTE_DELETED: 'note.deleted',

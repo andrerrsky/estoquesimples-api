@@ -54,7 +54,7 @@ function Origin({ ip, userAgent }: { ip: string | null; userAgent: string | null
   );
 }
 
-const TARGET_PATH: Record<string, string> = { user: '/usuarios', workspace: '/empresas', subscription: '/assinaturas' };
+const TARGET_PATH: Record<string, string> = { user: '/usuarios', workspace: '/empresas', subscription: '/assinaturas', coupon: '/cupons' };
 
 export function AuditPage() {
   const { values, set, page, pageSize } = useListParams();

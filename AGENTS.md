@@ -240,6 +240,7 @@ Servido pela própria API na mesma origem (SPA em `admin/`, build em
 | Usuários | `users` (filtro `platform`), `users/:id`, `timeline`, `events`, `notes`, `notifications`, ações (`suspend`, `reactivate`, `unlock`, `verify-email`, `revoke-sessions`, `send-password-reset`, `cancel-deletion`, `devices/:id/revoke`, `PATCH`) | support |
 | Empresas | `workspaces`, detalhe, `products`, `movements`, `conflicts`, `timeline`, `notes`, ações (`PATCH`, `delete`, `restore`, `transfer-ownership`, membros, convites) | support |
 | Assinaturas | `billing/stats` (com `byProvider`), `subscriptions` (filtro `provider`), detalhe (bloco `asaas`: pagador, cobranças), `refresh`, `events`, `events/:id/retry`, `plans` (inclui preço da web) | support (planos e preços: owner) |
+| Cupons | `coupons` (lista com situação e números de resgate), detalhe, `redemptions` (sem documento nem hash), `POST coupons`, `activate`, `deactivate`, `PATCH` (vigência; preços não editáveis) | owner |
 | Analytics | `analytics/summary`, `metrics`, `events`, `event-names`, `events/:name/series`, `funnel`, `retention` — com `platform` (android/web) opcional e quebra `byPlatform` | — |
 | Auditoria | `audit/users`, `audit/admins`, `audit/actions` | — |
 | Operação | `ops/status`, `ops/sync` (owner), `ops/jobs`, `retry`, `cancel` | support |

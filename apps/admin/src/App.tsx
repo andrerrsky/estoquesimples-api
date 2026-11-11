@@ -9,6 +9,7 @@ import { ErrorsPage } from './pages/ErrorsPage';
 import { EventsPage } from './pages/EventsPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
 import { BlogPage } from './pages/BlogPage';
+import { CouponDetailPage, CouponsPage } from './pages/CouponsPage';
 import { HelpPage } from './pages/HelpPage';
 import { LifecyclePage } from './pages/LifecyclePage';
 import { SecurityPage } from './pages/SecurityPage';
@@ -75,6 +76,8 @@ export const router = createBrowserRouter(
         { path: '/empresas/:workspaceId', element: <WorkspaceDetailPage /> },
         { path: '/assinaturas', element: <SubscriptionsPage /> },
         { path: '/assinaturas/:subscriptionId', element: <SubscriptionDetailPage /> },
+        { path: '/cupons', element: <CouponsPage /> },
+        { path: '/cupons/:couponId', element: <CouponDetailPage /> },
         { path: '/planos', element: <PlansPage /> },
         { path: '/suporte', element: <SupportPage /> },
         { path: '/suporte/:ticketId', element: <TicketDetailPage /> },

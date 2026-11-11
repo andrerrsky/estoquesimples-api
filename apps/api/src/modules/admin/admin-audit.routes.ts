@@ -181,6 +181,7 @@ export async function registerAdminAuditRoutes(app: FastifyInstance): Promise<vo
                    WHEN 'user' THEN (SELECT email FROM users WHERE id::text = l.target_id)
                    WHEN 'workspace' THEN (SELECT name FROM workspaces WHERE id::text = l.target_id)
                    WHEN 'admin' THEN (SELECT email FROM platform_admins WHERE id::text = l.target_id)
+                   WHEN 'coupon' THEN (SELECT code FROM coupons WHERE id::text = l.target_id)
                    ELSE NULL
                  END AS target_label
           FROM admin_audit_log l
