@@ -244,6 +244,8 @@ export const initialUploads = pgTable(
     declaredMovements: integer('declared_movements').notNull(),
     receivedProducts: integer('received_products').notNull().default(0),
     receivedMovements: integer('received_movements').notNull().default(0),
+    /** Gravados com sufixo " (2)" por nome repetido; ver `InitialUploadService.complete`. */
+    renamedProductIds: uuid('renamed_product_ids').array().notNull().default(sql`'{}'::uuid[]`),
 
     status: text('status').notNull().default('em_andamento'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),

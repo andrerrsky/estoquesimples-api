@@ -177,7 +177,7 @@ export class InitialUploadService {
       };
     }
 
-    const produtosGravados = await this.insertProducts(tx, workspaceId, userId, body.products);
+    const produtosGravados = await this.insertProducts(tx, workspaceId, uploadId, userId, body.products);
     if (plan.productLimit !== null) {
       const vivos = await countLiveProducts(tx, workspaceId);
       if (vivos > plan.productLimit) {
@@ -240,12 +240,30 @@ export class InitialUploadService {
   }> {
     const upload = await this.requireOpenUpload(tx, workspaceId, uploadId);
 
-    const missingProducts = body.declaredProducts - upload.receivedProducts;
-    const missingMovements = body.declaredMovements - upload.receivedMovements;
+    const missingProducts = Math.max(0, body.declaredProducts - upload.receivedProducts);
+    const missingMovements = Math.max(0, body.declaredMovements - upload.receivedMovements);
 
-    // Sellar com lotes faltando tornaria os registros perdidos irrecuperáveis:
-    // start() recusa novo upload depois de seededAt.
-    if (missingProducts > 0 || missingMovements > 0) {
+    // Selar com um lote faltando tornaria os registros dele irrecuperáveis:
+    // start() recusa novo upload depois de seededAt. O que importa é se TODOS
+    // os lotes chegaram (índices 0..n-1, sem buraco).
+    //
+    // A contagem sozinha não serve de critério: o aparelho declara quantos
+    // registros tem AGORA, e quem continua usando o app durante o envio cria
+    // produtos e movimentações que não estavam nos lotes — eles já estão na
+    // fila de operações e sobem pela sincronização incremental logo depois.
+    // Recusar por isso deixava a empresa presa para sempre na carga inicial
+    // (caso real: 1.184 de 1.187 produtos na nuvem, sincronização parada).
+    const [lotes] = await tx
+      .select({
+        quantidade: sql<number>`count(*)::int`,
+        maiorIndice: sql<number>`coalesce(max(${initialUploadBatches.batchIndex}), -1)::int`,
+      })
+      .from(initialUploadBatches)
+      .where(eq(initialUploadBatches.uploadId, uploadId));
+    const lotesComBuraco = (lotes?.quantidade ?? 0) !== (lotes?.maiorIndice ?? -1) + 1;
+    const nadaChegou = (lotes?.quantidade ?? 0) === 0 && (body.declaredProducts > 0 || body.declaredMovements > 0);
+
+    if (lotesComBuraco || nadaChegou) {
       throw new AppError(
         409,
         ErrorCode.SYNC_UPLOAD_COUNT_MISMATCH,
@@ -276,12 +294,27 @@ export class InitialUploadService {
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
 
+    // Produtos gravados com outro nome (" (2)") passam para depois do cursor:
+    // assim a próxima sincronização incremental leva o nome final ao
+    // aparelho, que ainda tem o nome repetido.
+    const [renomeados] = await tx
+      .select({ ids: initialUploads.renamedProductIds })
+      .from(initialUploads)
+      .where(eq(initialUploads.id, uploadId));
+    for (const id of renomeados?.ids ?? []) {
+      const seq = await this.nextChangeSeq(tx, workspaceId);
+      await tx
+        .update(products)
+        .set({ changeSeq: seq })
+        .where(and(eq(products.workspaceId, workspaceId), eq(products.id, id)));
+    }
+
     return {
       cursor: String(posicao?.cursor ?? 0),
       products: upload.receivedProducts,
       movements: upload.receivedMovements,
-      missingProducts: 0,
-      missingMovements: 0,
+      missingProducts,
+      missingMovements,
     };
   }
 
@@ -292,59 +325,79 @@ export class InitialUploadService {
   private async insertProducts(
     tx: Transaction,
     workspaceId: string,
+    uploadId: string,
     userId: string,
     entries: ProductInput[],
   ): Promise<number> {
     let gravados = 0;
+    const renomeados: string[] = [];
 
     for (const entry of entries) {
-      try {
-        // Savepoint por produto: um nome duplicado (índice parcial) não pode
-        // derrubar o lote inteiro — bancos legados estão cheios deles.
-        await tx.transaction(async (savepoint) => {
-          const seq = await this.nextChangeSeq(savepoint, workspaceId);
+      // Nome repetido ("Café" e "café" no mesmo aparelho, comum em bancos
+      // antigos e planilhas): em vez de recusar o produto — que nunca chegaria
+      // à nuvem —, grava como "café (2)". Nada se perde e a contagem fecha.
+      let gravado = false;
+      for (let tentativa = 1; tentativa <= MAX_RENOMEACOES && !gravado; tentativa++) {
+        const name = tentativa === 1 ? entry.name : nomeComSufixo(entry.name, tentativa);
+        try {
+          // Savepoint por tentativa: a violação do índice de nome não pode
+          // derrubar o lote inteiro.
+          await tx.transaction(async (savepoint) => {
+            const seq = await this.nextChangeSeq(savepoint, workspaceId);
 
-          const inserted = await savepoint
-            .insert(products)
-            .values({
-              id: entry.id,
-              workspaceId,
-              name: entry.name,
-              description: entry.description ?? null,
-              unitValue: String(entry.unitValue),
-              quantityCache: String(entry.quantity),
-              minStock: String(entry.minStock),
-              unit: entry.unit ?? null,
-              category: entry.category ?? null,
-              supplier: entry.supplier ?? null,
-              location: entry.location ?? null,
-              sku: entry.sku ?? null,
-              barcode: entry.barcode ?? null,
-              // Só quando o aparelho informou; sem custo a coluna fica nula.
-              ...(entry.unitCost !== undefined && entry.unitCost !== null
-                ? { unitCost: String(entry.unitCost) }
-                : {}),
-              rev: entry.rev,
-              changeSeq: seq,
-              deletedAt: entry.deletedAt ? new Date(entry.deletedAt) : null,
-              deletedBy: entry.deletedAt ? userId : null,
-            })
-            // Reenvio do mesmo id não é erro. Conflito de nome cai no catch.
-            .onConflictDoNothing({ target: products.id })
-            .returning({ id: products.id });
+            const inserted = await savepoint
+              .insert(products)
+              .values({
+                id: entry.id,
+                workspaceId,
+                name,
+                description: entry.description ?? null,
+                unitValue: String(entry.unitValue),
+                quantityCache: String(entry.quantity),
+                minStock: String(entry.minStock),
+                unit: entry.unit ?? null,
+                category: entry.category ?? null,
+                supplier: entry.supplier ?? null,
+                location: entry.location ?? null,
+                sku: entry.sku ?? null,
+                barcode: entry.barcode ?? null,
+                // Só quando o aparelho informou; sem custo a coluna fica nula.
+                ...(entry.unitCost !== undefined && entry.unitCost !== null
+                  ? { unitCost: String(entry.unitCost) }
+                  : {}),
+                rev: entry.rev,
+                changeSeq: seq,
+                deletedAt: entry.deletedAt ? new Date(entry.deletedAt) : null,
+                deletedBy: entry.deletedAt ? userId : null,
+              })
+              // Reenvio do mesmo id não é erro. Conflito de nome cai no catch.
+              .onConflictDoNothing({ target: products.id })
+              .returning({ id: products.id });
 
-          if (inserted.length > 0) {
+            // Já gravado num reenvio anterior também conta como recebido: o
+            // registro está na nuvem do mesmo jeito.
             gravados += 1;
+            if (inserted.length > 0 && tentativa > 1) {
+              renomeados.push(entry.id);
+            }
+          });
+          gravado = true;
+        } catch (error) {
+          if (pgErrorCode(error) === '23505') {
+            continue;
           }
-        });
-      } catch (error) {
-        const codigo = pgErrorCode(error);
-        if (codigo === '23505') {
-          // Nome duplicado ou outra unicidade: conta como não gravado e segue.
-          continue;
+          throw error;
         }
-        throw error;
       }
+    }
+
+    if (renomeados.length > 0) {
+      await tx
+        .update(initialUploads)
+        // Literal de array do Postgres: o driver espalharia a lista em
+        // parâmetros soltos. São UUIDs validados pelo schema do lote.
+        .set({ renamedProductIds: sql`${initialUploads.renamedProductIds} || ${`{${renomeados.join(',')}}`}::uuid[]` })
+        .where(eq(initialUploads.id, uploadId));
     }
 
     return gravados;
@@ -469,4 +522,13 @@ export class InitialUploadService {
     }
     return upload;
   }
+}
+
+/** Quantas variações " (2)", " (3)"… tentar antes de desistir de um nome repetido. */
+const MAX_RENOMEACOES = 50;
+
+/** "Café" → "Café (2)", respeitando o limite de 200 caracteres do nome. */
+export function nomeComSufixo(nome: string, numero: number): string {
+  const sufixo = ` (${numero})`;
+  return nome.slice(0, 200 - sufixo.length).trimEnd() + sufixo;
 }

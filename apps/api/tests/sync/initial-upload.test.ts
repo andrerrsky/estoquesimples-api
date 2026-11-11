@@ -261,7 +261,7 @@ describe('carga inicial', () => {
     expect(segunda.json().error.code).toBe('SYNC_ALREADY_SEEDED');
   });
 
-  it('isola nome repetido no lote e recusa selar com registros faltando', async () => {
+  it('grava nome repetido com sufixo, sela e leva o nome final ao aparelho', async () => {
     const user = await registerUser(context);
     const workspaceId = await setupWorkspace(user);
 
@@ -269,25 +269,78 @@ describe('carga inicial', () => {
     const { uploadId } = start.json();
 
     // Bancos antigos têm nomes repetidos com frequência. O índice único
-    // recusa o segundo, mas isso não pode travar a carga inteira: o lote
-    // segue e o produto conflitante conta como não gravado.
+    // recusaria o segundo e a carga nunca fecharia; agora ele entra como
+    // "café (2)" e nada se perde.
+    const repetido = produto({ name: 'café' });
     const primeiro = await sendBatch(user, workspaceId, uploadId, {
       batchIndex: 0,
-      products: [
-        produto({ name: 'Café' }),
-        produto({ name: 'café' }),
-      ],
+      products: [produto({ name: 'Café' }), repetido],
       movements: [],
     });
     expect(primeiro.statusCode).toBe(200);
-    expect(primeiro.json().receivedProducts).toBe(1);
+    expect(primeiro.json().receivedProducts).toBe(2);
 
-    // Selar com registros faltando tornaria a perda irrecuperável.
     const complete = await context.app.inject({
       method: 'POST',
       url: `/v1/workspaces/${workspaceId}/sync/initial-upload/${uploadId}/complete`,
       headers: { ...user.authHeader, ...PROTOCOL_HEADER },
       payload: { declaredProducts: 2, declaredMovements: 0 },
+    });
+    expect(complete.statusCode).toBe(200);
+    expect(complete.json()).toMatchObject({ products: 2, missingProducts: 0 });
+
+    // O renomeado vem depois do cursor: o aparelho recebe o nome final.
+    const changes = await context.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/sync/pull?cursor=${complete.json().cursor}`,
+      headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+    });
+    expect(changes.statusCode).toBe(200);
+    const nomes = JSON.stringify(changes.json());
+    expect(nomes).toContain('café (2)');
+    expect(nomes).toContain(repetido.id);
+  });
+
+  it('sela mesmo com produtos criados durante o envio (eles sobem depois pela fila)', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const start = await startUpload(user, workspaceId, 1, 0);
+    const { uploadId } = start.json();
+    const lote = await sendBatch(user, workspaceId, uploadId, {
+      batchIndex: 0,
+      products: [produto({ name: 'Esmalte' })],
+      movements: [],
+    });
+    expect(lote.statusCode).toBe(200);
+
+    // O aparelho declara o que tem AGORA: a pessoa cadastrou mais 3 enquanto
+    // o envio corria. Antes isso travava a empresa na carga inicial.
+    const complete = await context.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/sync/initial-upload/${uploadId}/complete`,
+      headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+      payload: { declaredProducts: 4, declaredMovements: 0 },
+    });
+    expect(complete.statusCode).toBe(200);
+    expect(complete.json()).toMatchObject({ products: 1, missingProducts: 3 });
+  });
+
+  it('recusa selar com um lote faltando no meio', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const start = await startUpload(user, workspaceId, 2, 0);
+    const { uploadId } = start.json();
+    await sendBatch(user, workspaceId, uploadId, { batchIndex: 0, products: [produto({ name: 'A' })], movements: [] });
+    await sendBatch(user, workspaceId, uploadId, { batchIndex: 2, products: [produto({ name: 'C' })], movements: [] });
+
+    // Selar sem o lote 1 tornaria os registros dele irrecuperáveis.
+    const complete = await context.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/sync/initial-upload/${uploadId}/complete`,
+      headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+      payload: { declaredProducts: 3, declaredMovements: 0 },
     });
     expect(complete.statusCode).toBe(409);
     expect(complete.json().error.code).toBe('SYNC_UPLOAD_COUNT_MISMATCH');
