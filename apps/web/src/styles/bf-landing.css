@@ -1,0 +1,641 @@
+/* ==========================================================================
+   Landing /black-friday
+   Linguagem de varejo: vídeo de um mercadinho de verdade, preço em etiqueta
+   de prateleira (amarelo, código de barras, sombra dura), o plano impresso
+   como cupom fiscal. Paleta própria e quente (tinta + papel), sem gradientes
+   azuis nem cartões de vidro.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/assets/fonts/plus-jakarta-sans-800-latin.woff2') format('woff2');
+}
+
+.bfx {
+  --ink: #12110f;
+  --ink-2: #1c1a17;
+  --paper: #f3efe6;
+  --paper-2: #e8e2d4;
+  --tag: #ffd23f;
+  --tag-ink: #141210;
+  --cut: #e2412b;
+  --muted: #8f897d;
+  --line: rgba(243, 239, 230, 0.14);
+  --display: 'Plus Jakarta Sans', 'Jakarta Fallback', var(--font);
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  overflow-x: hidden;
+}
+.bfx s {
+  text-decoration-color: var(--cut);
+  text-decoration-thickness: 2px;
+}
+
+/* ---- Hero com vídeo -------------------------------------------------------- */
+.bfx-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: min(92svh, 860px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--ink) url('/video/bf-loja-poster.jpg') center / cover no-repeat;
+  color: var(--paper);
+  overflow: hidden;
+}
+.bfx-hero__video {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 62% 40%;
+  filter: saturate(0.85) contrast(1.05);
+}
+.bfx-hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(18, 17, 15, 0.94) 0%, rgba(18, 17, 15, 0.78) 42%, rgba(18, 17, 15, 0.35) 100%),
+    linear-gradient(180deg, rgba(18, 17, 15, 0) 60%, rgba(18, 17, 15, 0.9) 100%);
+}
+.bfx-hero__pause {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(243, 239, 230, 0.35);
+  background: rgba(18, 17, 15, 0.5);
+  color: var(--paper);
+  fill: currentColor;
+  cursor: pointer;
+}
+.bfx-hero__pause:focus-visible {
+  outline: 2px solid var(--tag);
+  outline-offset: 2px;
+}
+
+.bfx-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1180px, 100% - 32px);
+  margin: 0 auto;
+  padding: 20px 0;
+}
+.bfx-top__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--paper);
+  font-weight: 700;
+  text-decoration: none;
+}
+.bfx-top__link {
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(243, 239, 230, 0.4);
+}
+.bfx-top__link:hover {
+  text-decoration-color: var(--tag);
+}
+
+.bfx-hero__grid {
+  width: min(1180px, 100% - 32px);
+  margin: 0 auto;
+  padding: 24px 0 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  align-items: end;
+  gap: 48px;
+}
+.bfx-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tag);
+}
+.bfx-kicker__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cut);
+  box-shadow: 0 0 0 4px rgba(226, 65, 43, 0.25);
+}
+.bfx-title {
+  margin: 0;
+  max-width: 15ch;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 6.4vw, 5.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.bfx-title mark {
+  background: none;
+  color: var(--tag);
+  white-space: nowrap;
+}
+.bfx-lead {
+  max-width: 46ch;
+  margin: 24px 0 0;
+  font-size: clamp(1.02rem, 1.4vw, 1.18rem);
+  line-height: 1.55;
+  color: rgba(243, 239, 230, 0.82);
+}
+.bfx-lead s {
+  color: rgba(243, 239, 230, 0.6);
+}
+.bfx-clock {
+  margin: 28px 0 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: rgba(243, 239, 230, 0.75);
+}
+.bfx-clock strong {
+  color: var(--paper);
+  font-weight: 700;
+}
+.bfx-clock__digits {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.bfx-hero__cta {
+  margin-top: 20px;
+}
+.bfx-hero__tag {
+  justify-self: end;
+  width: min(340px, 100%);
+  transform: rotate(-2.5deg);
+  transform-origin: 30% 10%;
+}
+
+/* ---- Botões ------------------------------------------------------------------ */
+.bfx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.bfx-btn--solid {
+  background: var(--tag);
+  color: var(--tag-ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  border: 2px solid var(--ink);
+}
+.bfx-hero .bfx-btn--solid {
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55);
+  border-color: var(--tag);
+}
+.bfx-btn--solid:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.bfx-btn--solid:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.bfx-btn--line {
+  background: transparent;
+  color: inherit;
+  border: 2px solid currentColor;
+}
+.bfx-btn--line:hover {
+  background: rgba(18, 17, 15, 0.06);
+}
+.bfx-btn--off {
+  opacity: 0.7;
+  cursor: default;
+}
+.bfx-btn:focus-visible {
+  outline: 3px solid var(--cut);
+  outline-offset: 3px;
+}
+
+/* ---- Etiqueta de prateleira ----------------------------------------------- */
+.bfx-tag {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  color: var(--tag-ink);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+.bfx-tag--yellow {
+  background: var(--tag);
+}
+.bfx-tag--paper {
+  background: #fffdf8;
+}
+.bfx-hero .bfx-tag {
+  border-color: var(--tag);
+  box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.5);
+}
+/* Furo da etiqueta, como as que ficam penduradas no gancho. */
+.bfx-tag::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+.bfx-tag__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 28px 10px 0;
+  border-bottom: 2px solid currentColor;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bfx-tag__sku {
+  opacity: 0.6;
+}
+.bfx-tag__from {
+  margin: 14px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.bfx-tag__from s {
+  font-weight: 700;
+}
+.bfx-tag__price {
+  display: flex;
+  align-items: flex-start;
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+.bfx-tag__cur {
+  margin: 0.55em 6px 0 0;
+  font-size: 1.35rem;
+  letter-spacing: 0;
+}
+.bfx-tag__whole {
+  font-size: clamp(4.2rem, 8vw, 5.6rem);
+  font-variant-numeric: tabular-nums;
+}
+.bfx-tag__cents {
+  margin-top: 0.2em;
+  font-size: 2rem;
+}
+.bfx-tag__per {
+  margin: 8px 0 0;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.bfx-tag__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed currentColor;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.bfx-tag__foot > span:last-child {
+  max-width: 24ch;
+  text-align: right;
+  opacity: 0.8;
+}
+.bfx-hero .bfx-tag__foot > span:last-child {
+  font-family: var(--display);
+  font-size: 1.6rem;
+  opacity: 1;
+  color: var(--cut);
+}
+.bfx-barcode {
+  display: inline-flex;
+  align-items: stretch;
+  height: 30px;
+  flex: none;
+}
+.bfx-barcode i {
+  display: block;
+  background: currentColor;
+}
+.bfx-tag__action {
+  margin-top: 18px;
+}
+.bfx-tag__action .bfx-btn {
+  width: 100%;
+}
+
+/* ---- Conteúdo ------------------------------------------------------------- */
+.bfx-main {
+  width: min(1180px, 100% - 32px);
+  margin: 0 auto;
+  padding: 72px 0 40px;
+  display: grid;
+  gap: 96px;
+}
+.bfx-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 32px;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--ink);
+}
+.bfx-section-head h2,
+.bfx-faq h2,
+.bfx-ended h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.bfx-section-head p {
+  margin: 0;
+  max-width: 44ch;
+  color: #5d584f;
+}
+
+.bfx-offers__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  align-items: start;
+}
+.bfx-offers__row .bfx-tag:first-child {
+  transform: rotate(-1deg);
+}
+.bfx-offers__row .bfx-tag:last-child {
+  transform: rotate(0.8deg);
+  margin-top: 24px;
+}
+
+/* ---- Cupom fiscal ---------------------------------------------------------- */
+.bfx-receipt-wrap {
+  display: grid;
+}
+.bfx-receipt {
+  justify-self: center;
+  width: min(520px, 100%);
+  padding: 28px 28px 34px;
+  background: #fffdf8;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  color: #2a2722;
+  box-shadow: 0 1px 0 var(--paper-2), 0 18px 30px -18px rgba(18, 17, 15, 0.35);
+  /* Bordas serrilhadas do papel térmico. */
+  --zz: 10px;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--zz) 51% repeat-x,
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--zz) 51% repeat-x;
+}
+.bfx-receipt__top {
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed #b9b2a3;
+  text-align: center;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.bfx-receipt__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.bfx-receipt__line > span:first-child {
+  flex: none;
+}
+.bfx-receipt__line > span:last-child {
+  flex: none;
+  max-width: 55%;
+  text-align: right;
+  color: #6c665b;
+}
+.bfx-receipt__dots {
+  flex: 1;
+  min-width: 16px;
+  border-bottom: 2px dotted #c9c2b3;
+  transform: translateY(-4px);
+}
+.bfx-receipt__total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px dashed #b9b2a3;
+  font-weight: 700;
+  font-size: 1rem;
+}
+.bfx-receipt__total s {
+  font-weight: 400;
+  color: #8f897d;
+  margin-right: 6px;
+}
+.bfx-receipt__thanks {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8f897d;
+}
+
+/* ---- Dúvidas ----------------------------------------------------------------- */
+.bfx-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 48px;
+  align-items: start;
+}
+.bfx-faq details {
+  border-top: 2px solid var(--ink);
+  padding: 18px 0;
+}
+.bfx-faq details:last-child {
+  border-bottom: 2px solid var(--ink);
+}
+.bfx-faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.bfx-faq summary::-webkit-details-marker {
+  display: none;
+}
+.bfx-faq summary::after {
+  content: '+';
+  flex: none;
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.bfx-faq details[open] summary::after {
+  content: '–';
+}
+.bfx-faq details p {
+  margin: 12px 0 0;
+  max-width: 60ch;
+  line-height: 1.6;
+  color: #4a463f;
+}
+
+/* ---- Fecho, fim e rodapé ------------------------------------------------- */
+.bfx-closing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding: 32px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 8px;
+}
+.bfx-closing p {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.3rem, 2.6vw, 1.9rem);
+  letter-spacing: -0.02em;
+}
+.bfx-closing strong {
+  color: var(--tag);
+}
+.bfx-closing .bfx-btn--solid {
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+  border-color: var(--tag);
+}
+.bfx-ended {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding: 40px 0;
+}
+.bfx-ended p {
+  margin: 0;
+  color: #5d584f;
+}
+.bfx-foot {
+  width: min(1180px, 100% - 32px);
+  margin: 0 auto;
+  padding: 28px 0 40px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+  border-top: 1px solid var(--paper-2);
+  font-size: 0.88rem;
+  color: #6c665b;
+}
+.bfx-foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.bfx-foot a {
+  color: inherit;
+}
+.bfx-foot p {
+  margin: 0;
+}
+
+/* ---- Telas menores ---------------------------------------------------------- */
+@media (max-width: 900px) {
+  .bfx-hero__grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding-bottom: 64px;
+  }
+  .bfx-hero__tag {
+    justify-self: start;
+    transform: rotate(-1.5deg);
+  }
+  .bfx-hero__scrim {
+    background:
+      linear-gradient(180deg, rgba(18, 17, 15, 0.5) 0%, rgba(18, 17, 15, 0.8) 38%, rgba(18, 17, 15, 0.95) 100%);
+  }
+  .bfx-offers__row,
+  .bfx-faq {
+    grid-template-columns: 1fr;
+  }
+  .bfx-offers__row .bfx-tag:last-child {
+    margin-top: 0;
+  }
+  .bfx-faq {
+    gap: 20px;
+  }
+  .bfx-main {
+    gap: 72px;
+    padding-top: 56px;
+  }
+}
+@media (max-width: 520px) {
+  .bfx-hero__cta .bfx-btn,
+  .bfx-closing .bfx-btn {
+    width: 100%;
+  }
+  .bfx-receipt {
+    padding: 24px 18px 30px;
+    font-size: 0.84rem;
+  }
+  .bfx-tag {
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  .bfx-closing {
+    padding: 24px 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bfx-btn {
+    transition: none;
+  }
+}

@@ -76,6 +76,20 @@ export const BILLING_CYCLE: Record<string, string> = {
   YEARLY: 'Anual',
 };
 
+/** Situação do cupom promocional (calculada na API a partir de `active` e da vigência). */
+export const COUPON_STATUS: Record<string, { label: string; tone: Tone; hint: string }> = {
+  agendado: { label: 'Agendado', tone: 'info', hint: 'Ativo, mas a vigência ainda não começou.' },
+  no_ar: { label: 'No ar', tone: 'success', hint: 'Vigente: aparece nas faixas e o checkout aceita.' },
+  encerrado: { label: 'Encerrado', tone: 'neutral', hint: 'A vigência terminou.' },
+  desativado: { label: 'Desativado', tone: 'error', hint: 'Desligado pelo painel: some das faixas e o checkout recusa.' },
+};
+
+/** Estado de um uso de cupom. */
+export const COUPON_REDEMPTION_STATE: Record<string, { label: string; tone: Tone; hint: string }> = {
+  reservado: { label: 'Reservado', tone: 'warning', hint: 'Checkout feito com o cupom; a 1ª cobrança ainda não foi paga.' },
+  resgatado: { label: 'Resgatado', tone: 'success', hint: '1ª cobrança paga: o uso conta para o limite.' },
+};
+
 export const BILLING_TYPE: Record<string, string> = {
   PIX: 'Pix',
   BOLETO: 'Boleto',
@@ -298,6 +312,10 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'subscription.event_retried': { label: 'Notificação de assinatura reprocessada', tone: 'info' },
   'plan.updated': { label: 'Plano alterado', tone: 'warning' },
   'plan.feature_updated': { label: 'Recurso de plano alterado', tone: 'warning' },
+  'coupon.created': { label: 'Cupom criado', tone: 'info' },
+  'coupon.activated': { label: 'Cupom ativado', tone: 'success' },
+  'coupon.deactivated': { label: 'Cupom desativado', tone: 'error' },
+  'coupon.period_changed': { label: 'Vigência do cupom alterada', tone: 'warning' },
   'note.created': { label: 'Nota de suporte adicionada', tone: 'neutral' },
   'note.deleted': { label: 'Nota de suporte removida', tone: 'neutral' },
   'ops.sync_config_changed': { label: 'Sincronização reconfigurada', tone: 'error' },

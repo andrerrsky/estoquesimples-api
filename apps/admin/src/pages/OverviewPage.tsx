@@ -30,6 +30,13 @@ export function OverviewPage() {
   const { admin } = useAuth();
   const navigate = useNavigate();
   const query = useQuery({ queryKey: ['overview'], queryFn: () => api.get<Overview>('/overview'), refetchInterval: 60_000 });
+  // Cupom no ar (Black Friday etc.): uma linha com os resgates, sem pesar a visão geral.
+  const coupons = useQuery({
+    queryKey: ['coupons', 'overview'],
+    queryFn: () => api.get<{ items: Array<{ id: string; code: string; status: string; redeemed: number; reserved: number }> }>('/coupons', { pageSize: 50 }),
+    refetchInterval: 60_000,
+  });
+  const liveCoupons = coupons.data?.items.filter((coupon) => coupon.status === 'no_ar') ?? [];
   const data = query.data;
   const k = data?.kpis ?? {};
   const s = data?.series ?? {};
@@ -85,6 +92,13 @@ export function OverviewPage() {
           </div>
         </div>
       </section>
+
+      {liveCoupons.map((coupon) => (
+        <Notice key={coupon.id} tone="success">
+          <Link to={`/cupons/${coupon.id}`}>Cupom <strong>{coupon.code}</strong> no ar</Link> · {fmtNumber(coupon.redeemed)} {coupon.redeemed === 1 ? 'resgate' : 'resgates'}
+          {coupon.reserved > 0 && <span className="caption"> · {fmtNumber(coupon.reserved)} aguardando pagamento</span>}
+        </Notice>
+      ))}
 
       {data && data.alerts.length > 0 && (
         <div className="stack stack--tight">
