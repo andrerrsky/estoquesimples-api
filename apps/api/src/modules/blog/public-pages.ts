@@ -69,8 +69,8 @@ const PAGES: Record<string, PublicPage> = {
   // Landing da campanha (docs/black-friday-2026.md). Indexável durante e
   // depois da campanha: a página diz se a oferta está vigente, terminou ou vai começar.
   '/black-friday': {
-    title: 'Black Friday Estoque Simples: plano anual com 40% off',
-    description: 'Black Friday do Estoque Simples: plano Equipe anual de R$ 199,90 por R$ 119,90 (equivale a R$ 9,99/mês) ou 1º mês por R$ 12,49. De 20/11 a 01/12/2026.',
+    title: 'Black Friday Estoque Simples: R$ 9,99/mês no plano anual',
+    description: 'Black Friday do Estoque Simples: plano Equipe por R$ 9,99/mês no anual (R$ 119,90 à vista, de R$ 199,90) ou 1º mês por R$ 12,49. Cupom BF26, de 20/11 a 01/12/2026.',
     crumb: 'Black Friday',
   },
   '/entrar': {

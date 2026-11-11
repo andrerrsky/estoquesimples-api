@@ -6,9 +6,11 @@ import { promoTexts } from '../lib/promo';
 import '../styles/promo.css';
 
 /**
- * As duas ofertas da campanha lado a lado: anual em destaque (total tão
- * visível quanto o equivalente por mês) e mensal secundário, cada uma com a
- * regra de renovação escrita por extenso. Usado na página Plano e na landing.
+ * As duas ofertas da campanha lado a lado. O destaque é o valor por mês, que
+ * é como o pequeno lojista compara preço: no anual, o equivalente mensal vai
+ * grande e o total à vista vai colado logo abaixo (CDC: o valor cobrado nunca
+ * fica escondido; ele também aparece no botão). O mensal vem como segunda
+ * opção, com o preço depois do 1º mês na mesma linha. Usado na página Plano.
  */
 export function PromoOffers({ prices, yearlyAction, monthlyAction }: { prices: PromoPrices; yearlyAction?: ReactNode; monthlyAction?: ReactNode }) {
   const t = promoTexts(prices);
@@ -16,28 +18,25 @@ export function PromoOffers({ prices, yearlyAction, monthlyAction }: { prices: P
     <div className="promo-offers">
       <section className="promo-offer promo-offer--featured" aria-label="Plano Equipe anual com desconto">
         <div className="promo-offer__name">
-          Equipe anual <span className="promo-offer__pill">{t.yearlyPct}% off</span>
-        </div>
-        <div className="promo-offer__from">
-          De <s>{t.yearlyFull}</s> por
+          Plano anual <span className="promo-offer__pill">Melhor preço da Black Friday</span>
         </div>
         <div className="promo-offer__price">
-          {t.yearlyPromo} <small>no ano</small>
+          {t.yearlyPerMonth}
+          <small>/mês</small>
         </div>
-        <div className="promo-offer__equiv">equivale a {t.yearlyPerMonth}/mês</div>
-        <p className="promo-offer__fine">Pagamento único de {t.yearlyPromo} pelos 12 meses. {t.yearlyRenewal}</p>
+        <div className="promo-offer__equiv">
+          {t.yearlyPromo} à vista <s>{t.yearlyFull}</s>
+        </div>
+        <p className="promo-offer__fine">Cobrança única por 12 meses · {t.yearlyRenewal}</p>
         {yearlyAction}
       </section>
 
       <section className="promo-offer" aria-label="Plano Equipe mensal com desconto no primeiro mês">
-        <div className="promo-offer__name">Equipe mensal</div>
-        <div className="promo-offer__from">
-          {t.monthlyFirstLabel} por
+        <div className="promo-offer__name">Plano mensal</div>
+        <div className="promo-offer__price promo-offer__price--md">
+          {t.monthlyFirst} <small>no {t.monthlyFirstLabel}</small>
         </div>
-        <div className="promo-offer__price">
-          {t.monthlyFirst}
-        </div>
-        <div className="promo-offer__from">depois {t.monthlyFull}/mês</div>
+        <div className="promo-offer__from">Depois {t.monthlyFull}/mês</div>
         <p className="promo-offer__fine">{t.monthlyRenewal} Cancele quando quiser.</p>
         {monthlyAction}
       </section>

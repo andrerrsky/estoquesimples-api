@@ -180,6 +180,17 @@
   font-size: var(--fs-supporting);
   font-weight: 600;
 }
+.promo-offer--featured .promo-offer__price {
+  font-size: 44px;
+}
+.promo-offer__price--md {
+  font-size: 26px;
+}
+.promo-offer__equiv s {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.7;
+}
 .promo-offer__equiv {
   font-size: var(--fs-section);
   font-weight: 700;

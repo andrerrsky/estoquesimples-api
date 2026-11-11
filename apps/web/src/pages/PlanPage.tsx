@@ -675,7 +675,7 @@ function PaymentPanel({
   );
 }
 
-/** Cartão da campanha no topo da página Plano: as duas ofertas, anual em destaque. */
+/** Cartão da campanha no topo da página Plano: o valor por mês do anual em destaque, total no botão. */
 function PromoCard({ offer, onPick }: { offer: Offer; onPick: (cycle: Cycle) => void }) {
   const until = endDayLabel(offer.endsAt);
   const t = promoTexts(offer);
@@ -687,20 +687,22 @@ function PromoCard({ offer, onPick }: { offer: Offer; onPick: (cycle: Cycle) => 
           {until && <span className="promo-card__sub">Até {until}</span>}
         </div>
         <h2 id="promo-card-title" className="promo-card__title">
-          Plano Equipe anual com {t.yearlyPct}% off
+          {offer.label ?? 'Black Friday'} · {t.yearlyPerMonth}/mês no anual
         </h2>
-        <p className="promo-card__sub">Produtos ilimitados, equipe no mesmo estoque e análise avançada. Vale no app e na web.</p>
+        <p className="promo-card__sub">
+          De {t.yearlyFull} por {t.yearlyPromo} à vista, para 12 meses de uso. Produtos ilimitados, equipe no mesmo estoque e análise avançada, no app e na web.
+        </p>
       </div>
       <PromoOffers
         prices={offer}
         yearlyAction={
           <button type="button" className="btn btn--promo btn--block" onClick={() => onPick('YEARLY')}>
-            Garantir o anual por {t.yearlyPromo}
+            Assinar por {t.yearlyPromo}
           </button>
         }
         monthlyAction={
           <button type="button" className="btn btn--promo-ghost btn--block" onClick={() => onPick('MONTHLY')}>
-            Começar no mensal
+            Começar por {t.monthlyFirst}
           </button>
         }
       />

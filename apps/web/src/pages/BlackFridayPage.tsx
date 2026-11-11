@@ -108,6 +108,7 @@ function PriceTag({
   name,
   fromLabel,
   price,
+  suffix,
   per,
   note,
   code,
@@ -117,7 +118,9 @@ function PriceTag({
   name: string;
   fromLabel: ReactNode;
   price: string;
-  per: string;
+  /** Sufixo ao lado do preço ("/mês"); vazio quando o preço é o total. */
+  suffix?: string;
+  per: ReactNode;
   note: string;
   code: string;
   children?: ReactNode;
@@ -130,10 +133,13 @@ function PriceTag({
         <span className="bfx-tag__sku">{code}</span>
       </header>
       <p className="bfx-tag__from">{fromLabel}</p>
-      <p className="bfx-tag__price" aria-label={price}>
+      <p className="bfx-tag__price" aria-label={`${price}${suffix ?? ''}`}>
         <span className="bfx-tag__cur">{p.currency}</span>
         <span className="bfx-tag__whole">{p.whole}</span>
-        <span className="bfx-tag__cents">,{p.cents}</span>
+        <span className="bfx-tag__cents">
+          ,{p.cents}
+          {suffix && <span className="bfx-tag__suffix">{suffix}</span>}
+        </span>
       </p>
       <p className="bfx-tag__per">{per}</p>
       <footer className="bfx-tag__foot">
@@ -202,8 +208,8 @@ export function BlackFridayPage() {
   const now = useNow(live);
 
   useEffect(() => {
-    document.title = 'Black Friday: plano Equipe com 40% off · Estoque Simples';
-    const restore = setMeta('description', 'Black Friday Estoque Simples: plano Equipe anual de R$ 199,90 por R$ 119,90 (equivale a R$ 9,99/mês). Produtos ilimitados, equipe e sincronização. Até 01/12.');
+    document.title = 'Black Friday: Estoque Simples por R$ 9,99/mês · Estoque Simples';
+    const restore = setMeta('description', 'Black Friday Estoque Simples: plano Equipe por R$ 9,99/mês no anual (R$ 119,90 à vista, de R$ 199,90). Ou 1º mês por R$ 12,49. Cupom BF26 até 01/12.');
     return () => {
       document.title = 'Estoque Simples';
       restore();
@@ -263,15 +269,15 @@ export function BlackFridayPage() {
             </p>
             {t && !ended ? (
               <h1 className="bfx-title" id="bf-titulo">
-                Um ano de estoque em ordem por <mark>{t.yearlyPromo}</mark>
+                Controle seu estoque por <mark>{t.yearlyPerMonth}/mês</mark>
               </h1>
             ) : (
               <h1 className="bfx-title" id="bf-titulo">Black Friday Estoque Simples</h1>
             )}
             {t && !ended && (
               <p className="bfx-lead">
-                Plano Equipe anual com {t.yearlyPct}% de desconto: de <s>{t.yearlyFull}</s> por {t.yearlyPromo} à vista, o que dá {t.yearlyPerMonth} por mês. Pra quem
-                cansou de caderninho e planilha.
+                Plano Equipe anual de <s>{t.yearlyFull}</s> por {t.yearlyPromo} à vista com o cupom {code}. Prefere mensal? {t.monthlyFirstLabel} por{' '}
+                {t.monthlyFirst}. Pra quem cansou de caderninho e planilha.
               </p>
             )}
 
@@ -298,13 +304,14 @@ export function BlackFridayPage() {
                 tone="yellow"
                 name="Plano Equipe · anual"
                 code={code}
-                fromLabel={
+                fromLabel="no plano anual"
+                price={t.yearlyPerMonth}
+                suffix="/mês"
+                per={
                   <>
-                    de <s>{t.yearlyFull}</s>
+                    {t.yearlyPromo} à vista · de <s>{t.yearlyFull}</s>
                   </>
                 }
-                price={t.yearlyPromo}
-                per={`à vista · ${t.yearlyPerMonth}/mês`}
                 note={`-${t.yearlyPct}%`}
               />
             </div>
@@ -330,29 +337,30 @@ export function BlackFridayPage() {
             <div className="bfx-offers__row">
               <PriceTag
                 tone="yellow"
-                name="Equipe anual"
+                name="Plano anual · melhor preço"
                 code={code}
-                fromLabel={
+                fromLabel="equivale a"
+                price={t.yearlyPerMonth}
+                suffix="/mês"
+                per={
                   <>
-                    de <s>{t.yearlyFull}</s>
+                    {t.yearlyPromo} à vista · de <s>{t.yearlyFull}</s>
                   </>
                 }
-                price={t.yearlyPromo}
-                per={`no ano · equivale a ${t.yearlyPerMonth}/mês`}
-                note={`Pagamento único. ${t.yearlyRenewal}`}
+                note={`Cobrança única por 12 meses. ${t.yearlyRenewal}`}
               >
-                {cta(`Quero o anual por ${t.yearlyPromo}`)}
+                {cta(`Assinar por ${t.yearlyPromo}`)}
               </PriceTag>
               <PriceTag
                 tone="paper"
-                name="Equipe mensal"
+                name="Plano mensal"
                 code={code}
                 fromLabel={<>{t.monthlyFirstLabel} por</>}
                 price={t.monthlyFirst}
                 per={`depois ${t.monthlyFull}/mês`}
                 note={t.monthlyRenewal}
               >
-                {cta('Começar no mensal', 'line')}
+                {cta(`Começar por ${t.monthlyFirst}`, 'line')}
               </PriceTag>
             </div>
           </section>

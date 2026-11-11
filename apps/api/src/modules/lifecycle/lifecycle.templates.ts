@@ -129,23 +129,28 @@ function campaignEmail(kind: 'bf2026_launch' | 'bf2026_today' | 'bf2026_last_day
   const p = ctx.promo ?? SAMPLE_PROMO;
   const off = Math.round((1 - p.yearlyPromoCents / p.yearlyFullCents) * 100);
   const until = dayMonth(p.endsAt);
-  const perMonth = p.yearlyPromoCents / 12 < 1000 ? 'menos de R$ 10 por mês' : `cerca de ${brl(Math.round(p.yearlyPromoCents / 12))} por mês`;
+  // Destaque no valor por mês do anual (é como o lojista compara preço), com o
+  // total à vista sempre junto: nunca o "R$ 9,99" sem o valor cobrado.
+  const perMonth = `${brl(Math.floor(p.yearlyPromoCents / 12))}/mês`;
+  const total = `${brl(p.yearlyPromoCents)} à vista`;
   const subject =
     kind === 'bf2026_launch'
-      ? `${p.label}: Estoque Simples com ${off}% off`
+      ? `${p.label}: Estoque Simples por ${perMonth}`
       : kind === 'bf2026_today'
-        ? `É hoje: ${p.label} do Estoque Simples com ${off}% off`
-        : `Último dia: Estoque Simples com ${off}% off`;
+        ? `Reta final: anual a ${perMonth}`
+        : `Último dia: ${perMonth} no anual`;
   // Texto simples não tem pré-cabeçalho: a 1ª linha é o que aparece na prévia da caixa de entrada.
   const preheader =
     kind === 'bf2026_last_day'
-      ? `Plano anual por ${brl(p.yearlyPromoCents)}, só até hoje (${until})`
-      : `Plano anual por ${brl(p.yearlyPromoCents)}, só até ${until}`;
+      ? `O cupom ${p.code} vale até 23h59 de hoje (${until}). Depois o anual volta a ${brl(p.yearlyFullCents)}.`
+      : kind === 'bf2026_today'
+        ? `${total} por 12 meses (de ${brl(p.yearlyFullCents)}). Cupom ${p.code} até ${until}.`
+        : `Anual de ${brl(p.yearlyFullCents)} por ${total} com o cupom ${p.code}. Até ${until}.`;
   const opening =
     kind === 'bf2026_today'
-      ? `É hoje a ${p.label}. `
+      ? `Estamos na reta final da ${p.label}. `
       : kind === 'bf2026_last_day'
-        ? `Último dia da ${p.label}: o desconto acaba hoje à meia-noite. `
+        ? `Último dia da ${p.label}: o desconto acaba hoje às 23h59. `
         : '';
   return {
     subject,
@@ -153,7 +158,7 @@ function campaignEmail(kind: 'bf2026_launch' | 'bf2026_today' | 'bf2026_last_day
       `${preheader}\n\n` +
       `${hello(ctx)}\n\n` +
       opening +
-      `Produtos ilimitados, sua equipe e seus aparelhos sincronizados. De ${brl(p.yearlyFullCents)} por ${brl(p.yearlyPromoCents)} no ano — ${perMonth}.\n\n` +
+      `Plano Equipe por ${perMonth} no anual: ${total}, de ${brl(p.yearlyFullCents)} (${off}% off). Produtos ilimitados, sua equipe e seus aparelhos sincronizados. Prefere pagar por mês? O 1º mês também sai com desconto.\n\n` +
       `Ativar com desconto: ${ctx.link(`/black-friday?cupom=${encodeURIComponent(p.code)}`)}` +
       footer(ctx),
   };
