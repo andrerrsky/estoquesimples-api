@@ -38,10 +38,11 @@ const COLUNA_POR_CAMPO: Record<string, string> = {
   location: 'location',
   sku: 'sku',
   barcode: 'barcode',
+  unitCost: 'unit_cost',
 };
 
 /** Campos guardados como número no banco. */
-const CAMPOS_NUMERICOS = new Set(['unitValue', 'minStock']);
+const CAMPOS_NUMERICOS = new Set(['unitValue', 'minStock', 'unitCost']);
 
 /**
  * Conflitos que esperam decisão de uma pessoa.
@@ -204,6 +205,13 @@ export class ConflictsService {
         category: (edicao['category'] as string | null) ?? null,
         supplier: (edicao['supplier'] as string | null) ?? null,
         location: (edicao['location'] as string | null) ?? null,
+        // Ausente na edição guardada (app antigo) = mantém o custo que estava.
+        unitCost:
+          edicao['unitCost'] === undefined
+            ? undefined
+            : edicao['unitCost'] === null
+              ? null
+              : String(edicao['unitCost']),
         rev: atual.rev + 1,
         changeSeq: seq,
       })
@@ -242,7 +250,13 @@ export class ConflictsService {
     // de uma lista fechada, nunca do corpo da requisição.
     await tx.execute(sql`
       UPDATE products
-         SET ${sql.raw(coluna)} = ${CAMPOS_NUMERICOS.has(registro.field) ? Number(valor) : valor},
+         SET ${sql.raw(coluna)} = ${
+           // Custo descartado pode ser nulo ("não informado"); Number(null)
+           // viraria custo zero, que é outra informação.
+           CAMPOS_NUMERICOS.has(registro.field) && valor !== null && valor !== undefined
+             ? Number(valor)
+             : valor ?? null
+         },
              rev = rev + 1,
              change_seq = ${seq}
        WHERE workspace_id = ${workspaceId}::uuid

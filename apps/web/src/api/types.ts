@@ -139,6 +139,8 @@ export interface Product {
   description: string | null;
   quantity: number;
   unitValue: number;
+  /** Preço de custo por unidade; `null` = não informado (fica fora das contas de lucro). */
+  unitCost: number | null;
   minStock: number;
   unit: string | null;
   category: string | null;
@@ -162,7 +164,7 @@ export interface CreatedProduct extends Product {
 
 export type ProductFields = Pick<
   Product,
-  'name' | 'description' | 'unitValue' | 'minStock' | 'unit' | 'category' | 'supplier' | 'location' | 'sku' | 'barcode' | 'photoHash'
+  'name' | 'description' | 'unitValue' | 'unitCost' | 'minStock' | 'unit' | 'category' | 'supplier' | 'location' | 'sku' | 'barcode' | 'photoHash'
 >;
 
 export interface UploadedImage {
@@ -235,6 +237,12 @@ export interface ReportSummary {
   period: ReportPeriod;
   products: number;
   stockValue: number;
+  /** Valor do estoque pelo preço de custo (só produtos com custo informado). */
+  stockCostValue: number;
+  /** Lucro se o estoque atual fosse vendido pelo preço atual (só produtos com custo). */
+  potentialProfit: number;
+  /** Produtos sem custo informado: ficam fora das duas contas acima. */
+  productsWithoutCost: number;
   toRestock: number;
   outOfStock: number;
   itemsByUnit: Array<{ unit: string; quantity: number }>;
@@ -243,7 +251,15 @@ export interface ReportSummary {
   byCategory: Array<{ category: string; products: number; quantity: number; value: number }>;
   movements: {
     entries: { count: number; quantity: number; value: number };
-    exits: { count: number; quantity: number; value: number };
+    exits: {
+      count: number;
+      quantity: number;
+      value: number;
+      /** Σ quantidade × (preço − custo) das saídas de produtos com custo. */
+      estimatedProfit: number;
+      /** Valor (a preço de venda) das saídas de produtos sem custo: fora do lucro. */
+      valueWithoutCost: number;
+    };
     others: { count: number; value: number };
   };
   daily: Array<{ day: string; entries: number; exits: number }>;
@@ -278,6 +294,7 @@ export interface ImportRow {
   description?: string;
   quantity?: number;
   unitValue?: number;
+  unitCost?: number;
   minStock?: number;
   unit?: string;
   category?: string;

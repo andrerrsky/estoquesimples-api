@@ -65,6 +65,10 @@ public final class PortableBackup {
         putOptional(json, "description", product.description);
         json.put("quantity", product.amountAsNumber());
         json.put("unitValue", Quantities.parse(product.value));
+        Double custo = product.costAsNumber();
+        if (custo != null) {
+            json.put("unitCost", custo);
+        }
         json.put("minStock", Quantities.parse(product.minStock));
         putOptional(json, "unit", product.unit);
         putOptional(json, "category", product.category);

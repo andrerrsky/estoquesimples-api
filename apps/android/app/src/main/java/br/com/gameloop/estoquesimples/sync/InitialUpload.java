@@ -256,7 +256,7 @@ public final class InitialUpload {
         try {
             cursor = db.rawQuery(
                     "SELECT uuid, name, description, amount, value, category, sku, barcode, "
-                            + "supplier, location, min_stock, unit, updated_at, deleted_at, rev "
+                            + "supplier, location, min_stock, unit, updated_at, deleted_at, rev, cost "
                             + "FROM " + LocalDb.TABLE_PRODUCTS
                             + " WHERE id > ? ORDER BY id LIMIT ?",
                     new String[]{String.valueOf(aposId), String.valueOf(limite)});
@@ -277,6 +277,10 @@ public final class InitialUpload {
                 produto.put("updatedAt", cursor.getLong(12));
                 produto.put("deletedAt", cursor.isNull(13) ? JSONObject.NULL : cursor.getLong(13));
                 produto.put("rev", cursor.getLong(14));
+                // Só quando informado: ausente = "sem custo" na primeira carga.
+                if (!cursor.isNull(15) && !cursor.getString(15).trim().isEmpty()) {
+                    produto.put("unitCost", parse(cursor.getString(15)));
+                }
                 destino.put(produto);
             }
         } catch (JSONException e) {

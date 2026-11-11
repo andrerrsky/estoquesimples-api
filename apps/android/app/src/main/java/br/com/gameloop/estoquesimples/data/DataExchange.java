@@ -34,7 +34,9 @@ public final class DataExchange {
 
     public static final List<String> PRODUCT_CSV_HEADER = Arrays.asList(
             "nome", "descricao", "quantidade", "valor", "categoria", "sku",
-            "codigo_barras", "fornecedor", "localizacao", "estoque_minimo", "unidade"
+            "codigo_barras", "fornecedor", "localizacao", "estoque_minimo", "unidade",
+            // No fim, para planilhas antigas (sem a coluna) continuarem iguais.
+            "custo"
     );
 
     public static final List<String> MOVEMENT_CSV_HEADER = Arrays.asList(
@@ -128,7 +130,7 @@ public final class DataExchange {
         try {
             cursor = db.rawQuery(
                     "SELECT name, description, amount, value, category, sku, barcode, "
-                            + "supplier, location, min_stock, unit FROM "
+                            + "supplier, location, min_stock, unit, cost FROM "
                             + LocalDb.TABLE_PRODUCTS + " WHERE " + LocalDb.ACTIVE_PRODUCTS
                             + " ORDER BY name COLLATE NOCASE",
                     null);
@@ -144,7 +146,8 @@ public final class DataExchange {
                         text(cursor, 7),
                         text(cursor, 8),
                         text(cursor, 9),
-                        text(cursor, 10)
+                        text(cursor, 10),
+                        text(cursor, 11)
                 ))).append('\n');
                 report.exported++;
             }
@@ -466,6 +469,10 @@ public final class DataExchange {
         putIfChanged(values, "name", current.name, row.name);
         putIfChanged(values, "description", current.description, row.description);
         putIfNumberChanged(values, "value", current.value, row.unitValue);
+        // Coluna vazia ou ausente na planilha não apaga o custo já cadastrado.
+        if (row.unitCost != null) {
+            putIfNumberChanged(values, "cost", current.cost, row.unitCost);
+        }
         putIfChanged(values, "category", current.category, row.category);
         putIfChanged(values, "sku", current.sku, row.sku);
         putIfChanged(values, "barcode", current.barcode, row.barcode);
@@ -587,6 +594,8 @@ public final class DataExchange {
         String description = "";
         double quantity;
         double unitValue;
+        /** Preço de custo; {@code null} = a linha não informa. */
+        Double unitCost;
         String category = "";
         String sku = "";
         String barcode = "";
@@ -618,6 +627,7 @@ public final class DataExchange {
             row.description = clip(cell(fields, columns, "descricao", "description"), MAX_DESCRIPTION);
             row.quantity = Quantities.parse(cell(fields, columns, "quantidade", "quantity", "qtd", "estoque"), 0d);
             row.unitValue = Quantities.parse(cell(fields, columns, "valor", "preco", "unitvalue", "unit_value"), 0d);
+            row.unitCost = Product.costOf(cell(fields, columns, "custo", "preco_de_custo", "custo_unitario", "unitcost", "unit_cost", "cost"));
             row.category = clip(cell(fields, columns, "categoria", "category"), MAX_SHORT);
             row.sku = clip(cell(fields, columns, "sku"), MAX_CODE);
             row.barcode = clip(cell(fields, columns, "codigo_barras", "codigo_de_barras", "barcode", "ean"), MAX_CODE);
@@ -635,6 +645,9 @@ public final class DataExchange {
             row.description = clip(json.optString("description", ""), MAX_DESCRIPTION);
             row.quantity = json.optDouble("quantity", 0d);
             row.unitValue = json.optDouble("unitValue", 0d);
+            row.unitCost = json.has("unitCost") && !json.isNull("unitCost")
+                    ? json.optDouble("unitCost", 0d)
+                    : null;
             row.category = clip(json.optString("category", ""), MAX_SHORT);
             row.sku = clip(json.optString("sku", ""), MAX_CODE);
             row.barcode = clip(json.optString("barcode", ""), MAX_CODE);
@@ -654,6 +667,9 @@ public final class DataExchange {
             values.put("description", description);
             values.put("amount", Quantities.forStorage(quantity));
             values.put("value", Quantities.forStorage(unitValue));
+            if (unitCost != null) {
+                values.put("cost", Quantities.forStorage(unitCost));
+            }
             values.put("photo", "");
             values.put("category", category);
             values.put("sku", sku);

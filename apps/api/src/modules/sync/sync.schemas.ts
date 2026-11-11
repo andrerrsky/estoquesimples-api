@@ -32,6 +32,15 @@ export const productInputSchema = z
      * enviam e não podem apagá-la sem querer); `null` = "remover a foto".
      */
     photoHash: z.string().regex(/^[0-9a-f]{64}$/).nullish(),
+    /**
+     * Preço de custo por unidade.
+     *
+     * Mesma regra da foto: ausente = "não mexi no custo" (versões antigas do
+     * app não conhecem o campo e não podem apagar o custo cadastrado pela web
+     * ao editar outro dado do produto); `null` = "custo não informado";
+     * número = novo custo.
+     */
+    unitCost: quantidade.nonnegative().nullish(),
     // Milissegundos do relógio do aparelho. Informativo apenas.
     updatedAt: z.number().int().nonnegative().optional(),
     deletedAt: z.number().int().nonnegative().nullish(),

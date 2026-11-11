@@ -418,6 +418,62 @@ describe('estoque pela web', () => {
   });
 });
 
+describe('preço de custo pela web', () => {
+  const base = (workspaceId: string) => `/v1/workspaces/${workspaceId}`;
+
+  it('cadastra e edita o custo, importa a coluna e calcula valor a custo e lucro nos relatórios', async () => {
+    const user = await registerUser(context);
+    const ws = await criarEmpresa(user);
+    const h = user.authHeader;
+    const post = (payload: Record<string, unknown>) => context.app.inject({ method: 'POST', url: `${base(ws)}/products`, headers: h, payload });
+
+    const cafe = await post({ name: 'Café', quantity: 10, unitValue: 20, unitCost: 12 });
+    expect(cafe.statusCode).toBe(201);
+    expect(cafe.json()).toMatchObject({ unitValue: 20, unitCost: 12 });
+    const leite = await post({ name: 'Leite', quantity: 5, unitValue: 6 });
+    expect(leite.json().unitCost).toBeNull();
+    expect((await post({ name: 'Errado', quantity: 1, unitCost: -2 })).statusCode).toBe(400);
+
+    // Editar outro campo não mexe no custo; null limpa; número grava.
+    const cat = await context.app.inject({ method: 'PATCH', url: `${base(ws)}/products/${cafe.json().id}`, headers: h, payload: { rev: 0, changes: { category: 'Bebidas' } } });
+    expect(cat.json()).toMatchObject({ category: 'Bebidas', unitCost: 12, rev: 1 });
+    const limpo = await context.app.inject({ method: 'PATCH', url: `${base(ws)}/products/${cafe.json().id}`, headers: h, payload: { rev: 1, changes: { unitCost: null } } });
+    expect(limpo.json()).toMatchObject({ unitCost: null, rev: 2 });
+    const custo = await context.app.inject({ method: 'PATCH', url: `${base(ws)}/products/${cafe.json().id}`, headers: h, payload: { rev: 2, changes: { unitCost: 12 }, base: { unitCost: null } } });
+    expect(custo.json()).toMatchObject({ unitCost: 12, rev: 3 });
+
+    // Importação: coluna de custo cria e atualiza; ausente não apaga.
+    const imported = await context.app.inject({
+      method: 'POST',
+      url: `${base(ws)}/products/import`,
+      headers: h,
+      payload: { rows: [{ name: 'Açúcar', quantity: 4, unitValue: 5, unitCost: 3 }, { name: 'Café', unitValue: 20 }] },
+    });
+    expect(imported.json()).toMatchObject({ created: 1, updated: 0, unchanged: 1 });
+
+    // Saídas no período: 2 cafés (lucro 2 × 8) e 1 leite (sem custo, R$ 6).
+    for (const [productId, quantity] of [[cafe.json().id, 2], [leite.json().id, 1]] as const) {
+      const out = await context.app.inject({ method: 'POST', url: `${base(ws)}/movements`, headers: h, payload: { productId, type: 'saida', quantity } });
+      expect(out.statusCode).toBe(201);
+    }
+
+    const summary = (await context.app.inject({ method: 'GET', url: `${base(ws)}/reports/summary?period=30d`, headers: h })).json();
+    // Estoque: café 8 × 20, leite 4 × 6, açúcar 4 × 5.
+    expect(summary).toMatchObject({
+      stockValue: 8 * 20 + 4 * 6 + 4 * 5,
+      stockCostValue: 8 * 12 + 4 * 3,
+      potentialProfit: 8 * (20 - 12) + 4 * (5 - 3),
+      productsWithoutCost: 1,
+    });
+    expect(summary.movements.exits).toMatchObject({ count: 2, quantity: 3, value: 2 * 20 + 6, estimatedProfit: 2 * 8, valueWithoutCost: 6 });
+
+    // O aparelho recebe o custo na leitura.
+    const pull = await context.app.inject({ method: 'GET', url: `${base(ws)}/sync/pull?cursor=0`, headers: { ...h, ...SYNC } });
+    const recebidos = (pull.json().changes as Array<{ entity: string; data: { name: string; unitCost: number | null } }>).filter((c) => c.entity === 'produto');
+    expect(Object.fromEntries(recebidos.map((c) => [c.data.name, c.data.unitCost]))).toEqual({ Café: 12, Leite: null, Açúcar: 3 });
+  });
+});
+
 describe('caixa de notificações', () => {
   it('resposta do suporte chega na caixa do usuário e pode ser marcada como lida', async () => {
     const user = await registerUser(context, { installId: 'instalacao-caixa-0001-00000000000000' });

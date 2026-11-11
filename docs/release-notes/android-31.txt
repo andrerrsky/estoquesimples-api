@@ -1,0 +1,10 @@
+<pt-BR>
+Novidades para cuidar do lucro e da reposição:
+• Preço de custo nos produtos, com margem e lucro na hora
+• Relatórios com estoque a custo, lucro potencial e lucro das saídas
+• Lista de reposição separada por fornecedor
+• Pedido pronto para enviar pelo WhatsApp, com quantidade sugerida
+• "Montar pedido" direto no alerta de estoque baixo
+• Custo também na planilha e na versão web
+• Mensagens mais claras sobre a conta e correções
+</pt-BR>

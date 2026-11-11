@@ -12,6 +12,7 @@ import { fmtQuantity, fold, numberInput, parseNumber } from '../../lib/format';
 import { IMAGE_ACCEPT, ImageError, prepareImage, type PreparedImage } from '../../lib/image';
 import { inventoryKeys, useDebounced, useInvalidateInventory } from '../../lib/inventory';
 import { ProductImage } from '../../lib/product-image';
+import { costInput, marginHint } from '../../lib/profit';
 import { fractionMessage, hasFraction, isValidUnit, isWholeUnit, UNIT_ERROR } from '../../lib/units';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { BarcodeScanner } from '../BarcodeScanner';
@@ -28,12 +29,13 @@ interface FormState {
   quantity: string;
   unit: string;
   unitValue: string;
+  unitCost: string;
   minStock: string;
   supplier: string;
   location: string;
 }
 
-const EMPTY: FormState = { name: '', sku: '', barcode: '', category: '', description: '', quantity: '', unit: 'un', unitValue: '', minStock: '', supplier: '', location: '' };
+const EMPTY: FormState = { name: '', sku: '', barcode: '', category: '', description: '', quantity: '', unit: 'un', unitValue: '', unitCost: '', minStock: '', supplier: '', location: '' };
 
 function fromProduct(product: Product): FormState {
   return {
@@ -45,6 +47,7 @@ function fromProduct(product: Product): FormState {
     quantity: numberInput(product.quantity) || '0',
     unit: product.unit ?? 'un',
     unitValue: numberInput(product.unitValue),
+    unitCost: costInput(product.unitCost),
     minStock: numberInput(product.minStock),
     supplier: product.supplier ?? '',
     location: product.location ?? '',
@@ -129,10 +132,12 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const validate = (): { ok: boolean; quantity: number; unitValue: number; minStock: number } => {
+  const validate = (): { ok: boolean; quantity: number; unitValue: number; unitCost: number | null; minStock: number } => {
     const next: Errors = {};
     const quantity = parseNumber(form.quantity);
     const unitValue = parseNumber(form.unitValue) ?? 0;
+    // Vazio = custo não informado (null), que é diferente de custo zero.
+    const unitCost = parseNumber(form.unitCost);
     const minStock = parseNumber(form.minStock) ?? 0;
     if (form.name.trim() === '') next.name = 'Informe o nome do produto.';
     if (quantity === null) next.quantity = 'Informe a quantidade.';
@@ -141,9 +146,10 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     else if (isWholeUnit(form.unit) && hasFraction(quantity)) next.quantity = fractionMessage(form.unit);
     if (!isValidUnit(form.unit)) next.unit = UNIT_ERROR;
     if (Number.isNaN(unitValue) || unitValue < 0) next.unitValue = 'Valor inválido.';
+    if (unitCost !== null && (Number.isNaN(unitCost) || unitCost < 0)) next.unitCost = 'Custo inválido.';
     if (Number.isNaN(minStock) || minStock < 0) next.minStock = 'Quantidade inválida.';
     setErrors(next);
-    return { ok: Object.keys(next).length === 0, quantity: quantity ?? 0, unitValue, minStock };
+    return { ok: Object.keys(next).length === 0, quantity: quantity ?? 0, unitValue, unitCost, minStock };
   };
 
   const choosePhoto = async (file: File | undefined) => {
@@ -168,7 +174,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
   };
 
   const save = useMutation({
-    mutationFn: async (values: { quantity: number; unitValue: number; minStock: number }) => {
+    mutationFn: async (values: { quantity: number; unitValue: number; unitCost: number | null; minStock: number }) => {
       // A foto sobe primeiro; só então o produto aponta para ela. Se o envio
       // falhar, nada do produto é gravado e o formulário continua como estava.
       let photoHash: string | null | undefined;
@@ -186,6 +192,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
         name: form.name.trim(),
         description: form.description.trim() || null,
         unitValue: values.unitValue,
+        unitCost: values.unitCost,
         minStock: values.minStock,
         unit: form.unit.trim() || 'un',
         category: form.category.trim() || null,
@@ -271,6 +278,14 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
     }
     save.mutate(result);
   };
+
+  // Prévia da margem enquanto a pessoa digita; só com os dois preços válidos.
+  const margin = useMemo(() => {
+    const sale = parseNumber(form.unitValue);
+    const cost = parseNumber(form.unitCost);
+    if (sale === null || cost === null || Number.isNaN(sale) || Number.isNaN(cost) || cost < 0) return null;
+    return marginHint(sale, cost, currency);
+  }, [form.unitValue, form.unitCost, currency]);
 
   const units = [...new Set([...(facets.data?.defaultUnits ?? []), ...(facets.data?.units.map((item) => item.value) ?? [])])];
 
@@ -384,6 +399,12 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
               <div className="input-affix">
                 <span className="input-affix__label">{currency}</span>
                 <input className="input num" value={form.unitValue} onChange={(event) => set('unitValue')(event.target.value)} inputMode="decimal" placeholder="0,00" />
+              </div>
+            </Field>
+            <Field label="Preço de custo" optional error={errors.unitCost} hint={margin ?? 'Quanto você paga por unidade. Usado para calcular margem e lucro.'}>
+              <div className="input-affix">
+                <span className="input-affix__label">{currency}</span>
+                <input className="input num" value={form.unitCost} onChange={(event) => set('unitCost')(event.target.value)} inputMode="decimal" placeholder="0,00" aria-invalid={errors.unitCost ? true : undefined} />
               </div>
             </Field>
             <Field label="Estoque mínimo" error={errors.minStock} hint="Avisa quando o estoque chegar a este número.">

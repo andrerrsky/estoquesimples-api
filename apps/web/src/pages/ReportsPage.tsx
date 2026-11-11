@@ -304,6 +304,38 @@ export function ReportsPage() {
         <Tile label="Sem estoque" value={fmtInteger(data.outOfStock)} foot="Quantidade zerada" alert={data.outOfStock > 0} />
       </div>
 
+      <Card title="Custo e lucro" subtitle="Pelo preço de custo e pelo valor unitário atuais de cada produto. É estimativa, não faturamento.">
+        <div className="stack">
+          <div className="stat-trio">
+            <div className="stat">
+              <div className="stat__label">Valor do estoque a custo</div>
+              <div className="stat__value num">{fmtMoney(data.stockCostValue, currency)}</div>
+              <div className="stat__foot">Quantidade × preço de custo</div>
+            </div>
+            <div className="stat">
+              <div className="stat__label">Lucro potencial</div>
+              <div className="stat__value num">{fmtMoney(data.potentialProfit, currency)}</div>
+              <div className="stat__foot">Se o estoque atual for vendido pelo valor unitário</div>
+            </div>
+            <div className="stat">
+              <div className="stat__label">Lucro estimado das saídas no período</div>
+              <div className="stat__value num">{fmtMoney(movements.exits.estimatedProfit, currency)}</div>
+              <div className="stat__foot">
+                Saídas {period.text} × (valor − custo)
+                {movements.exits.valueWithoutCost > 0 && ` · ${fmtMoney(movements.exits.valueWithoutCost, currency)} em saídas de produtos sem custo ficam de fora`}
+              </div>
+            </div>
+          </div>
+          {data.productsWithoutCost > 0 && (
+            <p className="caption">
+              {data.productsWithoutCost === data.products
+                ? 'Nenhum produto tem preço de custo ainda. Informe o custo no cadastro do produto para ver margem e lucro.'
+                : `${plural(data.productsWithoutCost, 'produto sem custo fica', 'produtos sem custo ficam')} de fora destas contas.`}
+            </p>
+          )}
+        </div>
+      </Card>
+
       <Card title="Entradas e saídas" subtitle={`Lançamentos ${period.text}. Valores estimados pelo valor unitário atual de cada produto.`}>
         <div className="stack">
           <div className="stat-trio">

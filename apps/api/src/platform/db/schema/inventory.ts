@@ -34,6 +34,8 @@ export const products = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     unitValue: numeric('unit_value', quantity).notNull().default('0'),
+    /** Preço de custo por unidade; nulo = custo não informado (fica fora das contas de lucro). */
+    unitCost: numeric('unit_cost', quantity),
     /** Projeção do saldo; a verdade é a soma de `stockMovements`. */
     quantityCache: numeric('quantity_cache', quantity).notNull().default('0'),
     minStock: numeric('min_stock', quantity).notNull().default('0'),

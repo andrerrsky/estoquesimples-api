@@ -74,6 +74,8 @@ const ALIASES: Record<keyof ImportRow, string[]> = {
   description: ['descricao', 'description'],
   quantity: ['quantidade', 'quantity', 'qtd', 'estoque'],
   unitValue: ['valor', 'preco', 'unitvalue', 'unit_value', 'valor_unitario'],
+  // "Preço de custo" e "Custo unitário" chegam aqui já sem acento e com "_".
+  unitCost: ['custo', 'preco_de_custo', 'preco_custo', 'custo_unitario', 'unitcost', 'unit_cost'],
   category: ['categoria', 'category'],
   sku: ['sku'],
   barcode: ['codigo_barras', 'codigo_de_barras', 'barcode', 'ean'],
@@ -87,7 +89,7 @@ const ALIASES: Record<keyof ImportRow, string[]> = {
 const POSITIONAL: Array<keyof ImportRow | null> = ['name', 'description', 'quantity', 'unitValue', null, 'category', 'sku', 'barcode', 'supplier', 'location', 'minStock', 'unit'];
 
 const LIMITS: Partial<Record<keyof ImportRow, number>> = { name: 200, description: 2000, category: 120, supplier: 120, location: 120, sku: 80, barcode: 80, unit: 30 };
-const NUMERIC = new Set<keyof ImportRow>(['quantity', 'unitValue', 'minStock']);
+const NUMERIC = new Set<keyof ImportRow>(['quantity', 'unitValue', 'unitCost', 'minStock']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ParsedSheet {

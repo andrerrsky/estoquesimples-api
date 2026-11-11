@@ -48,6 +48,7 @@ public class AddActivity extends BaseActivity {
     private EditText productName;
     private EditText productAmount;
     private EditText productValue;
+    private EditText productCost;
     private Spinner currencySpinner;
     private TextInputLayout nameLayout;
     private TextInputLayout amountLayout;
@@ -109,6 +110,8 @@ public class AddActivity extends BaseActivity {
         productName = (EditText) findViewById(R.id.addName);
         productAmount = (EditText) findViewById(R.id.addAmount);
         productValue = (EditText) findViewById(R.id.addValue);
+        productCost = (EditText) findViewById(R.id.addCost);
+        CostField.bind(this, findViewById(R.id.addCostLayout), productCost, productValue);
         productDescription = (EditText) findViewById(R.id.addDescription);
         productCategory = (EditText) findViewById(R.id.addCategory);
         productSku = (EditText) findViewById(R.id.addSku);
@@ -415,6 +418,12 @@ public class AddActivity extends BaseActivity {
             insertValues.put("amount", productAmount.getText().toString().trim());
             String valorDigitado = productValue.getText().toString().trim();
             insertValues.put("value", valorDigitado.isEmpty() ? "0" : CurrencyHelper.sanitizeForStorage(valorDigitado));
+            String custoDigitado = CostField.forStorage(productCost);
+            if (custoDigitado == null) {
+                insertValues.putNull("cost");
+            } else {
+                insertValues.put("cost", custoDigitado);
+            }
             insertValues.put("description", productDescription != null ? productDescription.getText().toString().trim() : "");
             
             // Novos campos com verificação null

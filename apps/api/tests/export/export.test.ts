@@ -70,6 +70,7 @@ async function seedInventory(
       name: '=CMD()',
       description: 'grãos, torrados',
       unitValue: '12.5',
+      unitCost: '7.25',
       quantityCache: '10',
       minStock: '2',
       unit: 'un',
@@ -148,6 +149,7 @@ describe('exportação de dados', () => {
       // coisas, então o saldo real e esperado aqui é 10 + (-3) = 7.
       quantity: 7,
       unitValue: 12.5,
+      unitCost: 7.25,
       sku: 'CAF-1',
     });
     expect(body.movements).toHaveLength(1);
@@ -176,6 +178,10 @@ describe('exportação de dados', () => {
     expect(csv).toContain("'=CMD()");
     expect(csv).toContain('"grãos, torrados"');
     expect(csv).toContain('CAF-1');
+    // Custo logo depois do valor.
+    const [cabecalho, linha] = csv.replace(/^\uFEFF/, '').split('\n');
+    expect(cabecalho?.split(',').slice(2, 5)).toEqual(['quantidade', 'valor', 'custo']);
+    expect(linha).toContain(',7,12.5,7.25,');
   });
 
   it('CSV de movimentações leva quantidade com sinal', async () => {

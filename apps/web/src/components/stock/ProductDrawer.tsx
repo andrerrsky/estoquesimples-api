@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api } from '../../api/client';
@@ -6,6 +7,7 @@ import type { Movement, Page, Product } from '../../api/types';
 import { fmtDateTime, fmtMoney, fmtQuantity, fmtStock } from '../../lib/format';
 import { inventoryKeys } from '../../lib/inventory';
 import { ProductImage } from '../../lib/product-image';
+import { fmtMargin, unitMargin } from '../../lib/profit';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { Icon } from '../Icon';
 import { Badge, Drawer, KeyValue, QueryState, Time } from '../ui';
@@ -87,6 +89,8 @@ export function ProductDrawer({
             items={[
               { label: 'Valor unitário', value: fmtMoney(item.unitValue, currency) },
               { label: 'Valor em estoque', value: fmtMoney(item.unitValue * item.quantity, currency) },
+              { label: 'Preço de custo', value: item.unitCost !== null ? fmtMoney(item.unitCost, currency) : <span className="faint">Não informado</span> },
+              { label: 'Margem', value: marginText(item.unitValue, item.unitCost, currency) },
               { label: 'Estoque mínimo', value: item.minStock > 0 ? fmtStock(item.minStock, item.unit) : '—' },
               { label: 'SKU / código', value: item.sku ?? '—' },
               { label: 'Código de barras', value: item.barcode ? <span className="mono">{item.barcode}</span> : '—' },
@@ -138,5 +142,16 @@ export function ProductDrawer({
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** "40% · R$ 8,00 por unidade"; sem custo (ou sem preço de venda) não há margem para mostrar. */
+function marginText(unitValue: number, unitCost: number | null, currency: string): ReactNode {
+  const result = unitMargin(unitValue, unitCost);
+  if (!result) return <span className="faint">—</span>;
+  return (
+    <span style={result.profit < 0 ? { color: 'var(--error)' } : undefined}>
+      {fmtMargin(result.margin)} · {fmtMoney(result.profit, currency)} por unidade
+    </span>
   );
 }

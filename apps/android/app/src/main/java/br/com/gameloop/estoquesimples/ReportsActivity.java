@@ -5,6 +5,8 @@ import br.com.gameloop.estoquesimples.analytics.Analytics;
 
 import br.com.gameloop.estoquesimples.data.LocalDb;
 import br.com.gameloop.estoquesimples.data.MovementRepository;
+import br.com.gameloop.estoquesimples.data.Product;
+import br.com.gameloop.estoquesimples.data.ProfitSummary;
 
 import android.Manifest;
 import android.content.DialogInterface;
@@ -66,6 +68,8 @@ public class ReportsActivity extends BaseActivity {
     private TextView totalProducts;
     private TextView totalItems;
     private TextView totalValue;
+    /** Custo, margem e lucro: produtos em generateData, saídas em calculateEntryExitTotals. */
+    private ProfitSummary profit = new ProfitSummary();
     private TextView averageValue;
     private TextView totalEntryValue;
     private TextView totalExitValue;
@@ -385,11 +389,12 @@ public class ReportsActivity extends BaseActivity {
 
         Cursor cursor = null;
         try {
-            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category, unit FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
+            cursor = MainActivity.stock.rawQuery("SELECT name, amount, value, min_stock, category, unit, cost FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
 
         int cursorCount = cursor.getCount();
         double totalItemsCount = 0;
         double totalValueSum = 0.0;
+        profit = new ProfitSummary();
         List<String> lowStockProducts = new ArrayList<>();
         // Mais urgente primeiro: o que já zerou, depois o mais longe do mínimo.
         List<double[]> urgencia = new ArrayList<>();
@@ -419,6 +424,7 @@ public class ReportsActivity extends BaseActivity {
             
             totalItemsCount += columnAmount;
             totalValueSum += (columnAmount * columnValue);
+            profit.addProduct(columnAmount, columnValue, Product.costOf(cursor.getString(6)));
             somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
             if (Unidades.inteira(cursor.getString(5)) && Unidades.fracionada(columnAmount)) quantidadesQuebradas++;
 
@@ -458,6 +464,7 @@ public class ReportsActivity extends BaseActivity {
                 
                 totalItemsCount += columnAmount;
                 totalValueSum += (columnAmount * columnValue);
+            profit.addProduct(columnAmount, columnValue, Product.costOf(cursor.getString(6)));
                 somarPorUnidade(porUnidade, cursor.getString(5), columnAmount);
                 if (Unidades.inteira(cursor.getString(5)) && Unidades.fracionada(columnAmount)) quantidadesQuebradas++;
 
@@ -488,6 +495,15 @@ public class ReportsActivity extends BaseActivity {
         // "Valor médio por produto" não ajudava ninguém a decidir nada; o que
         // o dono quer saber é quantos itens precisa repor.
         averageValue.setText("Produtos para repor: " + lowStockProducts.size());
+        if (!lowStockProducts.isEmpty()) {
+            // Do número à ação: a lista de reposição já sai com o pedido
+            // por fornecedor pronto para o WhatsApp.
+            averageValue.setText("Produtos para repor: " + lowStockProducts.size() + "  ·  Montar pedido ›");
+            averageValue.setTextColor(ContextCompat.getColor(this, R.color.color_brand_ink));
+            averageValue.setOnClickListener(v -> ReorderActivity.open(this, "relatorios"));
+        } else {
+            averageValue.setOnClickListener(null);
+        }
 
         // Calcular valor total de entradas e saídas
         calculateEntryExitTotals();
@@ -734,7 +750,7 @@ public class ReportsActivity extends BaseActivity {
         Cursor historyCursor = null;
         try {
             historyCursor = MainActivity.stock.rawQuery(
-                "SELECT h.change_type, h.quantity, e.value " +
+                "SELECT h.change_type, h.quantity, e.value, e.cost " +
                 "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
                 "WHERE h.deleted_at IS NULL",
                 null);
@@ -756,6 +772,7 @@ public class ReportsActivity extends BaseActivity {
                         totalEntry += lineTotal;
                     } else if (isSaida(changeType, qty)) {
                         totalExit += lineTotal;
+                        profit.addExit(qty, unitVal, Product.costOf(historyCursor.getString(3)));
                     }
                 } while (historyCursor.moveToNext());
             }
@@ -785,6 +802,48 @@ public class ReportsActivity extends BaseActivity {
                     + "\nSaldo líquido das movimentações: " + CurrencyHelper.formatCurrency(this, liquido)
                     + "\n(difere do valor do estoque quando produtos foram excluídos ou o valor unitário mudou)");
         }
+        renderProfit();
+    }
+
+    /**
+     * Linha de custo, margem e lucro, logo abaixo do valor do estoque.
+     *
+     * Sem nenhum custo cadastrado vira um convite curto (o recurso é novo e a
+     * pessoa precisa saber que existe); com custo parcial, diz quantos
+     * produtos ficaram de fora, para ninguém tomar decisão com um lucro
+     * maior do que o real.
+     */
+    private void renderProfit() {
+        TextView view = findViewById(R.id.profitSummary);
+        if (view == null || profit == null) {
+            return;
+        }
+        view.setVisibility(View.VISIBLE);
+        if (!profit.hasAnyCost()) {
+            view.setText("Novo: cadastre o preço de custo nos produtos para ver aqui a margem e o lucro.");
+            return;
+        }
+        StringBuilder texto = new StringBuilder();
+        texto.append("Valor a custo: ").append(CurrencyHelper.formatCurrency(this, profit.stockAtCost));
+        texto.append("\nLucro potencial do estoque: ").append(CurrencyHelper.formatCurrency(this, profit.potentialProfit));
+        Long margem = profit.potentialMarginPercent();
+        if (margem != null) {
+            texto.append(" (margem ").append(margem).append("%)");
+        }
+        if (profit.exitsRevenueWithCost > 0) {
+            texto.append("\nLucro estimado das saídas: ").append(CurrencyHelper.formatCurrency(this, profit.exitsProfit));
+            Long margemSaidas = profit.exitsMarginPercent();
+            if (margemSaidas != null) {
+                texto.append(" (margem ").append(margemSaidas).append("%)");
+            }
+            texto.append("\n(com o preço e o custo atuais de cada produto)");
+        }
+        if (profit.productsWithoutCost > 0) {
+            texto.append("\n").append(Texto.plural(profit.productsWithoutCost,
+                    "produto sem custo fica", "produtos sem custo ficam"))
+                    .append(" de fora dessas contas.");
+        }
+        view.setText(texto.toString());
     }
 
     // Métodos de permissão
@@ -1220,9 +1279,10 @@ public class ReportsActivity extends BaseActivity {
         Cursor c = null;
         int totalProducts = 0, paraRepor = 0;
         double totalItems = 0, totalValue = 0.0;
+        ProfitSummary custos = new ProfitSummary();
         java.util.Map<String, Double> porUnidade = new java.util.LinkedHashMap<>();
         try {
-            c = MainActivity.stock.rawQuery("SELECT amount, value, unit, min_stock FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
+            c = MainActivity.stock.rawQuery("SELECT amount, value, unit, min_stock, cost FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
             if (c != null) {
                 totalProducts = c.getCount();
                 if (c.moveToFirst()) {
@@ -1232,6 +1292,7 @@ public class ReportsActivity extends BaseActivity {
                         double min = CurrencyHelper.parseCurrency(c.getString(3), 0);
                         totalItems += amount;
                         totalValue += (amount * value);
+                        custos.addProduct(amount, value, Product.costOf(c.getString(4)));
                         somarPorUnidade(porUnidade, c.getString(2), amount);
                         if (amount <= 0 || (min > 0 && amount <= min)) paraRepor++;
                     } while (c.moveToNext());
@@ -1246,6 +1307,14 @@ public class ReportsActivity extends BaseActivity {
         b.text("Total de produtos: " + totalProducts, 10);
         b.text("Itens em estoque: " + descreverPorUnidade(porUnidade, totalItems), 10);
         b.text("Valor do estoque: " + fc(totalValue), 10);
+        if (custos.hasAnyCost()) {
+            Long margem = custos.potentialMarginPercent();
+            b.text("Valor a custo: " + fc(custos.stockAtCost) + " · lucro potencial: " + fc(custos.potentialProfit)
+                    + (margem != null ? " (margem " + margem + "%)" : ""), 10);
+            if (custos.productsWithoutCost > 0) {
+                b.small(custos.productsWithoutCost + " produto(s) sem preço de custo ficam fora do custo e do lucro.", 10);
+            }
+        }
         b.text("Produtos para repor: " + paraRepor, 10);
         b.spacer(8);
     }
@@ -1260,10 +1329,11 @@ public class ReportsActivity extends BaseActivity {
         // ou saída e os números não batiam com a tela.
         double totalEntry = 0.0, totalExit = 0.0, totalOutros = 0.0;
         int entryCount = 0, exitCount = 0, outrosCount = 0;
+        ProfitSummary lucro = new ProfitSummary();
         Cursor c = null;
         try {
             c = MainActivity.stock.rawQuery(
-                    "SELECT h.change_type, h.quantity, e.value " +
+                    "SELECT h.change_type, h.quantity, e.value, e.cost " +
                             "FROM EstoqueHistorico h " + LocalDb.JOIN_MOVEMENT_PRODUCT + " " +
                             "WHERE h.timestamp >= ? AND h.deleted_at IS NULL",
                     new String[]{String.valueOf(period.cutoffMillis())});
@@ -1282,6 +1352,7 @@ public class ReportsActivity extends BaseActivity {
                     } else if (isSaida(changeType, qty)) {
                         totalExit += line;
                         exitCount++;
+                        lucro.addExit(qty, val, Product.costOf(c.getString(3)));
                     }
                 } while (c.moveToNext());
             }
@@ -1293,6 +1364,13 @@ public class ReportsActivity extends BaseActivity {
         b.colored("Saídas (" + exitCount + "): " + fc(totalExit), 10, false);
         b.text("Cadastros, ajustes e estornos (" + outrosCount + "): " + (totalOutros < 0 ? "- " : "") + fc(Math.abs(totalOutros)), 10);
         b.small("Soma do valor unitário cadastrado x quantidade movimentada. Não é faturamento, lucro nem despesa real.", 10);
+        if (lucro.exitsRevenueWithCost > 0) {
+            Long margem = lucro.exitsMarginPercent();
+            b.text("Lucro estimado das saídas: " + fc(lucro.exitsProfit)
+                    + (margem != null ? " (margem " + margem + "%)" : ""), 10);
+            b.small("Com o preço de venda e o custo atuais de cada produto"
+                    + (lucro.exitsWithoutCost > 0 ? "; " + lucro.exitsWithoutCost + " saída(s) de produtos sem custo ficaram de fora." : "."), 10);
+        }
         b.spacer(8);
     }
 

@@ -120,6 +120,16 @@
                 android:paddingTop="4dp"
                 android:paddingBottom="4dp" />
 
+            <!-- Custo, margem e lucro (v31). Preenchido por renderProfit(). -->
+            <TextView
+                android:id="@+id/profitSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.Estoque.Body"
+                android:paddingTop="2dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/stroke_width"

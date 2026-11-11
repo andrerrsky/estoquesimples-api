@@ -201,6 +201,14 @@ public final class RemoteChanges {
         values.put("name", data.optString("name", ""));
         values.put("description", optString(data, "description"));
         values.put("value", Quantities.forStorage(data.optDouble("unitValue", 0d)));
+        // Servidor anterior à versão 31 não manda o campo: não mexe no custo local.
+        if (data.has("unitCost")) {
+            if (data.isNull("unitCost")) {
+                values.putNull("cost");
+            } else {
+                values.put("cost", Quantities.forStorage(data.optDouble("unitCost", 0d)));
+            }
+        }
         values.put("min_stock", Quantities.forStorage(data.optDouble("minStock", 0d)));
         values.put("unit", optString(data, "unit"));
         values.put("category", optString(data, "category"));

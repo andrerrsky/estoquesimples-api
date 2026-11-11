@@ -13,7 +13,6 @@ import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
@@ -201,13 +200,28 @@ public final class ErrorReporter {
         return new File(app.getFilesDir(), FILE);
     }
 
+    private static byte[] readAll(File file) throws java.io.IOException {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(file);
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            return out.toByteArray();
+        }
+    }
+
     private static JSONArray read() {
         try {
             File file = file();
             if (!file.isFile()) {
                 return new JSONArray();
             }
-            return new JSONArray(new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8));
+            // Sem java.nio.file: Files/toPath só existem a partir do Android 8, e
+            // no 7 a chamada derrubava o app com NoSuchMethodError (que o catch
+            // de Exception não pega) justo ao registrar outro erro.
+            return new JSONArray(new String(readAll(file), StandardCharsets.UTF_8));
         } catch (Exception e) {
             return new JSONArray();
         }
