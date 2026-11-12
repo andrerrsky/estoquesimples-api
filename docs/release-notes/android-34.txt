@@ -1,0 +1,6 @@
+<pt-BR>
+Novidades desta versão:
+• Depois de alguns dias de uso, o app pode pedir sua avaliação na Google Play, uma única vez
+• Melhorias no cadastro de conta
+• Correções e melhorias gerais de estabilidade
+</pt-BR>

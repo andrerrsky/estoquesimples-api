@@ -17,6 +17,8 @@
 export const AnalyticsEventName = {
   // Ciclo de vida do app
   APP_OPENED: 'app.opened',
+  APP_INSTALL_ATTRIBUTED: 'app.install_attributed',
+  REVIEW_PROMPTED: 'review.prompted',
   SCREEN_VIEWED: 'screen.viewed',
 
   // Conta (emitidos pela API; o app pode emitir os de intenção)
@@ -129,6 +131,8 @@ export interface AnalyticsEventDefinition {
 
 export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'app.opened', source: 'app', description: 'Abriu o app ou a web (inclusive voltando de segundo plano). Conta como uso ativo no dia.', properties: { coldStart: 'sim = abriu do zero; não = voltou de segundo plano' } },
+  { name: 'app.install_attributed', source: 'app', description: 'Origem da instalação pela Google Play (Install Referrer), enviada uma vez por aparelho. Mostra de onde vêm as instalações do Android, inclusive de quem nunca cria conta.', properties: { utm_source: 'origem (google-play = orgânico da loja; google = anúncio)', utm_medium: 'meio (organic, cpc…)', utm_campaign: 'campanha', utm_content: 'anúncio', has_click_id: 'boolean' } },
+  { name: 'review.prompted', source: 'app', description: 'O app pediu avaliação na Google Play (uma vez, após 3 dias e 10 movimentações). A Play decide se mostra e não informa a nota.' },
   { name: 'screen.viewed', source: 'app', description: 'Uma tela do app ou da web foi aberta. Mostra por onde a pessoa navega.', properties: { screen: 'qual tela (nome da tela no app ou caminho na web)' } },
   { name: 'signup.started', source: 'app', description: 'Começou a preencher o cadastro (primeira digitação no formulário).' },
   { name: 'landing.viewed', source: 'app', description: 'Página inicial aberta (web, sem cookie).', properties: { utm_source: 'origem', utm_medium: 'meio', utm_campaign: 'campanha', utm_content: 'anúncio', has_click_id: 'boolean' } },

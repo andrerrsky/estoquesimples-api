@@ -16,8 +16,8 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 33
-        versionName "33"
+        versionCode 34
+        versionName "34"
 
         // Endereço da API e versão do protocolo de sincronização. Ficam aqui
         // para que o app de depuração possa apontar para outro ambiente sem
@@ -109,6 +109,13 @@ dependencies {
     // ficar em SharedPreferences comum: com allowBackup ativo ele sairia do
     // aparelho no backup do Android.
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // Origem da instalação (Install Referrer da Google Play): de onde veio
+    // cada instalação, gravada no cadastro e num evento de uso.
+    implementation 'com.android.installreferrer:installreferrer:2.2'
+
+    // Pedido de avaliação dentro do app (In-App Review da Google Play).
+    implementation 'com.google.android.play:review:2.0.2'
 
     // WorkManager for scheduled notifications
     implementation 'androidx.work:work-runtime:2.10.0'

@@ -19,7 +19,8 @@ import { openCookiePreferences } from '../lib/ga';
 const videoApresentacao = '/assets/video/apresentacao.mp4';
 const videoCapa = '/assets/video/apresentacao-capa.webp';
 
-const PLAY_URL = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
+/** Link da Play com a origem no `referrer` (o app lê pela Install Referrer API). */
+const PLAY_URL = `https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples&referrer=${encodeURIComponent('utm_source=site&utm_medium=landing')}`;
 
 /** O vídeo de apresentação, também descrito ao Google em JSON-LD (scripts/prerender.mjs). */
 export const VIDEO = {
