@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.com.gameloop.estoquesimples.BuildConfig;
+import br.com.gameloop.estoquesimples.analytics.InstallAttribution;
 
 /**
  * Entrada, cadastro e escolha de empresa.
@@ -56,6 +57,10 @@ public final class AccountService {
             body.put("email", email);
             body.put("password", password);
             body.put("device", deviceInfo());
+            JSONObject attribution = InstallAttribution.forSignup(context);
+            if (attribution != null) {
+                body.put("attribution", attribution);
+            }
 
             ApiClient.Response response = api.post("/v1/auth/register", body, null);
             session.storeSession(response.body);

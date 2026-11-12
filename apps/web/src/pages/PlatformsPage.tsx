@@ -8,7 +8,8 @@ import { track } from '../lib/analytics';
 
 import '../styles/pages-platforms.css';
 
-const PLAY_URL = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
+/** Link da Play com a origem no `referrer` (o app lê pela Install Referrer API). */
+const PLAY_URL = `https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples&referrer=${encodeURIComponent('utm_source=site&utm_medium=plataformas')}`;
 
 type Device = 'ios' | 'android' | 'desktop' | 'mac';
 

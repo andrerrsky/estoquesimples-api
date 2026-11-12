@@ -17,7 +17,8 @@ const SITE_NAME = 'Estoque Simples';
 const DEFAULT_IMAGE = `${SITE}/og.jpg`;
 const BLOG_TITLE = 'Blog do Estoque Simples: dicas de estoque, vendas e gestão';
 const BLOG_DESCRIPTION = 'Dicas práticas de controle de estoque, vendas e gestão para pequenos negócios, mais as novidades do Estoque Simples. Novos posts toda semana.';
-const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples';
+/** Com a origem no `referrer`: o app lê pela Install Referrer API e grava no cadastro. */
+const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples&referrer=${encodeURIComponent('utm_source=blog&utm_medium=artigo')}`;
 /** Perfis oficiais: ajudam buscadores e assistentes a ligar o site à marca. */
 export const SAME_AS = [
   PLAY_STORE_URL,

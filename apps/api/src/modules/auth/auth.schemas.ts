@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { signupAttributionSchema } from './signup-attribution.js';
+
 /**
  * Todos os schemas usam `.strict()`: um campo desconhecido no corpo é erro,
  * não algo ignorado em silêncio. É a proteção contra mass assignment — nunca
@@ -36,6 +38,12 @@ export const registerBodySchema = z
     password: passwordSchema,
     name: z.string().trim().min(1).max(120),
     device: deviceInfoSchema.optional(),
+    /**
+     * Origem da instalação no app Android (Install Referrer da Google Play:
+     * UTMs e, quando veio de anúncio, o identificador do clique). Mesmas
+     * regras e mesma lista fechada de chaves do cadastro web.
+     */
+    attribution: signupAttributionSchema.optional(),
   })
   .strict();
 

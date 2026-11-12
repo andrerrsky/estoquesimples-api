@@ -815,7 +815,7 @@ export function WelcomePage() {
                   No app, entre com <strong>{user?.email}</strong> e esta senha. Na web, você continua entrando com o Google.
                 </p>
                 {isAndroid && (
-                  <a className="btn btn--secondary btn--block" href="https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples" target="_blank" rel="noopener noreferrer">
+                  <a className="btn btn--secondary btn--block" href={`https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples&referrer=${encodeURIComponent('utm_source=site&utm_medium=cadastro')}`} target="_blank" rel="noopener noreferrer">
                     Baixar o app na Google Play
                   </a>
                 )}

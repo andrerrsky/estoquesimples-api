@@ -36,9 +36,10 @@ const PLAY_APP = 'https://play.google.com/store/apps/details?id=br.com.gameloop.
 
 /**
  * Link da Play Store com a origem do anúncio no `referrer`: quem busca
- * "aplicativo" no Android costuma instalar pela loja, e o app ainda não lê a
- * Install Referrer API. Assim a Play Console mostra as instalações por
- * campanha (Aquisição de usuários › origem google / cpc), para somar ao painel.
+ * "aplicativo" no Android costuma instalar pela loja. O app lê o `referrer`
+ * pela Install Referrer API (desde a versão 34) e grava a origem no cadastro
+ * e no evento `app.install_attributed`; a Play Console também mostra as
+ * instalações por campanha (Aquisição de usuários › origem google / cpc).
  */
 export function playUrlWithReferrer(search: string): string {
   const params = new URLSearchParams(search);

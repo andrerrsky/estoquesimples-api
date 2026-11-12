@@ -344,6 +344,8 @@ public class MainActivity extends BaseActivity {
         AnalyticsScheduler.schedulePeriodic(this);
         // Token do FCM: registra (ou renova o vínculo com a conta) a cada abertura.
         PushRegistrar.register(this);
+        // Origem da instalação (Install Referrer): uma consulta por instalação.
+        br.com.gameloop.estoquesimples.analytics.InstallAttribution.fetchOnce(this);
         handlePushIntent(getIntent());
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_FROM_LOW_STOCK_NOTIFICATION, false)) {
             Analytics.track(this, "notification.opened", Analytics.props("kind", "low_stock"));
@@ -695,6 +697,9 @@ public class MainActivity extends BaseActivity {
             pendingMessage = null;
             Feedback.show(this, message);
         }
+
+        // Avaliação na Play: uma vez, só para quem já usa (ver ReviewPrompt).
+        ReviewPrompt.maybeAsk(this);
     }
 
     /**

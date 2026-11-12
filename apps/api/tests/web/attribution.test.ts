@@ -101,6 +101,41 @@ describe('origem do cadastro web', () => {
   });
 });
 
+describe('origem da instalação no app Android', () => {
+  it('o cadastro do app grava o Install Referrer da Play, sem enviar o clique a ninguém', async () => {
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: {
+        email: uniqueEmail('play'),
+        password: VALID_PASSWORD,
+        name: 'Pessoa Play',
+        attribution: { utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'app_instalacoes', gclid: 'EAIaIQ-play_1' },
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const stored = await storedAttribution(response.json().user.id);
+    expect(stored).toMatchObject({ utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'app_instalacoes', gclid: 'EAIaIQ-play_1', consent: 'none' });
+  });
+
+  it('instalação orgânica da loja também fica registrada; sem atribuição o cadastro segue como antes', async () => {
+    const organic = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { email: uniqueEmail('organico'), password: VALID_PASSWORD, name: 'Orgânico', attribution: { utm_source: 'google-play', utm_medium: 'organic' } },
+    });
+    expect(organic.statusCode).toBe(201);
+    expect(await storedAttribution(organic.json().user.id)).toMatchObject({ utm_source: 'google-play', utm_medium: 'organic' });
+
+    const plain = await context.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: uniqueEmail('sem'), password: VALID_PASSWORD, name: 'Sem origem' } });
+    expect(plain.statusCode).toBe(201);
+    expect(await storedAttribution(plain.json().user.id)).toBeNull();
+
+    const bad = await context.app.inject({ method: 'POST', url: '/v1/auth/register', payload: { email: uniqueEmail('ruim'), password: VALID_PASSWORD, name: 'Ruim', attribution: { referrer: 'x' } } });
+    expect(bad.statusCode).toBe(400);
+  });
+});
+
 describe('primeiros passos na web', () => {
   it('cria a empresa no cadastro web (o do app não)', async () => {
     const user = await register();
