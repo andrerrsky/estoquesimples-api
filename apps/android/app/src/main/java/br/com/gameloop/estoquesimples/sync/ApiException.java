@@ -16,6 +16,8 @@ public class ApiException extends Exception {
     public static final String NAO_AUTENTICADO = "UNAUTHENTICATED";
     public static final String PERMISSAO_DESATUALIZADA = "AUTH_PERMISSION_STALE";
     public static final String SEM_PERMISSAO = "FORBIDDEN";
+    /** O perfil desta pessoa não tem a permissão que a rota exige. */
+    public static final String PERMISSAO_NEGADA = "MISSING_PERMISSION";
     public static final String EMAIL_NAO_CONFIRMADO = "AUTH_EMAIL_NOT_VERIFIED";
     /** Conta bloqueada pelo suporte: no login (403) ou com a sessão encerrada (401). */
     public static final String CONTA_BLOQUEADA = "AUTH_ACCOUNT_SUSPENDED";

@@ -223,6 +223,10 @@ public final class SyncEngine {
         db.beginTransaction();
         try {
             meta.put(SyncMeta.CARGA_INICIAL_CONCLUIDA, true);
+            // Marca a fronteira entre o histórico legado, que a nuvem
+            // recebeu como saldo declarado, e o que vier daqui em diante.
+            // Ver SyncMeta.CORTE_CARGA_INICIAL e sync/BalanceAudit.java.
+            meta.put(SyncMeta.CORTE_CARGA_INICIAL, BalanceAudit.ultimaMovimentacaoGravada(db));
             meta.put(SyncMeta.WORKSPACE_ID, workspaceId);
             meta.remove(SyncMeta.UPLOAD_ID);
             meta.remove(SyncMeta.UPLOAD_PROXIMO_LOTE);

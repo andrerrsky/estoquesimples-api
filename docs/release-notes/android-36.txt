@@ -1,0 +1,6 @@
+<pt-BR>
+Novidades desta versão:
+• Correção: a quantidade de cada produto no site e nos outros aparelhos agora bate com a do celular; o app confere e reenvia sozinho o que faltou chegar
+• Ao abrir, o app verifica se há uma atualização necessária
+• Correções e melhorias gerais de estabilidade
+</pt-BR>

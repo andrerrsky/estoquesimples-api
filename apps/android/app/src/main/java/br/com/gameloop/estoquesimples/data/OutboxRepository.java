@@ -407,6 +407,32 @@ public final class OutboxRepository {
         return countWhere("status=?", STATUS_FALHA);
     }
 
+    /**
+     * Maior id entre as operações que ainda estão na fila.
+     *
+     * Serve de marca d'água: comparando o valor antes e depois de uma leitura
+     * demorada dá para saber se alguma operação nasceu nesse meio-tempo — o
+     * que a contagem sozinha não mostra, porque uma operação que entra e é
+     * enviada na mesma janela deixa a contagem como estava.
+     *
+     * Vale como marca porque a coluna é {@code AUTOINCREMENT} (ids nunca
+     * voltam) e porque só o worker esvazia a fila, um de cada vez. O caso
+     * limite — a operação mais nova sair da fila dentro da janela — baixa o
+     * valor, o que também acusa mudança e abandona a rodada.
+     */
+    public long maxId() {
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery("SELECT coalesce(max(id), 0) FROM " + LocalDb.TABLE_OUTBOX, null);
+            return cursor.moveToFirst() ? cursor.getLong(0) : 0L;
+        } catch (RuntimeException e) {
+            Log.e(TAG, "falha ao ler a marca d'água da fila", e);
+            return -1L;
+        } finally {
+            LocalDb.closeQuietly(cursor);
+        }
+    }
+
     /** Operações que falharam de forma definitiva, para exibição e exportação. */
     public List<Operation> failures() {
         List<Operation> failures = new ArrayList<>();

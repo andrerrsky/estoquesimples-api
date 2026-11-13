@@ -187,7 +187,18 @@ public final class SyncWorker extends Worker {
             Log.w(TAG, "falha inesperada ao baixar fotos", e);
         }
 
-        int pendentes = new OutboxRepository(db).pendingCount();
+        OutboxRepository outbox = new OutboxRepository(db);
+        int pendentes = outbox.pendingCount();
+
+        // Conferência de saldo. Ela própria lê a fila e decide: produto com
+        // operação na fila fica de fora, porque uma diferença nele pode ser
+        // só o que ainda não subiu. Ver sync/BalanceAudit.java.
+        BalanceAudit.Resultado conferencia = new BalanceAudit(context, db, api, session).run(interrupcao);
+        if (conferencia.reenviadas > 0) {
+            // As movimentações recuperadas estão na fila: uma rodada a mais as leva.
+            SyncScheduler.syncSoon(context);
+        }
+
         meta.put(SyncMeta.ULTIMA_SINCRONIZACAO, System.currentTimeMillis());
         meta.put(SyncMeta.DESVIO_RELOGIO, api.getClockSkewMs());
         meta.remove(SyncMeta.ULTIMO_ERRO);
@@ -197,12 +208,16 @@ public final class SyncWorker extends Worker {
         // sincronização e some quando a pessoa o vê na tela de conta.
         Log.i(TAG, "sincronização concluída: " + resultado.enviadas + " enviada(s), "
                 + resultado.recebidas + " recebida(s), " + resultado.conflitos + " conflito(s), "
-                + resultado.recusadas + " recusada(s), " + pendentes + " na fila");
+                + resultado.recusadas + " recusada(s), " + pendentes + " na fila"
+                + (conferencia.executou
+                        ? ", " + conferencia.divergentes + " saldo(s) divergente(s) e "
+                                + conferencia.reenviadas + " movimentação(ões) recuperada(s)"
+                        : ""));
 
         // Operação recusada em definitivo não se resolve sozinha. O aviso fica
         // na tela de conta em vez de sumir junto com o registro do worker.
         String aviso = avisoNovo;
-        if (new OutboxRepository(db).failedCount() > 0) {
+        if (outbox.failedCount() > 0) {
             meta.put(SyncMeta.ULTIMO_ERRO,
                     "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.");
             aviso = "Algumas alterações não foram aceitas. Veja os detalhes na tela de conta.";

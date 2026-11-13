@@ -1,5 +1,0 @@
-<pt-BR>
-Novidades desta versão:
-• Correção: ao usar a nuvem, a quantidade de cada produto no site e nos outros aparelhos agora bate com a do celular, mesmo quando o histórico antigo estava incompleto
-• Correções e melhorias gerais de estabilidade
-</pt-BR>

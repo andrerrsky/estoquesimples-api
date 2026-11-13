@@ -190,6 +190,10 @@ public final class LocalDb extends SQLiteOpenHelper {
                 + "photo VARCHAR, category VARCHAR, sku VARCHAR, barcode VARCHAR, "
                 + "supplier VARCHAR, location VARCHAR, min_stock VARCHAR, unit VARCHAR)");
 
+        // O `id` AUTOINCREMENT é também a fronteira da carga inicial
+        // (SyncMeta.CORTE_CARGA_INICIAL): qualquer reconstrução desta tabela
+        // precisa copiar a coluna como está. Renumerar para baixo devolveria
+        // o histórico legado à fila de reenvio, que é o estoque dobrado.
         db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_MOVEMENTS + " ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "product_name VARCHAR, change_type VARCHAR, quantity NUMERIC, "

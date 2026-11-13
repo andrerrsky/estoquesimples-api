@@ -42,6 +42,13 @@ public final class MovementRepository {
     private static final String VENDA = "venda";
 
     /**
+     * Menor diferença de quantidade que o sistema trata como real. Abaixo
+     * disto é ruído de ponto flutuante (0,1 g, 0,001 unidade). Usada pela
+     * conferência de saldo (`sync/BalanceAudit`).
+     */
+    public static final double ACERTO_MINIMO = 0.0001d;
+
+    /**
      * Tipos que gravam {@code quantity} com sinal, porque representam uma
      * correção de saldo e podem ir nos dois sentidos. Nos demais tipos o
      * sentido já está no próprio nome, e a quantidade é sempre positiva.
@@ -231,52 +238,6 @@ public final class MovementRepository {
         } catch (Exception e) {
             Log.e(TAG, "falha ao ajustar quantidade", e);
             return Result.fail("Erro ao ajustar a quantidade.");
-        } finally {
-            db.endTransaction();
-        }
-    }
-
-    /**
-     * Grava o ajuste que falta no histórico para ele explicar o saldo atual,
-     * <b>sem mexer no saldo</b>.
-     *
-     * É o contrário de {@link #setAbsolute}: ali a quantidade do produto muda
-     * e o histórico registra a mudança; aqui a quantidade já é a certa — quem
-     * está errado é o histórico, que não a explica inteira. Serve ao acerto de
-     * abertura ({@link OpeningBalance}), antes de os dados subirem para a
-     * nuvem, onde o saldo é a soma das movimentações.
-     *
-     * @param delta diferença a registrar, com sinal (saldo menos a soma do histórico).
-     */
-    public Result ledgerGapAdjustment(String productUuid, double delta, String note) {
-        if (productUuid == null) {
-            return Result.fail("Produto sem identificação.");
-        }
-        if (!OpeningBalance.worthAdjusting(delta)) {
-            return Result.fail("Nada a acertar.");
-        }
-
-        db.beginTransaction();
-        try {
-            Snapshot atual = readForUpdate(productUuid);
-            if (atual == null) {
-                return Result.fail("Produto não encontrado.");
-            }
-
-            // O produto não é tocado: nem `amount`, nem `updated_at`, nem
-            // `rev`. Mexer neles geraria uma operação de produto na fila e,
-            // pior, marcaria como alteração do cliente algo que ele não fez.
-            String movementUuid = insertMovement(productUuid, atual.name, AJUSTE, delta, note,
-                    System.currentTimeMillis());
-            if (movementUuid == null) {
-                return Result.fail("Não foi possível registrar o acerto.");
-            }
-
-            db.setTransactionSuccessful();
-            return Result.ok(atual.amount, movementUuid);
-        } catch (Exception e) {
-            Log.e(TAG, "falha ao acertar o histórico", e);
-            return Result.fail("Erro ao acertar o histórico.");
         } finally {
             db.endTransaction();
         }

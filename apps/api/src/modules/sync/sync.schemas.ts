@@ -246,6 +246,56 @@ export const pullResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Conferência de saldo
+// ---------------------------------------------------------------------------
+
+/**
+ * Página da conferência. Percorre os produtos por `id` (não por `changeSeq`),
+ * porque aqui não interessa o que mudou e sim o retrato completo.
+ */
+export const balancesQuerySchema = z
+  .object({
+    /** Último id da página anterior; vazio começa do início. */
+    after: z.string().uuid().optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional(),
+  })
+  .strict();
+
+export const balancesResponseSchema = z.object({
+  items: z.array(z.object({ id: z.string(), quantity: z.string() })),
+  /** Id para a próxima página, ou `null` quando acabou. */
+  nextAfter: z.string().nullable(),
+  hasMore: z.boolean(),
+  /**
+   * Posição da empresa no momento da leitura. O aparelho só pode confiar na
+   * comparação se o cursor dele for igual a este valor: qualquer alteração
+   * posterior explicaria a diferença sem haver defeito nenhum.
+   */
+  changeSeq: z.string(),
+  /**
+   * Quando a carga inicial desta empresa fechou, em milissegundos; `null` se
+   * ela nunca fez uma. Marca a fronteira entre o histórico que subiu como
+   * saldo declarado — incompleto por natureza — e os fatos posteriores. Só
+   * estes o aparelho pode repor: reenviar os antigos somaria duas vezes.
+   */
+  seededAt: z.number().int().nullable(),
+});
+
+/** Página dos identificadores de movimentação de um produto. */
+export const movementIdsQuerySchema = z
+  .object({
+    after: z.string().uuid().optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional(),
+  })
+  .strict();
+
+export const movementIdsResponseSchema = z.object({
+  items: z.array(z.string()),
+  nextAfter: z.string().nullable(),
+  hasMore: z.boolean(),
+});
+
+// ---------------------------------------------------------------------------
 // Conflitos
 // ---------------------------------------------------------------------------
 
@@ -309,3 +359,5 @@ export type MovementInput = z.infer<typeof movementInputSchema>;
 export type StartUploadBody = z.infer<typeof startUploadBodySchema>;
 export type UploadBatchBody = z.infer<typeof uploadBatchBodySchema>;
 export type CompleteUploadBody = z.infer<typeof completeUploadBodySchema>;
+export type BalancesQuery = z.infer<typeof balancesQuerySchema>;
+export type MovementIdsQuery = z.infer<typeof movementIdsQuerySchema>;

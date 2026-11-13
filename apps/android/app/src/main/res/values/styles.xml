@@ -9,6 +9,23 @@
         <item name="postSplashScreenTheme">@style/CustomActionBarTheme</item>
     </style>
 
+    <!-- Tela de abertura (SplashActivity): o fundo da janela já é o azul da
+         marca e não há barra de ação, então a splash nativa emenda nela sem
+         salto de cor nem um segundo "abrir". Ela não usa Theme.SplashScreen:
+         a própria Activity é a tela de espera, e deixar a splash do sistema
+         por cima dela esconderia o aviso de atualização. -->
+    <style name="Theme.App.Splash" parent="Theme.MaterialComponents.Light.NoActionBar.Bridge">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/color_brand</item>
+        <item name="android:statusBarColor">@color/color_brand</item>
+        <item name="android:navigationBarColor">@color/color_brand</item>
+        <item name="android:textColorPrimary">@color/color_text</item>
+        <item name="android:textColorSecondary">@color/color_text_muted</item>
+        <item name="materialButtonStyle">@style/Widget.Estoque.Button.Primary</item>
+    </style>
+
     <style name="CustomActionBarTheme" parent="Theme.MaterialComponents.Light.DarkActionBar.Bridge">
         <item name="android:actionBarStyle">@style/MyActionBar</item>
         <item name="actionBarStyle">@style/MyActionBar</item>

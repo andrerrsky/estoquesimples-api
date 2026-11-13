@@ -169,6 +169,62 @@ describe('carga inicial', () => {
     expect(custos).toEqual({ [p1.id]: 3.25, [p2.id]: null });
   });
 
+  it('movimentação que chega antes do produto fica ligada a ele no fim, sem mexer no saldo declarado', async () => {
+    // O aparelho pagina produtos e movimentações em lotes independentes, e o
+    // histórico pode chegar primeiro. Sem o vínculo, a conferência de saldo
+    // não reconheceria essas movimentações como recebidas e o aparelho as
+    // reenviaria todo dia — somando um saldo que já veio declarado.
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const p1 = produto({ quantity: 40 });
+    const start = await startUpload(user, workspaceId, 1, 2);
+    const { uploadId } = start.json();
+
+    const antigas = [
+      movimentacao(p1.id, { quantity: 25 }),
+      movimentacao(p1.id, { quantity: 15 }),
+    ];
+    // Lote 0: só o histórico. O produto só aparece no lote 1.
+    expect((await sendBatch(user, workspaceId, uploadId, {
+      batchIndex: 0, products: [], movements: antigas,
+    })).statusCode).toBe(200);
+    expect((await sendBatch(user, workspaceId, uploadId, {
+      batchIndex: 1, products: [p1], movements: [],
+    })).statusCode).toBe(200);
+
+    const complete = await context.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/sync/initial-upload/${uploadId}/complete`,
+      headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+      payload: { declaredProducts: 1, declaredMovements: 2 },
+    });
+    expect(complete.statusCode).toBe(200);
+
+    // O saldo continua o que o aparelho declarou: na carga inicial o
+    // histórico é incompleto por natureza e somá-lo daria outro número.
+    const [gravado] = await context.services.db
+      .select({ quantity: products.quantityCache })
+      .from(products)
+      .where(eq(products.id, p1.id));
+    expect(Number(gravado?.quantity)).toBe(40);
+
+    // E as duas estão vinculadas, logo a conferência as enxerga.
+    const vinculadas = await context.services.db
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(eq(stockMovements.productId, p1.id));
+    expect(vinculadas.map((m) => m.id).sort()).toEqual(antigas.map((m) => m.id).sort());
+
+    const historico = await context.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/sync/balances/${p1.id}/movements`,
+      headers: { ...user.authHeader, ...PROTOCOL_HEADER },
+    });
+    expect(historico.statusCode).toBe(200);
+    expect([...historico.json().items].sort()).toEqual(antigas.map((m) => m.id).sort());
+  });
+
   it('reenviar o mesmo lote não duplica nem soma duas vezes', async () => {
     const user = await registerUser(context);
     const workspaceId = await setupWorkspace(user);

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Atualização obrigatória: esta versão do app não pode mais ser usada.
+
+  É uma tela própria, e não um estado escondido da tela de abertura, porque
+  ela precisa aparecer sem depender de nada ter sido trocado em tempo de
+  execução — é a única saída que o cliente tem, e não pode falhar.
+-->
+<!-- Rola de propósito: com fonte em 200% ou em paisagem num telefone, o
+     conteúdo não cabe, e esta é a única saída que o cliente tem. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/splashUpdateScroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/color_surface"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/splashUpdate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="100dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="32dp"
+        android:paddingBottom="32dp">
+
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_cloud_upload"
+            app:tint="@color/color_brand" />
+
+        <TextView
+            android:id="@+id/splashUpdateTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:text="@string/splash_update_title"
+            android:textColor="@color/color_text"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/splashUpdateMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="@string/splash_update_message"
+            android:textColor="@color/color_text_muted"
+            android:textSize="15sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/splashUpdateButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:minHeight="52dp"
+            android:text="@string/splash_update_action"
+            android:textSize="16sp"
+            app:backgroundTint="@color/color_brand"
+            app:cornerRadius="@dimen/radius_button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/splashRetryButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:minHeight="48dp"
+            android:text="@string/splash_update_retry"
+            android:textColor="@color/color_brand" />
+
+        <!-- Saída de emergência. Nasce invisível e só aparece para quem já
+             viu esta tela algumas vezes: quem não consegue atualizar (loja
+             sem conta, aparelho antigo, armazenamento cheio) não pode ficar
+             sem acesso ao próprio estoque. Ver SplashActivity. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/splashSkipButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:minHeight="48dp"
+            android:text="@string/splash_update_skip"
+            android:textColor="@color/color_text_muted"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

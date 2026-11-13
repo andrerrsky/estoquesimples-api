@@ -18,6 +18,10 @@ import { ConflictsService } from './conflicts.service.js';
 import { InitialUploadService } from './initial-upload.service.js';
 import { SyncService } from './sync.service.js';
 import {
+  balancesQuerySchema,
+  balancesResponseSchema,
+  movementIdsQuerySchema,
+  movementIdsResponseSchema,
   completeUploadBodySchema,
   completeUploadResponseSchema,
   conflictsQuerySchema,
@@ -295,6 +299,62 @@ export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       return result;
+    },
+  );
+
+  /**
+   * Conferência de saldo: o aparelho compara o que mostra com o que a nuvem
+   * calculou. Só leitura, e de propósito fora do fluxo de `pull` — o pull
+   * entrega o que mudou, esta rota entrega o retrato inteiro.
+   */
+  routes.get(
+    '/workspaces/:workspaceId/sync/balances',
+    {
+      preHandler: [app.authenticate, requireWorkspace('produtos.ver')],
+      schema: {
+        tags: ['sincronizacao'],
+        summary: 'Saldo de cada produto vivo, para o aparelho conferir o dele',
+        description:
+          'Use o `changeSeq` devolvido: só vale comparar quando ele é igual ao cursor do aparelho. ' +
+          'Percorra as páginas com `after` até `hasMore` ser falso.',
+        security: [{ bearerAuth: [] }],
+        params: workspaceParams,
+        querystring: balancesQuerySchema,
+        response: { 200: balancesResponseSchema, ...commonErrors },
+      },
+    },
+    async (request) => {
+      const { workspaceId } = request.params;
+      await assertCanSync(request);
+      return inWorkspace(request, (tx) =>
+        sync.balances(tx, workspaceId, request.query, env.SYNC_DEFAULT_PAGE_SIZE),
+      );
+    },
+  );
+
+  /**
+   * Segunda etapa da conferência: o que a nuvem tem de histórico para um
+   * produto, para o aparelho reenviar o que só existe nele.
+   */
+  routes.get(
+    '/workspaces/:workspaceId/sync/balances/:productId/movements',
+    {
+      preHandler: [app.authenticate, requireWorkspace('movimentacoes.ver')],
+      schema: {
+        tags: ['sincronizacao'],
+        summary: 'Identificadores das movimentações que a nuvem tem para um produto',
+        security: [{ bearerAuth: [] }],
+        params: workspaceParams.extend({ productId: z.string().uuid() }),
+        querystring: movementIdsQuerySchema,
+        response: { 200: movementIdsResponseSchema, ...commonErrors },
+      },
+    },
+    async (request) => {
+      const { workspaceId, productId } = request.params;
+      await assertCanSync(request);
+      return inWorkspace(request, (tx) =>
+        sync.productMovementIds(tx, workspaceId, productId, request.query, env.SYNC_DEFAULT_PAGE_SIZE),
+      );
     },
   );
 

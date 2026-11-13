@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
 import { pgErrorCode, type Transaction } from '../../platform/db/client.js';
 import {
@@ -29,6 +29,8 @@ import {
   type Change,
   type Operation,
   type OperationResult,
+  type BalancesQuery,
+  type MovementIdsQuery,
   type PullQuery,
   type PushBody,
 } from './sync.schemas.js';
@@ -455,6 +457,10 @@ export class SyncService {
             eq(stockMovements.workspaceId, workspaceId),
             eq(stockMovements.intendedProductId, payload.id),
             isNull(stockMovements.productId),
+            // Só as que subiram por aqui. As da carga inicial são ligadas ao
+            // produto no fim da carga e não entram nesta conta: lá o saldo
+            // veio declarado do aparelho e já as inclui.
+            isNotNull(stockMovements.opId),
           ),
         )
         .returning({ quantity: stockMovements.quantity });
@@ -971,6 +977,138 @@ export class SyncService {
    * `changeSeq` já lido da empresa: como `next_change_seq` segura o lock da
    * linha até o commit, tudo ≤ esse valor está garantidamente visível.
    */
+  /**
+   * Retrato do saldo de cada produto vivo, para o aparelho conferir o dele.
+   *
+   * Existe porque os dois lados guardam o saldo de formas diferentes — campo
+   * do produto no aparelho, soma das movimentações aqui (regra 9) — e, até
+   * esta rota, nada comparava um com o outro: cada lado ficava internamente
+   * coerente e a divergência só aparecia quando o cliente reclamava.
+   *
+   * Devolve junto o `changeSeq` da empresa no instante da leitura. O aparelho
+   * só pode agir sobre a diferença se o cursor dele for esse mesmo: qualquer
+   * alteração que ele ainda não baixou explicaria o desencontro sem haver
+   * defeito nenhum.
+   */
+  async balances(
+    tx: Transaction,
+    workspaceId: string,
+    query: BalancesQuery,
+    limitePadrao: number,
+  ): Promise<{
+    items: { id: string; quantity: string }[];
+    nextAfter: string | null;
+    hasMore: boolean;
+    changeSeq: string;
+    seededAt: number | null;
+  }> {
+    const limite = query.limit ?? limitePadrao;
+
+    const linhas = await tx
+      .select({ id: products.id, quantity: products.quantityCache })
+      .from(products)
+      .where(
+        and(
+          eq(products.workspaceId, workspaceId),
+          isNull(products.deletedAt),
+          ...(query.after ? [gt(products.id, query.after)] : []),
+        ),
+      )
+      .orderBy(asc(products.id))
+      .limit(limite + 1);
+
+    // A posição é lida DEPOIS das linhas, e não antes: a transação roda em
+    // READ COMMITTED, então cada comando vê um retrato próprio. Lendo por
+    // último, uma gravação concorrente faz a posição ficar à frente do cursor
+    // do aparelho — que então adia a conferência. Na ordem inversa o aparelho
+    // receberia quantidades novas com uma posição velha, acharia que está
+    // tudo em dia e desfaria a alteração feita na web um instante antes.
+    //
+    // E a posição é o maior `change_seq` **entregue**, não o contador da
+    // empresa: o cursor do aparelho vem do `pull`, que devolve o seq da
+    // última alteração que ele leu. Um seq alocado e não gravado (uma troca
+    // que perdeu a corrida, por exemplo) deixa o contador à frente para
+    // sempre — e compará-lo com o cursor desligaria a conferência em
+    // silêncio, justamente nas empresas mais movimentadas.
+    const [posicao] = await tx.execute<{ change_seq: string }>(sql`
+      SELECT GREATEST(
+        (SELECT coalesce(max(change_seq), 0) FROM products WHERE workspace_id = ${workspaceId}),
+        (SELECT coalesce(max(change_seq), 0) FROM stock_movements WHERE workspace_id = ${workspaceId})
+      )::text AS change_seq
+    `).then((resultado) => resultado.rows);
+
+    const [empresa] = await tx
+      .select({ id: workspaces.id, seededAt: workspaces.seededAt })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId));
+
+    if (!empresa) {
+      throw new AppError(404, ErrorCode.NOT_FOUND, 'Empresa não encontrada.');
+    }
+
+    const hasMore = linhas.length > limite;
+    const items = hasMore ? linhas.slice(0, limite) : linhas;
+
+    return {
+      items: items.map((linha) => ({ id: linha.id, quantity: String(linha.quantity) })),
+      nextAfter: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      hasMore,
+      changeSeq: posicao?.change_seq ?? '0',
+      // Quando a carga inicial fechou. É a fronteira entre o histórico que
+      // subiu como saldo declarado — e que a nuvem pode nem ter em registro —
+      // e os fatos que vieram depois, um a um. Só estes últimos o aparelho
+      // pode repor: reenviar os antigos somaria um saldo já contado.
+      seededAt: empresa.seededAt ? empresa.seededAt.getTime() : null,
+    };
+  }
+
+  /**
+   * Identificadores das movimentações que a nuvem tem para um produto.
+   *
+   * Segunda etapa da conferência de saldo: sabendo quais a nuvem conhece, o
+   * aparelho descobre quais das suas nunca chegaram e as reenvia. É assim, e
+   * não com um ajuste de diferença, porque o que falta lá são fatos — e um
+   * ajuste sintético deixaria o histórico do aparelho sem explicar o próprio
+   * saldo, estragando a conferência, a exportação e a restauração de cópia.
+   */
+  async productMovementIds(
+    tx: Transaction,
+    workspaceId: string,
+    productId: string,
+    query: MovementIdsQuery,
+    limitePadrao: number,
+  ): Promise<{ items: string[]; nextAfter: string | null; hasMore: boolean }> {
+    const limite = query.limit ?? limitePadrao;
+
+    const linhas = await tx
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.workspaceId, workspaceId),
+          // O vínculo pretendido conta como vínculo: a movimentação que
+          // chegou antes do produto está na nuvem, e tratá-la como ausente
+          // faria o aparelho reenviá-la todo dia sem nunca mudar nada.
+          or(
+            eq(stockMovements.productId, productId),
+            and(isNull(stockMovements.productId), eq(stockMovements.intendedProductId, productId)),
+          ),
+          ...(query.after ? [gt(stockMovements.id, query.after)] : []),
+        ),
+      )
+      .orderBy(asc(stockMovements.id))
+      .limit(limite + 1);
+
+    const hasMore = linhas.length > limite;
+    const items = hasMore ? linhas.slice(0, limite) : linhas;
+
+    return {
+      items: items.map((linha) => linha.id),
+      nextAfter: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      hasMore,
+    };
+  }
+
   async pull(
     tx: Transaction,
     workspaceId: string,

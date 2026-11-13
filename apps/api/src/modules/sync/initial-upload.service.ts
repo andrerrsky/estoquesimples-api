@@ -279,6 +279,26 @@ export class InitialUploadService {
       );
     }
 
+    // Movimentação que chegou antes do produto fica com o vínculo só
+    // pretendido. Agora que todos os lotes passaram, ela ganha o produto de
+    // verdade — e o saldo não se mexe: na carga inicial ele veio declarado do
+    // aparelho e já conta essa movimentação. Somá-la aqui dobraria o estoque,
+    // que foi exatamente o defeito que tirou a versão 35 da loja.
+    //
+    // Fazer isso agora, e não deixar para a adoção do envio incremental, é o
+    // que impede que um upsert posterior do produto recalcule o saldo a
+    // partir de um histórico legado que sempre foi incompleto.
+    await tx.execute(sql`
+      UPDATE stock_movements m
+      SET product_id = m.intended_product_id, intended_product_id = NULL
+      FROM products p
+      WHERE m.workspace_id = ${workspaceId}
+        AND m.product_id IS NULL
+        AND m.op_id IS NULL
+        AND m.intended_product_id = p.id
+        AND p.workspace_id = ${workspaceId}
+    `);
+
     await tx
       .update(initialUploads)
       .set({ status: 'concluida', completedAt: new Date() })
@@ -417,6 +437,11 @@ export class InitialUploadService {
       // O produto pode não ter chegado ainda, ou nem existir. A chave
       // estrangeira recusaria a movimentação inteira; guardar o vínculo como
       // nulo preserva o registro histórico, que é o que o usuário consulta.
+      //
+      // O vínculo pretendido fica guardado à parte: é ele que permite ligar a
+      // movimentação ao produto quando o lote dele chegar (ver `complete`) e,
+      // enquanto isso, reconhecê-la como já recebida — sem isso o aparelho a
+      // considera perdida e a reenvia todo dia, para sempre.
       const productExists = entry.productId
         ? await this.productExists(tx, workspaceId, entry.productId)
         : false;
@@ -427,6 +452,7 @@ export class InitialUploadService {
           id: entry.id,
           workspaceId,
           productId: productExists ? entry.productId : null,
+          intendedProductId: productExists ? null : (entry.productId ?? null),
           productName: entry.productName ?? null,
           type: entry.changeType.toLowerCase(),
           quantity: String(entry.quantity),

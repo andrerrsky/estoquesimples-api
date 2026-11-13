@@ -104,4 +104,13 @@
     <string name="promo_card_title">Oferta de Black Friday</string>
     <string name="promo_card_cta">Ver oferta</string>
     <string name="promo_card_close">Fechar oferta</string>
+    <!-- Tela de abertura (SplashActivity) -->
+    <string name="splash_checking">Verificando atualizações…</string>
+    <string name="splash_update_title">Atualize para continuar</string>
+    <string name="splash_update_message">Esta versão do app não é mais compatível com o seu estoque na nuvem. A atualização é rápida e os seus dados continuam no aparelho.</string>
+    <string name="splash_update_action">Atualizar agora</string>
+    <string name="splash_update_retry">Já atualizei, verificar de novo</string>
+    <string name="splash_update_store_missing">Não foi possível abrir a loja neste aparelho.</string>
+    <string name="splash_update_skip">Não consigo atualizar agora</string>
+    <string name="splash_update_skip_granted">Tudo bem. Você pode usar o app por hoje; amanhã vamos pedir a atualização de novo.</string>
 </resources>

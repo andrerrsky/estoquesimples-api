@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tela de abertura: confere se esta versão ainda pode ser usada antes de
+  liberar o app (ver SplashActivity). Só o estado "verificando" mora aqui; o
+  bloqueio é outro layout, trocado por setContentView, porque ele é a única
+  saída do cliente e não pode depender de uma troca de visibilidade.
+
+  O fundo é o azul da marca e o ícone é o mesmo da splash nativa: as duas
+  emendam sem salto de cor, e para quem abre o app existe uma só abertura.
+  Tudo é centrado, então funciona igual em telefone estreito e em tablet.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/color_brand"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/splashChecking"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal">
+
+        <ImageView
+            android:layout_width="108dp"
+            android:layout_height="108dp"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_splash_icon" />
+
+        <!-- Altura fixa: o spinner ocupa seu lugar sem empurrar o ícone, que
+             é o que faria a emenda com a abertura do sistema saltar. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="128dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/splashSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                app:indicatorColor="@color/color_text_on_brand"
+                app:indicatorSize="30dp"
+                app:trackColor="@color/color_ripple_on_brand"
+                app:trackThickness="3dp" />
+
+            <TextView
+                android:id="@+id/splashStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/splash_checking"
+                android:textColor="@color/color_text_on_brand_muted"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

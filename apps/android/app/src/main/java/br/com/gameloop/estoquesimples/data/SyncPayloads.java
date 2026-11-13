@@ -20,7 +20,7 @@ import java.util.Set;
  * não tocou e o {@code rev} resultante. Montar a partir do formulário faria a
  * nuvem receber uma versão do registro que nunca existiu no aparelho.
  */
-final class SyncPayloads {
+public final class SyncPayloads {
 
     private static final String TAG = "SyncPayloads";
 
@@ -172,7 +172,11 @@ final class SyncPayloads {
         }
     }
 
-    static JSONObject movement(SQLiteDatabase db, String uuid) {
+    /**
+     * Público porque a conferência de saldo (`sync/BalanceAudit`) remonta o
+     * payload de uma movimentação já gravada para reenviá-la à nuvem.
+     */
+    public static JSONObject movement(SQLiteDatabase db, String uuid) {
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(

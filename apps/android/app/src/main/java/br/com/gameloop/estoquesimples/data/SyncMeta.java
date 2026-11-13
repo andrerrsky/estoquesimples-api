@@ -58,11 +58,28 @@ public final class SyncMeta {
     public static final String RECONCILIAR = "reconciliar_apos_restauracao";
 
     /**
-     * O acerto de abertura ({@link OpeningBalance}) já rodou neste aparelho.
-     * Ele compara o saldo de cada produto com a soma do histórico uma única
-     * vez, antes de os dados subirem; repetir só criaria ajustes de zero.
+     * Quando a última conferência de saldo contra a nuvem terminou (millis).
+     * Ver `sync/BalanceAudit.java`: ela roda no máximo uma vez por dia, ao fim
+     * de uma sincronização limpa.
      */
-    public static final String ACERTO_ABERTURA = "acerto_abertura";
+    public static final String ULTIMA_CONFERENCIA_SALDO = "ultima_conferencia_saldo";
+
+    /**
+     * Maior rowid de movimentação existente quando a carga inicial fechou.
+     *
+     * Divide o histórico em duas eras. O que é anterior a esta marca já está
+     * contado no saldo que a carga enviou declarado — a nuvem pode nem ter o
+     * registro, e reenviá-lo somaria duas vezes. Só o que veio depois pode
+     * ser reposto pela conferência de saldo.
+     */
+    public static final String CORTE_CARGA_INICIAL = "corte_carga_inicial";
+
+    /**
+     * Esta conta não pode ler o histórico de movimentações, então a
+     * conferência de saldo não tem como funcionar aqui. Gravado na primeira
+     * recusa, para não repetir o download do catálogo a cada rodada.
+     */
+    public static final String CONFERENCIA_SALDO_PROIBIDA = "conferencia_saldo_proibida";
 
     private final SQLiteDatabase db;
 

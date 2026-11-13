@@ -244,11 +244,32 @@ public class MainActivity extends BaseActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Precisa vir antes de super.onCreate(): é isso que troca o tema desta
-        // Activity de volta para o CustomActionBarTheme assim que a splash sai.
-        androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
-
+        // A abertura do app é da SplashActivity, que confere a versão antes de
+        // chegar aqui; esta tela não instala mais a splash do sistema.
         super.onCreate(savedInstanceState);
+
+        // Notificação, atalho da tela inicial e link externo abrem esta tela
+        // direto, sem passar pela abertura — e passariam por cima de um
+        // bloqueio de versão. Aqui a porta é fechada também por dentro.
+        if (new br.com.gameloop.estoquesimples.sync.RemoteConfig(this).isUpdateBlocking()) {
+            Intent paraAbertura = new Intent(this, SplashActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            // O destino não se perde: quem veio de uma notificação chega nele
+            // assim que atualizar, em vez de cair na tela inicial.
+            Intent origem = getIntent();
+            if (origem != null) {
+                if (origem.getExtras() != null) {
+                    paraAbertura.putExtras(origem.getExtras());
+                }
+                if (origem.getData() != null) {
+                    paraAbertura.setData(origem.getData());
+                }
+            }
+            startActivity(paraAbertura);
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_main);
 
         CurrencyHelper.warmUp(this);

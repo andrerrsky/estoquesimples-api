@@ -4,10 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   products,
+  stockMovements,
   syncCursors,
   workspaceMembers,
   workspaces,
 } from '../../src/platform/db/schema/index.js';
+import { clearPermissionCache } from '../../src/platform/http/authorize.js';
 import type { SubscriptionPurchaseV2 } from '../../src/modules/billing/play-client.js';
 import {
   createTestApp,
@@ -751,6 +753,248 @@ describe('leitura incremental', () => {
       .from(syncCursors)
       .where(eq(syncCursors.workspaceId, workspaceId));
     expect(registro?.cursor).toBe(cursor);
+  });
+});
+
+describe('conferência de saldo', () => {
+  async function balances(user: RegisteredUser, workspaceId: string, query = '') {
+    return context.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/sync/balances${query ? `?${query}` : ''}`,
+      headers: { ...user.authHeader, ...PROTOCOL },
+    });
+  }
+
+  it('devolve o saldo de cada produto vivo com a posição da empresa', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produto = upsertProduto();
+    const outro = upsertProduto();
+    await push(user, workspaceId, [produto, outro]);
+    await push(user, workspaceId, [
+      movimentacao(produto.entityId, { payload: { quantity: 12 } }),
+      movimentacao(outro.entityId, { payload: { quantity: 4 } }),
+    ]);
+
+    const resposta = await balances(user, workspaceId);
+    expect(resposta.statusCode).toBe(200);
+    const corpo = resposta.json();
+    const porId = new Map<string, string>(corpo.items.map((item: { id: string; quantity: string }) => [item.id, item.quantity]));
+    expect(Number(porId.get(produto.entityId))).toBe(12);
+    expect(Number(porId.get(outro.entityId))).toBe(4);
+    expect(corpo.hasMore).toBe(false);
+    expect(corpo.nextAfter).toBeNull();
+
+    // O cursor do pull e o changeSeq da conferência precisam bater, senão o
+    // aparelho não tem como saber se a diferença é defeito ou atraso.
+    const lido = await pull(user, workspaceId, 0);
+    expect(corpo.changeSeq).toBe(lido.json().nextCursor);
+
+    // Empresa que nasceu na nuvem não tem carga inicial: todo o histórico
+    // subiu um a um, e o aparelho pode repor qualquer parte dele.
+    expect(corpo.seededAt).toBeNull();
+  });
+
+  it('informa quando a carga inicial fechou, que é a fronteira do que o aparelho pode repor', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const antes = Date.now();
+    await context.services.db
+      .update(workspaces)
+      .set({ seededAt: new Date(antes) })
+      .where(eq(workspaces.id, workspaceId));
+
+    const corpo = (await balances(user, workspaceId)).json();
+    // Sem esta data, o aparelho que fechou a carga numa versão antiga do app
+    // não teria como separar o histórico legado — que subiu como saldo
+    // declarado — dos fatos posteriores, e não repararia nada.
+    expect(corpo.seededAt).toBe(antes);
+  });
+
+  it('o saldo conferido é sempre a soma das movimentações, inclusive com saída e cancelamento', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produto = upsertProduto();
+    await push(user, workspaceId, [produto]);
+    const entrada = movimentacao(produto.entityId, { payload: { quantity: 20 } });
+    const saida = movimentacao(produto.entityId, { payload: { changeType: 'saida', quantity: -8 } });
+    await push(user, workspaceId, [entrada, saida]);
+
+    const corpo = (await balances(user, workspaceId)).json();
+    const saldo = Number(corpo.items.find((item: { id: string }) => item.id === produto.entityId)?.quantity);
+    expect(saldo).toBe(12);
+
+    const somado = await context.services.db.execute<{ total: string }>(
+      sql`SELECT coalesce(sum(quantity), 0)::text AS total FROM stock_movements WHERE product_id = ${produto.entityId}`,
+    );
+    expect(Number(somado.rows[0]?.total)).toBe(saldo);
+  });
+
+  it('pagina por id, não repete nem pula produto, e omite os excluídos', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produtos = [upsertProduto(), upsertProduto(), upsertProduto(), upsertProduto()];
+    await push(user, workspaceId, produtos);
+    const excluido = produtos[3]!.entityId;
+    const exclusao = await push(user, workspaceId, [
+      {
+        opId: randomUUID(),
+        entity: 'produto' as const,
+        op: 'delete' as const,
+        entityId: excluido,
+        payload: { id: excluido, deletedAt: Date.now(), rev: 1 },
+      },
+    ]);
+    expect(exclusao.json().results[0].status).toBe('aplicada');
+
+    const vistos: string[] = [];
+    let after = '';
+    for (let pagina = 0; pagina < 10; pagina++) {
+      const corpo = (await balances(user, workspaceId, `limit=2${after ? `&after=${after}` : ''}`)).json();
+      vistos.push(...corpo.items.map((item: { id: string }) => item.id));
+      if (!corpo.hasMore) break;
+      after = corpo.nextAfter;
+    }
+
+    expect(new Set(vistos).size).toBe(vistos.length);
+    expect(vistos.sort()).toEqual(produtos.slice(0, 3).map((p) => p.entityId).sort());
+  });
+
+  it('lista os ids das movimentações do produto, paginando por id', async () => {
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produto = upsertProduto();
+    const outro = upsertProduto();
+    await push(user, workspaceId, [produto, outro]);
+    const movimentacoes = [
+      movimentacao(produto.entityId, { payload: { quantity: 3 } }),
+      movimentacao(produto.entityId, { payload: { quantity: 5 } }),
+      movimentacao(produto.entityId, { payload: { quantity: 7 } }),
+    ];
+    await push(user, workspaceId, [...movimentacoes, movimentacao(outro.entityId, { payload: { quantity: 9 } })]);
+
+    const vistos: string[] = [];
+    let after = '';
+    for (let pagina = 0; pagina < 10; pagina += 1) {
+      const resposta = await context.app.inject({
+        method: 'GET',
+        url: `/v1/workspaces/${workspaceId}/sync/balances/${produto.entityId}/movements?limit=2${after ? `&after=${after}` : ''}`,
+        headers: { ...user.authHeader, ...PROTOCOL },
+      });
+      expect(resposta.statusCode).toBe(200);
+      const corpo = resposta.json();
+      vistos.push(...corpo.items);
+      if (!corpo.hasMore) break;
+      after = corpo.nextAfter;
+    }
+
+    // Exatamente as deste produto, sem repetir nem vazar as do vizinho: é
+    // dessa lista que o aparelho descobre o que precisa reenviar.
+    expect(new Set(vistos).size).toBe(vistos.length);
+    expect(vistos.sort()).toEqual(movimentacoes.map((m) => m.entityId).sort());
+  });
+
+  it('reenviar movimentação que a nuvem já tem não mexe no saldo', async () => {
+    // É a propriedade central do desenho: a conferência repõe fatos, e um
+    // fato que já está lá precisa ser inofensivo. Sem isso, um reenvio por
+    // engano inflaria o estoque — o defeito que tirou a versão 35 da loja.
+    const user = await registerUser(context);
+    const workspaceId = await setupWorkspace(user);
+
+    const produto = upsertProduto();
+    await push(user, workspaceId, [produto]);
+    const lancamento = movimentacao(produto.entityId, { payload: { quantity: 15 } });
+    await push(user, workspaceId, [lancamento]);
+
+    const antes = (await balances(user, workspaceId)).json();
+    expect(Number(antes.items.find((i: { id: string }) => i.id === produto.entityId)?.quantity)).toBe(15);
+
+    // O mesmo fato, com outro opId: é exatamente o que o aparelho manda ao
+    // reenviar uma movimentação que ele acha que se perdeu.
+    const reenvio = await push(user, workspaceId, [{ ...lancamento, opId: randomUUID() }]);
+    expect(reenvio.statusCode).toBe(200);
+    expect(['aplicada', 'duplicada']).toContain(reenvio.json().results[0].status);
+
+    const depois = (await balances(user, workspaceId)).json();
+    expect(Number(depois.items.find((i: { id: string }) => i.id === produto.entityId)?.quantity)).toBe(15);
+
+    const [linha] = await context.services.db
+      .select({ total: sql<string>`count(*)::text` })
+      .from(stockMovements)
+      .where(eq(stockMovements.id, lancamento.entityId));
+    expect(Number(linha?.total)).toBe(1);
+  });
+
+  it('conta sem permissão de ver movimentações recebe 403, e não uma lista vazia', async () => {
+    // O aparelho precisa distinguir "não há o que repor" de "não posso
+    // olhar": no segundo caso ele desliga a conferência, senão rebaixaria o
+    // catálogo inteiro em toda rodada sem nunca reparar nada.
+    const dono = await registerUser(context);
+    const workspaceId = await setupWorkspace(dono);
+    const produto = upsertProduto();
+    await push(dono, workspaceId, [produto]);
+
+    const consulta = await registerUser(context);
+    await context.services.db.insert(workspaceMembers).values({
+      workspaceId,
+      userId: consulta.userId,
+      roleKey: 'consulta',
+      status: 'active',
+      invitedBy: dono.userId,
+    });
+    // Papel sob medida: todos os de fábrica veem movimentações, mas o
+    // conjunto é dado de sistema e pode mudar por migration.
+    await context.services.db.execute(
+      sql`DELETE FROM role_permissions WHERE role_key = 'consulta' AND permission_key = 'movimentacoes.ver'`,
+    );
+    clearPermissionCache();
+    const sessao = await loginUser(context, consulta.email, VALID_PASSWORD);
+
+    try {
+      expect((await balances(sessao, workspaceId)).statusCode).toBe(200);
+
+      const historico = await context.app.inject({
+        method: 'GET',
+        url: `/v1/workspaces/${workspaceId}/sync/balances/${produto.entityId}/movements`,
+        headers: { ...sessao.authHeader, ...PROTOCOL },
+      });
+      expect(historico.statusCode).toBe(403);
+    } finally {
+      await context.services.db.execute(
+        sql`INSERT INTO role_permissions (role_key, permission_key) VALUES ('consulta', 'movimentacoes.ver')
+            ON CONFLICT DO NOTHING`,
+      );
+      clearPermissionCache();
+    }
+  });
+
+  it('quem não participa da empresa não enxerga o histórico do produto', async () => {
+    const dono = await registerUser(context);
+    const workspaceId = await setupWorkspace(dono);
+    const produto = upsertProduto();
+    await push(dono, workspaceId, [produto]);
+    const estranho = await registerUser(context);
+
+    const resposta = await context.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/sync/balances/${produto.entityId}/movements`,
+      headers: { ...estranho.authHeader, ...PROTOCOL },
+    });
+    expect(resposta.statusCode).toBe(404);
+  });
+
+  it('quem não participa da empresa não enxerga saldo nenhum', async () => {
+    const dono = await registerUser(context);
+    const workspaceId = await setupWorkspace(dono);
+    const estranho = await registerUser(context);
+
+    // 404 e não 403: para quem não participa, a empresa não existe.
+    expect((await balances(estranho, workspaceId)).statusCode).toBe(404);
   });
 });
 

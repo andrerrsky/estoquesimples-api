@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS stock_movements_workspace_intended_id_idx;
+DROP INDEX IF EXISTS stock_movements_workspace_product_id_idx;
+DROP INDEX IF EXISTS stock_products_workspace_id_idx;

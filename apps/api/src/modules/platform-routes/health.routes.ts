@@ -143,6 +143,19 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
               maxBatchItems: z.number().int(),
               defaultPageSize: z.number().int(),
             }),
+            /**
+             * Versões do app Android. `minRequiredVersionCode` é a única
+             * coisa que bloqueia o uso do aplicativo inteiro, e por isso é
+             * separada de `sync.minAppVersionCode`, que só pausa a nuvem: um
+             * app offline-first não deve parar de funcionar por não conseguir
+             * sincronizar. Zero (o padrão) não bloqueia ninguém.
+             */
+            app: z.object({
+              minRequiredVersionCode: z.number().int(),
+              latestVersionCode: z.number().int(),
+              updateUrl: z.string(),
+              message: z.string().nullable(),
+            }),
             entitlements: z.object({ offlineGraceDays: z.number().int() }),
           }),
         },
@@ -163,6 +176,44 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
         minAppVersionCode?: number;
       };
 
+      // Bloqueio de versão: vive em `app_config` com a chave `app`, para ser
+      // ligado sem redeploy quando uma versão quebrada precisar sair de
+      // circulação depressa.
+      const appOverrides = await db
+        .select({ value: appConfig.value })
+        .from(appConfig)
+        .where(eq(appConfig.key, 'app'))
+        .limit(1)
+        .catch(() => []);
+
+      // Validado, e não convertido com `as`: este bloco é editado à mão no
+      // banco, e um valor de tipo errado faria o schema de resposta recusar a
+      // serialização — 500 em `/v1/config` para toda a base instalada, que é
+      // justamente a rota por onde o app decide se pode sincronizar e se pode
+      // abrir. Valor inválido cai no padrão, que não bloqueia ninguém.
+      const appOverrideSchema = z
+        .object({
+          minRequiredVersionCode: z.number().int().nonnegative().max(100_000).optional(),
+          latestVersionCode: z.number().int().nonnegative().max(100_000).optional(),
+          updateUrl: z.string().url().max(500).optional(),
+          message: z.string().max(300).nullable().optional(),
+        })
+        .partial();
+      const parsed = appOverrideSchema.safeParse(appOverrides[0]?.value ?? {});
+      if (!parsed.success) {
+        app.log.error({ alerta: true, erros: parsed.error.issues }, 'app_config.app inválido; usando o padrão');
+      }
+      const appOverride = parsed.success ? parsed.data : {};
+
+      // Exigir uma versão que nem existe na loja deixaria a base inteira sem
+      // saída. Quando as duas estão configuradas, a obrigatória nunca passa
+      // da mais nova publicada.
+      const latestVersionCode = appOverride.latestVersionCode ?? 0;
+      const minRequiredVersionCode =
+        latestVersionCode > 0
+          ? Math.min(appOverride.minRequiredVersionCode ?? 0, latestVersionCode)
+          : (appOverride.minRequiredVersionCode ?? 0);
+
       return {
         sync: {
           enabled: override.enabled ?? env.FEATURE_SYNC_ENABLED,
@@ -171,6 +222,14 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
           minAppVersionCode: override.minAppVersionCode ?? env.FEATURE_SYNC_MIN_APP_VERSION_CODE,
           maxBatchItems: env.SYNC_MAX_BATCH_ITEMS,
           defaultPageSize: env.SYNC_DEFAULT_PAGE_SIZE,
+        },
+        app: {
+          minRequiredVersionCode,
+          latestVersionCode,
+          updateUrl:
+            appOverride.updateUrl ??
+            'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples',
+          message: appOverride.message ?? null,
         },
         entitlements: { offlineGraceDays: env.ENTITLEMENT_OFFLINE_MAX_DAYS },
       };

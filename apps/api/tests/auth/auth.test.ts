@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -620,6 +621,33 @@ describe('infraestrutura', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().sync.enabled).toBe(true);
     expect(response.json().sync.protocolVersion).toBe(1);
+  });
+
+  it('sem configuração de versão, nenhum app é bloqueado', async () => {
+    const corpo = (await context.app.inject({ method: 'GET', url: '/v1/config' })).json();
+    expect(corpo.app.minRequiredVersionCode).toBe(0);
+    expect(corpo.app.updateUrl).toContain('play.google.com');
+    expect(corpo.app.message).toBeNull();
+  });
+
+  it('a versão mínima obrigatória vem de app_config e não se confunde com a da sincronização', async () => {
+    await context.services.db.execute(
+      sql`INSERT INTO app_config (key, value) VALUES ('app', ${JSON.stringify({
+        minRequiredVersionCode: 42,
+        latestVersionCode: 45,
+        message: 'Atualize para continuar usando.',
+      })}::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+    );
+
+    const corpo = (await context.app.inject({ method: 'GET', url: '/v1/config' })).json();
+    expect(corpo.app.minRequiredVersionCode).toBe(42);
+    expect(corpo.app.latestVersionCode).toBe(45);
+    expect(corpo.app.message).toBe('Atualize para continuar usando.');
+    // Bloquear o app é decisão separada de pausar a nuvem.
+    expect(corpo.sync.minAppVersionCode).not.toBe(42);
+
+    await context.services.db.execute(sql`DELETE FROM app_config WHERE key = 'app'`);
   });
 
   it('permite desligar a sincronização por configuração', async () => {
