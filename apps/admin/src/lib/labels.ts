@@ -246,6 +246,8 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'workspace.deleted': { label: 'Empresa excluída', tone: 'error' },
   'workspace.purged': { label: 'Empresa apagada definitivamente (90 dias após a exclusão)', tone: 'error' },
   'workspace.ownership_transferred': { label: 'Propriedade transferida', tone: 'warning' },
+  'workspace.courtesy_granted': { label: 'Dias de cortesia dados', tone: 'success' },
+  'workspace.courtesy_revoked': { label: 'Cortesia revogada', tone: 'warning' },
   'member.role_changed': { label: 'Papel de membro alterado', tone: 'info' },
   'member.removed': { label: 'Membro removido', tone: 'warning' },
   'member.suspended': { label: 'Membro suspenso', tone: 'warning' },
