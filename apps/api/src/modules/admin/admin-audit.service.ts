@@ -40,6 +40,9 @@ export const AdminAction = {
   WORKSPACE_BRAND_BLOCKED: 'workspace.brand_blocked',
   WORKSPACE_BRAND_UNBLOCKED: 'workspace.brand_unblocked',
   WORKSPACE_OWNERSHIP_TRANSFERRED: 'workspace.ownership_transferred',
+  /** Dias de cortesia dados ao cliente (migration 0038). */
+  WORKSPACE_COURTESY_GRANTED: 'workspace.courtesy_granted',
+  WORKSPACE_COURTESY_REVOKED: 'workspace.courtesy_revoked',
   WORKSPACE_MEMBER_ROLE_CHANGED: 'workspace.member_role_changed',
   WORKSPACE_MEMBER_STATUS_CHANGED: 'workspace.member_status_changed',
   WORKSPACE_MEMBER_REMOVED: 'workspace.member_removed',

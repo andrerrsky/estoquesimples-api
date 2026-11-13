@@ -34,6 +34,9 @@ export const AuditAction = {
   WORKSPACE_DELETED: 'workspace.deleted',
   WORKSPACE_PURGED: 'workspace.purged',
   WORKSPACE_OWNERSHIP_TRANSFERRED: 'workspace.ownership_transferred',
+  /** Acesso estendido pelo suporte, sem cobrança (migration 0038). */
+  WORKSPACE_COURTESY_GRANTED: 'workspace.courtesy_granted',
+  WORKSPACE_COURTESY_REVOKED: 'workspace.courtesy_revoked',
   MEMBER_ROLE_CHANGED: 'member.role_changed',
   MEMBER_REMOVED: 'member.removed',
   MEMBER_SUSPENDED: 'member.suspended',

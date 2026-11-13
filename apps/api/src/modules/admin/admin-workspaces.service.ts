@@ -1,7 +1,11 @@
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 
 import {
+  courtesyGrants,
   invites,
+  planFeatures,
+  plans,
+  platformAdmins,
   subscriptions,
   users,
   workspaceMembers,
@@ -18,6 +22,20 @@ import { OWNER_ROLE } from '../workspaces/workspaces.service.js';
 import { AdminAction, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
 import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
+
+/** Uma concessão de dias de cortesia, como a ficha da empresa a mostra. */
+export interface CourtesyView {
+  id: string;
+  days: number;
+  planKey: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  reason: string | null;
+  grantedByEmail: string | null;
+  revokedAt: string | null;
+  createdAt: string | null;
+  active: boolean;
+}
 
 export interface WorkspaceListFilters extends PaginationQuery {
   q?: string;
@@ -540,6 +558,154 @@ export class AdminWorkspacesService {
         metadata: { fields: ['name'], origem: 'suporte' },
       });
     });
+  }
+
+  /**
+   * Dá dias de acesso sem cobrança.
+   *
+   * Serve ao caso em que falhamos com um cliente e o reembolso encerraria a
+   * relação: devolver tempo mantém a conta de pé e dá chance de a correção
+   * provar o seu valor. A assinatura **não** é tocada — ela é o espelho do
+   * que o Google ou o Asaas dizem, e escrever nela seria perder o acerto na
+   * próxima reconciliação.
+   *
+   * A cortesia começa onde o acesso já garantido termina (fim do período
+   * pago, carência ou outra cortesia em vigor), nunca em cima do que a pessoa
+   * já tinha: dar 30 dias a quem pagou até dezembro é acesso até janeiro.
+   */
+  async grantCourtesy(
+    actor: AdminActor,
+    workspaceId: string,
+    input: { days: number; planKey: string; reason: string },
+  ): Promise<{ startsAt: Date; endsAt: Date }> {
+    const inicio = await new BillingService(this.services).accessGuaranteedUntil(workspaceId);
+    const fim = new Date(inicio.getTime() + input.days * 86_400_000);
+
+    return this.db.transaction(async (tx) => {
+      const workspace = await this.lock(tx, workspaceId);
+      if (workspace.deletedAt) {
+        throw conflict(ErrorCode.CONFLICT, 'A empresa está excluída.');
+      }
+
+      const [plano] = await tx.select({ key: plans.key }).from(plans).where(eq(plans.key, input.planKey));
+      if (!plano) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Plano desconhecido.');
+
+      const [grant] = await tx
+        .insert(courtesyGrants)
+        .values({
+          workspaceId,
+          planKey: input.planKey,
+          days: input.days,
+          startsAt: inicio,
+          endsAt: fim,
+          reason: input.reason,
+          grantedBy: actor.adminId,
+        })
+        .returning({ id: courtesyGrants.id });
+
+      await recordAdminAudit(tx, {
+        actor,
+        action: AdminAction.WORKSPACE_COURTESY_GRANTED,
+        targetType: 'workspace',
+        targetId: workspaceId,
+        metadata: {
+          grantId: grant?.id,
+          days: input.days,
+          planKey: input.planKey,
+          startsAt: inicio.toISOString(),
+          endsAt: fim.toISOString(),
+          reason: input.reason,
+        },
+      });
+      await recordAudit(tx, {
+        workspaceId,
+        action: AuditAction.WORKSPACE_COURTESY_GRANTED,
+        entityType: 'workspace',
+        entityId: workspaceId,
+        metadata: { days: input.days, planKey: input.planKey, endsAt: fim.toISOString(), origem: 'suporte' },
+      });
+
+      return { startsAt: inicio, endsAt: fim };
+    });
+  }
+
+  /**
+   * Desfaz uma concessão. A linha fica, com a marca de quem revogou: o
+   * histórico de uma cortesia dada por engano importa tanto quanto o dela.
+   */
+  async revokeCourtesy(
+    actor: AdminActor,
+    workspaceId: string,
+    grantId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await this.lock(tx, workspaceId);
+
+      const [grant] = await tx
+        .select()
+        .from(courtesyGrants)
+        .where(and(eq(courtesyGrants.id, grantId), eq(courtesyGrants.workspaceId, workspaceId)))
+        .for('update');
+      if (!grant) throw notFound('Cortesia não encontrada.');
+      if (grant.revokedAt) throw conflict(ErrorCode.CONFLICT, 'Esta cortesia já foi revogada.');
+
+      await tx
+        .update(courtesyGrants)
+        .set({ revokedAt: new Date(), revokedBy: actor.adminId })
+        .where(eq(courtesyGrants.id, grantId));
+
+      await recordAdminAudit(tx, {
+        actor,
+        action: AdminAction.WORKSPACE_COURTESY_REVOKED,
+        targetType: 'workspace',
+        targetId: workspaceId,
+        metadata: { grantId, days: grant.days, endsAt: grant.endsAt.toISOString(), reason },
+      });
+      await recordAudit(tx, {
+        workspaceId,
+        action: AuditAction.WORKSPACE_COURTESY_REVOKED,
+        entityType: 'workspace',
+        entityId: workspaceId,
+        metadata: { days: grant.days, origem: 'suporte' },
+      });
+    });
+  }
+
+  /** Concessões desta empresa, da mais recente para a mais antiga. */
+  async listCourtesies(workspaceId: string): Promise<CourtesyView[]> {
+    const linhas = await this.db
+      .select({
+        id: courtesyGrants.id,
+        days: courtesyGrants.days,
+        planKey: courtesyGrants.planKey,
+        startsAt: courtesyGrants.startsAt,
+        endsAt: courtesyGrants.endsAt,
+        reason: courtesyGrants.reason,
+        revokedAt: courtesyGrants.revokedAt,
+        createdAt: courtesyGrants.createdAt,
+        grantedByEmail: platformAdmins.email,
+      })
+      .from(courtesyGrants)
+      .leftJoin(platformAdmins, eq(platformAdmins.id, courtesyGrants.grantedBy))
+      .where(eq(courtesyGrants.workspaceId, workspaceId))
+      .orderBy(desc(courtesyGrants.createdAt))
+      .limit(50);
+
+    const agora = Date.now();
+    return linhas.map((linha) => ({
+      id: linha.id,
+      days: linha.days,
+      planKey: linha.planKey,
+      startsAt: iso(linha.startsAt),
+      endsAt: iso(linha.endsAt),
+      reason: linha.reason,
+      grantedByEmail: linha.grantedByEmail,
+      revokedAt: iso(linha.revokedAt),
+      createdAt: iso(linha.createdAt),
+      /** Em vigor agora: não revogada e ainda dentro do prazo. */
+      active: linha.revokedAt === null && linha.endsAt.getTime() > agora,
+    }));
   }
 
   /**

@@ -1,8 +1,9 @@
-import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 
 import { scrubPurchasePayload, purchaseTokenAad } from '../../platform/crypto/purchase-token.js';
 import type { Transaction } from '../../platform/db/client.js';
 import {
+  courtesyGrants,
   planFeatures,
   plans,
   subscriptionEvents,
@@ -103,6 +104,13 @@ export interface EntitlementSnapshot {
   usage: { products: number; members: number; images: number };
   /** Identidade visual a aplicar (`active=false` = visual padrão). Ver docs/branding.md. */
   branding: BrandingView;
+  /**
+   * Fim da cortesia em vigor, quando há uma (migration 0038); `null` caso
+   * contrário. Dias dados pelo suporte valem como assinatura enquanto durarem
+   * e, quando são o que sustenta o acesso, também aparecem em
+   * `currentPeriodEnd` — para o app, acesso é acesso.
+   */
+  courtesyUntil: string | null;
   /** Até quando o app pode confiar neste retrato sem falar com a API. */
   offlineValidUntil: string;
   checkedAt: string;
@@ -434,11 +442,17 @@ export class BillingService {
 
     const subscription = rows[0];
     const now = new Date();
-    const active = this.isEntitled(subscription, now);
+    const pagante = this.isEntitled(subscription, now);
+    const cortesia = await this.cortesiaVigente(workspaceId, now);
+    const active = pagante || cortesia !== null;
 
-    // Sem assinatura ativa valem os recursos do plano gratuito — que hoje
-    // incluem a nuvem. O app nunca mais recebe `features` vazio.
-    const planKey = active && subscription ? subscription.planKey : 'gratuito';
+    // A assinatura manda enquanto vale; passada ela, a cortesia sustenta o
+    // mesmo plano que foi prometido. Sem nenhuma das duas valem os recursos
+    // do plano gratuito — que hoje incluem a nuvem, então o app nunca recebe
+    // `features` vazio.
+    const planKey = pagante && subscription
+      ? subscription.planKey
+      : (cortesia?.planKey ?? 'gratuito');
 
     const featureRows = await this.db
       .select()
@@ -470,9 +484,13 @@ export class BillingService {
       workspaceId,
       active,
       planKey,
-      state: subscription?.state ?? 'sem_assinatura',
+      state: pagante ? (subscription?.state ?? 'sem_assinatura') : (cortesia ? 'cortesia' : (subscription?.state ?? 'sem_assinatura')),
       provider: subscription?.provider ?? null,
-      currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
+      // Quando é a cortesia que sustenta o acesso, é o fim dela que responde
+      // "até quando isto vale" — a data da assinatura já passou.
+      currentPeriodEnd: pagante
+        ? (subscription?.currentPeriodEnd?.toISOString() ?? null)
+        : (cortesia?.endsAt.toISOString() ?? subscription?.currentPeriodEnd?.toISOString() ?? null),
       graceUntil: subscription?.graceUntil?.toISOString() ?? null,
       autoRenewing: subscription?.autoRenewing ?? false,
       features,
@@ -480,6 +498,7 @@ export class BillingService {
       limits: { products: limitOf('produtos.sincronizados'), members: limitOf('equipe.membros'), images: limitOf('imagens.armazenamento_mb') },
       usage: { products: usage?.products ?? 0, members: usage?.members ?? 0, images: Number(usage?.images ?? 0) },
       branding: await loadEffectiveBranding(this.db, workspaceId, features['marca.personalizada']?.enabled ?? false),
+      courtesyUntil: cortesia?.endsAt.toISOString() ?? null,
       offlineValidUntil: new Date(
         now.getTime() + this.services.env.ENTITLEMENT_OFFLINE_MAX_DAYS * 86_400_000,
       ).toISOString(),
@@ -506,6 +525,55 @@ export class BillingService {
     if (limit && limit.getTime() < now.getTime()) return false;
 
     return true;
+  }
+
+  /**
+   * Cortesia que ainda está de pé, se houver: a de maior vencimento entre as
+   * não revogadas. Concessões antigas ficam na tabela como histórico.
+   */
+  private async cortesiaVigente(
+    workspaceId: string,
+    now: Date,
+  ): Promise<{ planKey: string; endsAt: Date } | null> {
+    const [linha] = await this.db
+      .select({ planKey: courtesyGrants.planKey, endsAt: courtesyGrants.endsAt })
+      .from(courtesyGrants)
+      .where(
+        and(
+          eq(courtesyGrants.workspaceId, workspaceId),
+          isNull(courtesyGrants.revokedAt),
+          gt(courtesyGrants.endsAt, now),
+        ),
+      )
+      .orderBy(desc(courtesyGrants.endsAt))
+      .limit(1);
+    return linha ?? null;
+  }
+
+  /**
+   * Até quando esta empresa já tem acesso garantido, somando o que pagou e o
+   * que ganhou. É a âncora de uma cortesia nova: dar 30 dias a quem tem plano
+   * até dezembro significa acesso até janeiro, não até daqui a 30 dias.
+   */
+  async accessGuaranteedUntil(workspaceId: string, now = new Date()): Promise<Date> {
+    const [assinatura] = await this.db
+      .select({ currentPeriodEnd: subscriptions.currentPeriodEnd, graceUntil: subscriptions.graceUntil })
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.workspaceId, workspaceId), inArray(subscriptions.state, [...ENTITLED_STATES])),
+      )
+      .limit(1);
+
+    const cortesia = await this.cortesiaVigente(workspaceId, now);
+
+    const candidatos = [
+      now,
+      assinatura?.graceUntil ?? null,
+      assinatura?.currentPeriodEnd ?? null,
+      cortesia?.endsAt ?? null,
+    ].filter((data): data is Date => data !== null);
+
+    return candidatos.reduce((maior, data) => (data.getTime() > maior.getTime() ? data : maior), now);
   }
 
   async hasActiveEntitlement(workspaceId: string): Promise<boolean> {

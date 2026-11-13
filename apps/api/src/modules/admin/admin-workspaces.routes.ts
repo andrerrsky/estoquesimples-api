@@ -259,6 +259,101 @@ export async function registerAdminWorkspacesRoutes(app: FastifyInstance): Promi
     },
   );
 
+  // ---------------------------------------------------------------------
+  // Dias de cortesia (migration 0038)
+  // ---------------------------------------------------------------------
+
+  const courtesySchema = z.object({
+    id: z.string().uuid(),
+    days: z.number().int(),
+    planKey: z.string(),
+    startsAt: z.string().nullable(),
+    endsAt: z.string().nullable(),
+    reason: z.string().nullable(),
+    grantedByEmail: z.string().nullable(),
+    revokedAt: z.string().nullable(),
+    createdAt: z.string().nullable(),
+    active: z.boolean(),
+  });
+
+  routes.get(
+    '/workspaces/:workspaceId/courtesies',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Dias de cortesia já dados a esta empresa',
+        hide: true,
+        params: workspaceParams,
+        response: { 200: z.object({ items: z.array(courtesySchema) }), ...commonAdminErrors },
+      },
+    },
+    async (request) => ({ items: await service.listCourtesies(request.params.workspaceId) }),
+  );
+
+  routes.post(
+    '/workspaces/:workspaceId/courtesies',
+    {
+      preHandler: requireAdmin('support'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Dá dias de acesso sem cobrança, somados ao que a empresa já tem',
+        hide: true,
+        params: workspaceParams,
+        body: z
+          .object({
+            // Um ano é o teto: acima disso não é cortesia, é plano dado.
+            days: z.coerce.number().int().min(1).max(365),
+            // 'basico' é a chave do plano pago (o painel o exibe como "Equipe").
+            planKey: z.string().trim().min(1).max(60).default('basico'),
+            reason: z.string().trim().min(3).max(500),
+          })
+          .strict(),
+        response: {
+          200: messageSchema.extend({ startsAt: z.string(), endsAt: z.string() }),
+          ...commonAdminErrors,
+        },
+      },
+    },
+    async (request) => {
+      const { startsAt, endsAt } = await service.grantCourtesy(
+        adminActor(request),
+        request.params.workspaceId,
+        request.body,
+      );
+      const fim = endsAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      return {
+        message: `${request.body.days} dia(s) de cortesia: acesso garantido até ${fim}.`,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+      };
+    },
+  );
+
+  routes.post(
+    '/workspaces/:workspaceId/courtesies/:grantId/revoke',
+    {
+      preHandler: requireAdmin('support'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Revoga uma cortesia',
+        hide: true,
+        params: workspaceParams.extend({ grantId: z.string().uuid() }),
+        body: reasonBodySchema,
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      await service.revokeCourtesy(
+        adminActor(request),
+        request.params.workspaceId,
+        request.params.grantId,
+        request.body.reason,
+      );
+      return { message: 'Cortesia revogada.' };
+    },
+  );
+
   const memberParams = workspaceParams.extend({ userId: z.string().uuid() });
 
   routes.put(

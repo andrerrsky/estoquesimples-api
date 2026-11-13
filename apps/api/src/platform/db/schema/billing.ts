@@ -259,6 +259,40 @@ export const couponRedemptions = pgTable(
   ],
 );
 
+/**
+ * Dias de cortesia dados pelo suporte (migration 0038).
+ *
+ * Cada concessão é uma linha com início e fim já calculados: a cortesia
+ * começa onde o acesso garantido termina, então conceder duas vezes soma de
+ * verdade. A assinatura não é tocada — ela é espelho do provedor.
+ */
+export const courtesyGrants = pgTable(
+  'courtesy_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    planKey: text('plan_key')
+      .notNull()
+      .references(() => plans.key, { onDelete: 'restrict' }),
+    days: integer('days').notNull(),
+    startsAt: timestamp('starts_at', tz).notNull(),
+    endsAt: timestamp('ends_at', tz).notNull(),
+    reason: text('reason'),
+    grantedBy: uuid('granted_by'),
+    revokedAt: timestamp('revoked_at', tz),
+    revokedBy: uuid('revoked_by'),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+  },
+  (table) => [
+    index('courtesy_grants_vigentes_idx')
+      .on(table.workspaceId, table.endsAt.desc())
+      .where(sql`${table.revokedAt} IS NULL`),
+  ],
+);
+
+export type CourtesyGrant = typeof courtesyGrants.$inferSelect;
 export type Coupon = typeof coupons.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type BillingPayment = typeof billingPayments.$inferSelect;

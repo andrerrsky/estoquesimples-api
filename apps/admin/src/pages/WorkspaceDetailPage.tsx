@@ -67,6 +67,8 @@ type Dialog =
   | 'transfer'
   | 'brand-block'
   | 'brand-unblock'
+  | 'courtesy'
+  | { kind: 'revoke-courtesy'; id: string; days: number }
   | { kind: 'role'; userId: string; current: string }
   | { kind: 'status'; userId: string; status: 'active' | 'suspended' }
   | { kind: 'remove'; userId: string }
@@ -130,6 +132,7 @@ export function WorkspaceDetailPage() {
               items={[
                 { label: 'Renomear empresa', icon: 'edit', onClick: () => setDialog('rename') },
                 { label: 'Transferir propriedade', icon: 'users', disabled: activeMembers.length < 2, onClick: () => setDialog('transfer') },
+                { label: 'Dar dias de cortesia', icon: 'card', disabled: Boolean(ws.deletedAt), onClick: () => setDialog('courtesy') },
                 ...(ws.branding ? [ws.branding.blocked ? { label: 'Liberar identidade visual', icon: 'refresh', onClick: () => setDialog('brand-unblock') } : { label: 'Bloquear identidade visual', icon: 'trash', danger: true, onClick: () => setDialog('brand-block') }] : []),
                 'sep',
                 ws.deletedAt
@@ -325,6 +328,15 @@ export function WorkspaceDetailPage() {
         </Card>
       )}
 
+      {tab === 'assinatura' && (
+        <CourtesyCard
+          workspaceId={workspaceId}
+          canSupport={can('support')}
+          onGrant={() => setDialog('courtesy')}
+          onRevoke={(id, days) => setDialog({ kind: 'revoke-courtesy', id, days })}
+        />
+      )}
+
       {tab === 'estoque' && <InventoryTab workspaceId={workspaceId} />}
 
       {tab === 'sync' && (
@@ -387,6 +399,32 @@ export function WorkspaceDetailPage() {
       <ConfirmDialog open={dialog === 'brand-block'} onClose={() => setDialog(null)} title="Bloquear identidade visual" description="A empresa volta ao visual padrão do Estoque Simples em todos os aparelhos e na tela de entrada. A configuração fica guardada e pode ser liberada depois." confirmLabel="Bloquear" danger onConfirm={post('block-brand')} />
       <ConfirmDialog open={dialog === 'brand-unblock'} onClose={() => setDialog(null)} title="Liberar identidade visual" description="A configuração da empresa volta a ser aplicada (se o plano incluir o recurso)." confirmLabel="Liberar" onConfirm={post('unblock-brand')} />
       <TransferDialog open={dialog === 'transfer'} onClose={() => setDialog(null)} ws={ws} onConfirm={(newOwnerUserId, reason) => post('transfer-ownership', { newOwnerUserId })(reason)} />
+      <CourtesyDialog
+        open={dialog === 'courtesy'}
+        onClose={() => setDialog(null)}
+        workspaceId={workspaceId}
+        onSaved={() => {
+          refresh();
+          void queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId, 'courtesies'] });
+        }}
+      />
+      <ConfirmDialog
+        open={typeof dialog === 'object' && dialog?.kind === 'revoke-courtesy'}
+        onClose={() => setDialog(null)}
+        title="Revogar cortesia"
+        description={
+          typeof dialog === 'object' && dialog?.kind === 'revoke-courtesy'
+            ? `Os ${dialog.days} dia(s) deixam de valer agora. A concessão continua no histórico, com o registro de quem revogou.`
+            : ''
+        }
+        confirmLabel="Revogar"
+        danger
+        onConfirm={async (reason) => {
+          if (typeof dialog !== 'object' || dialog?.kind !== 'revoke-courtesy') return;
+          await post(`courtesies/${dialog.id}/revoke`)(reason);
+          void queryClient.invalidateQueries({ queryKey: ['workspace', workspaceId, 'courtesies'] });
+        }}
+      />
       <RoleDialog
         open={typeof dialog === 'object' && dialog?.kind === 'role'}
         onClose={() => setDialog(null)}
@@ -654,6 +692,212 @@ function ConflictsCard({ workspaceId }: { workspaceId: string }) {
       )}
       {query.data && query.data.total > 25 && <Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.total} onPage={setPage} />}
     </Card>
+  );
+}
+
+interface CourtesyItem {
+  id: string;
+  days: number;
+  planKey: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  reason: string | null;
+  grantedByEmail: string | null;
+  revokedAt: string | null;
+  createdAt: string | null;
+  active: boolean;
+}
+
+/**
+ * Dias de acesso dados pelo suporte.
+ *
+ * Fica junto das assinaturas porque é disso que se trata: tempo de plano sem
+ * cobrança. Mostra o que está valendo agora em destaque e o resto como
+ * histórico — uma cortesia revogada ou vencida continua sendo informação
+ * sobre o que foi prometido a este cliente.
+ */
+function CourtesyCard({
+  workspaceId,
+  canSupport,
+  onGrant,
+  onRevoke,
+}: {
+  workspaceId: string;
+  canSupport: boolean;
+  onGrant: () => void;
+  onRevoke: (id: string, days: number) => void;
+}) {
+  const query = useQuery({
+    queryKey: ['workspace', workspaceId, 'courtesies'],
+    queryFn: () => api.get<{ items: CourtesyItem[] }>(`/workspaces/${workspaceId}/courtesies`),
+  });
+
+  const items = query.data?.items ?? [];
+  const vigente = items.find((item) => item.active);
+
+  return (
+    <Card
+      title="Dias de cortesia"
+      subtitle="Acesso sem cobrança, somado ao fim do que a empresa já tem"
+      actions={canSupport ? <button type="button" className="btn btn--ghost" onClick={onGrant}>Dar dias</button> : undefined}
+    >
+      {query.isLoading ? (
+        <Skeleton lines={3} />
+      ) : items.length === 0 ? (
+        <Empty icon="card" title="Nenhuma cortesia dada" />
+      ) : (
+        <div className="stack">
+          {vigente && (
+            <Notice tone="success" title={`Em vigor até ${new Date(vigente.endsAt as string).toLocaleDateString('pt-BR')}`}>
+              {vigente.days} dia(s) no plano {PLAN_LABEL[vigente.planKey] ?? vigente.planKey}
+              {vigente.reason ? ` · ${vigente.reason}` : ''}
+            </Notice>
+          )}
+          <div className="table-wrap">
+            <table className="table table--compact">
+              <thead>
+                <tr>
+                  <th>Situação</th>
+                  <th>Dias</th>
+                  <th>Plano</th>
+                  <th>De</th>
+                  <th>Até</th>
+                  <th>Motivo</th>
+                  <th>Quem deu</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.revokedAt ? (
+                        <Badge tone="error">revogada</Badge>
+                      ) : item.active ? (
+                        <Badge tone="success">em vigor</Badge>
+                      ) : (
+                        <Badge>encerrada</Badge>
+                      )}
+                    </td>
+                    <td>{item.days}</td>
+                    <td>{PLAN_LABEL[item.planKey] ?? item.planKey}</td>
+                    <td><Time value={item.startsAt} relative={false} /></td>
+                    <td><Time value={item.endsAt} relative={false} /></td>
+                    <td>{item.reason ?? <span className="muted">—</span>}</td>
+                    <td>{item.grantedByEmail ?? <span className="muted">—</span>}</td>
+                    <td>
+                      {canSupport && !item.revokedAt && item.active && (
+                        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRevoke(item.id, item.days)}>
+                          revogar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Quantidades que o suporte usa na prática; o campo aceita qualquer número. */
+const COURTESY_PRESETS = [10, 20, 30, 60];
+
+function CourtesyDialog({
+  open,
+  onClose,
+  workspaceId,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  workspaceId: string;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [days, setDays] = useState(30);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.post<{ message: string }>(`/workspaces/${workspaceId}/courtesies`, {
+        days,
+        reason: reason.trim(),
+      });
+      toast.push(result.message, 'success');
+      onSaved();
+      onClose();
+      setReason('');
+      setDays(30);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Dar dias de cortesia"
+      description="Os dias entram depois do que a empresa já tem: quem está com o plano pago até dezembro passa a ter acesso até janeiro. A assinatura não é alterada."
+    >
+      <form onSubmit={submit} className="stack">
+        <label className="field">
+          <span className="field__label">Dias</span>
+          <div className="row">
+            {COURTESY_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`btn btn--sm ${days === preset ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => setDays(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={365}
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+              style={{ maxWidth: '7rem' }}
+              required
+            />
+          </div>
+        </label>
+        <label className="field">
+          <span className="field__label">Motivo</span>
+          <textarea
+            className="textarea"
+            rows={2}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={500}
+            placeholder="Ex.: compensação pelo saldo que não sincronizou"
+            required
+          />
+        </label>
+        {error && <div className="field__error">{error}</div>}
+        <div className="modal__actions">
+          <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button type="submit" className="btn btn--primary" disabled={busy || reason.trim().length < 3 || days < 1 || days > 365}>
+            Dar {days} dia(s)
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
