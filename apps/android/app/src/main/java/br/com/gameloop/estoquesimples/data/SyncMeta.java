@@ -57,6 +57,13 @@ public final class SyncMeta {
      */
     public static final String RECONCILIAR = "reconciliar_apos_restauracao";
 
+    /**
+     * O acerto de abertura ({@link OpeningBalance}) já rodou neste aparelho.
+     * Ele compara o saldo de cada produto com a soma do histórico uma única
+     * vez, antes de os dados subirem; repetir só criaria ajustes de zero.
+     */
+    public static final String ACERTO_ABERTURA = "acerto_abertura";
+
     private final SQLiteDatabase db;
 
     public SyncMeta(SQLiteDatabase db) {

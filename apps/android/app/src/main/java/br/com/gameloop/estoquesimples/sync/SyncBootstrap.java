@@ -1,13 +1,17 @@
 package br.com.gameloop.estoquesimples.sync;
 
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import java.util.concurrent.Executors;
 
 import br.com.gameloop.estoquesimples.billing.LinkPurchaseWorker;
 import br.com.gameloop.estoquesimples.billing.PendingPurchase;
+import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.data.OpeningBalance;
 import br.com.gameloop.estoquesimples.data.SyncGate;
+import br.com.gameloop.estoquesimples.data.SyncMeta;
 
 /**
  * Liga a camada de sincronização quando o app abre.
@@ -63,6 +67,10 @@ public final class SyncBootstrap {
                 }
 
                 if (pronto) {
+                    // Antes da primeira rodada: fazer o histórico fechar com o
+                    // saldo que este aparelho mostra. Depois que os dados sobem,
+                    // a nuvem só sabe somar movimentações (ver OpeningBalance).
+                    acertarSaldoInicial(appContext);
                     SyncScheduler.schedulePeriodic(appContext);
                     SyncScheduler.syncNow(appContext);
                 } else {
@@ -76,5 +84,31 @@ public final class SyncBootstrap {
                 SyncGate.setActive(false);
             }
         });
+    }
+
+    /**
+     * Acerto de abertura, uma vez por aparelho.
+     *
+     * Roda com a fila já ligada, para que os ajustes entrem nela, e antes da
+     * primeira sincronização — inclusive antes da carga inicial, que é quando
+     * a diferença entre o saldo do aparelho e a soma do histórico passaria
+     * despercebida para a nuvem. Uma falha aqui não pode impedir a
+     * sincronização: sem a marca, ele tenta de novo na próxima abertura.
+     */
+    private static void acertarSaldoInicial(Context appContext) {
+        try {
+            SQLiteDatabase db = LocalDb.open(appContext);
+            SyncMeta meta = new SyncMeta(db);
+            if (meta.getBoolean(SyncMeta.ACERTO_ABERTURA, false)) {
+                return;
+            }
+            int acertados = OpeningBalance.reconcile(db);
+            meta.put(SyncMeta.ACERTO_ABERTURA, true);
+            if (acertados > 0) {
+                Log.i(TAG, "saldo inicial acertado em " + acertados + " produto(s)");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "falha no acerto do saldo inicial", e);
+        }
     }
 }
