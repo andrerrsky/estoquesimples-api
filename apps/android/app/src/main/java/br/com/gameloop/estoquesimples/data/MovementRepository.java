@@ -236,6 +236,52 @@ public final class MovementRepository {
         }
     }
 
+    /**
+     * Grava o ajuste que falta no histórico para ele explicar o saldo atual,
+     * <b>sem mexer no saldo</b>.
+     *
+     * É o contrário de {@link #setAbsolute}: ali a quantidade do produto muda
+     * e o histórico registra a mudança; aqui a quantidade já é a certa — quem
+     * está errado é o histórico, que não a explica inteira. Serve ao acerto de
+     * abertura ({@link OpeningBalance}), antes de os dados subirem para a
+     * nuvem, onde o saldo é a soma das movimentações.
+     *
+     * @param delta diferença a registrar, com sinal (saldo menos a soma do histórico).
+     */
+    public Result ledgerGapAdjustment(String productUuid, double delta, String note) {
+        if (productUuid == null) {
+            return Result.fail("Produto sem identificação.");
+        }
+        if (!OpeningBalance.worthAdjusting(delta)) {
+            return Result.fail("Nada a acertar.");
+        }
+
+        db.beginTransaction();
+        try {
+            Snapshot atual = readForUpdate(productUuid);
+            if (atual == null) {
+                return Result.fail("Produto não encontrado.");
+            }
+
+            // O produto não é tocado: nem `amount`, nem `updated_at`, nem
+            // `rev`. Mexer neles geraria uma operação de produto na fila e,
+            // pior, marcaria como alteração do cliente algo que ele não fez.
+            String movementUuid = insertMovement(productUuid, atual.name, AJUSTE, delta, note,
+                    System.currentTimeMillis());
+            if (movementUuid == null) {
+                return Result.fail("Não foi possível registrar o acerto.");
+            }
+
+            db.setTransactionSuccessful();
+            return Result.ok(atual.amount, movementUuid);
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao acertar o histórico", e);
+            return Result.fail("Erro ao acertar o histórico.");
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public boolean exists(String uuid) {
         if (uuid == null) {
             return false;
