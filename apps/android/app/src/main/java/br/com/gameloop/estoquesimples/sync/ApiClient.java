@@ -108,9 +108,24 @@ public final class ApiClient {
         return execute("POST", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
     }
 
-    /** O envio do próprio registro de erros não pode gerar outro registro (laço). */
+    /**
+     * Esta chamada manda o 5xx para Admin › Erros?
+     *
+     * Vale para uma chamada só: o `execute` a devolve para `true` no fim,
+     * aconteça o que acontecer. Sem isso, uma única chamada silenciosa
+     * calaria todas as seguintes da mesma instância — e o cliente é
+     * reaproveitado.
+     */
     private boolean reportErrors = true;
 
+    /**
+     * Envia sem registrar falha em Admin › Erros.
+     *
+     * Dois usos: o envio do próprio registro de erros (que geraria um laço) e
+     * a telemetria, que é melhor-esforço. Perder um lote de analytics não é
+     * defeito de produto, e registrá-lo enchia a tela de erros com ruído que
+     * escondia o que importa.
+     */
     public Response postWithoutReporting(String path, JSONObject body, String accessToken) throws ApiException {
         reportErrors = false;
         return execute("POST", path, body, accessToken, null, TIMEOUT_LEITURA_MS);
@@ -301,6 +316,7 @@ public final class ApiClient {
             Log.w(TAG, method + " " + path + " falhou: " + e.getMessage(), e);
             throw ApiException.network(e);
         } finally {
+            reportErrors = true;
             if (watchdog != null) {
                 watchdog.interrupt();
             }

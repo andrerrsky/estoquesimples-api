@@ -63,7 +63,9 @@ public final class AnalyticsWorker extends Worker {
             }
 
             try {
-                api.post("/v1/analytics/events", corpo(session, lote), token);
+                // Sem registrar em Admin › Erros: telemetria que não sobe é
+                // melhor-esforço, e o lote fica na fila para a próxima.
+                api.postWithoutReporting("/v1/analytics/events", corpo(session, lote), token);
                 fila.remover(lote);
             } catch (ApiException e) {
                 if (e.getStatusCode() == 401 && token != null) {
