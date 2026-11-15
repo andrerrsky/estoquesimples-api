@@ -196,3 +196,59 @@ Duas regras, porque o recurso escasso é hora, não dinheiro: **nenhum item dest
 | **Total** | **R$ 132** — dentro do teto de R$ 250 |
 | Reserva do mês | R$ 118 |
 | Religamento, se o gate de 21/11 disparar | **dezembro**, R$ 180 no teto daquele mês |
+
+---
+
+## 8. Addendum de 14/11 — religamento antecipado, comprando cadastro
+
+A seção 7 previa o religamento só em dezembro. O dono decidiu antecipá-lo: há caixa, a campanha anterior não consumiu a reserva, e o custo de esperar duas semanas é perder duas semanas de aprendizado. A decisão é dele e está registrada aqui porque contraria o cronograma acima.
+
+**Uma correção de premissa, antes dos números.** A conversa partiu de "a campanha se pagou com os assinantes que já temos". Não se pagou: os 8 registros com `hasActiveSubscription` correspondem a 3 assinaturas (os demais são membros das mesmas empresas) e **todos têm `origin: null`** — nenhum assinante pagante veio de anúncio até aqui. O que existe é caixa não gasto, não retorno de mídia. Isso não invalida religar; invalida só o argumento de que a mídia já demonstrou retorno.
+
+### 8.1 O que mudou na campanha de App
+
+| | Antes (12–13/11) | Agora (14/11) |
+|---|---|---|
+| Foco | Volume de instalações | **Ações no aplicativo** |
+| Sinal comprado | instalação (CPI R$ 0,90) | **cadastro** — `sign_up` do Firebase (Android) |
+| Lance | CPI R$ 0,90 | **CPA desejado R$ 8,00** |
+| Orçamento | R$ 18,00/dia | **R$ 12,00/dia** |
+| Estado | pausada em 14/11 | **ativa** |
+
+Trocar o sinal é a mudança que importa. Enquanto a campanha comprava instalação, 50 instalações pagas em dois dias derrubaram os cadastros de 3,8/dia para 1,5/dia: o Google estava entregando exatamente o que pedimos, e o que pedimos não tinha valor.
+
+### 8.2 De onde vem o R$ 8,00
+
+| | |
+|---|---|
+| Assinatura anual, líquida da Play | R$ 170 |
+| CAC máximo com retorno 3:1 | R$ 55 |
+| Cadastro→pagante medido | ≈ 8% |
+| **Custo por cadastro saudável** | **≤ R$ 4,35** |
+| **Custo por cadastro de empate** | **R$ 13,40** |
+
+R$ 8,00 fica deliberadamente no meio: R$ 4,35 é um alvo que, cobrado de uma campanha nova, provavelmente a deixaria sem entrega nenhuma; R$ 13,40 é a linha do prejuízo. O CPA desejado é alvo, não teto — por isso o gatilho de parada abaixo existe.
+
+### 8.3 Orçamento
+
+| | R$/dia | R$/mês |
+|---|---|---|
+| App \| cadastro Android | 12,00 | 360 |
+| Pesquisa \| Planilha (teste) | 3,00 | 90 |
+| **Total** | **15,00** | **450** |
+
+Dentro do teto de ~R$ 500 que o dono indicou, e acima do teto de R$ 250 que a seção 1 havia proposto — essa é a parte da decisão que aceita mais risco em troca de velocidade de aprendizado.
+
+### 8.4 Gatilho de parada (autorizado em 14/11)
+
+> Quando o gasto acumulado da campanha de App desde 14/11 passar de **R$ 150**, mede-se o custo por cadastro Android **acima da linha de base orgânica de 3,8/dia**. Acima de **R$ 13,00**, a campanha é pausada na hora, sem nova consulta. Abaixo de **R$ 4,35** com ao menos 10 cadastros incrementais, propõe-se subir 30%.
+
+### 8.5 Acompanhamento automatizado
+
+| Rotina | Quando | O que faz |
+|---|---|---|
+| `estoque-simples-otimizacao-ads` | seg/qua/sex, 9h30 | checa o gatilho, compara Ads com o painel, limpa inventário, trata recomendações |
+| `estoque-simples-ads-veredito-7-dias` | 21/11 | lê a coorte de 7 dias e decide continuar, ajustar ou pausar |
+| `estoque-simples-ads-balanco-30-dias` | 14/12 | balanço do mês: quantos assinantes vieram de anúncio e a que custo |
+
+As três carregam o contexto inteiro desta seção, porque cada execução começa sem memória. Todas escrevem no mesmo diário, `~/Downloads/EstoqueSimples-PlayStore/google-ads-otimizacao/diario.md`.
