@@ -1,0 +1,8 @@
+<pt-BR>
+Novidades desta versão:
+• Conferência de estoque: conte o que você tem de verdade e veja, em reais, o que está faltando
+• Conte no toque, com os botões + e −, ou bipe o código de barras; quem bate com o sistema, um toque resolve
+• Diga o motivo de cada diferença: quebra, furto, erro de lançamento ou achado
+• Produto que você não contou fica como está — nada é zerado
+• Correção: "Lista de reposição" não abria pela tela inicial
+</pt-BR>
