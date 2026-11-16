@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { track } from '../lib/analytics';
+import { termoDeBusca } from '../lib/help-search-term';
 import { plural } from '../lib/format';
 import { useDebounced } from '../lib/inventory';
 import { Icon } from './Icon';
@@ -110,9 +111,14 @@ export function HelpCenter({ supportTo, supportLabel, supportState }: { supportT
   const results = useMemo(() => (searching ? searchArticles(HELP.articles, query) : []), [searching, query]);
   const categoryTitle = useMemo(() => new Map(HELP.categories.map((item) => [item.id, item.title])), []);
 
-  // Mede o que as pessoas procuram e não acham — só a contagem, nunca o texto.
+  // Mede o que as pessoas procuram e não acham. O termo vai junto quando é
+  // mesmo uma dúvida (ver `termoDeBusca`): saber que alguém buscou sem achar
+  // não ajuda se não sabemos o quê. Termo com cara de dado pessoal não sai —
+  // nesse caso o evento vai só com a contagem, como antes.
   useEffect(() => {
-    if (settled && searchTerms(settled).length > 0) track('help.searched', { results: searchArticles(HELP.articles, settled).length });
+    if (!settled || searchTerms(settled).length === 0) return;
+    const termo = termoDeBusca(settled);
+    track('help.searched', { results: searchArticles(HELP.articles, settled).length, ...(termo ? { term: termo } : {}) });
   }, [settled]);
 
   // Link direto para uma resposta: abre e leva até ela, uma vez.

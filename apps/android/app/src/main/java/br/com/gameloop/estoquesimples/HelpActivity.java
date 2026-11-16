@@ -434,7 +434,36 @@ public class HelpActivity extends BaseActivity {
             return;
         }
         searchReported = termos;
-        Analytics.track(this, "help.searched", Analytics.props("results", resultados));
+        // O termo vai junto quando é mesmo uma dúvida; `props` ignora nulo,
+        // então com cara de dado pessoal o evento sai só com a contagem.
+        Analytics.track(this, "help.searched", Analytics.props("results", resultados, "term", termoDeBusca(query)));
+    }
+
+    /** Até onde o termo buscado é guardado. Dúvida real cabe folgado nisso. */
+    static final int LIMITE_TERMO = 60;
+
+    /**
+     * O texto buscado na ajuda, pronto para virar propriedade do evento — ou
+     * {@code null} quando não deve ser registrado.
+     *
+     * A contagem sozinha não dizia nada: sabíamos que alguém procurou e não
+     * achou, sem saber o quê. Essas são as dúvidas reais de quem usa o
+     * produto. Mas o campo é livre, e um e-mail ou telefone digitado ali sem
+     * pensar não pode virar evento — na dúvida, descarta.
+     *
+     * A busca na lista de produtos continua sem texto: aquilo é conteúdo do
+     * estoque do cliente. Mesma regra da web
+     * (apps/web/src/lib/help-search-term.ts).
+     */
+    static String termoDeBusca(String bruto) {
+        if (bruto == null) return null;
+        String limpo = bruto.trim().replaceAll("\\s+", " ").toLowerCase(new java.util.Locale("pt", "BR"));
+        if (limpo.length() < 2 || limpo.length() > LIMITE_TERMO) return null;
+        if (limpo.indexOf('@') >= 0) return null;
+        if (limpo.contains("http:") || limpo.contains("https:") || limpo.contains("www.")) return null;
+        // 6 dígitos seguidos já não é "estoque 10": é identificador.
+        if (limpo.matches(".*\\d[\\d\\s.-]{5,}.*")) return null;
+        return limpo;
     }
 
     // ---------------------------------------------------------------- linhas
