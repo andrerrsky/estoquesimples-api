@@ -48,13 +48,19 @@ public final class LocalDb extends SQLiteOpenHelper {
      *     movimentação original, para sincronizar e exibir esse elo.
      * 7 — photo_hash / photo_base_hash: identificação da foto na nuvem (ver
      *     AGENTS.md, "Fotos dos produtos").
+     * 10 — conferência de estoque: inventory_sessions e inventory_counts,
+     *     tabelas puramente locais. Não sincronizam e não mudam payload
+     *     nenhum: o resultado de uma conferência vira movimentação `ajuste`
+     *     comum, que já sobe pela outbox (ver docs/conferencia-de-estoque.md).
      */
-    public static final int VERSION = 9;
+    public static final int VERSION = 10;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
     public static final String TABLE_OUTBOX = "sync_outbox";
     public static final String TABLE_SYNC_META = "sync_meta";
+    public static final String TABLE_CONFERENCES = "inventory_sessions";
+    public static final String TABLE_CONFERENCE_COUNTS = "inventory_counts";
 
     /** Filtro padrão de produtos visíveis. Exclusão passou a ser suave. */
     public static final String ACTIVE_PRODUCTS = "deleted_at IS NULL";
@@ -140,6 +146,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV7(db);
         upgradeToV8(db);
         upgradeToV9(db);
+        upgradeToV10(db);
     }
 
     @Override
@@ -169,6 +176,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 9) {
             upgradeToV9(db);
+        }
+        if (oldVersion < 10) {
+            upgradeToV10(db);
         }
     }
 
@@ -428,6 +438,43 @@ public final class LocalDb extends SQLiteOpenHelper {
      */
     private void upgradeToV9(SQLiteDatabase db) {
         addColumnIfMissing(db, TABLE_PRODUCTS, "cost", "TEXT");
+    }
+
+    /**
+     * Conferência de estoque (docs/conferencia-de-estoque.md).
+     *
+     * As duas tabelas são **locais e só locais**: não entram na outbox, não
+     * têm par na API e não aparecem em payload nenhum. O que uma conferência
+     * produz para o resto do mundo é uma movimentação `ajuste` comum, com o
+     * motivo na nota — exatamente o que a nuvem e a web já sabem exibir. Foi
+     * condição de projeto não encostar no protocolo de sincronização.
+     *
+     * `expected` e `cost_at_count` são congelados no instante da contagem: se
+     * o produto se mexer no meio de uma conferência longa, o resultado não
+     * muda retroativamente debaixo de quem está contando.
+     */
+    private void upgradeToV10(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_CONFERENCES + " ("
+                + "uuid TEXT PRIMARY KEY, "
+                + "started_at INTEGER NOT NULL, "
+                + "finished_at INTEGER, "
+                + "scope_type TEXT, "
+                + "scope_value TEXT, "
+                + "status TEXT NOT NULL)");
+
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_CONFERENCE_COUNTS + " ("
+                + "session_uuid TEXT NOT NULL, "
+                + "product_uuid TEXT NOT NULL, "
+                + "expected NUMERIC, "
+                + "counted NUMERIC, "
+                + "cost_at_count NUMERIC, "
+                + "counted_at INTEGER, "
+                + "PRIMARY KEY (session_uuid, product_uuid))");
+
+        // O limite do plano gratuito é contado por mês com um count() sobre
+        // esta tabela, então o índice serve ao caminho mais quente.
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_conference_status_finished "
+                + "ON " + TABLE_CONFERENCES + " (status, finished_at)");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {

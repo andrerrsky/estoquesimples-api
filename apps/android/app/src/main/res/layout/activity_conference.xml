@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Conferência de estoque. As três etapas (escopo, contagem e fechamento) são
+  montadas em ConferenceActivity dentro de `conferenceContainer`, como em
+  ReorderActivity: o conteúdo varia demais por etapa para caber em XML, e o
+  estado é todo local.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/color_surface"
+    tools:context="br.com.gameloop.estoquesimples.ConferenceActivity">
+
+    <!-- Andamento: "23 de 86 conferidos". Oculto na escolha do escopo. -->
+    <TextView
+        android:id="@+id/conferenceProgress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:id="@+id/conferenceScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/conferenceContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingLeft="@dimen/screen_padding_horizontal"
+            android:paddingRight="@dimen/screen_padding_horizontal"
+            android:paddingTop="@dimen/screen_padding_top"
+            android:paddingBottom="@dimen/screen_padding_bottom" />
+    </ScrollView>
+
+    <!-- Barra fixa: o botão principal muda de papel em cada etapa. -->
+    <LinearLayout
+        android:id="@+id/conferenceActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:paddingLeft="@dimen/screen_padding_horizontal"
+        android:paddingRight="@dimen/screen_padding_horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <Button
+            android:id="@+id/conferenceScanButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="Bipar" />
+
+        <Button
+            android:id="@+id/conferencePrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Fechar conferência" />
+    </LinearLayout>
+</LinearLayout>

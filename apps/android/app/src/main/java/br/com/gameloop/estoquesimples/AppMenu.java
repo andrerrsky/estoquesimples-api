@@ -19,6 +19,9 @@ public final class AppMenu {
         if (id == R.id.menu_reorder) {
             ReorderActivity.open(activity, "menu");
             return true;
+        } else if (id == R.id.menu_conference) {
+            ConferenceActivity.open(activity, "menu");
+            return true;
         } else if (id == R.id.menu_analytics) {
             activity.startActivity(new Intent(activity, AnalyticsActivity.class));
             return true;

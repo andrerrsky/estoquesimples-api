@@ -16,6 +16,10 @@
         android:title="Lista de reposição"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_conference"
+        android:title="Conferência de estoque"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_analytics"
         android:title="Análise de Estoque"
         app:showAsAction="never" />
