@@ -16,8 +16,8 @@ android {
         // targetSdk 36: requisito do Google Play (Android 16).
         // Edge-to-edge é obrigatório; tratado em BaseActivity/EdgeToEdgeHelper.
         targetSdkVersion 36
-        versionCode 36
-        versionName "36"
+        versionCode 37
+        versionName "37"
 
         // Endereço da API e versão do protocolo de sincronização. Ficam aqui
         // para que o app de depuração possa apontar para outro ambiente sem
@@ -26,6 +26,30 @@ android {
         buildConfigField "int", "SYNC_PROTOCOL", "1"
         // Endereço da versão web ("Abrir na web" já conectado).
         buildConfigField "String", "WEB_BASE_URL", "\"https://estoquesimples.com.br\""
+    }
+
+    // Assinatura de publicação por linha de comando.
+    //
+    // O keystore (signing/key.jks) está no repositório; as senhas **não** e
+    // nunca devem estar. Elas vêm do ambiente, só na máquina de quem publica:
+    //
+    //   ES_KEYSTORE_PASSWORD=… ES_KEY_PASSWORD=… ./gradlew :app:bundleRelease
+    //
+    // Sem as variáveis, o release continua saindo sem assinatura, exatamente
+    // como antes — quem preferir segue usando o Android Studio em
+    // Build › Generate Signed App Bundle. Ver signing/README.md.
+    signingConfigs {
+        release {
+            def storePw = System.getenv('ES_KEYSTORE_PASSWORD')
+            def keyPw = System.getenv('ES_KEY_PASSWORD')
+            def alias = System.getenv('ES_KEY_ALIAS') ?: 'estoquesimples'
+            if (storePw && keyPw) {
+                storeFile file('../signing/key.jks')
+                storePassword storePw
+                keyAlias alias
+                keyPassword keyPw
+            }
+        }
     }
 
     buildTypes {
@@ -37,6 +61,11 @@ android {
         }
 
         release {
+            // Só assina quando as senhas vieram do ambiente; caso contrário
+            // o comportamento é o de antes (bundle sem assinatura).
+            if (System.getenv('ES_KEYSTORE_PASSWORD') && System.getenv('ES_KEY_PASSWORD')) {
+                signingConfig signingConfigs.release
+            }
             // R8 ativo: reduz o tamanho do app e gera o mapping.txt de
             // desofuscação, embutido automaticamente no AAB para o Play Console.
             minifyEnabled true
