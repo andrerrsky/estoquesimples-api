@@ -57,6 +57,7 @@ costumam dizer "plano pró" querendo dizer Equipe.
 | Produtos na nuvem | até **50** | **sem limite** |
 | **Pessoas na empresa** | só o proprietário (1) | **sem limite, e não se cobra por pessoa** |
 | Análise Avançada | não | sim |
+| **Conferência de estoque** | **3 por mês**, completas | ilimitadas, com histórico |
 | Fotos (por empresa) | 100 MB | 5.000 MB |
 | Identidade visual | não | sim |
 | Histórico, relatórios, importação, exportação, backup | iguais nos dois, no aparelho | |
@@ -78,6 +79,23 @@ verdade é essa tela — não o código.
 A assinatura é **da empresa** e vale nos dois clientes, qualquer que seja o
 canal de compra.
 
+### Quem é a base (medido no painel em 15/11/2026)
+
+32 empresas, 40 contas, 3 empresas pagantes (**9,4%**). O número que mais
+importa para decidir produto: **apenas 2 empresas têm mais de uma pessoa** —
+**94% são de um dono sozinho**. E `paywall.viewed` por gatilho, em 176
+visualizações: `menu` 90, `analysis` 41, `product_limit` 17, `account` 11,
+`about` 8, `web_plan` 7, **`team` 2**.
+
+Ou seja: estamos cobrando por **colaboração** num produto usado por gente
+**sozinha**, e equipe é o gatilho que menos desperta interesse. Qualquer
+proposta de funcionalidade paga precisa passar por este teste antes de
+qualquer outro: **serve ao lojista que trabalha sozinho?**
+
+Cuidado com `hasActiveSubscription` em `/admin/api/users`: ele é por
+**pessoa**, então uma empresa com 5 membros aparece como 5 "assinantes". Para
+contar clientes de verdade, conte **empresas** com assinatura.
+
 ### Economia unitária (para decisões de mídia)
 
 Anual R$ 199,90 − 15% da Play ≈ **R$ 170 líquidos**. CAC máximo a 3:1 =
@@ -97,6 +115,7 @@ sem campanha.
 | Sincronização: como funciona, falhas conhecidas, pós-mortem | [docs/auditoria-sincronizacao-2026-11.md](docs/auditoria-sincronizacao-2026-11.md) |
 | Fotos de produto, cota, S3, redimensionamento | [docs/images.md](docs/images.md) |
 | Eventos de uso, o que o painel entende | [docs/analytics.md](docs/analytics.md) |
+| Conferência de estoque (contagem física, limite do gratuito) | [docs/conferencia-de-estoque.md](docs/conferencia-de-estoque.md) |
 | Suporte pelo app: como abre, como o painel responde | [docs/support.md](docs/support.md) |
 | Notificações e push (FCM) | [docs/notifications.md](docs/notifications.md) · [docs/push.md](docs/push.md) |
 | E-mails automáticos de ativação e recuperação | [docs/emails-ciclo-de-vida.md](docs/emails-ciclo-de-vida.md) |

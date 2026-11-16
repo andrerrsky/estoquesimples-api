@@ -70,6 +70,9 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `low_stock.filter_used` | app | chip "Estoque baixo" | — |
 | `report.generated` | app | relatório gerado | `format: pdf \| texto` |
 | `analysis.viewed` | app | Análise de Estoque aberta | — |
+| `conference.started` | app | conferência de estoque iniciada | `origin`, `scope_type`, `items_in_scope` |
+| `conference.finished` | app | conferência aplicada ao estoque | `scope_type`, `counted`, `divergent`, `delta_value`, `duration_ms` |
+| `conference.blocked` | app | limite gratuito de conferências atingido (vira `paywall.viewed` com `trigger=conference`) | `origin`, `done_this_month` |
 | `import.completed` / `export.completed` | app | importação/exportação concluída | `format`, `count` |
 | `backup.created` / `backup.restored` | app | backup local | — |
 | `paywall.viewed` | app | tela de assinatura exibida | `trigger` (de onde veio) |
