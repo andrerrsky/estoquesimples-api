@@ -157,6 +157,33 @@ para a avaliação de uma estrela.
 Reaproveita o `ScannerActivity` (ZXing, com lanterna) e o gerador de PDF do
 `ReportsActivity`. Entra no menu principal perto de Relatórios.
 
+### Como a tela de contagem é desenhada, e por quê
+
+Quem conta está **de pé, com uma mão na mercadoria**, repetindo o mesmo gesto
+centenas de vezes. A tela é feita para esse corpo, não para um formulário:
+
+| Elemento | Por que existe |
+| --- | --- |
+| **− e + redondos, de 52 dp** | o gesto principal é somar **uma unidade por toque**; digitar é a exceção, não a regra |
+| **"confere: 12 un"** | na vida real a maior parte dos itens bate. Um toque resolve o caso comum, em vez de obrigar a digitar o número que já está na tela |
+| **Diferença na própria linha**, colorida | o susto não precisa esperar o fechamento: "faltam 2 un · R$ 24,00" aparece assim que a contagem diverge, e some se passar a bater |
+| **Parcial em reais no cabeçalho** | o total corre junto com a contagem, o que sustenta a atenção numa tarefa longa e chata |
+| **Barra de progresso** | contagem é maratona; saber que faltam 12 de 86 é o que faz continuar |
+| **Filtros "Falta contar" e "Com diferença"** | durante, o que importa é o que ainda não se contou; no fim, o que não bateu |
+| **Busca por nome** | achar um produto numa lista de centenas sem rolar até ele |
+| **Descartar a conferência** | contagem errada acontece; recomeçar não pode custar o limite do mês, e por isso descartada **não conta** |
+
+Duas regras do contador que não são óbvias e foram decididas de propósito:
+
+- **O "+" começa do zero**, não do saldo do sistema. Partir do que já está lá
+  transformaria a contagem numa confirmação cega — a pessoa tocaria "+" uma
+  vez e o item bateria sozinho.
+- **O "−" não passa de zero.** Não existe estoque negativo contado.
+
+Com o leitor, bipar a mesma caixa **soma 1 a cada bipe** e já oferece "Bipar o
+próximo": é o gesto de quem conta caixa a caixa. Quem tem a quantidade de
+cabeça usa "Outra quantidade".
+
 ### Motivo da divergência
 
 Ao fechar, cada item divergente aceita um motivo em chip: **quebra**,

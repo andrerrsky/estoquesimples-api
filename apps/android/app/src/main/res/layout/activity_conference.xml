@@ -2,8 +2,11 @@
 <!--
   Conferência de estoque. As três etapas (escopo, contagem e fechamento) são
   montadas em ConferenceActivity dentro de `conferenceContainer`, como em
-  ReorderActivity: o conteúdo varia demais por etapa para caber em XML, e o
-  estado é todo local.
+  ReorderActivity: o conteúdo varia demais por etapa para caber em XML.
+
+  O que está fixo aqui é o que precisa estar sempre à vista durante uma
+  contagem longa: o andamento, o quanto já falta em dinheiro, a busca e os
+  botões de ação.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -14,18 +17,79 @@
     android:background="@color/color_surface"
     tools:context="br.com.gameloop.estoquesimples.ConferenceActivity">
 
-    <!-- Andamento: "23 de 86 conferidos". Oculto na escolha do escopo. -->
-    <TextView
-        android:id="@+id/conferenceProgress"
+    <!-- Cabeçalho de andamento. Oculto na escolha do escopo. -->
+    <LinearLayout
+        android:id="@+id/conferenceHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:visibility="gone"
+        android:background="@color/color_surface_content"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
         android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <TextView
+                android:id="@+id/conferenceProgress"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/color_text" />
+
+            <!-- O quanto já falta em dinheiro, durante a contagem: o número
+                 que dá o susto não precisa esperar o fechamento. -->
+            <TextView
+                android:id="@+id/conferencePartial"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/color_text_muted" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/conferenceBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progress="0" />
+
+        <EditText
+            android:id="@+id/conferenceSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_search"
+            android:hint="Buscar produto"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:maxLines="1"
+            android:paddingLeft="@dimen/search_padding_horizontal"
+            android:paddingRight="@dimen/search_padding_horizontal"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:textSize="15sp" />
+
+        <!-- Chips de filtro: durante a contagem o que importa é "o que ainda
+             falta"; no fim, "o que não bateu". -->
+        <LinearLayout
+            android:id="@+id/conferenceFilters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp" />
+    </LinearLayout>
 
     <ScrollView
         android:id="@+id/conferenceScroll"
@@ -51,16 +115,20 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:visibility="gone"
+        android:background="@color/color_surface_content"
         android:paddingLeft="@dimen/screen_padding_horizontal"
         android:paddingRight="@dimen/screen_padding_horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
         <Button
             android:id="@+id/conferenceScanButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_button_secondary"
+            android:textColor="@color/color_brand"
+            android:textAllCaps="false"
             android:text="Bipar" />
 
         <Button
@@ -68,6 +136,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:background="@drawable/bg_button_primary"
+            android:textColor="@color/color_text_on_brand"
+            android:textAllCaps="false"
             android:text="Fechar conferência" />
     </LinearLayout>
 </LinearLayout>
