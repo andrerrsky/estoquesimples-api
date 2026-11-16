@@ -102,6 +102,27 @@ estava. Para a hidratação bater, a `LandingPage` não pode depender de
 (`ToastProvider`) e o chat da raiz da aplicação só entram depois do primeiro
 render. O `prerender.mjs` recusa um HTML que não comece pela página.
 
+### Página de exibição do vídeo (`/video`)
+
+O Search Console recusava indexar o vídeo da página inicial: *"o vídeo não
+está em uma página de exibição — é um conteúdo complementar na página"*. O
+Google só indexa um vídeo que seja o **conteúdo principal** da página, e na
+home ele é uma seção entre várias. `src/pages/VideoPage.tsx` é esse lugar: o
+player primeiro, e o resto do texto sobre o vídeo.
+
+Ela é **HTML estático**, gerado no build por `scripts/prerender.mjs`
+(`dist/video.html`, entregue em `/video` por `web-app.ts`): sem bundle e sem
+hidratação, porque `<video controls>` é nativo e os links são `<a>` comuns.
+Reaproveita a folha de estilo e o pré-carregamento da fonte que o Vite gerou
+para a página inicial, então tem a cara do site sem um segundo build.
+
+A transcrição sai da própria legenda (`public/video/apresentacao.vtt`), lida
+no build e separada em blocos pelas pausas da narração: não há um segundo
+texto para manter em dia, e a página deixa de ser só um player (conteúdo
+raso, aos olhos do Google). O JSON-LD `VideoObject` mora **aqui**, não na
+home — uma página de exibição só. Trocou o vídeo? A transcrição acompanha
+sozinha, desde que a legenda acompanhe.
+
 A `LandingPage` também continua sendo a rota `/` da aplicação (`App.tsx`),
 para quem navega de volta a ela de dentro da aplicação; lá ela lê a sessão
 com `useAuthOptional` (de `auth/context.ts`, que tem só o contexto e os

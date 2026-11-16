@@ -517,6 +517,11 @@
 }
 /* O quadro recorta o anel de foco de fora (overflow: hidden): o do player
    fica por dentro, branco sobre o vídeo. */
+.lp-video__link {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 15px;
+}
 .lp-video__player:focus-visible {
   outline: 3px solid #fff;
   outline-offset: -6px;

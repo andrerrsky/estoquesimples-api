@@ -212,6 +212,11 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
   // arquivo, `/` cai no index como qualquer outra rota.
   const landing = files.get('/landing.html') ?? index;
   files.delete('/landing.html');
+  // Página de exibição do vídeo (apps/web/scripts/prerender.mjs): HTML
+  // estático, entregue em `/video`. O endereço sem `.html` é o canônico do
+  // JSON-LD, então o arquivo sai do mapa para não existir em dois lugares.
+  const videoPage = files.get('/video.html') ?? null;
+  files.delete('/video.html');
   // Blog, sitemap e feed: HTML/XML montados pela API a cada pedido (ver
   // modules/blog/blog-pages.ts), a partir do index.html do build.
   const blogPages = new BlogPages(app.services);
@@ -364,6 +369,8 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     // inicial fica em `no-cache` (revalida a cada visita, mas deixa o
     // navegador guardar a página para o botão Voltar); as demais, `no-store`.
     if (path === '/') return send(request, reply, landing);
+    if (videoPage && path === '/video') return send(request, reply, videoPage);
+    if (videoPage && path === '/video/') return reply.redirect('/video', 301);
     if (isPublicAppPage(path)) return send(request, reply, publicPages.get(path) ?? { ...index, cacheControl: 'no-store' });
     return send(request, reply, privateIndex);
   });
