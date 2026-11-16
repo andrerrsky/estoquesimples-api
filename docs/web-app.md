@@ -123,6 +123,27 @@ raso, aos olhos do Google). O JSON-LD `VideoObject` mora **aqui**, não na
 home — uma página de exibição só. Trocou o vídeo? A transcrição acompanha
 sozinha, desde que a legenda acompanhe.
 
+### O que a página inicial carrega depois (e o que não carrega)
+
+`landing-extras.tsx` entra em ociosidade e traz duas coisas: a retomada da
+sessão (que troca "Criar conta" por "Abrir meu estoque") e, em tela larga, o
+balão do chat. Dentro dele, os **provedores** (cache de consultas e sessão) só
+entram na árvore quando há o que fazer com eles — uma sessão para retomar
+(`es_web_sessao` marcado) ou o chat de verdade a caminho. Montá-los sempre
+custava uma tarefa longa de ~760 ms logo depois do carregamento (TBT de 670 ms
+no desktop e 1.180 ms no celular, medido na produção) para, na visita mais
+comum, desenhar só um botão estático. Sem eles: TBT de 300 ms e 10 ms.
+
+O balão fica **fora** da parte que muda, e isso não é arrumação: com ele
+dentro, o primeiro passar do mouse fazia os provedores entrarem, o botão se
+desmontava no meio do gesto e o clique seguinte se perdia. Por isso o estado
+do chat mora em `Extras`, acima dos provedores.
+
+O que sobra de render-blocking na página é a folha de estilo do build
+(~10 KB comprimidos, ~100 ms estimados pelo Lighthouse). Separar o CSS
+crítico mexeria na divisão de pacotes do site inteiro; não compensou até
+agora.
+
 A `LandingPage` também continua sendo a rota `/` da aplicação (`App.tsx`),
 para quem navega de volta a ela de dentro da aplicação; lá ela lê a sessão
 com `useAuthOptional` (de `auth/context.ts`, que tem só o contexto e os
