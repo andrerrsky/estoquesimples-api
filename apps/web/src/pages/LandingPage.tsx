@@ -255,6 +255,9 @@ function VideoSection() {
           Seu navegador não toca vídeos. <a href={videoApresentacao}>Baixe o vídeo</a>.
         </video>
       </div>
+      <p className="lp-video__link">
+        <a href="/video">Abrir a página do vídeo, com a transcrição</a>
+      </p>
     </section>
   );
 }

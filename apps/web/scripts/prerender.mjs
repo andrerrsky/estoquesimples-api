@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 const ssr = join(root, 'dist-ssr');
 
-const { render, PLAY_RATING, VIDEO } = await import(pathToFileURL(join(ssr, 'entry-prerender.js')).href);
+const { render, renderVideo, PLAY_RATING, VIDEO } = await import(pathToFileURL(join(ssr, 'entry-prerender.js')).href);
 const SITE = 'https://estoquesimples.com.br';
 // O React emite `<link rel="preload">` das imagens no começo do fragmento
 // (ele não tem um <head> para pôr). Dentro de #root esse nó faria a
@@ -29,19 +29,11 @@ const marker = '<div id="root"></div>';
 if (!index.includes(marker)) throw new Error('prerender: #root não encontrado em dist/landing.html');
 if (!index.includes('landing-')) throw new Error('prerender: dist/landing.html não aponta para a entrada leve');
 
-// O vídeo da página, descrito ao Google: miniatura, duração e arquivo com
-// URL absoluta (os caminhos vêm do build, com hash).
-const videoLd = `<script type="application/ld+json">${JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'VideoObject',
-  name: VIDEO.name,
-  description: VIDEO.description,
-  thumbnailUrl: [`${SITE}${VIDEO.poster}`],
-  uploadDate: VIDEO.uploadDate,
-  duration: VIDEO.duration,
-  contentUrl: `${SITE}${VIDEO.src}`,
-  inLanguage: 'pt-BR',
-})}</script>`;
+// O vídeo é descrito ao Google na página de exibição (/video), não aqui.
+// O Google só indexa um vídeo que seja o conteúdo principal da página; na
+// página inicial ele é uma seção entre várias, e o Search Console recusava
+// a indexação com "o vídeo não está em uma página de exibição". O JSON-LD
+// mora onde o vídeo é o assunto — ver buildVideoPage, no fim deste arquivo.
 
 // A nota da Google Play entra no JSON-LD só aqui, onde ela também está
 // visível na página (regra do Google para rich results), a partir da mesma
@@ -50,11 +42,134 @@ const rating = `"aggregateRating": { "@type": "AggregateRating", "ratingValue": 
 if (!index.includes('"offers":')) throw new Error('prerender: JSON-LD sem "offers" em index.html');
 
 const landing = index
-  .replace('</head>', `    ${videoLd}\n  </head>`)
   .replace('"offers":', `${rating} "offers":`)
   .replace(marker, `<div id="root">${html}</div>`);
 
 writeFileSync(join(dist, 'landing.html'), landing);
+
+// --- Página de exibição do vídeo (/video) ---------------------------------
+//
+// HTML estático, sem bundle e sem hidratação: o <video> é nativo e os links
+// são <a> comuns. Reaproveita a folha de estilo e o pré-carregamento da
+// fonte que o Vite gerou para a página inicial, então a página tem a cara do
+// site sem um segundo build. O JSON-LD VideoObject mora aqui (ver o
+// comentário lá em cima).
+
+/** A legenda vira transcrição: blocos separados pelas pausas da narração. */
+function transcriptFromVtt(vtt) {
+  const seconds = (stamp) => {
+    const [h, m, rest] = stamp.split(':');
+    return Number(h) * 3600 + Number(m) * 60 + Number(rest.replace(',', '.'));
+  };
+  const cues = [];
+  for (const chunk of vtt.split(/\r?\n\r?\n/)) {
+    const lines = chunk.split(/\r?\n/).filter(Boolean);
+    const timing = lines.find((line) => line.includes('-->'));
+    if (!timing) continue;
+    const [from, to] = timing.split('-->').map((part) => part.trim());
+    const text = lines.slice(lines.indexOf(timing) + 1).join(' ').trim();
+    if (text) cues.push({ start: seconds(from), end: seconds(to), text });
+  }
+  // Uma pausa de meio segundo entre uma fala e a seguinte marca mudança de
+  // assunto no roteiro; é por ela que a transcrição é separada.
+  const blocks = [];
+  for (const cue of cues) {
+    const last = blocks[blocks.length - 1];
+    if (last && cue.start - last.end <= 0.5) {
+      last.text = `${last.text} ${cue.text}`;
+      last.end = cue.end;
+    } else {
+      blocks.push({ start: cue.start, end: cue.end, text: cue.text });
+    }
+  }
+  return blocks.map((block) => ({
+    time: `${Math.floor(block.start / 60)}:${String(Math.floor(block.start % 60)).padStart(2, '0')}`,
+    text: block.text,
+  }));
+}
+
+const transcript = transcriptFromVtt(readFileSync(join(root, 'public/video/apresentacao.vtt'), 'utf8'));
+const videoHtml = renderVideo(transcript).replace(/^(<link\b[^>]*>)+/, '');
+if (!videoHtml.includes('lp-video__player')) throw new Error('prerender: a página do vídeo não foi renderizada');
+
+const stylesheet = /<link rel="stylesheet"[^>]*>/.exec(index)?.[0];
+const fontPreload = /<link rel="preload"[^>]*fonts[^>]*>/.exec(index)?.[0] ?? '';
+if (!stylesheet) throw new Error('prerender: folha de estilo não encontrada em dist/landing.html');
+
+const VIDEO_URL = `${SITE}/video`;
+const videoTitle = 'Vídeo: como o Estoque Simples funciona no dia a dia';
+const videoDescription = 'Veja em 1 min 40 s o cadastro de produtos, as entradas e saídas, o aviso de estoque baixo e os relatórios, nas telas reais do aplicativo. Com legenda e transcrição.';
+const videoJsonLd = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'VideoObject',
+  name: VIDEO.name,
+  description: VIDEO.description,
+  thumbnailUrl: [`${SITE}${VIDEO.poster}`],
+  uploadDate: VIDEO.uploadDate,
+  duration: VIDEO.duration,
+  contentUrl: `${SITE}${VIDEO.src}`,
+  url: VIDEO_URL,
+  inLanguage: 'pt-BR',
+  isFamilyFriendly: true,
+  publisher: { '@type': 'Organization', name: 'Estoque Simples', url: `${SITE}/` },
+  transcript: transcript.map((block) => block.text).join(' '),
+});
+
+// Layout próprio desta página (as classes .lp- vêm da folha do site).
+const videoCss = `
+    .vp-main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 8px; }
+    .vp-head { max-width: 760px; margin: 0 auto 24px; text-align: center; }
+    .vp-title { margin: 8px 0 12px; }
+    .vp-frame { margin-top: 0; }
+    .vp-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 24px 0 8px; }
+    .vp-section { max-width: 760px; margin: 40px auto 0; }
+    .vp-section .landing__h2 { margin-bottom: 8px; }
+    .vp-transcript { list-style: none; margin: 20px 0 0; padding: 0; }
+    .vp-transcript li { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); }
+    .vp-transcript__time { flex: 0 0 44px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .vp-links { margin: 16px 0 0; padding-left: 20px; }
+    .vp-links li { margin: 6px 0; }
+    .vp-footer { max-width: 1040px; margin: 48px auto 0; padding: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px; text-align: center; }
+    @media (max-width: 640px) { .vp-main { padding: 20px 16px 8px; } }`;
+
+const videoPage = `<!doctype html>
+<!-- Página de exibição do vídeo (/video), gerada em scripts/prerender.mjs.
+     HTML estático: sem bundle, sem hidratação. Ver src/pages/VideoPage.tsx. -->
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1C679D" />
+    <title>${videoTitle} · Estoque Simples</title>
+    <meta name="description" content="${videoDescription}" />
+    <link rel="canonical" href="${VIDEO_URL}" />
+    <meta property="og:type" content="video.other" />
+    <meta property="og:site_name" content="Estoque Simples" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="${VIDEO_URL}" />
+    <meta property="og:title" content="${videoTitle}" />
+    <meta property="og:description" content="${videoDescription}" />
+    <meta property="og:image" content="${SITE}${VIDEO.poster}" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:video" content="${SITE}${VIDEO.src}" />
+    <meta property="og:video:type" content="video/mp4" />
+    <meta name="twitter:card" content="player" />
+    ${fontPreload}
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    ${stylesheet}
+    <style>${videoCss}
+    </style>
+    <script type="application/ld+json">${videoJsonLd}</script>
+  </head>
+  <body>
+    ${videoHtml}
+  </body>
+</html>
+`;
+writeFileSync(join(dist, 'video.html'), videoPage);
+console.log(`prerender: dist/video.html (${(videoPage.length / 1024).toFixed(0)} kB, ${transcript.length} trechos de transcrição)`);
 
 // Só a página inicial é reescrita a cada build: só ela ganha a data dele.
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
