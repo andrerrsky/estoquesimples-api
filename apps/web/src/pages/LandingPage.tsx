@@ -30,7 +30,12 @@ export const VIDEO = {
   description: 'Cadastro de produtos, entradas e saídas, aviso de estoque baixo, relatórios, a conta grátis e o plano Equipe, tudo nas telas reais do aplicativo.',
   /** ISO 8601; o arquivo tem 1 min 40 s. */
   duration: 'PT1M40S',
-  uploadDate: '2026-10-17',
+  /**
+   * ISO 8601 **com hora e fuso**. O Search Console reclama de uma data
+   * simples ("2026-10-17"): "falta o fuso horário da propriedade datetime
+   * uploadDate". O offset é o de São Paulo (-03:00), sem horário de verão.
+   */
+  uploadDate: '2026-10-17T09:00:00-03:00',
 };
 
 /**
