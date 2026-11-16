@@ -10,6 +10,7 @@ import { Badge, Card, Chips, ConfirmDialog, Empty, Field, Notice, PageHeader, Pa
 import { track } from '../lib/analytics';
 import { fmtDateTime, fmtStock, plural } from '../lib/format';
 import { inventoryKeys, useDebounced, useInvalidateInventory } from '../lib/inventory';
+import { saldoAposEstorno } from '../lib/movements';
 import { movementLabel } from '../lib/labels';
 import { useCurrentWorkspace } from '../workspace/WorkspaceProvider';
 
@@ -38,6 +39,14 @@ function dayBoundary(day: string, end: boolean): Date | undefined {
  * mais recente para o mais antigo. Os filtros vivem na URL (o estoque abre
  * esta tela já filtrada por produto). Nada é apagado aqui: estornar grava o
  * lançamento contrário e a movimentação original continua visível.
+ *
+ * A confirmação do estorno diz o efeito com o número ("saem 10 un do estoque
+ * deste produto"), e não mais "o estoque volta ao que era antes". A frase
+ * antiga custou caro: uma cliente nova, aprendendo o sistema, estornou 21
+ * lançamentos em dois minutos para limpar os testes e zerou o estoque —
+ * "volta ao que era antes" se lê como "restaura meu estoque", que é o
+ * oposto do que acontece ao estornar uma entrada. Quem estorna precisa ver
+ * para que lado o número vai andar, antes de confirmar.
  */
 export function HistoryPage() {
   const { workspaceId, base, can } = useCurrentWorkspace();
@@ -115,6 +124,18 @@ export function HistoryPage() {
   useEffect(() => {
     if (cancelling) setCancelNote('');
   }, [cancelling]);
+
+  /**
+   * Saldo atual do produto do estorno em aberto, para a confirmação mostrar
+   * "agora X → fica Y" como o app Android já faz. É uma consulta por
+   * diálogo, só enquanto ele está aberto.
+   */
+  const cancellingProduct = useQuery({
+    queryKey: inventoryKeys.product(workspaceId, cancelling?.productId ?? ''),
+    queryFn: () => api.get<Product>(`${base}/products/${cancelling?.productId}`),
+    enabled: cancelling !== null && Boolean(cancelling.productId) && !cancelling.productDeleted,
+    staleTime: 0,
+  });
 
   const cancel = async (movement: Movement) => {
     const note = cancelNote.trim();
@@ -337,8 +358,18 @@ export function HistoryPage() {
         description={
           cancelling ? (
             <>
-              {movementLabel(cancelling.type)} de <strong>{fmtStock(Math.abs(cancelling.quantity), cancelling.unit)}</strong> em “{cancelling.productName}”: o estoque volta ao que era antes, com
-              um lançamento contrário. A movimentação original continua no histórico, marcada como estornada.
+              {movementLabel(cancelling.type)} de <strong>{fmtStock(Math.abs(cancelling.quantity), cancelling.unit)}</strong> em “{cancelling.productName}”.
+              {' '}Ao estornar, o estoque deste produto{' '}
+              <strong>
+                {cancelling.quantity >= 0 ? 'diminui' : 'aumenta'} {fmtStock(Math.abs(cancelling.quantity), cancelling.unit)}
+              </strong>
+              {cancellingProduct.data ? (
+                <>
+                  : de <strong>{fmtStock(cancellingProduct.data.quantity, cancelling.unit)}</strong> para{' '}
+                  <strong>{fmtStock(saldoAposEstorno(cancellingProduct.data.quantity, cancelling.quantity), cancelling.unit)}</strong>
+                </>
+              ) : null}
+              . O lançamento original continua no histórico, marcado como estornado.
             </>
           ) : undefined
         }
