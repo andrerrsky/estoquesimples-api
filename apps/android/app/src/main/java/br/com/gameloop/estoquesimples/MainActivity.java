@@ -1727,7 +1727,11 @@ public class MainActivity extends BaseActivity {
             HelpActivity.open(this);
             return true;
         }
-        return super.onOptionsItemSelected(item);
+        // O que esta tela não trata vai para o AppMenu, como nas demais. Sem
+        // esta linha, todo item do menu que só existe lá morria em silêncio
+        // aqui na tela inicial — era o caso de "Lista de reposição" e, agora,
+        // de "Conferência de estoque": o menu fechava e nada acontecia.
+        return AppMenu.handle(this, item) || super.onOptionsItemSelected(item);
     }
 
     public void showAboutActivity() {
