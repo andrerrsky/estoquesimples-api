@@ -137,6 +137,7 @@ sem campanha.
 | Medição do funil, GA4, gclid, o que o código garante | [docs/aquisicao-e-conversao.md](docs/aquisicao-e-conversao.md) |
 | Google Ads: estratégia, régua, gatilho de parada | [docs/plano-google-ads-2026-11.md](docs/plano-google-ads-2026-11.md) |
 | Google Ads: o que foi feito em cada dia, decisões já tomadas | `~/Downloads/EstoqueSimples-PlayStore/google-ads-otimizacao/diario.md` |
+| Pautas do blog por busca real (volume medido) | [docs/pautas-blog-2026-11.md](docs/pautas-blog-2026-11.md) |
 | Black Friday 2026 | [docs/black-friday-2026.md](docs/black-friday-2026.md) |
 | Imagens da ficha da Play, vídeos, criativos, .aab | `~/Downloads/EstoqueSimples-PlayStore/` |
 
