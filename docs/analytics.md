@@ -67,6 +67,19 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `bulk_edit.applied` | app | edição em massa aplicada | `count` |
 | `barcode.scanned` | app | leitura de código | `found: boolean` |
 | `search.performed` | app | busca na lista (debounce; não por tecla) | `results` |
+
+> O `term` do `help.searched` existe porque a contagem sozinha não dizia nada:
+> sabíamos que alguém procurou e não achou, sem saber o quê. São as dúvidas
+> reais de quem usa o produto — pauta para a ajuda e para o blog. O termo é
+> descartado (e o evento sai só com `results`) quando tem cara de dado
+> pessoal — e-mail, telefone, documento, link — ou quando passa de 60
+> caracteres, que não é busca, é texto colado. A regra está em
+> `apps/web/src/lib/help-search-term.ts`, com teste, e é a mesma no app
+> Android (`HelpActivity.termoDeBusca`).
+>
+> A busca na lista de produtos (`search.performed`) **continua sem texto**:
+> aquilo é conteúdo do estoque do cliente, que a política de privacidade
+> promete não coletar.
 | `low_stock.filter_used` | app | chip "Estoque baixo" | — |
 | `report.generated` | app | relatório gerado | `format: pdf \| texto` |
 | `analysis.viewed` | app | Análise de Estoque aberta | — |
@@ -80,7 +93,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `low_stock.notified` / `notification.opened` | app | notificação exibida/tocada | `count` |
 | `help.article_opened` | app e web | resposta aberta na central de ajuda | `article` (id do artigo em `packages/help`) |
 | `platform.play_clicked` / `platform.device_selected` / `platform.install_clicked` / `platform.web_app_installed` | web | página Plataformas: clique na Google Play, aparelho escolhido no passo a passo, instalação com um clique e instalação confirmada | `device` |
-| `help.searched` | app e web | busca na central de ajuda (após pausa na digitação) | `results` — só a contagem, nunca o texto buscado |
+| `help.searched` | app e web | busca na central de ajuda (após pausa na digitação) | `results`; `term` — o que foi buscado, em minúsculas, **quando é mesmo uma dúvida** |
 | `user.registered` / `user.logged_in` / `user.email_verified` / `user.deletion_requested` | API | ciclo de vida da conta | `origin` |
 | `workspace.created` / `invite.sent` / `invite.accepted` | API | empresa e equipe | `roleKey`, `newAccount`; `automatic` (empresa criada no cadastro web) |
 | `onboarding.viewed` / `onboarding.name_set` / `onboarding.name_skipped` | web | tela de boas-vindas pós-cadastro: exibida, nome dado, pulada (reversão: viewed sem passo seguinte em 24 h > 10% com ≥ 30 cadastros) | `segment` |

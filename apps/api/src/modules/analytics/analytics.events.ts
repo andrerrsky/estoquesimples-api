@@ -194,7 +194,7 @@ export const ANALYTICS_EVENT_CATALOG: AnalyticsEventDefinition[] = [
   { name: 'blog.post_viewed', source: 'app', description: 'Abriu um post do blog (web ou app).', properties: { slug: 'endereço do post', category: 'categoria' } },
   { name: 'blog.post_shared', source: 'app', description: 'Compartilhou um post do blog.', properties: { slug: 'endereço do post', via: 'whatsapp | share' } },
   { name: 'platform.web_app_installed', source: 'app', description: 'O navegador confirmou a instalação do web app.' },
-  { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda (só a contagem, nunca o texto).', properties: { results: 'quantidade' } },
+  { name: 'help.searched', source: 'app', description: 'Busca feita na central de ajuda. O termo vai junto quando é mesmo uma dúvida; com cara de dado pessoal (e-mail, telefone, link) ou longo demais, sai só a contagem.', properties: { results: 'quantidade', term: 'o que foi buscado, em minúsculas (ausente quando descartado)' } },
   { name: 'support.ticket_submitted', source: 'app', description: 'Usuário tocou em enviar na tela de nova solicitação.', properties: { category: 'categoria escolhida' } },
   { name: 'subscription.checkout_started', source: 'server', description: 'Contratação do plano iniciada pela web (Asaas).', properties: { provider: 'asaas', cycle: 'MONTHLY | SEMIANNUALLY | YEARLY', billingType: 'forma de pagamento' } },
   { name: 'brand.updated', source: 'server', description: 'Empresa salvou a identidade visual.', properties: { colors: 'quantas cores personalizadas (0-3)', font: 'default | serif', hasLogo: 'boolean' } },
