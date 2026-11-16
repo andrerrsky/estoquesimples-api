@@ -46,6 +46,11 @@ provada, oferta ruim.
    *"Faltam R$ 3.480 · Sobram R$ 210 · 14 itens divergentes de 86 conferidos"*.
 4. Confirma e o app lança os ajustes.
 
+O total é calculado **a preço de custo** (`cost`), caindo para o preço de
+venda quando o produto não tem custo cadastrado — perda vale o que se pagou,
+não o que se cobraria. A tela diz isso em texto, para ninguém comparar o
+número com a etiqueta e achar que está errado.
+
 Um produto que ela não contou fica **"não conferido"** e **nunca vira zero**.
 Tratar não contado como zero é o erro que destrói estoque alheio e rende uma
 estrela — é a regra mais importante deste documento.

@@ -45,6 +45,14 @@ public class ConferenceActivity extends BaseActivity {
 
     private static final String[] REASONS = {"quebra", "furto", "erro de lançamento", "achado"};
 
+    /**
+     * Teto de linhas na tela de contagem. Cada linha tem campo de texto; um
+     * estoque de milhares de produtos no escopo "Tudo" travaria a tela. Acima
+     * disso a tela orienta a conferir por categoria, local ou fornecedor —
+     * que é como se conta na prática, prateleira por prateleira.
+     */
+    static final int MAX_ROWS = 400;
+
     public static void open(Context context, String origin) {
         Intent intent = new Intent(context, ConferenceActivity.class);
         intent.putExtra("origem", origin);
@@ -68,6 +76,15 @@ public class ConferenceActivity extends BaseActivity {
     private boolean showingSummary;
     private String origin;
     private long startedAtMillis;
+    private int inScopeCount;
+
+    /** "No sistema: 12 un · contado: 10" — ou "não conferido", que não é zero. */
+    private String statusLine(double expected, String unit, Double counted) {
+        return "No sistema: " + CurrencyHelper.formatQuantity(expected) + unit
+                + (counted == null
+                ? "  ·  não conferido"
+                : "  ·  contado: " + CurrencyHelper.formatQuantity(counted));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,18 +240,36 @@ public class ConferenceActivity extends BaseActivity {
         scanButton.setOnClickListener(v -> onScanRequested());
 
         List<ConferenceRepository.Item> items = repository.itemsInScope(session);
-        int counted = 0;
-        for (ConferenceRepository.Item item : items) {
-            if (item.isCounted()) {
-                counted++;
-            }
-            container.addView(buildCountRow(item));
+        inScopeCount = items.size();
+
+        int shown = Math.min(items.size(), MAX_ROWS);
+        for (int i = 0; i < shown; i++) {
+            container.addView(buildCountRow(items.get(i)));
         }
-        progress.setText(counted + " de " + items.size() + " conferidos");
 
         if (items.isEmpty()) {
             addText("Nenhum produto neste escopo.", 15f, false);
+        } else if (items.size() > MAX_ROWS) {
+            // Montar milhares de linhas com campo de texto trava a tela. Em
+            // vez de fingir que cabe, dizemos o que fazer: conferir por
+            // categoria, local ou fornecedor — que é como se conta na vida
+            // real, prateleira por prateleira.
+            addSpace(16);
+            addText("Mostrando os primeiros " + MAX_ROWS + " de " + items.size()
+                    + " produtos. Para contar o resto, faça a conferência por categoria, "
+                    + "local ou fornecedor — é mais rápido e não se perde o lugar.", 14f, false);
         }
+        updateProgress();
+    }
+
+    /**
+     * Só o contador. Chamado a cada item contado, no lugar de reconstruir a
+     * lista: recriar tudo a cada "Ok" faria a tela piscar e o scroll voltar ao
+     * topo — numa contagem de centenas de itens, isso é o bastante para
+     * tornar a funcionalidade inútil.
+     */
+    private void updateProgress() {
+        progress.setText(repository.countedIn(session) + " de " + inScopeCount + " conferidos");
     }
 
     private View buildCountRow(ConferenceRepository.Item item) {
@@ -248,13 +283,10 @@ public class ConferenceActivity extends BaseActivity {
         name.setTypeface(name.getTypeface(), android.graphics.Typeface.BOLD);
         row.addView(name);
 
-        TextView expected = new TextView(this);
-        String unit = item.unit == null || item.unit.trim().isEmpty() ? "" : " " + item.unit;
-        expected.setText("No sistema: " + CurrencyHelper.formatQuantity(item.expected) + unit
-                + (item.isCounted()
-                ? "  ·  contado: " + CurrencyHelper.formatQuantity(item.counted)
-                : "  ·  não conferido"));
+        final String unit = item.unit == null || item.unit.trim().isEmpty() ? "" : " " + item.unit;
+        final TextView expected = new TextView(this);
         expected.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+        expected.setText(statusLine(item.expected, unit, item.counted));
         row.addView(expected);
 
         LinearLayout input = new LinearLayout(this);
@@ -276,8 +308,10 @@ public class ConferenceActivity extends BaseActivity {
         save.setAllCaps(false);
         save.setOnClickListener(v -> {
             String typed = field.getText().toString().trim();
+            Double novoValor;
             if (typed.isEmpty()) {
                 repository.clearCount(session.uuid, item.productUuid);
+                novoValor = null;
             } else {
                 double value = CurrencyHelper.parseCurrency(typed, -1d);
                 if (value < 0d) {
@@ -288,8 +322,12 @@ public class ConferenceActivity extends BaseActivity {
                     toast("Não foi possível registrar a contagem.");
                     return;
                 }
+                novoValor = value;
             }
-            renderCounting();
+            // Atualiza só esta linha e o contador. Nada de reconstruir a
+            // lista: quem está contando não pode perder o lugar a cada item.
+            expected.setText(statusLine(item.expected, unit, novoValor));
+            updateProgress();
         });
         input.addView(save);
         row.addView(input);
@@ -378,7 +416,7 @@ public class ConferenceActivity extends BaseActivity {
         headline.setPadding(0, 0, 0, dp(8));
 
         addText(summary.divergent + " item(ns) divergente(s) de " + summary.counted
-                + " conferido(s).", 15f, false);
+                + " conferido(s), a preço de custo.", 15f, false);
         if (summary.notCounted() > 0) {
             addSpace(8);
             addText(summary.notCounted() + " item(ns) não foram conferidos e ficam como estão — "

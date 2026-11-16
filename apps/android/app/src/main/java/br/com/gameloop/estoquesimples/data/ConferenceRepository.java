@@ -410,6 +410,31 @@ public final class ConferenceRepository {
         }
     }
 
+    /**
+     * Quantos itens já foram contados nesta sessão.
+     *
+     * Consulta própria, e não {@code itemsInScope().size()}, porque o
+     * contador é atualizado a cada item: refazer a junção com a tabela de
+     * produtos a cada "Ok" deixaria a contagem lenta justamente no gesto que
+     * mais se repete.
+     */
+    public int countedIn(Session session) {
+        if (session == null) {
+            return 0;
+        }
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery("SELECT count(*) FROM " + LocalDb.TABLE_CONFERENCE_COUNTS
+                    + " WHERE session_uuid=?", new String[]{session.uuid});
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao contar itens conferidos", e);
+            return 0;
+        } finally {
+            close(cursor);
+        }
+    }
+
     /** Desfaz a contagem de um item: ele volta a "não conferido". */
     public boolean clearCount(String sessionUuid, String productUuid) {
         try {
