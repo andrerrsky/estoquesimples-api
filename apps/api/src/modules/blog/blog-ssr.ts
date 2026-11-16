@@ -387,6 +387,10 @@ export function sitemapXml(posts: BlogPostView[], landingLastmod: string, catego
   const fixed = [
     { loc: `${SITE}/`, lastmod: landingLastmod, priority: '1.0' },
     { loc: `${SITE}/blog`, lastmod: latest(posts) ?? landingLastmod, priority: '0.8' },
+    // Página de exibição do vídeo (apps/web/src/pages/VideoPage.tsx): é a
+    // única página do site cujo assunto é o vídeo, e a que leva o JSON-LD
+    // VideoObject.
+    { loc: `${SITE}/video`, priority: '0.7' },
     { loc: `${SITE}/plataformas`, priority: '0.6' },
     { loc: `${SITE}/ajuda`, priority: '0.6' },
     { loc: `${SITE}/termos`, priority: '0.2' },
