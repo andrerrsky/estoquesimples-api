@@ -58,6 +58,13 @@ h2 {
   margin: 28px 0 8px;
 }
 
+/* Subtítulo dentro de uma seção (ex.: 8.1), um degrau abaixo do h2. */
+h3 {
+  font-size: 0.98rem;
+  color: #14507a;
+  margin: 20px 0 6px;
+}
+
 p, ul {
   margin: 0 0 12px;
 }
