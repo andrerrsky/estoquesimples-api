@@ -56,8 +56,8 @@ export const DUVIDAS = [
 ];
 
 const FAZ = [
-  ['Saldo automático', 'Lance o que entra e o que sai. A quantidade de cada produto se atualiza sozinha.'],
-  ['Aviso de estoque baixo', 'Chegou no mínimo que você definiu, a planilha marca “Repor” em vermelho.'],
+  ['Saldo automático', 'Lance o que entra e o que sai: esta planilha de estoque atualiza a quantidade de cada produto sozinha.'],
+  ['Aviso de estoque baixo', 'Chegou no mínimo que você definiu, a coluna Situação marca “Repor”; se zerar, marca “Sem estoque”.'],
   ['Valor do estoque', 'Quanto dinheiro está parado em mercadoria, somado na hora.'],
   ['Lista de produtos pronta', 'O produto é escolhido numa lista, não digitado. Nome errado não quebra a conta.'],
 ];
@@ -145,21 +145,23 @@ export function PlanilhaPage() {
 
           {/* Prévia da aba Produtos, com as cores do arquivo. */}
           <figure className="pl-previa">
-            <figcaption className="pl-previa__legenda">
+            <figcaption className="pl-previa__legenda" id="pl-previa-legenda">
               A aba <strong>Produtos</strong>, como ela abre: você preenche as colunas amarelas, as cinzas são
               calculadas.
             </figcaption>
-            <div className="pl-previa__rolagem">
+            {/* tabindex/role: a tabela rola na horizontal, e região rolável
+                precisa ser alcançável pelo teclado (WCAG 2.1.1). */}
+            <div className="pl-previa__rolagem" tabIndex={0} role="region" aria-labelledby="pl-previa-legenda">
               <table className="pl-tabela">
                 <caption className="sr-only">Exemplo da aba Produtos com três itens cadastrados</caption>
                 <thead>
                   <tr>
-                    <th scope="col" className="pl-th--entrada">Código</th>
+                    <th scope="col" className="pl-th--entrada pl-so-grande">Código</th>
                     <th scope="col" className="pl-th--entrada">Produto</th>
-                    <th scope="col" className="pl-th--entrada">Estoque mínimo</th>
-                    <th scope="col" className="pl-th--entrada">Custo</th>
-                    <th scope="col">Entradas</th>
-                    <th scope="col">Saídas</th>
+                    <th scope="col" className="pl-th--entrada pl-so-grande">Estoque mínimo</th>
+                    <th scope="col" className="pl-th--entrada pl-so-grande">Custo</th>
+                    <th scope="col" className="pl-so-grande">Entradas</th>
+                    <th scope="col" className="pl-so-grande">Saídas</th>
                     <th scope="col">Saldo atual</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Valor em estoque</th>
@@ -168,12 +170,12 @@ export function PlanilhaPage() {
                 <tbody>
                   {PREVIA.map((l) => (
                     <tr key={l.cod}>
-                      <td className="pl-td--entrada">{l.cod}</td>
+                      <td className="pl-td--entrada pl-so-grande">{l.cod}</td>
                       <td className="pl-td--entrada">{l.nome}</td>
-                      <td className="pl-td--entrada pl-num">{l.min}</td>
-                      <td className="pl-td--entrada pl-num">{l.custo}</td>
-                      <td className="pl-num">{l.ent}</td>
-                      <td className="pl-num">{l.sai}</td>
+                      <td className="pl-td--entrada pl-num pl-so-grande">{l.min}</td>
+                      <td className="pl-td--entrada pl-num pl-so-grande">{l.custo}</td>
+                      <td className="pl-num pl-so-grande">{l.ent}</td>
+                      <td className="pl-num pl-so-grande">{l.sai}</td>
                       <td className="pl-num"><strong>{l.saldo}</strong></td>
                       <td>
                         <span className={`pl-situacao pl-situacao--${l.situacao === 'Repor' ? 'repor' : l.situacao === 'Sem estoque' ? 'zerado' : 'ok'}`}>
@@ -186,6 +188,7 @@ export function PlanilhaPage() {
                 </tbody>
               </table>
             </div>
+            <p className="pl-previa__nota">No computador e no arquivo, a aba mostra as nove colunas.</p>
           </figure>
         </section>
 
@@ -253,6 +256,25 @@ export function PlanilhaPage() {
           <p>
             As fórmulas, as listas de produto e as cores de aviso continuam funcionando. A partir daí ela fica salva na
             sua conta e abre do celular pelo app do Google Planilhas.
+          </p>
+        </section>
+
+        <section className="pl-section" aria-labelledby="pl-excel">
+          <h2 className="landing__h2" id="pl-excel">Controle de estoque no Excel: o que a planilha resolve e onde ela para</h2>
+          <p>
+            O que vem pronto: o saldo de cada produto (entradas menos saídas), o aviso de reposição comparando o saldo
+            com o mínimo, o valor em estoque multiplicando saldo por custo, e o resumo somando tudo. Você não escreve
+            nenhuma fórmula — e não corre o risco de apagar uma sem perceber, porque as colunas calculadas são as
+            cinzas, separadas das suas.
+          </p>
+          <p>
+            Onde ela para, e nenhuma planilha resolve: ela só sabe o que você digitou, então não avisa nada enquanto
+            você não abrir o arquivo; não lê código de barras; e, se duas pessoas editarem a mesma cópia, a última a
+            salvar apaga o trabalho da outra. Um controle de estoque grátis em Excel dá conta do começo — o limite
+            prático aqui é 500 produtos e 500 lançamentos, depois disso o arquivo fica lento.
+          </p>
+          <p>
+            Chegando nesse ponto, o caminho natural é um aplicativo, que é do que trata a próxima seção.
           </p>
         </section>
 
