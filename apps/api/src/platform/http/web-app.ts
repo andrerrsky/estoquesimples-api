@@ -79,6 +79,8 @@ const CONTENT_TYPES: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.vtt': 'text/vtt; charset=utf-8',
+  // Planilha de controle de estoque oferecida em /planilha-de-controle-de-estoque.
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.txt', '.xml', '.vtt']);
@@ -217,6 +219,9 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
   // JSON-LD, então o arquivo sai do mapa para não existir em dois lugares.
   const videoPage = files.get('/video.html') ?? null;
   files.delete('/video.html');
+  // Página da planilha gratuita, pelo mesmo caminho da /video.
+  const planilhaPage = files.get('/planilha.html') ?? null;
+  files.delete('/planilha.html');
   // Blog, sitemap e feed: HTML/XML montados pela API a cada pedido (ver
   // modules/blog/blog-pages.ts), a partir do index.html do build.
   const blogPages = new BlogPages(app.services);
@@ -371,6 +376,8 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     if (path === '/') return send(request, reply, landing);
     if (videoPage && path === '/video') return send(request, reply, videoPage);
     if (videoPage && path === '/video/') return reply.redirect('/video', 301);
+    if (planilhaPage && path === '/planilha-de-controle-de-estoque') return send(request, reply, planilhaPage);
+    if (planilhaPage && path === '/planilha-de-controle-de-estoque/') return reply.redirect('/planilha-de-controle-de-estoque', 301);
     if (isPublicAppPage(path)) return send(request, reply, publicPages.get(path) ?? { ...index, cacheControl: 'no-store' });
     return send(request, reply, privateIndex);
   });

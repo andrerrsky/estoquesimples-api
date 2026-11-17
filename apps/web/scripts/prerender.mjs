@@ -4,7 +4,7 @@
 // (WhatsApp, Telegram) leem o conteúdo sem executar JavaScript, e a primeira
 // pintura não espera o bundle. Roda depois de `vite build` e de
 // `vite build --ssr src/entry-prerender.tsx --outDir dist-ssr`.
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 const ssr = join(root, 'dist-ssr');
 
-const { render, renderVideo, PLAY_RATING, VIDEO } = await import(pathToFileURL(join(ssr, 'entry-prerender.js')).href);
+const { render, renderVideo, renderPlanilha, PLAY_RATING, VIDEO, PLANILHA, DUVIDAS } = await import(pathToFileURL(join(ssr, 'entry-prerender.js')).href);
 const SITE = 'https://estoquesimples.com.br';
 // O React emite `<link rel="preload">` das imagens no começo do fragmento
 // (ele não tem um <head> para pôr). Dentro de #root esse nó faria a
@@ -170,6 +170,98 @@ const videoPage = `<!doctype html>
 `;
 writeFileSync(join(dist, 'video.html'), videoPage);
 console.log(`prerender: dist/video.html (${(videoPage.length / 1024).toFixed(0)} kB, ${transcript.length} trechos de transcrição)`);
+
+// --- Página da planilha gratuita (/planilha-de-controle-de-estoque) -------
+//
+// Mesma receita da /video: HTML estático, sem bundle. Existe porque as
+// variações de "planilha de controle de estoque" somam mais de 10 mil buscas
+// por mês no Brasil (ver docs/pautas-blog-2026-11.md) — o maior termo do
+// nosso nicho, e o público que ainda controla estoque na mão.
+
+const planilhaHtml = renderPlanilha().replace(/^(<link\b[^>]*>)+/, '');
+if (!planilhaHtml.includes('pl-duvidas')) throw new Error('prerender: a página da planilha não foi renderizada');
+if (!existsSync(join(dist, PLANILHA.arquivo.replace(/^\//, '')))) {
+  throw new Error(`prerender: ${PLANILHA.arquivo} não está no build — a página ofereceria um download quebrado`);
+}
+
+const PLANILHA_URL = `${SITE}/planilha-de-controle-de-estoque`;
+const planilhaTitulo = 'Planilha de controle de estoque grátis (Excel)';
+const planilhaDescricao = 'Baixe grátis, sem cadastro: planilha de controle de estoque com entradas, saídas, saldo automático e aviso de estoque mínimo. Funciona no Excel e no Google Planilhas.';
+// As mesmas perguntas que estão visíveis na página (regra do Google).
+const planilhaFaq = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: DUVIDAS.map((item) => ({
+    '@type': 'Question',
+    name: item.p,
+    acceptedAnswer: { '@type': 'Answer', text: item.r },
+  })),
+});
+
+const planilhaCss = `
+    .pl-main { max-width: 1040px; margin: 0 auto; padding: 8px 20px; }
+    .pl-hero { max-width: 760px; margin: 0 auto; padding: 8px 0 44px; text-align: center; }
+    .pl-title { margin: 10px 0 14px; }
+    .pl-lead { margin: 0 auto 26px; max-width: 620px; }
+    .pl-baixar { margin: 0 0 10px; }
+    .pl-meta { margin: 0; font-size: 14px; color: var(--lp-on-brand-soft); }
+    .pl-meta--escuro { color: var(--text-muted); }
+    .pl-section { max-width: 820px; margin: 48px auto 0; }
+    .pl-section .landing__h2 { margin-bottom: 14px; }
+    .pl-abas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+    .pl-aba { border: 1px solid var(--border); border-radius: var(--radius-card, 14px); padding: 16px 18px; background: var(--surface-content); }
+    .pl-aba__nome { margin: 0 0 6px; font-size: 16px; }
+    .pl-aba p { margin: 0; color: var(--text-muted); font-size: 15px; }
+    .pl-passos { margin: 18px 0 0; padding-left: 22px; }
+    .pl-passos li { margin: 12px 0; }
+    .pl-limites { margin: 14px 0 20px; padding-left: 22px; }
+    .pl-limites li { margin: 8px 0; }
+    .pl-app { border-top: 1px solid var(--border); padding-top: 36px; }
+    .pl-cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0 10px; }
+    .pl-duvidas dt { font-weight: 700; margin-top: 18px; }
+    .pl-duvidas dd { margin: 6px 0 0; color: var(--text-muted); }
+    .pl-footer { max-width: 1040px; margin: 56px auto 0; padding: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px; text-align: center; }
+    @media (max-width: 760px) {
+      .pl-abas { grid-template-columns: 1fr; }
+      .pl-main { padding: 8px 16px; }
+    }`;
+
+const planilhaPagina = `<!doctype html>
+<!-- Página da planilha gratuita, gerada em scripts/prerender.mjs.
+     HTML estático: sem bundle. Ver src/pages/PlanilhaPage.tsx. -->
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1C679D" />
+    <title>${planilhaTitulo} · Estoque Simples</title>
+    <meta name="description" content="${planilhaDescricao}" />
+    <link rel="canonical" href="${PLANILHA_URL}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Estoque Simples" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="${PLANILHA_URL}" />
+    <meta property="og:title" content="${planilhaTitulo}" />
+    <meta property="og:description" content="${planilhaDescricao}" />
+    <meta property="og:image" content="${SITE}/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    ${fontPreload}
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    ${stylesheet}
+    <style>${planilhaCss}
+    </style>
+    <script type="application/ld+json">${planilhaFaq}</script>
+  </head>
+  <body>
+    ${planilhaHtml}
+  </body>
+</html>
+`;
+writeFileSync(join(dist, 'planilha.html'), planilhaPagina);
+console.log(`prerender: dist/planilha.html (${(planilhaPagina.length / 1024).toFixed(0)} kB)`);
 
 // Só a página inicial é reescrita a cada build: só ela ganha a data dele.
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });

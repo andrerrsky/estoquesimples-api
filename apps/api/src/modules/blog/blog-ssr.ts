@@ -390,6 +390,8 @@ export function sitemapXml(posts: BlogPostView[], landingLastmod: string, catego
     // Página de exibição do vídeo (apps/web/src/pages/VideoPage.tsx): é a
     // única página do site cujo assunto é o vídeo, e a que leva o JSON-LD
     // VideoObject.
+    // Planilha gratuita: o termo de maior volume do nicho (ver docs/pautas-blog-2026-11.md).
+    { loc: `${SITE}/planilha-de-controle-de-estoque`, priority: '0.9' },
     { loc: `${SITE}/video`, priority: '0.7' },
     { loc: `${SITE}/plataformas`, priority: '0.6' },
     { loc: `${SITE}/ajuda`, priority: '0.6' },

@@ -1,9 +1,10 @@
 import { renderToString } from 'react-dom/server';
 
 import { LandingPage, PLAY_RATING, VIDEO } from './pages/LandingPage';
+import { DUVIDAS, PLANILHA, PlanilhaPage } from './pages/PlanilhaPage';
 import { VideoPage, type TranscriptBlock } from './pages/VideoPage';
 
-export { PLAY_RATING, VIDEO };
+export { PLAY_RATING, VIDEO, PLANILHA, DUVIDAS };
 
 /**
  * Renderiza a página inicial em HTML no build (ver scripts/prerender.mjs).
@@ -21,4 +22,9 @@ export function render(): string {
  */
 export function renderVideo(transcript: TranscriptBlock[]): string {
   return renderToString(<VideoPage transcript={transcript} />);
+}
+
+/** Renderiza a página da planilha gratuita (`/planilha-de-controle-de-estoque`). */
+export function renderPlanilha(): string {
+  return renderToString(<PlanilhaPage />);
 }
