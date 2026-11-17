@@ -191,7 +191,7 @@ export function PlanilhaPage() {
                 </tbody>
               </table>
             </div>
-            <p className="pl-previa__nota">No computador e no arquivo, a aba mostra as nove colunas, incluindo o valor em estoque de cada produto.</p>
+            <p className="pl-previa__nota">O arquivo traz estes mesmos três produtos de exemplo, e a aba tem ainda as colunas Categoria e Unidade.</p>
           </figure>
         </section>
 
