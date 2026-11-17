@@ -7,6 +7,8 @@ import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { resolveAppDist } from './app-dist.js';
 import { BlogPages, isBlogPagePath } from '../../modules/blog/blog-pages.js';
 import { INDEXNOW_KEY } from '../../modules/blog/indexnow.js';
+import { AnalyticsEventName } from '../../modules/analytics/analytics.events.js';
+import { trackServerEvent } from '../../modules/analytics/analytics.service.js';
 import { isPublicAppPage, privateAppHtml, PUBLIC_APP_PATHS, publicPageHtml } from '../../modules/blog/public-pages.js';
 import { ErrorCode } from './errors.js';
 
@@ -82,6 +84,23 @@ const CONTENT_TYPES: Record<string, string> = {
   // Planilha de controle de estoque oferecida em /planilha-de-controle-de-estoque.
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
+
+/** A planilha gratuita, cujo download é contado (ver o evento planilha.downloaded). */
+const PLANILHA_PATH = '/assets/planilha/planilha-controle-de-estoque.xlsx';
+
+/**
+ * Só o host de quem mandou, nunca a URL inteira: basta para separar o
+ * tráfego da nossa página do de um link copiado para outro site, e não
+ * guarda caminho nem parâmetros de busca de ninguém.
+ */
+function hostOfReferer(referer: string | undefined): string {
+  if (!referer) return 'direto';
+  try {
+    return new URL(referer).host;
+  } catch {
+    return 'desconhecido';
+  }
+}
 
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.txt', '.xml', '.vtt']);
 
@@ -345,7 +364,21 @@ export async function registerWebApp(app: FastifyInstance): Promise<void> {
     }
 
     const file = files.get(path);
-    if (file) return send(request, reply, file);
+    if (file) {
+      // Download da planilha gratuita: contado aqui, ao entregar o arquivo.
+      // A página é HTML puro, sem script e sem cookie (a CSP nem permitiria
+      // script inline), então não há como medir o clique no navegador — e
+      // medir no servidor não depende de consentimento nem de bloqueador.
+      // Só o pedido inicial conta: o navegador que retoma o download manda
+      // `Range`, e isso não é um download novo.
+      if (path === PLANILHA_PATH && request.method === 'GET' && !request.headers.range) {
+        void trackServerEvent(app.services, {
+          name: AnalyticsEventName.PLANILHA_DOWNLOADED,
+          properties: { referer: hostOfReferer(request.headers.referer) },
+        });
+      }
+      return send(request, reply, file);
+    }
     if (path === `/${INDEXNOW_KEY}.txt`) return send(request, reply, indexNowFile);
 
     // Post que não existe (ou qualquer caminho inválido sob /blog/): 404 de
