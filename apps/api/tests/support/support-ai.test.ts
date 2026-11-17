@@ -78,15 +78,25 @@ async function ligarRespostaAutomatica(cookie: string): Promise<void> {
   expect(ligar.json()).toEqual({ aiAutoReplyEnabled: true });
 }
 
-/** Espera a fila processar as tarefas do atendimento. */
+/**
+ * Espera a fila processar as tarefas do atendimento que já estão na hora. O
+ * aviso à equipe fica agendado para alguns minutos à frente quando a IA está
+ * ligada, então esperar por ele travaria o teste.
+ */
 async function filaVazia(): Promise<void> {
   for (let i = 0; i < 100; i += 1) {
     const pending = await context.services.db.execute<{ total: number }>(
-      sql`SELECT count(*)::int AS total FROM jobs WHERE kind LIKE 'support.%' AND completed_at IS NULL AND failed_at IS NULL`,
+      sql`SELECT count(*)::int AS total FROM jobs
+          WHERE kind LIKE 'support.%' AND completed_at IS NULL AND failed_at IS NULL AND run_at <= now()`,
     );
     if ((pending.rows[0]?.total ?? 0) === 0) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
+}
+
+/** Adianta o aviso à equipe, que nasce agendado quando a IA está ligada. */
+async function adiantarAvisoDaEquipe(): Promise<void> {
+  await context.services.db.execute(sql`UPDATE jobs SET run_at = now() WHERE kind = 'support.notify_team' AND completed_at IS NULL`);
 }
 
 describe('resposta automática por IA no suporte', () => {
@@ -142,6 +152,28 @@ describe('resposta automática por IA no suporte', () => {
     }
   });
 
+  it('respondida pela IA: o aviso de solicitação nova não incomoda o dono', async () => {
+    const cookie = await ownerCookie();
+    const openai = fakeOpenAi({ acao: 'responder', resposta: 'No Gratuito são até 50 produtos na nuvem.' });
+    const stop = startJobRunner(context.services, context.app.log, { intervalMs: 50 });
+    try {
+      await ligarRespostaAutomatica(cookie);
+      const installId = randomUUID();
+      await context.app.inject({ method: 'POST', url: '/v1/support/tickets', payload: chatTicket(installId, 'Quantos produtos cabem no plano gratuito?') });
+      await filaVazia();
+      // Com a IA ligada o aviso à equipe nasce agendado; aqui ele é adiantado
+      // para o teste ver o que a tarefa decide quando chega a hora.
+      await adiantarAvisoDaEquipe();
+      await filaVazia();
+
+      expect(context.mailer.sent.filter((message) => message.kind === 'support_new_ticket')).toHaveLength(0);
+      expect(context.mailer.sent.filter((message) => message.kind === 'support_needs_human')).toHaveLength(0);
+    } finally {
+      stop();
+      openai.restore();
+    }
+  });
+
   it('pedido de reembolso: a IA escalona, nada é enviado ao cliente e o dono recebe um e-mail só', async () => {
     const cookie = await ownerCookie();
     const openai = fakeOpenAi({ acao: 'humano', motivo: 'Pedido de reembolso: depende de uma pessoa.' });
@@ -171,8 +203,12 @@ describe('resposta automática por IA no suporte', () => {
       expect(row.rows[0]?.needs_human).toBe(true);
       expect(row.rows[0]?.needs_human_reason).toContain('reembolso');
 
+      await adiantarAvisoDaEquipe();
+      await filaVazia();
       const avisos = context.mailer.sent.filter((message) => message.kind === 'support_needs_human');
       expect(avisos).toHaveLength(1);
+      // Um e-mail só: o de abertura não se soma ao de "precisa de você".
+      expect(context.mailer.sent.filter((message) => message.kind === 'support_new_ticket')).toHaveLength(0);
       expect(avisos[0]!.subject).toContain('precisa de você');
       expect(avisos[0]!.text).toContain('Pedido de reembolso');
       expect(avisos[0]!.text).toContain('Marina');

@@ -66,6 +66,15 @@ export const SUPPORT_NOTIFY_NEEDS_HUMAN_JOB = 'support.notify_needs_human';
 /** Configurações do atendimento no banco (mesmo lugar das do blog). */
 const SETTINGS_KEY = 'support_settings';
 
+/**
+ * Quanto o aviso de solicitação nova espera, quando a resposta automática
+ * está ligada, antes de incomodar o dono: tempo de a IA tentar responder
+ * (segundos, mais folga de fila). Respondida, o aviso não sai; escalonada, o
+ * e-mail de "precisa de você" já saiu. Com a IA desligada o aviso sai na
+ * hora, como sempre.
+ */
+const NOTIFY_TEAM_DELAY_MS = 2 * 60_000;
+
 const CATEGORY_LABEL: Record<string, string> = {
   question: 'Dúvida',
   problem: 'Problema',
@@ -215,6 +224,7 @@ export class SupportService {
         uniqueKey: `${SUPPORT_NOTIFY_TEAM_JOB}:${created.id}`,
         payload: { ticketId: created.id },
         maxAttempts: 5,
+        runAt: aiOn ? new Date(Date.now() + NOTIFY_TEAM_DELAY_MS) : new Date(),
       });
       return created;
     });
@@ -237,10 +247,22 @@ export class SupportService {
    *
    * Lança se nenhum envio der certo, para a fila repetir.
    */
-  async notifyTeamOfNewTicket(ticketId: string): Promise<{ recipients: number; sent: number }> {
+  async notifyTeamOfNewTicket(ticketId: string): Promise<{ recipients: number; sent: number; skipped?: string }> {
     const rows = await this.db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
     const ticket = rows[0];
     if (!ticket) return { recipients: 0, sent: 0 };
+
+    // A IA já cuidou desta: ou respondeu ao cliente (nada a fazer agora), ou
+    // passou para uma pessoa, e aí o e-mail de "precisa de você" já saiu.
+    // Vale só para solicitação respondida pela IA sem ninguém do time ter
+    // entrado: resposta de pessoa não cancela aviso nenhum.
+    if (ticket.needsHuman) return { recipients: 0, sent: 0, skipped: 'escalonada pela IA (aviso próprio já enviado)' };
+    const aiAnswered = await this.db
+      .select({ id: supportMessages.id })
+      .from(supportMessages)
+      .where(and(eq(supportMessages.ticketId, ticketId), eq(supportMessages.ai, true), eq(supportMessages.internal, false)))
+      .limit(1);
+    if (aiAnswered.length > 0) return { recipients: 0, sent: 0, skipped: 'respondida pela IA' };
 
     const recipients = await this.teamRecipients();
     if (recipients.length === 0) return { recipients: 0, sent: 0 };

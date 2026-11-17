@@ -137,6 +137,13 @@ primeira mensagem e o link do painel.
 Mensagens seguintes na mesma solicitação não geram e-mail. Falha de envio é
 repetida pela fila (até 5 tentativas) e aparece em Operação › Jobs.
 
+Com a **resposta automática ligada**, esse aviso nasce agendado para 2 minutos
+à frente (`jobs.run_at`) em vez de sair na hora, e quando chega a hora a
+tarefa desiste se a IA já resolveu: respondida pela IA, o dono não é
+incomodado; escalonada, o e-mail de "precisa de você" já saiu no lugar. Uma
+resposta de pessoa não cancela aviso nenhum. Com a IA desligada, nada muda: o
+aviso sai imediatamente, como sempre.
+
 ## Resposta automática por IA
 
 O chat de suporte pode responder sozinho as dúvidas básicas — quase sempre
@@ -231,6 +238,9 @@ nome de quem escreveu, motivo, a última mensagem do cliente e o link do
 painel. Destinatários iguais aos do aviso de solicitação nova
 (`SUPPORT_NOTIFY_EMAILS` ou os donos ativos do painel). **Um por
 solicitação**: quem garante isso é o `UPDATE … WHERE needs_human = false` —
-não alterou linha, não enfileira aviso. O e-mail de solicitação nova continua
-saindo como antes, então um chamado que a IA escalona rende dois e-mails: o
-de abertura e o de "precisa de você".
+não alterou linha, não enfileira aviso.
+
+**Um e-mail por solicitação, no total.** Com a IA ligada, o aviso de
+solicitação nova espera 2 minutos e desiste se a IA já respondeu ou já
+escalonou (ver a seção anterior): o dono recebe o aviso de abertura, ou o de
+"precisa de você", nunca os dois.
