@@ -51,7 +51,16 @@ export interface SupportAiInput {
   transcript: Array<{ author: 'user' | 'support' | 'system'; body: string }>;
 }
 
-const REAIS = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const REAIS_FORMAT = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/**
+ * "R$ 24,99". O `Intl` separa o símbolo com espaço não separável (U+00A0);
+ * aqui ele vira espaço comum, para o texto do prompt ser igual ao que se
+ * escreve e se procura em qualquer lugar.
+ */
+function reais(cents: number): string {
+  return REAIS_FORMAT.format(cents / 100).replace(/\u00a0/g, ' ');
+}
 
 /** Nome legível das chaves de `plan_features` que o cliente pergunta. */
 const FEATURE_LABEL: Record<string, string> = {
@@ -100,13 +109,13 @@ export async function planFactsFor(db: Database): Promise<string> {
         .filter((row) => row.planKey === plan.key)
         .map((row) => describeFeature(row.featureKey, row.enabled, row.limitValue));
       const prices = [
-        plan.webPriceMonthlyCents ? `mensal ${REAIS.format(plan.webPriceMonthlyCents / 100)}` : null,
-        plan.webPriceSemiannualCents ? `semestral ${REAIS.format(plan.webPriceSemiannualCents / 100)} (total)` : null,
-        plan.webPriceYearlyCents ? `anual ${REAIS.format(plan.webPriceYearlyCents / 100)} (total)` : null,
+        plan.webPriceMonthlyCents ? `mensal ${reais(plan.webPriceMonthlyCents)}` : null,
+        plan.webPriceSemiannualCents ? `semestral ${reais(plan.webPriceSemiannualCents)} (total)` : null,
+        plan.webPriceYearlyCents ? `anual ${reais(plan.webPriceYearlyCents)} (total)` : null,
       ].filter((line) => line !== null);
       const offer =
         plan.googleOfferPriceCents && plan.googleOfferCycles
-          ? `Oferta de entrada no app Android: ${REAIS.format(plan.googleOfferPriceCents / 100)} por mês nos ${plan.googleOfferCycles} primeiros meses.`
+          ? `Oferta de entrada no app Android: ${reais(plan.googleOfferPriceCents)} por mês nos ${plan.googleOfferCycles} primeiros meses.`
           : null;
       return [
         `Plano "${plan.name}" (chave ${plan.key})${plan.description ? `: ${plan.description}` : ''}`,
