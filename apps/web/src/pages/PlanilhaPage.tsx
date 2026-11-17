@@ -23,7 +23,7 @@ import { PLAY_RATING } from './LandingPage';
 export const PLANILHA = {
   arquivo: '/assets/planilha/planilha-controle-de-estoque.xlsx',
   nome: 'planilha-controle-de-estoque.xlsx',
-  tamanho: '52 KB',
+  tamanho: '55 KB',
   versao: '2',
   atualizada: 'novembro de 2026',
   atualizadaIso: '2026-11-16',
