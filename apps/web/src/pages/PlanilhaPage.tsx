@@ -22,7 +22,7 @@
 export const PLANILHA = {
   arquivo: '/assets/planilha/planilha-controle-de-estoque.xlsx',
   nome: 'planilha-controle-de-estoque.xlsx',
-  tamanho: '51 KB',
+  tamanho: '52 KB',
 };
 
 const PLAY_URL = `https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples&referrer=${encodeURIComponent('utm_source=site&utm_medium=planilha')}`;
@@ -35,7 +35,7 @@ export const DUVIDAS = [
   },
   {
     p: 'Funciona no Excel e no Google Planilhas?',
-    r: 'Sim. O arquivo é .xlsx: abre no Excel, no Google Planilhas (Arquivo › Importar), no LibreOffice e no Numbers. As fórmulas e os avisos de estoque baixo funcionam nos quatro.',
+    r: 'Sim. O arquivo é .xlsx: abre no Excel, no Google Planilhas (Arquivo › Importar), no LibreOffice e no Numbers. É um controle de estoque no Excel pronto — você não precisa montar nenhuma fórmula.',
   },
   {
     p: 'Preciso saber fórmulas de Excel para usar?',
@@ -43,7 +43,7 @@ export const DUVIDAS = [
   },
   {
     p: 'Quantos produtos cabem?',
-    r: 'Até 500 produtos e 500 lançamentos, que atende a maioria dos pequenos negócios. Acima disso a planilha fica lenta — é o ponto em que vale usar um aplicativo.',
+    r: 'Até 500 produtos e 500 lançamentos, o que atende a maioria dos pequenos negócios. Acima disso qualquer planilha de estoque fica lenta — é o ponto em que vale usar um aplicativo.',
   },
   {
     p: 'Qual a diferença para o aplicativo?',
@@ -52,10 +52,10 @@ export const DUVIDAS = [
 ];
 
 const DENTRO = [
-  ['Produtos', 'O cadastro: código, nome, categoria, unidade, estoque mínimo e custo. O saldo e o aviso saem sozinhos.'],
-  ['Entradas e saídas', 'Uma linha por movimento, com o produto escolhido numa lista — sem risco de digitar o nome diferente e bagunçar a conta.'],
-  ['Resumo', 'Quantos produtos, quantos para repor, quantos zerados e quanto dinheiro está parado no estoque.'],
-  ['Começar aqui', 'As instruções, em três passos, na primeira aba.'],
+  ['Saldo automático', 'Lance o que entra e o que sai. A quantidade de cada produto se atualiza sozinha.'],
+  ['Aviso de estoque baixo', 'Chegou no mínimo que você definiu, a planilha marca “Repor” em vermelho.'],
+  ['Valor do estoque', 'Quanto dinheiro está parado em mercadoria, somado na hora.'],
+  ['Lista de produtos pronta', 'O produto é escolhido numa lista, não digitado. Nome errado não quebra a conta.'],
 ];
 
 export function PlanilhaPage() {
@@ -74,8 +74,8 @@ export function PlanilhaPage() {
           <p className="lp-eyebrow">Planilha gratuita · Excel e Google Planilhas</p>
           <h1 className="landing__title pl-title">Planilha de controle de estoque</h1>
           <p className="landing__lead pl-lead">
-            Cadastre seus produtos, lance o que entra e o que sai, e veja o saldo, o aviso de reposição e o valor do
-            estoque calculados sozinhos. Sem cadastro: o botão baixa o arquivo.
+            Registre entrada e saída de produtos e veja o saldo, o aviso de reposição e o valor do estoque
+            calculados sozinhos. Sem cadastro: o botão baixa o arquivo.
           </p>
           <p className="pl-baixar">
             <a className="btn btn--on-brand btn--lg" href={PLANILHA.arquivo} download={PLANILHA.nome}>
@@ -88,7 +88,7 @@ export function PlanilhaPage() {
 
       <main id="conteudo" className="pl-main">
         <section className="pl-section" aria-labelledby="pl-dentro">
-          <h2 className="landing__h2" id="pl-dentro">O que vem dentro</h2>
+          <h2 className="landing__h2" id="pl-dentro">O que a planilha faz por você</h2>
           <div className="pl-abas">
             {DENTRO.map(([nome, texto]) => (
               <div className="pl-aba" key={nome}>
@@ -107,8 +107,8 @@ export function PlanilhaPage() {
               quantidade que significa “está na hora de comprar”.
             </li>
             <li>
-              <strong>Lance o que entra e o que sai.</strong> Uma linha por movimento, na hora em que acontece. É isso
-              que faz a conta fechar no fim do mês.
+              <strong>Lance entrada e saída de produtos.</strong> Uma linha por movimento, na hora em que
+              acontece. É isso que faz a conta fechar no fim do mês.
             </li>
             <li>
               <strong>Acompanhe.</strong> A coluna Situação avisa “Repor” quando o produto chega ao mínimo, e o Resumo
@@ -118,7 +118,7 @@ export function PlanilhaPage() {
         </section>
 
         <section className="pl-section pl-app" aria-labelledby="pl-app">
-          <h2 className="landing__h2" id="pl-app">Quando a planilha começa a atrapalhar</h2>
+          <h2 className="landing__h2" id="pl-app">Quando vale trocar por um aplicativo de controle de estoque</h2>
           <p className="lp-lead">
             Planilha resolve bem no começo. Três coisas costumam marcar o limite:
           </p>
