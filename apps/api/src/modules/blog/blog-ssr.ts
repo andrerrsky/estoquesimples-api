@@ -381,6 +381,20 @@ export function renderBlogPost(template: string, post: BlogPostView, related: Bl
 }
 
 /**
+ * O dia de um instante no fuso do site, no formato do sitemap.
+ *
+ * `updatedAt.slice(0, 10)` recortava a data **em UTC**: depois das 21h de
+ * Brasília o sitemap publicava o dia seguinte, e `lastmod` no futuro faz o
+ * Google desconfiar do campo no site inteiro — inclusive nas páginas em que
+ * ele está certo.
+ */
+function diaDoSite(instante: string): string {
+  const data = new Date(instante);
+  if (Number.isNaN(data.getTime())) return instante.slice(0, 10);
+  return data.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
+
+/**
  * Quando cada página estática mudou pela última vez. Mantida à mão porque
  * essas páginas são escritas, não geradas: a data é a do conteúdo, não a do
  * último deploy. Precisa bater com o `dateModified` que a própria página
@@ -394,7 +408,11 @@ const PAGINAS_ATUALIZADAS: Record<string, string> = {
 /** Sitemap com as páginas fixas e todos os posts publicados. */
 export function sitemapXml(posts: BlogPostView[], landingLastmod: string, categoryCounts: Record<string, number> = {}): string {
   // Última alteração de cada lista: o post mais recentemente atualizado nela.
-  const latest = (items: BlogPostView[]) => items.reduce<string | null>((max, post) => (max && max > post.updatedAt ? max : post.updatedAt), null)?.slice(0, 10);
+  const maisRecente = (items: BlogPostView[]) => items.reduce<string | null>((max, post) => (max && max > post.updatedAt ? max : post.updatedAt), null);
+  const latest = (items: BlogPostView[]) => {
+    const instante = maisRecente(items);
+    return instante ? diaDoSite(instante) : undefined;
+  };
   const fixed = [
     { loc: `${SITE}/`, lastmod: landingLastmod, priority: '1.0' },
     { loc: `${SITE}/blog`, lastmod: latest(posts) ?? landingLastmod, priority: '0.8' },
@@ -407,16 +425,17 @@ export function sitemapXml(posts: BlogPostView[], landingLastmod: string, catego
     // (o `priority` ele ignora há anos; fica porque não atrapalha).
     { loc: `${SITE}/planilha-de-controle-de-estoque`, lastmod: PAGINAS_ATUALIZADAS['/planilha-de-controle-de-estoque'], priority: '0.9' },
     { loc: `${SITE}/video`, lastmod: PAGINAS_ATUALIZADAS['/video'], priority: '0.7' },
-    { loc: `${SITE}/plataformas`, priority: '0.6' },
-    { loc: `${SITE}/ajuda`, priority: '0.6' },
-    { loc: `${SITE}/termos`, priority: '0.2' },
-    { loc: `${SITE}/privacidade`, priority: '0.2' },
+    // Páginas que mudam junto com o build: a data dele serve de lastmod.
+    { loc: `${SITE}/plataformas`, lastmod: landingLastmod, priority: '0.6' },
+    { loc: `${SITE}/ajuda`, lastmod: landingLastmod, priority: '0.6' },
+    { loc: `${SITE}/termos`, lastmod: landingLastmod, priority: '0.2' },
+    { loc: `${SITE}/privacidade`, lastmod: landingLastmod, priority: '0.2' },
     // Só categorias com post: uma categoria vazia seria um "soft 404" no sitemap.
     ...BLOG_CATEGORIES.filter((category) => (categoryCounts[category.slug] ?? 0) > 0).map((category) => ({ loc: `${SITE}/blog?categoria=${category.slug}`, lastmod: latest(posts.filter((post) => post.category.slug === category.slug)), priority: '0.5' })),
   ];
   const urls = [
     ...fixed.map((item) => `  <url><loc>${item.loc}</loc>${'lastmod' in item && item.lastmod ? `<lastmod>${item.lastmod}</lastmod>` : ''}<priority>${item.priority}</priority></url>`),
-    ...posts.map((post) => `  <url><loc>${escapeHtml(postUrl(post))}</loc><lastmod>${post.updatedAt.slice(0, 10)}</lastmod><priority>0.7</priority></url>`),
+    ...posts.map((post) => `  <url><loc>${escapeHtml(postUrl(post))}</loc><lastmod>${diaDoSite(post.updatedAt)}</lastmod><priority>0.7</priority></url>`),
   ];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
 }
