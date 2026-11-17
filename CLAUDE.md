@@ -111,6 +111,7 @@ sem campanha.
 | --- | --- |
 | Planos, limites, o que cada um libera, por que a nuvem é grátis | [docs/plans.md](docs/plans.md) |
 | Cobrança pela web, Pix/boleto/cartão, recorrência | [docs/billing-asaas.md](docs/billing-asaas.md) |
+| Reembolso, arrependimento de 7 dias, cancelamento (o que a lei exige) | [docs/reembolso-e-cancelamento.md](docs/reembolso-e-cancelamento.md) |
 | Aplicação web: rotas, telas, SEO, pré-renderização | [docs/web-app.md](docs/web-app.md) |
 | Sincronização: como funciona, falhas conhecidas, pós-mortem | [docs/auditoria-sincronizacao-2026-11.md](docs/auditoria-sincronizacao-2026-11.md) |
 | Fotos de produto, cota, S3, redimensionamento | [docs/images.md](docs/images.md) |
