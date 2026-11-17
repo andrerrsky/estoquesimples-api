@@ -51,6 +51,8 @@ export const pushCampaigns = pgTable('push_campaigns', {
   createdByEmail: text('created_by_email').notNull(),
   createdAt: timestamp('created_at', tz).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
+  /** Marcada para sair neste instante; a fila é quem espera (ver 0039). */
+  scheduledAt: timestamp('scheduled_at', tz),
   startedAt: timestamp('started_at', tz),
   completedAt: timestamp('completed_at', tz),
 });

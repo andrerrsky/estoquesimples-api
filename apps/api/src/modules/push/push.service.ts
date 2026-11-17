@@ -27,6 +27,22 @@ export interface TokenRegistration {
   deviceId: string | null;
 }
 
+/**
+ * Tem assinatura em vigor — escrito duas vezes porque um lado parte do
+ * aparelho (`push_tokens.user_id`) e o outro do próprio usuário.
+ */
+const entitledByToken = (): SQL => sql`EXISTS (
+  SELECT 1 FROM workspace_members wm
+  JOIN subscriptions s ON s.workspace_id = wm.workspace_id
+  WHERE wm.user_id = t.user_id AND wm.status = 'active' AND s.state IN ${sqlList(ENTITLED_STATES)}
+)`;
+
+const entitledByUser = (): SQL => sql`EXISTS (
+  SELECT 1 FROM workspace_members wm
+  JOIN subscriptions s ON s.workspace_id = wm.workspace_id
+  WHERE wm.user_id = u.id AND wm.status = 'active' AND s.state IN ${sqlList(ENTITLED_STATES)}
+)`;
+
 /** Descrição legível do público, gravada na campanha para o histórico. */
 export function describeAudience(audience: Audience, activeWithinDays: number): string {
   const base = (() => {
@@ -39,6 +55,8 @@ export function describeAudience(audience: Audience, activeWithinDays: number): 
         return 'Aparelhos sem conta';
       case 'subscription':
         return audience.entitled ? 'Usuários com assinatura ativa' : 'Usuários sem assinatura ativa';
+      case 'signed_in_free':
+        return 'Aparelhos com conta e sem assinatura';
       case 'inactive':
         return `Usuários sem atividade há ${audience.days} dias`;
       case 'app_version':
@@ -190,14 +208,13 @@ export class PushService {
         conditions.push(sql`t.user_id IS NULL`);
         break;
       case 'subscription': {
-        const entitled = sql`EXISTS (
-          SELECT 1 FROM workspace_members wm
-          JOIN subscriptions s ON s.workspace_id = wm.workspace_id
-          WHERE wm.user_id = t.user_id AND wm.status = 'active' AND s.state IN ${sqlList(ENTITLED_STATES)}
-        )`;
+        const entitled = entitledByToken();
         conditions.push(audience.entitled ? sql`t.user_id IS NOT NULL AND ${entitled}` : sql`(t.user_id IS NULL OR NOT ${entitled})`);
         break;
       }
+      case 'signed_in_free':
+        conditions.push(sql`t.user_id IS NOT NULL AND NOT ${entitledByToken()}`);
+        break;
       case 'inactive':
         conditions.push(sql`t.user_id IS NOT NULL AND NOT EXISTS (
           SELECT 1 FROM (${ACTIVITY_SQL}) a
@@ -432,24 +449,46 @@ export class PushService {
   }
 
   /** Coloca a campanha na fila; o job faz o envio. */
-  async send(actor: AdminActor, id: string): Promise<void> {
+  /**
+   * Põe a campanha na fila — agora ou na hora marcada.
+   *
+   * Agendar não precisa de job novo nem de varredura: a própria fila só pega
+   * tarefas cujo `run_at` já chegou, então marcar um horário é enfileirar com
+   * `runAt`. O estado `scheduled` existe para o painel mostrar o que está
+   * marcado e para o cancelamento alcançar a campanha antes da hora.
+   *
+   * O público **não** é congelado aqui: ele é resolvido no envio, como no
+   * disparo imediato. Uma campanha marcada para amanhã alcança quem entrar
+   * no critério até lá — é o que se espera de "quem ainda não assina".
+   */
+  async send(actor: AdminActor, id: string, scheduledAt?: Date): Promise<void> {
     // Sem Firebase a campanha ainda chega aos web apps (Web Push) e à caixa de notificações.
     await this.db.transaction(async (tx) => {
       const campaign = await this.lock(tx, id);
       if (campaign.status !== 'draft') throw conflict(ErrorCode.CONFLICT, 'Esta campanha já foi enviada ou está na fila.');
-      await tx.update(pushCampaigns).set({ status: 'queued' }).where(eq(pushCampaigns.id, id));
+      const marcada = scheduledAt && scheduledAt.getTime() > Date.now();
+      await tx
+        .update(pushCampaigns)
+        .set({ status: marcada ? 'scheduled' : 'queued', scheduledAt: marcada ? scheduledAt : null })
+        .where(eq(pushCampaigns.id, id));
       await enqueueJob(tx, {
         kind: PUSH_SEND_CAMPAIGN_JOB,
         payload: { campaignId: id },
         uniqueKey: `${PUSH_SEND_CAMPAIGN_JOB}:${id}`,
         maxAttempts: 3,
+        ...(marcada ? { runAt: scheduledAt } : {}),
       });
       await recordAdminAudit(tx, {
         actor,
         action: AdminAction.PUSH_CAMPAIGN_SENT,
         targetType: 'push_campaign',
         targetId: id,
-        metadata: { title: campaign.title, audience: campaign.audienceLabel, estimated: campaign.targeted },
+        metadata: {
+          title: campaign.title,
+          audience: campaign.audienceLabel,
+          estimated: campaign.targeted,
+          ...(marcada ? { scheduledAt: scheduledAt.toISOString() } : {}),
+        },
       });
     });
   }
@@ -477,10 +516,11 @@ export class PushService {
   async cancel(actor: AdminActor, id: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       const campaign = await this.lock(tx, id);
-      if (!['queued', 'sending'].includes(campaign.status)) {
-        throw conflict(ErrorCode.CONFLICT, 'Só campanhas na fila ou em envio podem ser canceladas.');
+      if (!['queued', 'sending', 'scheduled'].includes(campaign.status)) {
+        throw conflict(ErrorCode.CONFLICT, 'Só campanhas agendadas, na fila ou em envio podem ser canceladas.');
       }
-      await tx.update(pushCampaigns).set({ status: 'cancelled', completedAt: new Date() }).where(eq(pushCampaigns.id, id));
+      // Limpa o horário: cancelada não fica mostrando "sai amanhã às 10h".
+      await tx.update(pushCampaigns).set({ status: 'cancelled', completedAt: new Date(), scheduledAt: null }).where(eq(pushCampaigns.id, id));
       await recordAdminAudit(tx, { actor, action: AdminAction.PUSH_CAMPAIGN_CANCELLED, targetType: 'push_campaign', targetId: id, metadata: { title: campaign.title } });
     });
   }
@@ -505,7 +545,8 @@ export class PushService {
     const campaign = rows[0];
     if (!campaign) throw notFound('Campanha não encontrada.');
     if (campaign.status === 'cancelled') return { targeted: 0, accepted: 0, failed: 0 };
-    if (campaign.status !== 'queued' && campaign.status !== 'sending') {
+    // `scheduled` chega aqui quando a fila libera a tarefa na hora marcada.
+    if (campaign.status !== 'queued' && campaign.status !== 'sending' && campaign.status !== 'scheduled') {
       throw conflict(ErrorCode.CONFLICT, `Campanha em estado ${campaign.status}; nada a enviar.`);
     }
 
@@ -609,13 +650,11 @@ export class PushService {
       case 'signed_in':
         return sql`SELECT u.id FROM users u WHERE ${active}`;
       case 'subscription': {
-        const entitled = sql`EXISTS (
-          SELECT 1 FROM workspace_members wm
-          JOIN subscriptions s ON s.workspace_id = wm.workspace_id
-          WHERE wm.user_id = u.id AND wm.status = 'active' AND s.state IN ${sqlList(ENTITLED_STATES)}
-        )`;
+        const entitled = entitledByUser();
         return sql`SELECT u.id FROM users u WHERE ${active} AND ${audience.entitled ? entitled : sql`NOT ${entitled}`}`;
       }
+      case 'signed_in_free':
+        return sql`SELECT u.id FROM users u WHERE ${active} AND NOT ${entitledByUser()}`;
       case 'inactive':
         return sql`SELECT u.id FROM users u WHERE ${active} AND NOT EXISTS (
           SELECT 1 FROM (${ACTIVITY_SQL}) a WHERE a.user_id = u.id AND a.at > now() - ${`${audience.days} days`}::interval
@@ -704,6 +743,7 @@ export class PushService {
       inboxCount: pick('inboxCount', 'inbox_count') ?? 0,
       error: row['error'],
       createdByEmail: pick('createdByEmail', 'created_by_email'),
+      scheduledAt: date(pick('scheduledAt', 'scheduled_at')),
       createdAt: date(pick('createdAt', 'created_at')),
       startedAt: date(pick('startedAt', 'started_at')),
       completedAt: date(pick('completedAt', 'completed_at')),

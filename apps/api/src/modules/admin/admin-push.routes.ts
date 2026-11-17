@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { audienceSchema, campaignBodySchema, PUSH_SCREENS } from '../push/push.schemas.js';
+import { badRequest, ErrorCode } from '../../platform/http/errors.js';
+import { audienceSchema, campaignBodySchema, PUSH_SCREENS, sendCampaignBodySchema } from '../push/push.schemas.js';
 import { PushService } from '../push/push.service.js';
 import { adminActor, requireAdmin } from './admin-auth.plugin.js';
 import { commonAdminErrors, messageSchema, paginationQuerySchema, uuidParam } from './admin.schemas.js';
@@ -58,7 +59,7 @@ export async function registerAdminPushRoutes(app: FastifyInstance): Promise<voi
         summary: 'Campanhas',
         hide: true,
         querystring: paginationQuerySchema.extend({
-          status: z.enum(['draft', 'queued', 'sending', 'sent', 'failed', 'cancelled']).optional(),
+          status: z.enum(['draft', 'scheduled', 'queued', 'sending', 'sent', 'failed', 'cancelled']).optional(),
           includeTests: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
         }),
         response: { 200: z.any(), ...commonAdminErrors },
@@ -114,11 +115,22 @@ export async function registerAdminPushRoutes(app: FastifyInstance): Promise<voi
     '/push/campaigns/:campaignId/send',
     {
       preHandler: requireAdmin('support'),
-      schema: { tags: ['admin'], summary: 'Coloca a campanha na fila de envio', hide: true, params: campaignParams, response: { 200: messageSchema, ...commonAdminErrors, 503: z.any() } },
+      schema: { tags: ['admin'], summary: 'Envia a campanha agora ou na hora marcada', hide: true, params: campaignParams, response: { 200: messageSchema, ...commonAdminErrors, 503: z.any() } },
     },
     async (request) => {
-      await service.send(adminActor(request), request.params.campaignId);
-      return { message: 'Campanha na fila. O envio começa em instantes.' };
+      // O corpo é validado aqui, e não pelo `schema.body`: enviar agora é um
+      // POST sem corpo nenhum, e um schema de objeto no Fastify recusaria a
+      // requisição antes de chegar aqui.
+      const corpo = sendCampaignBodySchema.safeParse(request.body ?? {});
+      if (!corpo.success) {
+        throw badRequest(ErrorCode.VALIDATION_FAILED, corpo.error.issues[0]?.message ?? 'Horário inválido.');
+      }
+      const marcado = corpo.data.scheduledAt ? new Date(corpo.data.scheduledAt) : undefined;
+      await service.send(adminActor(request), request.params.campaignId, marcado);
+      if (!marcado) return { message: 'Campanha na fila. O envio começa em instantes.' };
+      return {
+        message: `Campanha agendada para ${marcado.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}. Dá para cancelar até lá.`,
+      };
     },
   );
 

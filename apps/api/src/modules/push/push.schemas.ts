@@ -19,6 +19,10 @@ export const audienceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('signed_in') }).strict(),
   z.object({ type: z.literal('anonymous') }).strict(),
   z.object({ type: z.literal('subscription'), entitled: z.boolean() }).strict(),
+  // Com conta e sem assinatura: o alvo natural do convite para assinar.
+  // Diferente de `subscription: { entitled: false }`, que também pega quem
+  // nunca criou conta e portanto não tem como assinar.
+  z.object({ type: z.literal('signed_in_free') }).strict(),
   z.object({ type: z.literal('inactive'), days: z.number().int().min(3).max(365) }).strict(),
   z.object({ type: z.literal('app_version'), maxVersionCode: z.number().int().positive() }).strict(),
   z.object({ type: z.literal('users'), emails: z.array(z.string().trim().email().max(254)).min(1).max(200) }).strict(),
@@ -39,6 +43,26 @@ export const campaignBodySchema = z
   .strict();
 
 export type CampaignBody = z.infer<typeof campaignBodySchema>;
+
+/**
+ * Envio: imediato (corpo vazio) ou marcado para um instante futuro.
+ *
+ * O horário chega do painel em ISO com fuso, já resolvido pelo navegador de
+ * quem agenda — o servidor não adivinha fuso nenhum.
+ */
+export const sendCampaignBodySchema = z
+  .object({
+    scheduledAt: z
+      .string()
+      .datetime({ offset: true })
+      .optional()
+      .refine((value) => !value || new Date(value).getTime() > Date.now() + 60_000, {
+        message: 'O horário precisa estar pelo menos um minuto no futuro.',
+      }),
+  })
+  .strict();
+
+export type SendCampaignBody = z.infer<typeof sendCampaignBodySchema>;
 
 // ---------------------------------------------------------------------------
 // Rotas públicas (app)

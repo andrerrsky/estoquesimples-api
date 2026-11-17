@@ -20,6 +20,7 @@ type Audience =
   | { type: 'signed_in' }
   | { type: 'anonymous' }
   | { type: 'subscription'; entitled: boolean }
+  | { type: 'signed_in_free' }
   | { type: 'inactive'; days: number }
   | { type: 'app_version'; maxVersionCode: number }
   | { type: 'users'; emails: string[] }
@@ -49,7 +50,9 @@ interface Campaign {
   action: { screen?: string | null; url?: string | null };
   audience: Audience & { activeWithinDays?: number };
   audienceLabel: string;
-  status: 'draft' | 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled';
+  status: 'draft' | 'scheduled' | 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled';
+  /** Hora marcada, quando a campanha foi agendada em vez de enviada na hora. */
+  scheduledAt?: string | null;
   isTest: boolean;
   targeted: number;
   accepted: number;
@@ -78,6 +81,7 @@ interface Preview {
 
 const STATUS: Record<Campaign['status'], { label: string; tone: Tone }> = {
   draft: { label: 'Rascunho', tone: 'neutral' },
+  scheduled: { label: 'Agendada', tone: 'warning' },
   queued: { label: 'Na fila', tone: 'info' },
   sending: { label: 'Enviando', tone: 'brand' },
   sent: { label: 'Enviada', tone: 'success' },
@@ -110,7 +114,8 @@ const AUDIENCE_OPTIONS: Array<{ key: AudienceKind; label: string; hint: string }
   { key: 'all', label: 'Todos', hint: 'Aparelhos com ou sem conta; na caixa, todas as contas ativas.' },
   { key: 'signed_in', label: 'Com conta', hint: 'Aparelhos onde alguém fez login; na caixa, todas as contas ativas (inclui quem usa só a web).' },
   { key: 'anonymous', label: 'Sem conta', hint: 'Usam o app só no modo local. Só push: sem conta não há caixa.' },
-  { key: 'subscription', label: 'Por assinatura', hint: 'Com ou sem assinatura ativa.' },
+  { key: 'signed_in_free', label: 'Com conta, sem assinatura', hint: 'Quem já se cadastrou e ainda não assina: o público do convite para assinar.' },
+  { key: 'subscription', label: 'Por assinatura', hint: 'Com ou sem assinatura ativa. Sem assinatura aqui inclui quem nem conta tem.' },
   { key: 'inactive', label: 'Inativos', hint: 'Sem nenhuma atividade há N dias.' },
   { key: 'app_version', label: 'Versão antiga do app', hint: 'Para pedir atualização. Só push para esses aparelhos; a web não entra.' },
   { key: 'users', label: 'E-mails específicos', hint: 'Até 200 contas.' },
@@ -282,6 +287,12 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
     setAudience(defaultAudience(next));
   };
 
+  // Agendamento: vazio = enviar agora. O valor vem do navegador de quem
+  // agenda, no fuso dele; a API recebe o instante absoluto.
+  const [quando, setQuando] = useState('');
+  const quandoData = quando ? new Date(quando) : null;
+  const quandoValido = !quando || (!!quandoData && !Number.isNaN(quandoData.getTime()) && quandoData.getTime() > Date.now() + 60_000);
+
   const sendTest = useMutation({
     mutationFn: () => api.post<{ campaignId: string; targeted: number; accepted: number; failed: number }>('/push/test', { ...payload, email: testEmail.trim() }),
     onSuccess: (result) => toast.push(`Teste enviado: ${result.accepted} aparelho(s) aceito(s) pelo FCM${result.failed ? `, ${result.failed} falha(s)` : ''}.`, 'success'),
@@ -417,9 +428,25 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
               <span className="field__hint">Vai só para os aparelhos onde esse e-mail fez login (e para a caixa dessa conta); fica registrado como teste. Conta que usa só a web não tem aparelho para o teste.</span>
             </label>
             <hr className="divider" />
+            <label className="field">
+              <span className="field__label">Agendar para (opcional)</span>
+              <div className="row">
+                <input className="input input--sm" type="datetime-local" value={quando} onChange={(event) => setQuando(event.target.value)} style={{ flex: 1 }} />
+                {quando && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setQuando('')}>Limpar</button>}
+              </div>
+              <span className="field__hint">
+                {quando
+                  ? quandoValido
+                    ? `A campanha fica "Agendada" e sai sozinha em ${quandoData!.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Dá para cancelar até lá. O público é resolvido na hora do envio.`
+                    : 'Escolha um horário pelo menos um minuto no futuro.'
+                  : 'Em branco, o envio começa na hora.'}
+              </span>
+            </label>
             <div className="row" style={{ justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn--ghost" disabled={!ready || saveDraft.isPending} onClick={() => saveDraft.mutate()}>Salvar rascunho</button>
-              <button type="button" className="btn btn--primary" disabled={!ready || ((preview.data?.total ?? 0) === 0 && (preview.data?.inboxUsers ?? 0) === 0)} onClick={() => setConfirm(true)}><Icon name="zap" /> Enviar agora</button>
+              <button type="button" className="btn btn--primary" disabled={!ready || !quandoValido || ((preview.data?.total ?? 0) === 0 && (preview.data?.inboxUsers ?? 0) === 0)} onClick={() => setConfirm(true)}>
+                <Icon name={quando ? 'calendar' : 'zap'} /> {quando ? 'Agendar envio' : 'Enviar agora'}
+              </button>
             </div>
           </div>
         </Card>
@@ -428,15 +455,23 @@ function Composer({ onDone, initial }: { onDone: (campaignId: string) => void; i
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
-        title="Enviar campanha"
-        description={<>Vai por push para <strong>{fmtNumber(preview.data?.total ?? 0)} aparelho(s)</strong> ({preview.data?.label}) e para a caixa de notificações de <strong>{fmtNumber(preview.data?.inboxUsers ?? 0)} conta(s)</strong>, no app e na web. Depois de aceita pelo FCM ou gravada na caixa, a mensagem não pode ser retirada.</>}
-        confirmLabel="Enviar para todos"
-        confirmWord="enviar"
+        title={quando ? 'Agendar campanha' : 'Enviar campanha'}
+        description={
+          <>
+            {quando
+              ? <>Vai sair em <strong>{quandoData!.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</strong>, para quem estiver no público naquela hora — hoje seriam </>
+              : <>Vai por push para </>}
+            <strong>{fmtNumber(preview.data?.total ?? 0)} aparelho(s)</strong> ({preview.data?.label}) e a caixa de notificações de <strong>{fmtNumber(preview.data?.inboxUsers ?? 0)} conta(s)</strong>, no app e na web.{' '}
+            {quando ? 'Até a hora marcada dá para cancelar.' : 'Depois de aceita pelo FCM ou gravada na caixa, a mensagem não pode ser retirada.'}
+          </>
+        }
+        confirmLabel={quando ? 'Agendar' : 'Enviar para todos'}
+        confirmWord={quando ? 'agendar' : 'enviar'}
         requireReason={false}
         onConfirm={async () => {
           const campaign = initial ? await api.put<Campaign>(`/push/campaigns/${initial.id}`, payload) : await api.post<Campaign>('/push/campaigns', payload);
-          await api.post(`/push/campaigns/${campaign.id}/send`);
-          toast.push('Campanha na fila de envio.', 'success');
+          await api.post(`/push/campaigns/${campaign.id}/send`, quando ? { scheduledAt: quandoData!.toISOString() } : {});
+          toast.push(quando ? 'Campanha agendada.' : 'Campanha na fila de envio.', 'success');
           onDone(campaign.id);
         }}
       >
@@ -532,7 +567,7 @@ export function CampaignDetailPage() {
           can('support') && (
             <div className="row">
               {campaign.status === 'draft' && <button type="button" className="btn btn--secondary" onClick={() => setEditing(true)}><Icon name="edit" /> Editar e enviar</button>}
-              {['queued', 'sending'].includes(campaign.status) && <button type="button" className="btn btn--danger" onClick={() => setCancelOpen(true)}>Cancelar envio</button>}
+              {['scheduled', 'queued', 'sending'].includes(campaign.status) && <button type="button" className="btn btn--danger" onClick={() => setCancelOpen(true)}>Cancelar envio</button>}
               {(campaign.status === 'draft' || campaign.isTest) && <button type="button" className="btn btn--ghost" onClick={() => setDeleteOpen(true)}><Icon name="trash" /> Apagar</button>}
             </div>
           )
@@ -541,6 +576,11 @@ export function CampaignDetailPage() {
 
       {campaign.status === 'failed' && <Notice tone="error" title="O envio falhou">{campaign.error ?? 'Erro desconhecido.'}</Notice>}
       {campaign.status === 'sending' && <Notice tone="info">Envio em andamento; os números atualizam sozinhos.</Notice>}
+      {campaign.status === 'scheduled' && campaign.scheduledAt && (
+        <Notice tone="warning" title="Agendada">
+          Sai sozinha em <strong>{new Date(campaign.scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</strong>. O público é resolvido na hora do envio, então ainda pode mudar até lá.
+        </Notice>
+      )}
 
       <div className="grid grid--2-1">
         <Card title="Funil de entrega (push)" subtitle="Aceita = o FCM recebeu; entregue e aberta = o app reportou. A caixa de notificações não entra neste funil.">
