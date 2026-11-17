@@ -297,6 +297,9 @@ const planilhaCss = `
     .pl-footer { max-width: 1040px; margin: 56px auto 0; padding: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px; text-align: center; }
     .pl-previa { margin: 28px 0 0; }
     .pl-previa__legenda { margin: 0 0 10px; color: var(--text-muted); font-size: 15px; }
+    /* O ● da frase precisa ser o mesmo ● do cabeçalho; herdando a cor do
+       texto ele saía cinza, e a legenda deixava de ligar as duas coisas. */
+    .pl-previa__legenda span[aria-hidden] { color: #C8930A; }
     .pl-previa__rolagem { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-card, 14px); }
     .pl-tabela { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px; background: #fff; }
     .pl-tabela th { background: #14507A; color: #fff; font-weight: 700; padding: 10px 12px; text-align: left; white-space: nowrap; }
