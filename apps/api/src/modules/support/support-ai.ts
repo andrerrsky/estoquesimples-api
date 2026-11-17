@@ -61,7 +61,26 @@ const FEATURE_LABEL: Record<string, string> = {
   [Feature.DEVICES]: 'aparelhos sincronizados',
   [Feature.ANALYSIS]: 'análise avançada',
   [Feature.IMAGES_MB]: 'armazenamento de fotos (MB)',
+  'marca.personalizada': 'identidade visual da empresa',
 };
+
+/**
+ * Recursos cujo `limit_value` é um número que o cliente pergunta ("quantos
+ * produtos?"). Os outros são liga/desliga: para eles, `limit_value` nulo não
+ * quer dizer "sem limite", e dizer isso faria a IA responder "análise
+ * avançada: sem limite" no lugar de "sim".
+ */
+const NUMERIC_FEATURES = new Set<string>([Feature.PRODUCTS, Feature.MEMBERS, Feature.DEVICES, Feature.IMAGES_MB]);
+
+/** Como um recurso do plano é descrito para a IA. */
+function describeFeature(featureKey: string, enabled: boolean, limitValue: number | null): string {
+  const label = FEATURE_LABEL[featureKey] ?? featureKey;
+  if (!NUMERIC_FEATURES.has(featureKey)) return `${label}: ${enabled ? 'sim' : 'não'}`;
+  // No gratuito, `equipe.membros` vem desligado com limite 1 (só o
+  // proprietário): o número é a resposta, não o "não".
+  if (limitValue !== null) return `${label}: ${limitValue}`;
+  return `${label}: ${enabled ? 'sem limite' : 'não'}`;
+}
 
 /**
  * Planos, limites e preços como estão agora no banco. Texto curto, em
@@ -79,11 +98,7 @@ export async function planFactsFor(db: Database): Promise<string> {
     .map((plan) => {
       const features = featureRows
         .filter((row) => row.planKey === plan.key)
-        .map((row) => {
-          const label = FEATURE_LABEL[row.featureKey] ?? row.featureKey;
-          if (!row.enabled) return `${label}: não`;
-          return `${label}: ${row.limitValue === null ? 'sem limite' : row.limitValue}`;
-        });
+        .map((row) => describeFeature(row.featureKey, row.enabled, row.limitValue));
       const prices = [
         plan.webPriceMonthlyCents ? `mensal ${REAIS.format(plan.webPriceMonthlyCents / 100)}` : null,
         plan.webPriceSemiannualCents ? `semestral ${REAIS.format(plan.webPriceSemiannualCents / 100)} (total)` : null,

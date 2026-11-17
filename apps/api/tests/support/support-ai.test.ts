@@ -173,7 +173,8 @@ describe('resposta automática por IA no suporte', () => {
 
       const avisos = context.mailer.sent.filter((message) => message.kind === 'support_needs_human');
       expect(avisos).toHaveLength(1);
-      expect(avisos[0]!.text).toContain('precisa de você');
+      expect(avisos[0]!.subject).toContain('precisa de você');
+      expect(avisos[0]!.text).toContain('Pedido de reembolso');
       expect(avisos[0]!.text).toContain('Marina');
       // Regra de atendimento: no aviso ao dono também vai só o primeiro nome.
       expect(avisos[0]!.text).not.toContain('marina@exemplo.com.br');
@@ -253,14 +254,20 @@ describe('contexto entregue à IA', () => {
     const antes = await planFactsFor(context.services.db);
     expect(antes).toContain('Plano "Equipe"');
     expect(antes).toContain('pessoas na empresa: sem limite');
+    // Recurso de liga/desliga não vira "sem limite" só porque não tem número.
+    expect(antes).toContain('análise avançada: sim');
+    expect(antes).toContain('identidade visual da empresa: sim');
+    // No gratuito, o número é a resposta: 50 produtos e 1 pessoa.
+    expect(antes).toMatch(/Gratuito[\s\S]*produtos sincronizados na nuvem: 50/);
+    expect(antes).toMatch(/Gratuito[\s\S]*pessoas na empresa: 1/);
 
     // `plans` é tabela de referência (o reset não a limpa): o preço volta ao
     // que era para não vazar para os outros arquivos de teste.
     const original = (await context.services.db.execute<{ cents: number | null }>(sql`SELECT web_price_monthly_cents AS cents FROM plans WHERE key = 'basico'`)).rows[0]?.cents ?? null;
     try {
-      await context.services.db.execute(sql`UPDATE plans SET web_price_monthly_cents = 2999 WHERE key = 'basico'`);
+      await context.services.db.execute(sql`UPDATE plans SET web_price_monthly_cents = 3499 WHERE key = 'basico'`);
       const depois = await planFactsFor(context.services.db);
-      expect(depois).toContain('R$ 29,99');
+      expect(depois).toContain('R$ 34,99');
     } finally {
       await context.services.db.execute(sql`UPDATE plans SET web_price_monthly_cents = ${original} WHERE key = 'basico'`);
     }
