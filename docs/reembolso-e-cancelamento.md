@@ -105,9 +105,31 @@ empresarial e o CNPJ (ou CPF)** de quem vende. Hoje os Termos dizem apenas
 CNPJ em lugar nenhum. É o tipo de falha que, sozinha, já rende autuação de
 Procon — e que não custa nada corrigir.
 
+## Pessoa física, sem CNPJ: muda alguma coisa?
+
+**Para o decreto, não.** O art. 2º, I pede "nome empresarial e número de
+inscrição do fornecedor, **quando houver**, no Cadastro Nacional de Pessoas
+Físicas **ou** no Cadastro Nacional de Pessoas Jurídicas". CPF está previsto;
+não ter CNPJ não descumpre nada.
+
+**O incômodo é outro:** publicar CPF completo num site aberto expõe o número a
+golpe, e ele é dado pessoal do dono. É uma escolha entre dois riscos — o de
+não se identificar (Procon) e o de expor o CPF (fraude).
+
+**MEI não é saída aqui.** Desenvolvimento e licenciamento de software não
+constam na lista de ocupações permitidas ao MEI (Anexo XI da Resolução CGSN
+140/2018). O PLP 25/2026 propõe incluir, mas não foi aprovado. O caminho para
+CNPJ seria ME no Simples Nacional, que exige contador.
+
+**Vale a conversa com um contador**, por um motivo que vai além da
+identificação: receber assinatura recorrente como pessoa física leva o
+faturamento para a tabela do IRPF, que chega a 27,5%, enquanto no Simples a
+faixa é bem menor. A identificação no site é o sintoma; a pergunta de fundo é
+se a operação já comporta um CNPJ.
+
 ## Proposta de redação (seção 8)
 
-> **8.x Cancelamento, arrependimento e reembolso**
+> **Aplicada em 16/11/2026 como seção 8.1 dos Termos.** Redação publicada:
 >
 > **Cancelar a qualquer momento.** O proprietário cancela na área Plano da
 > versão web, ou na Google Play se contratou por lá. O cancelamento interrompe
