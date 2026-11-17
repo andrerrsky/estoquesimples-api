@@ -24,8 +24,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await resetDatabase(context);
   await context.services.db.execute(sql`DELETE FROM platform_admins`);
-  await context.services.db.execute(sql`DELETE FROM jobs`);
-  await context.services.db.execute(sql`DELETE FROM admin_settings`);
+  await context.services.db.execute(sql`DELETE FROM jobs WHERE kind LIKE 'support.%'`);
   context.mailer.clear();
 });
 
