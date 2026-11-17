@@ -111,9 +111,31 @@ export const adminDraftBodySchema = z
 
 export const adminTicketListQuerySchema = z.object({
   status: z.enum([...SUPPORT_STATUSES, 'unresolved']).optional(),
+  /** Só as solicitações que a IA passou para uma pessoa. */
+  needsHuman: z.enum(['true', 'false']).optional(),
   category: z.enum(SUPPORT_CATEGORIES).optional(),
   priority: z.enum(SUPPORT_PRIORITIES).optional(),
   assigned: z.enum(['me', 'none', 'any']).optional(),
   platform: z.enum(['android', 'web']).optional(),
   q: z.string().trim().max(200).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Configurações do atendimento
+// ---------------------------------------------------------------------------
+
+/**
+ * Guardadas no banco (`admin_settings`, chave `support_settings`), como as do
+ * blog: o dono liga e desliga a resposta automática pelo painel, sem deploy.
+ */
+export const supportSettingsSchema = z
+  .object({
+    /** A IA responde sozinha no chat de suporte. Desligado, nada muda no atendimento. */
+    aiAutoReplyEnabled: z.boolean(),
+  })
+  .strict();
+
+export type SupportSettings = z.infer<typeof supportSettingsSchema>;
+
+/** Desligado por padrão: ninguém é respondido por IA sem o dono ligar. */
+export const DEFAULT_SUPPORT_SETTINGS: SupportSettings = { aiAutoReplyEnabled: false };

@@ -39,6 +39,8 @@ interface Stats {
   avgFirstResponseMinutes: number | null;
   byCategory: Array<{ category: string; count: number }>;
   openAiConfigured: boolean;
+  aiAutoReplyEnabled: boolean;
+  needsHuman: number;
   fcmConfigured: boolean;
 }
 
@@ -67,6 +69,10 @@ interface Ticket {
   lastMessageBy: string;
   unread: boolean;
   firstResponseAt: string | null;
+  /** A resposta automática passou esta solicitação para uma pessoa. */
+  needsHuman: boolean;
+  needsHumanAt: string | null;
+  needsHumanReason: string | null;
   resolvedAt: string | null;
   resolvedBy: string | null;
   createdAt: string;
@@ -79,6 +85,8 @@ interface Message {
   adminName: string | null;
   body: string;
   internal: boolean;
+  /** Escrita pela IA do atendimento, não por uma pessoa. */
+  ai: boolean;
   notifyStatus: string | null;
   notifyDetail: string | null;
   createdAt: string;
@@ -133,6 +141,7 @@ export function SupportPage() {
         priority: values['priority'],
         assigned: values['assigned'],
         platform: values['platform'],
+        needsHuman: values['needsHuman'],
         q: values['q'],
         page,
         pageSize,
@@ -155,6 +164,7 @@ export function SupportPage() {
         <StatTile label="Aguardando equipe" value={fmtNumber(s?.open)} foot={s && s.openStale > 0 ? `${fmtNumber(s.openStale)} há mais de 24 h` : 'nenhuma parada há mais de 24 h'} tone={(s?.openStale ?? 0) > 0 ? 'alert' : (s?.open ?? 0) > 0 ? 'accent' : undefined} />
         <StatTile label="Aguardando usuário" value={fmtNumber(s?.answered)} foot="respondidas, sem retorno ainda" />
         <StatTile label="Sem responsável" value={fmtNumber(s?.unassigned)} foot="entre as não resolvidas" />
+        <StatTile label="A IA passou para você" value={fmtNumber(s?.needsHuman)} foot={s?.aiAutoReplyEnabled ? 'em aberto, esperando uma pessoa' : 'resposta automática desligada'} tone={(s?.needsHuman ?? 0) > 0 ? 'alert' : undefined} />
         <StatTile label="1ª resposta (30 d)" value={fmtMinutes(s?.avgFirstResponseMinutes ?? null)} foot="tempo médio até a primeira resposta" />
         <StatTile label="Últimos 7 dias" value={fmtNumber(s?.new7d)} foot={`${fmtNumber(s?.resolved7d ?? 0)} resolvidas · ${fmtNumber(s?.total ?? 0)} no total`} />
       </div>
@@ -173,6 +183,11 @@ export function SupportPage() {
                 { key: 'all', label: 'Todas' },
               ]}
             />
+            <select className="select select--sm" value={values['needsHuman'] ?? ''} onChange={(event) => set({ needsHuman: event.target.value })} aria-label="Resposta automática">
+              <option value="">IA e pessoas</option>
+              <option value="true">Só o que precisa de pessoa</option>
+              <option value="false">Sem pedido de pessoa</option>
+            </select>
             <select className="select select--sm" value={values['assigned'] ?? ''} onChange={(event) => set({ assigned: event.target.value })} aria-label="Responsável">
               <option value="">Qualquer responsável</option>
               <option value="me">Minhas</option>
@@ -230,17 +245,63 @@ export function SupportPage() {
               <Skeleton />
             )}
           </Card>
+          <AutoReplyCard stats={s} />
           <Card title="Como funciona">
             <div className="stack stack--tight" style={{ fontSize: 'var(--fs-supporting)' }}>
               <div>O app envia junto o modelo do aparelho, a versão do Android e do app e um diagnóstico (sessão, empresa, assinatura, sincronização). Pela web vêm o navegador, o sistema e a versão da aplicação.</div>
               <div>Ao responder, o aparelho recebe um push que abre a conversa. Sem aparelho com push — caso de quem usa só a web — o aviso vai por e-mail, e a resposta fica na conversa e na caixa de notificações.</div>
               <div>Quem não tem conta é identificado pela instalação; se criar conta depois, as solicitações passam a ser dela.</div>
               <div>Notas internas ficam só aqui e não avisam ninguém.{s?.openAiConfigured ? ' O rascunho por IA usa a chave da OpenAI configurada em Inteligência artificial.' : ' Configure a chave da OpenAI em Inteligência artificial para gerar rascunhos.'}</div>
+              <div>Com a resposta automática ligada, a IA responde dúvidas de plano, limite e preço com os números do próprio sistema. O que depende de uma pessoa (reembolso, cobrança, bug ou qualquer coisa fora do contexto) ela não responde: marca "precisa de você" e manda um e-mail.</div>
             </div>
           </Card>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Liga e desliga a resposta automática por IA. A configuração fica no banco
+ * (`admin_settings`), não em variável de ambiente: o dono liga e desliga sem
+ * esperar deploy.
+ */
+function AutoReplyCard({ stats }: { stats: Stats | undefined }) {
+  const { can } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const settings = useQuery({ queryKey: ['support', 'settings'], queryFn: () => api.get<{ aiAutoReplyEnabled: boolean }>('/support/settings') });
+  const save = useMutation({
+    mutationFn: (next: { aiAutoReplyEnabled: boolean }) => api.put<{ aiAutoReplyEnabled: boolean }>('/support/settings', next),
+    onSuccess: (result) => {
+      toast.push(result.aiAutoReplyEnabled ? 'Resposta automática ligada.' : 'Resposta automática desligada.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['support'] });
+    },
+    onError: (error) => toast.push(errorMessage(error), 'error'),
+  });
+  const on = settings.data?.aiAutoReplyEnabled ?? false;
+
+  return (
+    <Card title="Resposta automática por IA" subtitle="Responde na hora as dúvidas básicas de plano, limite e preço; o resto cai na sua mão">
+      {settings.isLoading ? (
+        <Skeleton />
+      ) : (
+        <div className="stack stack--tight">
+          {!stats?.openAiConfigured && (
+            <Notice tone="warning">Sem chave da OpenAI a IA não responde. Configure em <Link to="/ia">Inteligência artificial</Link> — a mesma chave do blog e das avaliações.</Notice>
+          )}
+          <label className="checkbox">
+            <input type="checkbox" checked={on} onChange={(event) => save.mutate({ aiAutoReplyEnabled: event.target.checked })} disabled={!can('support') || save.isPending} />
+            A IA responde sozinha no chat de suporte
+          </label>
+          <div className="small muted">
+            {on
+              ? 'Os números que ela cita (planos, limites, preços) são lidos de Planos a cada resposta. Desligando, o atendimento volta a ser só por pessoas.'
+              : 'Desligada: nada muda no atendimento de hoje.'}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -256,6 +317,7 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
       </div>
       <div className="ticket-row__side">
         <PlatformBadge platform={ticket.platform} />
+        {ticket.needsHuman && ticket.status !== 'resolved' && <Badge tone="error">precisa de você</Badge>}
         {priority && ticket.priority === 'high' && <Badge tone={priority.tone}>{priority.label}</Badge>}
         <Badge tone={status.tone}>{status.label}</Badge>
         <span className="caption"><Time value={ticket.lastMessageAt} /></span>
@@ -399,6 +461,11 @@ export function TicketDetailPage() {
       {ticket.status === 'resolved' && (
         <Notice tone="success" title={`Resolvida ${ticket.resolvedBy === 'user' ? 'pelo usuário' : 'pela equipe'}`}>
           {fmtDateTime(ticket.resolvedAt)}. Se o usuário escrever de novo, ela volta para a fila.
+        </Notice>
+      )}
+      {ticket.needsHuman && ticket.status !== 'resolved' && (
+        <Notice tone="warning" title="A resposta automática passou esta solicitação para você">
+          {ticket.needsHumanReason ?? 'Sem motivo registrado.'} Nada foi enviado ao cliente por esta via{ticket.needsHumanAt ? ` (${fmtDateTime(ticket.needsHumanAt)})` : ''}.
         </Notice>
       )}
       {ticket.reachableDevices === 0 && ticket.status !== 'resolved' && (
@@ -652,6 +719,7 @@ function MessageBubble({ message }: { message: Message }) {
     <div className={`msg ${cls}`}>
       <div className="msg__meta">
         <span className="strong" style={{ color: 'var(--text)' }}>{message.author === 'user' ? 'Usuário' : message.adminName ?? 'Equipe'}</span>
+        {message.ai && <Badge tone="info" plain>por IA</Badge>}
         {message.internal && <Badge tone="warning" plain>nota interna</Badge>}
         <Time value={message.createdAt} />
       </div>

@@ -59,3 +59,32 @@ export function answerText(article: HelpArticle): string {
 export function answerMarkdown(article: HelpArticle): string {
   return article.answer.map((line) => (line.startsWith('• ') ? `- ${line.slice(2)}` : line)).join('\n\n').replace(/\n\n(- )/g, '\n$1');
 }
+
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
+}
+
+/**
+ * Os artigos da ajuda com mais palavras em comum com o texto dado ("RAG"
+ * simples, sem vetor: a base é pequena e cabe no prompt). A IA do blog usa
+ * para fundamentar a pauta; a do atendimento, para responder a dúvida com o
+ * que a central de ajuda já diz — as duas partem da mesma fonte.
+ */
+export function relatedHelpArticles(text: string, limit = 5): HelpArticle[] {
+  const terms = new Set(
+    fold(text)
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length > 3),
+  );
+  return helpContent()
+    .articles.map((article) => {
+      const haystack = fold(`${article.question} ${article.answer.join(' ')} ${(article.keywords ?? []).join(' ')}`);
+      let score = 0;
+      for (const term of terms) if (haystack.includes(term)) score += 1;
+      return { article, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((item) => item.article);
+}

@@ -212,6 +212,8 @@ export const JOB_KIND: Record<string, string> = {
   'play.reviews_sync': 'Coleta de avaliações da Play Store',
   'push.send_campaign': 'Envio de campanha (push e caixa de notificações)',
   'support.notify_team': 'Aviso à equipe de solicitação nova (e-mail)',
+  'support.ai_reply': 'Resposta automática do atendimento (IA)',
+  'support.notify_needs_human': 'Aviso de solicitação que precisa de uma pessoa (e-mail)',
 };
 
 /**

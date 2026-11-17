@@ -119,7 +119,7 @@ sem campanha.
 | Fotos de produto, cota, S3, redimensionamento | [docs/images.md](docs/images.md) |
 | Eventos de uso, o que o painel entende | [docs/analytics.md](docs/analytics.md) |
 | Conferência de estoque (contagem física, limite do gratuito) | [docs/conferencia-de-estoque.md](docs/conferencia-de-estoque.md) |
-| Suporte pelo app: como abre, como o painel responde | [docs/support.md](docs/support.md) |
+| Suporte pelo app e chat, resposta automática por IA, escalonamento | [docs/support.md](docs/support.md) |
 | Notificações e push (FCM) | [docs/notifications.md](docs/notifications.md) · [docs/push.md](docs/push.md) |
 | E-mails automáticos de ativação e recuperação | [docs/emails-ciclo-de-vida.md](docs/emails-ciclo-de-vida.md) |
 | Central de ajuda (FAQ), fonte única | [docs/help.md](docs/help.md) |

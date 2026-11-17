@@ -12,9 +12,14 @@ responde. Código do servidor em `src/modules/support/`; painel em
   `diagnostics`, o estado local no momento da abertura (sessão, empresa,
   assinatura, última sincronização, operações pendentes, contagens).
 - `support_messages`: a conversa. `author` é `user`, `admin` ou `system`;
-  `internal = true` é nota só do painel; `notify_status` registra como o
-  usuário foi avisado da resposta (`push`, `email`, `muted`, `none`,
-  `failed`).
+  `internal = true` é nota só do painel; `ai = true` marca o que a IA
+  escreveu (resposta ao cliente ou nota de escalonamento); `notify_status`
+  registra como o usuário foi avisado da resposta (`push`, `email`, `muted`,
+  `none`, `failed`).
+- `needs_human` (com `needs_human_at` e `needs_human_reason`): a resposta
+  automática por IA passou a solicitação para uma pessoa. É estado do
+  chamado, não de uma mensagem — é por ele que o painel filtra e que o aviso
+  ao dono sai uma vez só.
 - Estados: `open` (aguardando equipe) → `answered` (equipe respondeu) →
   `resolved`. O usuário escrever de novo volta para `open`, inclusive de
   `resolved`. `priority` (`low|normal|high`) e `assigned_to` são triagem do
@@ -81,7 +86,9 @@ da conversa), `tickets/:id` (conversa completa, aparelho, diagnóstico, conta
 e empresas, outros chamados, aparelhos alcançáveis), `tickets/:id/messages`
 (`internal` opcional), `tickets/:id/status`, `PATCH tickets/:id`
 (`priority`, `category`, `assign: me|none`), `tickets/:id/draft` (rascunho
-com a OpenAI, mesma chave das avaliações). Responder assume o atendimento
+com a OpenAI, mesma chave das avaliações), `settings` (GET/PUT da resposta
+automática). A lista aceita `needsHuman=true|false` e põe o que precisa de
+uma pessoa no topo da fila. Responder assume o atendimento
 se ninguém assumiu. Tudo é auditado (`support.*`).
 
 ## Eventos de analytics
@@ -129,3 +136,111 @@ primeira mensagem e o link do painel.
 
 Mensagens seguintes na mesma solicitação não geram e-mail. Falha de envio é
 repetida pela fila (até 5 tentativas) e aparece em Operação › Jobs.
+
+Com a **resposta automática ligada**, esse aviso nasce agendado para 2 minutos
+à frente (`jobs.run_at`) em vez de sair na hora, e quando chega a hora a
+tarefa desiste se a IA já resolveu: respondida pela IA, o dono não é
+incomodado; escalonada, o e-mail de "precisa de você" já saiu no lugar. Uma
+resposta de pessoa não cancela aviso nenhum. Com a IA desligada, nada muda: o
+aviso sai imediatamente, como sempre.
+
+## Resposta automática por IA
+
+O chat de suporte pode responder sozinho as dúvidas básicas — quase sempre
+plano, limite e preço — e passar para uma pessoa tudo o que depende de gente.
+Ligada e desligada em **Painel › Atendimento**, no card "Resposta automática
+por IA" (`admin_settings`, chave `support_settings`, campo
+`aiAutoReplyEnabled`). É configuração de banco, não variável de ambiente: liga
+e desliga sem deploy. **Desligada, nada muda** — nenhuma tarefa é enfileirada
+e o atendimento segue só por pessoas. Nasce desligada.
+
+Usa a **mesma chave e o mesmo modelo da OpenAI** do resto do painel
+(`modules/reviews/openai-client.ts`, `completeJson`), configurados em
+Inteligência artificial. Sem chave, a solicitação é marcada para humano em vez
+de ficar sem resposta.
+
+### Onde está
+
+| Parte | Caminho |
+| --- | --- |
+| Prompt, contexto do produto e decisão | `apps/api/src/modules/support/support-ai.ts` |
+| Travas, envio e escalonamento | `SupportService.autoReply`, `sendAiReply`, `markNeedsHuman` |
+| Tarefas da fila | `support.ai_reply` · `support.notify_needs_human` (`support.jobs.ts`) |
+| Migração | `0040_suporte_ia.{up,down}.sql` |
+| Painel | `apps/admin/src/pages/SupportPage.tsx` (toggle, etiqueta "por IA", aviso e filtro) |
+| Cadência no chat da web | `apps/web/src/components/SupportChatPanel.tsx` |
+
+### O contexto que ela recebe
+
+Nenhum número escrito à mão no prompt:
+
+- **O que o produto faz**: `PRODUCT_FACT_LINES`
+  (`modules/blog/product-facts.ts`), a mesma fonte única da IA do blog e do
+  `llms.txt`. A IA só pode citar funcionalidade que esteja ali.
+- **Planos, limites e preços**: lidos de `plans` e `plan_features` a cada
+  resposta (`planFactsFor`) — as mesmas linhas de **Painel › Planos**, que é a
+  fonte da verdade. Mudar o preço no painel muda o que a IA diz, sem deploy.
+  `limit_value` nulo entra como "sem limite".
+- **Central de ajuda**: os artigos de `packages/help/faq.json` com mais
+  palavras em comum com a dúvida (`relatedHelpArticles`, o mesmo seletor que
+  a IA do blog usa).
+- **A conversa**: as 12 últimas mensagens não internas, o aparelho, o
+  diagnóstico do app e o plano em vigor da empresa.
+- Mais as duas frases que valem sempre: a assinatura é **da empresa** e vale
+  nos dois clientes; **não se cobra por pessoa**.
+
+### Tom e regras
+
+São as da seção 4 do `CLAUDE.md`, iguais para a IA e para quem atende:
+resposta curta e objetiva, resolver do nosso lado, **reembolso só se o cliente
+pedir**, **sem cupom**, só o primeiro nome (nunca o e-mail), nada de prometer
+o que o produto não faz. Diante de insatisfação ou cancelamento: apaziguar,
+perguntar o motivo, tentar resolver. Teto de 700 caracteres por resposta.
+
+### Resposta cadenciada
+
+A tarefa roda na fila (a pessoa não espera a OpenAI) e o chat da web revela a
+resposta no **ritmo de digitação** que já existia nas perguntas automáticas do
+balão: o indicador "digitando" fica uma pausa fixa mais um tanto por
+caractere, com teto de 6 s, e só então o texto aparece. O que já estava na
+conversa quando o balão abriu aparece de uma vez — ninguém quer ver a IA
+digitando de novo o que respondeu ontem. A marca `ai` da mensagem é o que
+liga esse efeito.
+
+### Escalonamento para humano
+
+A IA responde em JSON e o valor combinado é `{"acao": "humano", "motivo": …}`.
+Nesse caso **nada é enviado ao cliente**: a solicitação ganha
+`needs_human = true`, uma nota interna com o motivo, o destaque "precisa de
+você" no painel e um e-mail ao dono. Também escalona, em silêncio, quando:
+
+- não há chave da OpenAI configurada;
+- a OpenAI falha, estoura o tempo-limite ou devolve algo que não dá para
+  enviar (na dúvida, escalona — responder errado é pior que demorar);
+- a IA já respondeu 3 vezes no mesmo chamado e o cliente voltou a escrever.
+
+E simplesmente **não fala** quando: o toggle está desligado, a solicitação
+está resolvida ou já marcada para humano, a mensagem não é mais a última da
+conversa, ou **uma pessoa do time já respondeu ali** — daí em diante a
+conversa é dela.
+
+A resposta da IA entra como resposta normal do suporte (push, caixa de
+notificações, e-mail quando não há aparelho), com `author = admin`,
+`ai = true` e sem nome de atendente: o cliente vê "Equipe Estoque Simples".
+Ela conta como primeira resposta (`first_response_at`) — para o cliente, foi
+respondido. Nenhum responsável é assumido.
+
+### Aviso por e-mail ao dono
+
+Tarefa `support.notify_needs_human`, pelo mesmo caminho de envio dos outros
+avisos (`kind: support_needs_human`): número, assunto, categoria, primeiro
+nome de quem escreveu, motivo, a última mensagem do cliente e o link do
+painel. Destinatários iguais aos do aviso de solicitação nova
+(`SUPPORT_NOTIFY_EMAILS` ou os donos ativos do painel). **Um por
+solicitação**: quem garante isso é o `UPDATE … WHERE needs_human = false` —
+não alterou linha, não enfileira aviso.
+
+**Um e-mail por solicitação, no total.** Com a IA ligada, o aviso de
+solicitação nova espera 2 minutos e desiste se a IA já respondeu ou já
+escalonou (ver a seção anterior): o dono recebe o aviso de abertura, ou o de
+"precisa de você", nunca os dois.
