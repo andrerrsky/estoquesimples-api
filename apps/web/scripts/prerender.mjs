@@ -219,6 +219,7 @@ const planilhaGrafo = JSON.stringify({
       about: { '@id': `${PLANILHA_URL}#arquivo` },
       mentions: { '@id': `${SITE}/#app` },
       hasPart: { '@id': `${PLANILHA_URL}#faq` },
+      breadcrumb: { '@id': `${PLANILHA_URL}#trilha` },
     },
     {
       '@type': 'ImageObject',
@@ -246,6 +247,7 @@ const planilhaGrafo = JSON.stringify({
     },
     {
       '@type': 'BreadcrumbList',
+      '@id': `${PLANILHA_URL}#trilha`,
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE}/` },
         { '@type': 'ListItem', position: 2, name: 'Planilha de controle de estoque', item: PLANILHA_URL },
@@ -262,7 +264,11 @@ const planilhaGrafo = JSON.stringify({
       aggregateRating: { '@type': 'AggregateRating', ratingValue: PLAY_RATING.ratingValue, ratingCount: PLAY_RATING.ratingCount, bestRating: '5' },
       offers: { '@type': 'Offer', name: 'Plano Gratuito', price: '0', priceCurrency: 'BRL', description: 'Plano Gratuito, para uma pessoa' },
     },
-    { ...(({ '@context': _contexto, ...resto }) => resto)(JSON.parse(planilhaFaq)), '@id': `${PLANILHA_URL}#faq` },
+    {
+      ...(({ '@context': _contexto, ...resto }) => resto)(JSON.parse(planilhaFaq)),
+      '@id': `${PLANILHA_URL}#faq`,
+      isPartOf: { '@id': `${PLANILHA_URL}#pagina` },
+    },
   ],
 });
 
@@ -302,11 +308,16 @@ const planilhaCss = `
     .pl-situacao--repor { background: #FFECB3; color: #6F4300; }
     .pl-situacao--zerado { background: #FFD9D9; color: #8A1818; }
     .pl-tabela th.pl-th--entrada { background: #0F4467; }
-    .pl-tabela th.pl-th--entrada::after { content: " ●"; color: #FFD54F; }
+    .pl-tabela th.pl-th--entrada::after {
+      content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+      border-radius: 50%; background: #FFD54F; vertical-align: middle;
+    }
     .pl-previa__rolagem:focus-visible { outline: 3px solid var(--brand, #1C679D); outline-offset: 2px; }
     .pl-previa__nota { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
     .pl-links { margin: 16px 0 0; padding-left: 22px; }
     .pl-links li { margin: 8px 0; }
+    .pl-trilha { margin: 18px 0 0; color: var(--text-muted); font-size: 14px; }
+    .pl-trilha a { color: inherit; }
     .pl-lista-abas { margin: 16px 0 0; }
     .pl-lista-abas dt { font-weight: 700; margin-top: 14px; }
     .pl-lista-abas dd { margin: 4px 0 0; color: var(--text-muted); }
@@ -321,6 +332,7 @@ const planilhaCss = `
       .pl-so-grande { display: none; }
       .pl-tabela { min-width: 0; font-size: 12px; }
       .pl-tabela th, .pl-tabela td { padding: 8px 9px; }
+      .pl-tabela th { white-space: normal; }
     }
     @media (max-width: 760px) {
       .pl-abas { grid-template-columns: 1fr; }

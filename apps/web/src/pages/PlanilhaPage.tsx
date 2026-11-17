@@ -132,6 +132,9 @@ export function PlanilhaPage() {
       </header>
 
       <main id="conteudo" className="pl-main">
+        <nav className="pl-trilha" aria-label="Trilha">
+          <a href="/">Início</a> <span aria-hidden="true">›</span> Planilha de controle de estoque
+        </nav>
         <section className="pl-section" aria-labelledby="pl-faz">
           <h2 className="landing__h2" id="pl-faz">O que a planilha faz por você</h2>
           <div className="pl-abas">
@@ -146,8 +149,8 @@ export function PlanilhaPage() {
           {/* Prévia da aba Produtos, com as cores do arquivo. */}
           <figure className="pl-previa">
             <figcaption className="pl-previa__legenda" id="pl-previa-legenda">
-              A aba <strong>Produtos</strong>, como ela abre: você preenche as colunas amarelas, as cinzas são
-              calculadas.
+              A aba <strong>Produtos</strong>, como ela abre: as colunas com <span aria-hidden="true">●</span> amarelo
+              são as que você preenche; as cinzas são calculadas.
             </figcaption>
             {/* tabindex/role: a tabela rola na horizontal, e região rolável
                 precisa ser alcançável pelo teclado (WCAG 2.1.1). */}
@@ -158,13 +161,13 @@ export function PlanilhaPage() {
                   <tr>
                     <th scope="col" className="pl-th--entrada pl-so-grande">Código</th>
                     <th scope="col" className="pl-th--entrada">Produto</th>
-                    <th scope="col" className="pl-th--entrada pl-so-grande">Estoque mínimo</th>
+                    <th scope="col" className="pl-th--entrada">Estoque mínimo</th>
                     <th scope="col" className="pl-th--entrada pl-so-grande">Custo</th>
                     <th scope="col" className="pl-so-grande">Entradas</th>
                     <th scope="col" className="pl-so-grande">Saídas</th>
                     <th scope="col">Saldo atual</th>
                     <th scope="col">Situação</th>
-                    <th scope="col">Valor em estoque</th>
+                    <th scope="col" className="pl-so-grande">Valor em estoque</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,7 +175,7 @@ export function PlanilhaPage() {
                     <tr key={l.cod}>
                       <td className="pl-td--entrada pl-so-grande">{l.cod}</td>
                       <td className="pl-td--entrada">{l.nome}</td>
-                      <td className="pl-td--entrada pl-num pl-so-grande">{l.min}</td>
+                      <td className="pl-td--entrada pl-num">{l.min}</td>
                       <td className="pl-td--entrada pl-num pl-so-grande">{l.custo}</td>
                       <td className="pl-num pl-so-grande">{l.ent}</td>
                       <td className="pl-num pl-so-grande">{l.sai}</td>
@@ -182,13 +185,13 @@ export function PlanilhaPage() {
                           {l.situacao}
                         </span>
                       </td>
-                      <td className="pl-num">{l.valor}</td>
+                      <td className="pl-num pl-so-grande">{l.valor}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="pl-previa__nota">No computador e no arquivo, a aba mostra as nove colunas.</p>
+            <p className="pl-previa__nota">No computador e no arquivo, a aba mostra as nove colunas, incluindo o valor em estoque de cada produto.</p>
           </figure>
         </section>
 
