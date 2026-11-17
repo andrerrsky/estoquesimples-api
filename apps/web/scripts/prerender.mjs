@@ -198,6 +198,7 @@ const planilhaFaq = JSON.stringify({
   })),
 });
 
+// O FAQPage entra dentro do mesmo @graph, ligado à página por hasPart.
 const planilhaGrafo = JSON.stringify({
   '@context': 'https://schema.org',
   '@graph': [
@@ -213,6 +214,11 @@ const planilhaGrafo = JSON.stringify({
       isPartOf: { '@id': `${SITE}/#site` },
       publisher: { '@id': `${SITE}/#org` },
       primaryImageOfPage: { '@id': `${PLANILHA_URL}#capa` },
+      // Sem estas três, nada dizia que o assunto da página é o arquivo.
+      mainEntity: { '@id': `${PLANILHA_URL}#arquivo` },
+      about: { '@id': `${PLANILHA_URL}#arquivo` },
+      mentions: { '@id': `${SITE}/#app` },
+      hasPart: { '@id': `${PLANILHA_URL}#faq` },
     },
     {
       '@type': 'ImageObject',
@@ -232,6 +238,7 @@ const planilhaGrafo = JSON.stringify({
       contentSize: PLANILHA.tamanho,
       inLanguage: 'pt-BR',
       dateModified: PLANILHA.atualizadaIso,
+      isPartOf: { '@id': `${PLANILHA_URL}#pagina` },
       isAccessibleForFree: true,
       license: `${SITE}/termos`,
       author: { '@id': `${SITE}/#org` },
@@ -246,14 +253,16 @@ const planilhaGrafo = JSON.stringify({
     },
     {
       '@type': 'SoftwareApplication',
+      '@id': `${SITE}/#app`,
       name: 'Estoque Simples',
       operatingSystem: 'Android, Web',
       applicationCategory: 'BusinessApplication',
       inLanguage: 'pt-BR',
       installUrl: 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples',
       aggregateRating: { '@type': 'AggregateRating', ratingValue: PLAY_RATING.ratingValue, ratingCount: PLAY_RATING.ratingCount, bestRating: '5' },
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', description: 'Plano Gratuito, para uma pessoa' },
+      offers: { '@type': 'Offer', name: 'Plano Gratuito', price: '0', priceCurrency: 'BRL', description: 'Plano Gratuito, para uma pessoa' },
     },
+    { ...(({ '@context': _contexto, ...resto }) => resto)(JSON.parse(planilhaFaq)), '@id': `${PLANILHA_URL}#faq` },
   ],
 });
 
@@ -292,6 +301,12 @@ const planilhaCss = `
     .pl-situacao--ok { background: #E3F4E5; color: #14591B; }
     .pl-situacao--repor { background: #FFECB3; color: #6F4300; }
     .pl-situacao--zerado { background: #FFD9D9; color: #8A1818; }
+    .pl-tabela th.pl-th--entrada { background: #0F4467; }
+    .pl-tabela th.pl-th--entrada::after { content: " ●"; color: #FFD54F; }
+    .pl-previa__rolagem:focus-visible { outline: 3px solid var(--brand, #1C679D); outline-offset: 2px; }
+    .pl-previa__nota { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
+    .pl-links { margin: 16px 0 0; padding-left: 22px; }
+    .pl-links li { margin: 8px 0; }
     .pl-lista-abas { margin: 16px 0 0; }
     .pl-lista-abas dt { font-weight: 700; margin-top: 14px; }
     .pl-lista-abas dd { margin: 4px 0 0; color: var(--text-muted); }
@@ -300,6 +315,13 @@ const planilhaCss = `
     .pl-versao { margin: 26px 0 0; color: var(--text-muted); font-size: 14px; }
     .pl-section p { line-height: 1.65; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    /* No celular a prévia mostra as colunas que importam: sem isso, a
+       Situação — que é o ponto da prévia — ficava fora da tela. */
+    @media (max-width: 620px) {
+      .pl-so-grande { display: none; }
+      .pl-tabela { min-width: 0; font-size: 12px; }
+      .pl-tabela th, .pl-tabela td { padding: 8px 9px; }
+    }
     @media (max-width: 760px) {
       .pl-abas { grid-template-columns: 1fr; }
       .pl-main { padding: 8px 16px; }
@@ -330,13 +352,14 @@ const planilhaPagina = `<!doctype html>
     <meta property="og:image:alt" content="Planilha de controle de estoque aberta, com a coluna Situação marcando Repor" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="${SITE}/og-planilha.jpg" />
+    <meta name="twitter:image:alt" content="Planilha de controle de estoque aberta, com a coluna Situação marcando Repor" />
+    <meta name="robots" content="max-image-preview:large" />
     ${fontPreload}
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     ${stylesheet}
     <style>${planilhaCss}
     </style>
-    <script type="application/ld+json">${planilhaFaq}</script>
     <script type="application/ld+json">${planilhaGrafo}</script>
   </head>
   <body>
