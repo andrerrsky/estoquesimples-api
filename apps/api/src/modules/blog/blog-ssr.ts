@@ -380,6 +380,17 @@ export function renderBlogPost(template: string, post: BlogPostView, related: Bl
   return applyHead(template, head).replace('<div id="root"></div>', `<div id="root">${shell(inner)}</div>\n    ${dataScript}`);
 }
 
+/**
+ * Quando cada página estática mudou pela última vez. Mantida à mão porque
+ * essas páginas são escritas, não geradas: a data é a do conteúdo, não a do
+ * último deploy. Precisa bater com o `dateModified` que a própria página
+ * publica no JSON-LD.
+ */
+const PAGINAS_ATUALIZADAS: Record<string, string> = {
+  '/planilha-de-controle-de-estoque': '2026-11-16',
+  '/video': '2026-11-16',
+};
+
 /** Sitemap com as páginas fixas e todos os posts publicados. */
 export function sitemapXml(posts: BlogPostView[], landingLastmod: string, categoryCounts: Record<string, number> = {}): string {
   // Última alteração de cada lista: o post mais recentemente atualizado nela.
@@ -391,8 +402,11 @@ export function sitemapXml(posts: BlogPostView[], landingLastmod: string, catego
     // única página do site cujo assunto é o vídeo, e a que leva o JSON-LD
     // VideoObject.
     // Planilha gratuita: o termo de maior volume do nicho (ver docs/pautas-blog-2026-11.md).
-    { loc: `${SITE}/planilha-de-controle-de-estoque`, priority: '0.9' },
-    { loc: `${SITE}/video`, priority: '0.7' },
+    // O `lastmod` sai da mesma data que a página publica em dateModified, para
+    // os dois nunca divergirem — é o único dos dois campos que o Google usa
+    // (o `priority` ele ignora há anos; fica porque não atrapalha).
+    { loc: `${SITE}/planilha-de-controle-de-estoque`, lastmod: PAGINAS_ATUALIZADAS['/planilha-de-controle-de-estoque'], priority: '0.9' },
+    { loc: `${SITE}/video`, lastmod: PAGINAS_ATUALIZADAS['/video'], priority: '0.7' },
     { loc: `${SITE}/plataformas`, priority: '0.6' },
     { loc: `${SITE}/ajuda`, priority: '0.6' },
     { loc: `${SITE}/termos`, priority: '0.2' },
