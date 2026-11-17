@@ -79,9 +79,11 @@ verdade é essa tela — não o código.
 A assinatura é **da empresa** e vale nos dois clientes, qualquer que seja o
 canal de compra.
 
-### Quem é a base (medido no painel em 15/11/2026)
+### Quem é a base (medido no painel em 16/11/2026)
 
-32 empresas, 40 contas, 3 empresas pagantes (**9,4%**). O número que mais
+35 empresas, 47 contas, 4 empresas pagantes (**11,4%**) — 2 pela Play, 2 pela
+web. Em 15/11 eram 32 empresas, 40 contas e 3 pagantes: a base cresceu
+**+29 contas em 7 dias**, e 17 pessoas usaram o app hoje. O número que mais
 importa para decidir produto: **apenas 2 empresas têm mais de uma pessoa** —
 **94% são de um dono sozinho**. E `paywall.viewed` por gatilho, em 176
 visualizações: `menu` 90, `analysis` 41, `product_limit` 17, `account` 11,
