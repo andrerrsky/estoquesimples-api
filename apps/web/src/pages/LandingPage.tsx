@@ -880,6 +880,7 @@ export function LandingPage() {
           </div>
           <ul className="lp-footer__links">
             <li><a href="/blog">Blog</a></li>
+            <li><a href="/planilha-de-controle-de-estoque">Planilha grátis</a></li>
             <li><a href="/ajuda">Central de ajuda</a></li>
             {/* Só quando o chat está na página (telas largas): no celular o
                 visitante não tem canal sem conta, e a Central de ajuda já está ao lado. */}
