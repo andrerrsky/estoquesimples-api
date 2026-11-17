@@ -198,6 +198,65 @@ const planilhaFaq = JSON.stringify({
   })),
 });
 
+const planilhaGrafo = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebPage',
+      '@id': `${PLANILHA_URL}#pagina`,
+      url: PLANILHA_URL,
+      name: planilhaTitulo,
+      description: planilhaDescricao,
+      inLanguage: 'pt-BR',
+      datePublished: PLANILHA.atualizadaIso,
+      dateModified: PLANILHA.atualizadaIso,
+      isPartOf: { '@id': `${SITE}/#site` },
+      publisher: { '@id': `${SITE}/#org` },
+      primaryImageOfPage: { '@id': `${PLANILHA_URL}#capa` },
+    },
+    {
+      '@type': 'ImageObject',
+      '@id': `${PLANILHA_URL}#capa`,
+      url: `${SITE}/og-planilha.jpg`,
+      width: 800,
+      height: 420,
+    },
+    {
+      '@type': 'CreativeWork',
+      '@id': `${PLANILHA_URL}#arquivo`,
+      name: 'Planilha de controle de estoque',
+      description: 'Planilha em Excel com cadastro de produtos, entrada e saída, saldo automático, aviso de estoque mínimo e resumo do valor em estoque.',
+      url: `${SITE}${PLANILHA.arquivo}`,
+      encodingFormat: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileFormat: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      contentSize: PLANILHA.tamanho,
+      inLanguage: 'pt-BR',
+      dateModified: PLANILHA.atualizadaIso,
+      isAccessibleForFree: true,
+      license: `${SITE}/termos`,
+      author: { '@id': `${SITE}/#org` },
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', availability: 'https://schema.org/InStock' },
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Planilha de controle de estoque', item: PLANILHA_URL },
+      ],
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Estoque Simples',
+      operatingSystem: 'Android, Web',
+      applicationCategory: 'BusinessApplication',
+      inLanguage: 'pt-BR',
+      installUrl: 'https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples',
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: PLAY_RATING.ratingValue, ratingCount: PLAY_RATING.ratingCount, bestRating: '5' },
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', description: 'Plano Gratuito, para uma pessoa' },
+    },
+  ],
+});
+
 const planilhaCss = `
     .pl-main { max-width: 1040px; margin: 0 auto; padding: 8px 20px; }
     .pl-hero { max-width: 760px; margin: 0 auto; padding: 8px 0 44px; text-align: center; }
@@ -221,9 +280,31 @@ const planilhaCss = `
     .pl-duvidas dt { font-weight: 700; margin-top: 18px; }
     .pl-duvidas dd { margin: 6px 0 0; color: var(--text-muted); }
     .pl-footer { max-width: 1040px; margin: 56px auto 0; padding: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px; text-align: center; }
+    .pl-previa { margin: 28px 0 0; }
+    .pl-previa__legenda { margin: 0 0 10px; color: var(--text-muted); font-size: 15px; }
+    .pl-previa__rolagem { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-card, 14px); }
+    .pl-tabela { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px; background: #fff; }
+    .pl-tabela th { background: #14507A; color: #fff; font-weight: 700; padding: 10px 12px; text-align: left; white-space: nowrap; }
+    .pl-tabela td { padding: 9px 12px; border-top: 1px solid #e3e9ef; background: #F1F4F7; }
+    .pl-td--entrada { background: #FFF8E1; }
+    .pl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .pl-situacao { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+    .pl-situacao--ok { background: #E3F4E5; color: #14591B; }
+    .pl-situacao--repor { background: #FFECB3; color: #6F4300; }
+    .pl-situacao--zerado { background: #FFD9D9; color: #8A1818; }
+    .pl-lista-abas { margin: 16px 0 0; }
+    .pl-lista-abas dt { font-weight: 700; margin-top: 14px; }
+    .pl-lista-abas dd { margin: 4px 0 0; color: var(--text-muted); }
+    .pl-baixar--meio { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 26px 0 0; }
+    .pl-prova { margin: 18px 0 0; font-size: 15px; }
+    .pl-versao { margin: 26px 0 0; color: var(--text-muted); font-size: 14px; }
+    .pl-section p { line-height: 1.65; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     @media (max-width: 760px) {
       .pl-abas { grid-template-columns: 1fr; }
       .pl-main { padding: 8px 16px; }
+      .pl-hero { text-align: center; }
+      .pl-lead { text-align: left; }
     }`;
 
 const planilhaPagina = `<!doctype html>
@@ -241,12 +322,14 @@ const planilhaPagina = `<!doctype html>
     <meta property="og:site_name" content="Estoque Simples" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:url" content="${PLANILHA_URL}" />
-    <meta property="og:title" content="${planilhaTitulo}" />
+    <meta property="og:title" content="Planilha de controle de estoque grátis — sem cadastro" />
     <meta property="og:description" content="${planilhaDescricao}" />
-    <meta property="og:image" content="${SITE}/og.jpg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image" content="${SITE}/og-planilha.jpg" />
+    <meta property="og:image:width" content="800" />
+    <meta property="og:image:height" content="420" />
+    <meta property="og:image:alt" content="Planilha de controle de estoque aberta, com a coluna Situação marcando Repor" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="${SITE}/og-planilha.jpg" />
     ${fontPreload}
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -254,6 +337,7 @@ const planilhaPagina = `<!doctype html>
     <style>${planilhaCss}
     </style>
     <script type="application/ld+json">${planilhaFaq}</script>
+    <script type="application/ld+json">${planilhaGrafo}</script>
   </head>
   <body>
     ${planilhaHtml}
