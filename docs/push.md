@@ -57,13 +57,26 @@ duas coisas.
 
 ## Painel
 
-- **Público**: todos, com conta, sem conta, por assinatura, inativos há N
-  dias, versão antiga do app, e-mails específicos, membros de uma empresa;
-  sempre limitado a aparelhos vistos nos últimos N dias (padrão 90). A
-  prévia mostra a contagem de agora; o público real é resolvido no envio.
+- **Público**: todos, com conta, sem conta, **com conta e sem assinatura**,
+  por assinatura, inativos há N dias, versão antiga do app, e-mails
+  específicos, membros de uma empresa; sempre limitado a aparelhos vistos
+  nos últimos N dias (padrão 90). A prévia mostra a contagem de agora; o
+  público real é resolvido no envio.
+  > "Com conta, sem assinatura" (`signed_in_free`) existe separado de
+  > "Por assinatura · sem assinatura ativa" porque este último também
+  > alcança quem nunca criou conta — e quem não tem conta não tem como
+  > assinar. Para convidar a assinar, o público certo é o primeiro; para
+  > convidar a criar conta, é "Sem conta".
 - **Fluxo**: rascunho → teste em um e-mail → "Enviar agora" com confirmação
   (palavra `enviar`) → fila → `sending` → `sent`. Cancelar interrompe o que
   ainda não saiu; o que o FCM já aceitou não volta.
+- **Agendamento**: o cartão *Enviar* tem "Agendar para". Em branco, o envio
+  começa na hora. Com horário, a campanha fica `scheduled` e sai sozinha —
+  a fila de tarefas só pega o que tem `run_at` vencido, então agendar é
+  enfileirar com a hora certa, sem job novo nem varredura. `scheduled_at`
+  serve ao painel e ao cancelamento; dá para cancelar até a hora marcada.
+  Como o público é resolvido no envio, uma campanha marcada para amanhã
+  alcança quem entrar no critério até lá.
 - **Métricas**: alvo, aceitas pelo FCM, entregues, abertas (por campanha e
   agregado), falhas por motivo, entregas por hora, aparelhos alcançáveis.
 - Tudo auditado em `admin_audit_log` (`push.*`).
