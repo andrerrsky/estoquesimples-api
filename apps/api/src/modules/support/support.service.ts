@@ -8,13 +8,25 @@ import { AppError, ErrorCode, conflict, notFound } from '../../platform/http/err
 import { AdminAction, recordAdminAudit, type AdminActor } from '../admin/admin-audit.service.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from '../admin/admin.schemas.js';
 import { AnalyticsService } from '../analytics/analytics.service.js';
+import { BillingService } from '../billing/billing.service.js';
 import { AnalyticsEventName } from '../analytics/analytics.events.js';
 import { dispatchPush, pushTargetColumns } from '../push/push-dispatch.js';
 import { NotificationService, NotificationType } from '../notifications/notifications.service.js';
 import { OpenAiClient } from '../reviews/openai-client.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
+import { settingAad } from '../../platform/crypto/purchase-token.js';
+import { adminSettings, plans } from '../../platform/db/schema/index.js';
 import type { SupportMessage, SupportTicket } from '../../platform/db/schema/support.js';
-import { MAX_OPEN_TICKETS, type CreateTicketBody, type DeviceInfo, type SupportStatus } from './support.schemas.js';
+import { AI_MAX_REPLIES_PER_TICKET, SupportAiAgent, type SupportAiInput } from './support-ai.js';
+import {
+  DEFAULT_SUPPORT_SETTINGS,
+  MAX_OPEN_TICKETS,
+  supportSettingsSchema,
+  type CreateTicketBody,
+  type DeviceInfo,
+  type SupportSettings,
+  type SupportStatus,
+} from './support.schemas.js';
 
 /**
  * Quem está falando com o suporte pelo app.
@@ -46,6 +58,13 @@ function entityToRow(ticket: SupportTicket): TicketRow {
 
 /** Tarefa que avisa a equipe, por e-mail, de uma solicitação nova (ver `support.jobs.ts`). */
 export const SUPPORT_NOTIFY_TEAM_JOB = 'support.notify_team';
+/** Tarefa que pede à IA a resposta automática de uma mensagem do cliente. */
+export const SUPPORT_AI_REPLY_JOB = 'support.ai_reply';
+/** Tarefa que avisa o dono, por e-mail, que uma solicitação precisa de uma pessoa. */
+export const SUPPORT_NOTIFY_NEEDS_HUMAN_JOB = 'support.notify_needs_human';
+
+/** Configurações do atendimento no banco (mesmo lugar das do blog). */
+const SETTINGS_KEY = 'support_settings';
 
 const CATEGORY_LABEL: Record<string, string> = {
   question: 'Dúvida',
@@ -146,6 +165,9 @@ export class SupportService {
 
   async createTicket(identity: SupportIdentity, body: CreateTicketBody) {
     await this.claimAnonymous(identity);
+    // Lido antes da transação: com a resposta automática desligada, nada é
+    // enfileirado e o atendimento segue exatamente como era.
+    const aiOn = (await this.settings()).aiAutoReplyEnabled;
 
     const openCount = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -184,7 +206,8 @@ export class SupportService {
         .returning();
       const created = inserted[0];
       if (!created) throw new Error('Falha ao abrir solicitação');
-      await tx.insert(supportMessages).values({ ticketId: created.id, author: 'user', body: body.message });
+      const firstMessage = await tx.insert(supportMessages).values({ ticketId: created.id, author: 'user', body: body.message }).returning();
+      if (aiOn && firstMessage[0]) await this.enqueueAiReply(tx, created.id, firstMessage[0].id);
       // Na mesma transação: ou a solicitação existe e a equipe é avisada, ou
       // nenhuma das duas coisas. A chave impede aviso em dobro.
       await enqueueJob(tx, {
@@ -219,16 +242,7 @@ export class SupportService {
     const ticket = rows[0];
     if (!ticket) return { recipients: 0, sent: 0 };
 
-    const configured = this.services.env.SUPPORT_NOTIFY_EMAILS;
-    const recipients =
-      configured.length > 0
-        ? configured
-        : (
-            await this.db
-              .select({ email: platformAdmins.email })
-              .from(platformAdmins)
-              .where(and(eq(platformAdmins.role, 'owner'), eq(platformAdmins.status, 'active')))
-          ).map((row) => row.email.toLowerCase());
+    const recipients = await this.teamRecipients();
     if (recipients.length === 0) return { recipients: 0, sent: 0 };
 
     const first = await this.db
@@ -331,10 +345,12 @@ export class SupportService {
 
   async addUserMessage(identity: SupportIdentity, ticketId: string, text: string) {
     await this.claimAnonymous(identity);
+    const aiOn = (await this.settings()).aiAutoReplyEnabled;
     const now = new Date();
     const result = await this.db.transaction(async (tx) => {
       const ticket = await this.lockVisible(tx, identity, ticketId);
       const inserted = await tx.insert(supportMessages).values({ ticketId, author: 'user', body: text }).returning();
+      if (aiOn && inserted[0]) await this.enqueueAiReply(tx, ticketId, inserted[0].id);
       const updated = await tx
         .update(supportTickets)
         .set({
@@ -409,6 +425,8 @@ export class SupportService {
       author: message.author === 'admin' ? 'support' : message.author,
       authorName: message.author === 'admin' ? (message.adminName ?? 'Equipe Estoque Simples') : null,
       body: message.body,
+      /** Escrita pela IA: o chat da web revela o texto no ritmo de digitação. */
+      ai: message.ai,
       createdAt: message.createdAt.toISOString(),
     };
   }
@@ -423,6 +441,7 @@ export class SupportService {
         count(*) FILTER (WHERE status = 'open')::int AS open,
         count(*) FILTER (WHERE status = 'answered')::int AS answered,
         count(*) FILTER (WHERE status <> 'resolved' AND assigned_to IS NULL)::int AS unassigned,
+        count(*) FILTER (WHERE status <> 'resolved' AND needs_human)::int AS needs_human,
         count(*) FILTER (WHERE status = 'open' AND last_message_at < now() - interval '24 hours')::int AS open_stale,
         count(*) FILTER (WHERE status = 'resolved' AND resolved_at > now() - interval '7 days')::int AS resolved_7d,
         count(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS new_7d,
@@ -439,6 +458,7 @@ export class SupportService {
       open: n('open'),
       answered: n('answered'),
       unassigned: n('unassigned'),
+      needsHuman: n('needs_human'),
       openStale: n('open_stale'),
       resolved7d: n('resolved_7d'),
       new7d: n('new_7d'),
@@ -446,13 +466,14 @@ export class SupportService {
       avgFirstResponseMinutes: r['avg_first_response_s'] ? Math.round(Number(r['avg_first_response_s']) / 60) : null,
       byCategory: categories.rows,
       openAiConfigured: (await readOpenAiKey(this.services)) !== null,
+      aiAutoReplyEnabled: (await this.settings()).aiAutoReplyEnabled,
       fcmConfigured: this.services.fcm.configured,
     };
   }
 
   async list(
     actor: AdminActor,
-    query: PaginationQuery & { status?: string; category?: string; priority?: string; assigned?: string; platform?: string; q?: string },
+    query: PaginationQuery & { status?: string; category?: string; priority?: string; assigned?: string; platform?: string; needsHuman?: string; q?: string },
   ): Promise<Paginated<Record<string, unknown>>> {
     const conditions: SQL[] = [sql`true`];
     if (query.status === 'unresolved') conditions.push(sql`t.status <> 'resolved'`);
@@ -462,6 +483,7 @@ export class SupportService {
     if (query.assigned === 'me') conditions.push(sql`t.assigned_to = ${actor.adminId}`);
     if (query.assigned === 'none') conditions.push(sql`t.assigned_to IS NULL`);
     if (query.platform) conditions.push(sql`coalesce(t.device->>'platform', 'android') = ${query.platform}`);
+    if (query.needsHuman) conditions.push(query.needsHuman === 'true' ? sql`t.needs_human` : sql`NOT t.needs_human`);
     if (query.q) {
       const term = `%${query.q}%`;
       const asNumber = /^#?\d+$/.test(query.q) ? Number(query.q.replace('#', '')) : null;
@@ -475,7 +497,8 @@ export class SupportService {
       this.db.execute<TicketRow>(sql`
         SELECT t.*, u.email AS user_email, u.name AS user_name
         ${base}
-        ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'answered' THEN 1 ELSE 2 END,
+        ORDER BY (t.needs_human AND t.status <> 'resolved') DESC,
+                 CASE t.status WHEN 'open' THEN 0 WHEN 'answered' THEN 1 ELSE 2 END,
                  CASE t.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
                  t.last_message_at DESC
         LIMIT ${query.pageSize} OFFSET ${offsetOf(query)}
@@ -747,6 +770,290 @@ export class SupportService {
     return { text, model: this.services.env.OPENAI_MODEL };
   }
 
+
+  // -------------------------------------------------------------------------
+  // Resposta automática por IA
+  // -------------------------------------------------------------------------
+
+  /** Configurações do atendimento; sem linha no banco, a IA fica desligada. */
+  async settings(): Promise<SupportSettings> {
+    const rows = await this.db.select({ valueEnc: adminSettings.valueEnc }).from(adminSettings).where(eq(adminSettings.key, SETTINGS_KEY)).limit(1);
+    if (!rows[0]) return DEFAULT_SUPPORT_SETTINGS;
+    try {
+      return supportSettingsSchema.parse(JSON.parse(this.services.purchaseTokens.decrypt(rows[0].valueEnc, settingAad(SETTINGS_KEY))));
+    } catch {
+      return DEFAULT_SUPPORT_SETTINGS;
+    }
+  }
+
+  async saveSettings(actor: AdminActor, settings: SupportSettings): Promise<SupportSettings> {
+    const valueEnc = this.services.purchaseTokens.encrypt(JSON.stringify(settings), settingAad(SETTINGS_KEY));
+    await this.db
+      .insert(adminSettings)
+      .values({ key: SETTINGS_KEY, valueEnc })
+      .onConflictDoUpdate({ target: adminSettings.key, set: { valueEnc, updatedAt: new Date() } });
+    await recordAdminAudit(this.db, { actor, action: AdminAction.SETTING_UPDATED, targetType: 'setting', targetId: SETTINGS_KEY, metadata: settings });
+    return settings;
+  }
+
+  /**
+   * A resposta da IA roda na fila, e não dentro da requisição: quem escreveu
+   * no chat não espera a OpenAI, e a espera da tarefa (alguns segundos) soma
+   * com a cadência de digitação do chat para a resposta não brotar pronta.
+   * Uma tarefa por mensagem do cliente (a chave única evita duplicata se a
+   * mesma mensagem for enfileirada duas vezes), e sem repetição: falhar aqui
+   * significa escalonar, não tentar de novo.
+   */
+  private async enqueueAiReply(tx: Transaction, ticketId: string, messageId: string): Promise<void> {
+    await enqueueJob(tx, {
+      kind: SUPPORT_AI_REPLY_JOB,
+      uniqueKey: `${SUPPORT_AI_REPLY_JOB}:${messageId}`,
+      payload: { ticketId, messageId },
+      maxAttempts: 1,
+    });
+  }
+
+  /**
+   * Responde ao cliente com a IA, ou passa a solicitação para uma pessoa.
+   * Chamada pela fila. Nunca lança: na dúvida, escalona em silêncio.
+   *
+   * As travas antes de chamar o modelo valem mais que o próprio prompt:
+   * desligado no painel, sem chave, solicitação resolvida ou já marcada para
+   * humano, mensagem que não é mais a última, pessoa do time já na conversa,
+   * ou IA já tendo respondido demais no mesmo chamado — em todos esses casos
+   * a IA não fala.
+   */
+  async autoReply(ticketId: string, messageId: string): Promise<{ outcome: string; reason?: string }> {
+    if (!(await this.settings()).aiAutoReplyEnabled) return { outcome: 'desligado' };
+    const apiKey = await readOpenAiKey(this.services);
+    if (!apiKey) {
+      await this.markNeedsHuman(ticketId, 'Resposta automática ligada, mas sem chave da OpenAI configurada.');
+      return { outcome: 'humano', reason: 'sem chave' };
+    }
+
+    const rows = await this.db.execute<TicketRow>(sql`
+      SELECT t.*, u.name AS user_name FROM support_tickets t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = ${ticketId}
+    `);
+    const row = rows.rows[0];
+    if (!row) return { outcome: 'inexistente' };
+    if (row['status'] === 'resolved' || row['needs_human'] === true) return { outcome: 'ignorado' };
+
+    const messages = await this.db
+      .select()
+      .from(supportMessages)
+      .where(eq(supportMessages.ticketId, ticketId))
+      .orderBy(supportMessages.createdAt)
+      .limit(200);
+
+    const visible = messages.filter((message) => !message.internal);
+    const last = visible.at(-1);
+    // O cliente escreveu de novo enquanto a tarefa esperava: a resposta certa
+    // é a da última mensagem, que tem a tarefa dela.
+    if (!last || last.id !== messageId || last.author !== 'user') return { outcome: 'desatualizado' };
+    // Uma pessoa do time já está na conversa: ela conduz daqui em diante.
+    if (visible.some((message) => message.author === 'admin' && !message.ai)) return { outcome: 'humano_na_conversa' };
+    const aiReplies = visible.filter((message) => message.ai).length;
+    if (aiReplies >= AI_MAX_REPLIES_PER_TICKET) {
+      await this.markNeedsHuman(ticketId, `A IA já respondeu ${aiReplies} vezes e o cliente voltou a escrever.`);
+      return { outcome: 'humano', reason: 'limite de respostas' };
+    }
+
+    const outcome = await new SupportAiAgent(this.services).answer(apiKey, await this.aiInput(row, visible));
+    if (outcome.action === 'human') {
+      await this.markNeedsHuman(ticketId, outcome.reason);
+      return { outcome: 'humano', reason: outcome.reason };
+    }
+    await this.sendAiReply(ticketId, outcome.text);
+    return { outcome: 'respondido' };
+  }
+
+  /** O contexto que vai para o modelo: conversa, aparelho, diagnóstico e plano em vigor. */
+  private async aiInput(row: TicketRow, visible: SupportMessage[]): Promise<SupportAiInput> {
+    const diagnostics = (row['diagnostics'] ?? {}) as Record<string, unknown>;
+    const diagnosticsText = Object.entries(diagnostics)
+      .filter(([key]) => key !== 'workspaceId')
+      .map(([key, value]) => `${key}=${String(value)}`)
+      .join(', ');
+    // Regra de atendimento: só o primeiro nome, nunca o e-mail.
+    const fullName = ((row['user_name'] ?? row['contact_name']) as string | null) ?? null;
+    const workspaceId = row['workspace_id'] as string | null;
+    const planLabel = workspaceId ? await this.planLabel(workspaceId) : null;
+    return {
+      subject: row['subject'] as string,
+      category: CATEGORY_LABEL[row['category'] as string] ?? (row['category'] as string),
+      firstName: fullName?.trim().split(/\s+/)[0] ?? null,
+      signedIn: row['user_id'] !== null,
+      planLabel,
+      device: describeDevice((row['device'] as DeviceInfo) ?? {}),
+      diagnostics: diagnosticsText || null,
+      transcript: visible.slice(-12).map((message) => ({
+        author: message.author === 'admin' ? ('support' as const) : message.author === 'user' ? ('user' as const) : ('system' as const),
+        body: message.body,
+      })),
+    };
+  }
+
+  /** Nome do plano em vigor da empresa, para a IA não oferecer o que o cliente já tem. */
+  private async planLabel(workspaceId: string): Promise<string | null> {
+    try {
+      const entitlement = await new BillingService(this.services).getEntitlement(workspaceId);
+      const plan = await this.db.select({ name: plans.name }).from(plans).where(eq(plans.key, entitlement.planKey)).limit(1);
+      const name = plan[0]?.name ?? entitlement.planKey;
+      return entitlement.active ? `${name} (assinatura ativa)` : name;
+    } catch (error) {
+      this.services.logger?.warn({ err: error, workspaceId }, 'plano da empresa não lido para a IA do atendimento');
+      return null;
+    }
+  }
+
+  /**
+   * Grava e entrega a resposta da IA como qualquer resposta do suporte: o
+   * cliente vê "Equipe Estoque Simples" (o `adminName` nulo já significa
+   * isso), recebe push/e-mail pelo mesmo caminho e a solicitação passa a
+   * "aguardando usuário". A marca `ai = true` é o que separa as duas coisas
+   * no painel. Sem auditoria de painel: não há administrador por trás da
+   * ação — o registro é a própria mensagem e o log da tarefa.
+   */
+  private async sendAiReply(ticketId: string, body: string): Promise<void> {
+    const now = new Date();
+    const { ticket, message } = await this.db.transaction(async (tx) => {
+      const current = await this.lock(tx, ticketId);
+      const inserted = await tx
+        .insert(supportMessages)
+        .values({ ticketId, author: 'admin', adminName: null, body, internal: false, ai: true, notifyStatus: 'pending' })
+        .returning();
+      const saved = inserted[0];
+      if (!saved) throw new Error('Falha ao gravar a resposta da IA');
+      const rows = await tx
+        .update(supportTickets)
+        .set({
+          status: 'answered',
+          resolvedAt: null,
+          resolvedBy: null,
+          messageCount: sql`${supportTickets.messageCount} + 1`,
+          lastMessageAt: now,
+          lastMessageBy: 'admin',
+          // Conta como primeira resposta: para o cliente, foi respondido.
+          firstResponseAt: sql`coalesce(${supportTickets.firstResponseAt}, ${now})`,
+        })
+        .where(eq(supportTickets.id, ticketId))
+        .returning();
+      return { ticket: rows[0] ?? current, message: saved };
+    });
+
+    const notify = await this.notifyUser(ticket, {
+      title: `Resposta do suporte · #${ticket.number}`,
+      body: excerpt(body),
+      kind: 'reply',
+      email: {
+        subject: `Resposta à sua solicitação #${ticket.number} · Estoque Simples`,
+        text: `Olá!\n\nSua solicitação "${ticket.subject}" recebeu uma resposta da equipe:\n\n${body}\n\nAbra o app Estoque Simples em Ajuda e suporte para continuar a conversa.`,
+      },
+    });
+    await this.db.update(supportMessages).set({ notifyStatus: notify.status, notifyDetail: notify.detail }).where(eq(supportMessages.id, message.id));
+  }
+
+  /**
+   * Marca a solicitação como "precisa de humano" e avisa o dono por e-mail.
+   *
+   * O `UPDATE ... WHERE needs_human = false` é o que garante um e-mail por
+   * solicitação, e não um por mensagem: quem não alterou nenhuma linha não
+   * enfileira aviso. A nota fica interna — o cliente não recebe nada aqui.
+   */
+  async markNeedsHuman(ticketId: string, reason: string): Promise<boolean> {
+    const now = new Date();
+    const marked = await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(supportTickets)
+        .set({ needsHuman: true, needsHumanAt: now, needsHumanReason: reason.slice(0, 300) })
+        .where(and(eq(supportTickets.id, ticketId), eq(supportTickets.needsHuman, false)))
+        .returning({ id: supportTickets.id });
+      if (rows.length === 0) return false;
+      await tx.insert(supportMessages).values({
+        ticketId,
+        author: SYSTEM_AUTHOR,
+        body: `A resposta automática passou esta solicitação para uma pessoa: ${reason}`,
+        internal: true,
+        ai: true,
+      });
+      await enqueueJob(tx, {
+        kind: SUPPORT_NOTIFY_NEEDS_HUMAN_JOB,
+        uniqueKey: `${SUPPORT_NOTIFY_NEEDS_HUMAN_JOB}:${ticketId}`,
+        payload: { ticketId },
+        maxAttempts: 5,
+      });
+      return true;
+    });
+    return marked;
+  }
+
+  /** Quem o painel avisa: `SUPPORT_NOTIFY_EMAILS` ou os donos ativos do painel. */
+  private async teamRecipients(): Promise<string[]> {
+    const configured = this.services.env.SUPPORT_NOTIFY_EMAILS;
+    if (configured.length > 0) return configured;
+    const rows = await this.db
+      .select({ email: platformAdmins.email })
+      .from(platformAdmins)
+      .where(and(eq(platformAdmins.role, 'owner'), eq(platformAdmins.status, 'active')));
+    return rows.map((row) => row.email.toLowerCase());
+  }
+
+  /**
+   * E-mail ao dono: esta solicitação precisa de uma pessoa. Mesmo caminho de
+   * envio dos outros avisos (`services.mailer`), um por solicitação.
+   *
+   * Lança se nenhum envio der certo, para a fila repetir.
+   */
+  async notifyNeedsHuman(ticketId: string): Promise<{ recipients: number; sent: number }> {
+    const rows = await this.db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+    const ticket = rows[0];
+    if (!ticket) return { recipients: 0, sent: 0 };
+    const recipients = await this.teamRecipients();
+    if (recipients.length === 0) return { recipients: 0, sent: 0 };
+
+    const lastFromUser = await this.db
+      .select({ body: supportMessages.body })
+      .from(supportMessages)
+      .where(and(eq(supportMessages.ticketId, ticketId), eq(supportMessages.author, 'user')))
+      .orderBy(sql`${supportMessages.createdAt} DESC`)
+      .limit(1);
+    // Regra de atendimento: primeiro nome, nunca o e-mail do cliente.
+    const account = ticket.userId
+      ? (await this.db.select({ name: users.name }).from(users).where(eq(users.id, ticket.userId)).limit(1))[0]
+      : undefined;
+    const firstName = (account?.name ?? ticket.contactName ?? '').trim().split(/\s+/)[0] || 'Cliente sem nome';
+    const panel = this.services.env.ADMIN_PANEL_URL;
+    const text =
+      `A resposta automática não deu conta desta solicitação e passou para uma pessoa.\n\n` +
+      `Número: #${ticket.number}\n` +
+      `Assunto: ${ticket.subject}\n` +
+      `Categoria: ${CATEGORY_LABEL[ticket.category] ?? ticket.category}\n` +
+      `De: ${firstName}${ticket.userId ? ' (com conta)' : ' (sem conta)'}\n` +
+      `Motivo: ${ticket.needsHumanReason ?? 'não informado'}\n\n` +
+      `Última mensagem do cliente:\n${excerpt(lastFromUser[0]?.body ?? '', 1500)}\n\n` +
+      `Nada foi enviado ao cliente por esta via.\n` +
+      (panel ? `Responder no painel: ${panel}/suporte/${ticket.id}\n` : 'Responda pelo painel, em Atendimento.\n');
+
+    let sent = 0;
+    let lastError: unknown = null;
+    for (const to of recipients) {
+      try {
+        await this.services.mailer.send({
+          to,
+          subject: `[Suporte #${ticket.number}] precisa de você · ${ticket.subject}`.slice(0, 160),
+          text,
+          kind: 'support_needs_human',
+        });
+        sent += 1;
+      } catch (error) {
+        lastError = error;
+        this.services.logger?.warn({ err: error, ticketId }, 'aviso de solicitação que precisa de humano não enviado');
+      }
+    }
+    if (sent === 0 && lastError) throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    return { recipients: recipients.length, sent };
+  }
+
   // -------------------------------------------------------------------------
   // Notificação ao usuário
   // -------------------------------------------------------------------------
@@ -899,6 +1206,9 @@ export class SupportService {
       lastMessageBy: row['last_message_by'],
       unread: row['last_message_by'] === 'user' && (adminSeenAt === null || adminSeenAt < lastMessageAt),
       firstResponseAt: at('first_response_at'),
+      needsHuman: row['needs_human'] === true,
+      needsHumanAt: at('needs_human_at'),
+      needsHumanReason: row['needs_human_reason'] ?? null,
       resolvedAt: at('resolved_at'),
       resolvedBy: row['resolved_by'] ?? null,
       createdAt: at('created_at'),
@@ -914,6 +1224,7 @@ export class SupportService {
       adminName: message.adminName,
       body: message.body,
       internal: message.internal,
+      ai: message.ai,
       notifyStatus: message.notifyStatus,
       notifyDetail: message.notifyDetail,
       createdAt: message.createdAt.toISOString(),

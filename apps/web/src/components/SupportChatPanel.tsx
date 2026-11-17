@@ -29,6 +29,20 @@ type GuestStep = 'name' | 'email' | 'question' | 'done';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MESSAGE_MAX = 4000;
 
+/**
+ * Ritmo de digitação das falas que não vêm de uma pessoa digitando de
+ * verdade: as perguntas automáticas do começo e, agora, a resposta da IA.
+ * Uma pausa fixa (o tempo de "ler" a mensagem) mais um tanto por caractere,
+ * com teto — sem isso, uma resposta pronta brota de uma vez na tela.
+ */
+const TYPING_BASE_MS = 900;
+const TYPING_PER_CHAR_MS = 22;
+const TYPING_MAX_MS = 6_000;
+
+function typingTime(body: string): number {
+  return Math.min(TYPING_MAX_MS, TYPING_BASE_MS + body.length * TYPING_PER_CHAR_MS);
+}
+
 const hour = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const dayAndHour = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -73,6 +87,10 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
   const [sending, setSending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /** Mensagens da IA já reveladas na tela (ver o efeito da cadência abaixo). */
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const firstLoad = useRef(true);
+
   const counter = useRef(0);
   const timers = useRef<number[]>([]);
   const greeted = useRef(false);
@@ -99,7 +117,7 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
 
   /** Fala automática, com a pausa de "digitando" antes — sem ela o texto brota de uma vez. */
   const say = useCallback(
-    (body: string, delay = 900) => {
+    (body: string, delay = TYPING_BASE_MS) => {
       setTyping(true);
       const timer = window.setTimeout(() => {
         addLine('support', body);
@@ -171,8 +189,41 @@ export default function SupportChatPanel({ onClose }: { onClose: () => void }) {
     };
   }, [waiting, ticketId, authed, firstName, addLine]);
 
-  const messages = detail.data?.messages ?? [];
+  const all = detail.data?.messages ?? [];
   const ticket = detail.data?.ticket ?? null;
+
+  // A resposta da IA chega pronta da API; aqui ela espera o "digitando"
+  // antes de aparecer, pelo mesmo mecanismo das perguntas automáticas.
+  // O efeito depende dos ids pendentes, e não da lista: a consulta de 8 s
+  // devolve um objeto novo a cada vez, e depender dela reiniciaria a
+  // contagem no meio da "digitação".
+  const pendingAi = all.filter((message) => message.ai && !revealed.has(message.id));
+  const pendingKey = pendingAi.map((message) => message.id).join(',');
+  const pendingText = pendingAi.map((message) => message.body).join(' ');
+  useEffect(() => {
+    if (pendingKey === '') return;
+    const ids = pendingKey.split(',');
+    // O histórico que já estava na conversa quando o balão abriu aparece de
+    // uma vez: ninguém quer ver a IA "digitando" de novo o que respondeu ontem.
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      setRevealed((current) => new Set([...current, ...ids]));
+      return;
+    }
+    setTyping(true);
+    const timer = window.setTimeout(() => {
+      setRevealed((current) => new Set([...current, ...ids]));
+      setTyping(false);
+    }, typingTime(pendingText));
+    timers.current.push(timer);
+    return () => {
+      window.clearTimeout(timer);
+      setTyping(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingKey]);
+
+  const messages = all.filter((message) => !message.ai || revealed.has(message.id));
   const answered = messages.some((message) => message.author === 'support');
 
   // Sempre na última mensagem, como em qualquer chat. Observa a própria

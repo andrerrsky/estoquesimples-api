@@ -54,6 +54,7 @@ export function AiPage() {
   const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ['settings', 'openai'], queryFn: () => api.get<OpenAiStatus>('/settings/openai') });
   const blog = useQuery({ queryKey: ['blog', 'meta'], queryFn: () => api.get<BlogMetaLite>('/blog/meta') });
+  const support = useQuery({ queryKey: ['support', 'settings'], queryFn: () => api.get<{ aiAutoReplyEnabled: boolean }>('/support/settings') });
   const running = useQuery({
     queryKey: ['ops', 'jobs', 'running', 'ia'],
     queryFn: () => api.get<Paginated<AiJob>>('/ops/jobs', { status: 'running', kind: AI_JOB_KINDS[0], page: 1, pageSize: 5 }),
@@ -78,7 +79,14 @@ export function AiPage() {
       action: 'Configurar o blog',
     },
     { title: 'Avaliações', text: 'Rascunho de resposta às avaliações da Play Store; quem responde revisa antes de publicar.', to: '/avaliacoes', action: 'Abrir avaliações' },
-    { title: 'Atendimento', text: 'Rascunho da próxima resposta numa solicitação de suporte, a partir da conversa e do diagnóstico do app.', to: '/suporte', action: 'Abrir atendimento' },
+    {
+      title: 'Atendimento',
+      text: support.data?.aiAutoReplyEnabled
+        ? 'Responde sozinha no chat de suporte as dúvidas de plano, limite e preço (com os números de Planos) e passa para uma pessoa o que depende de gente. Também rascunha respostas no painel.'
+        : 'Rascunho da próxima resposta numa solicitação de suporte, a partir da conversa e do diagnóstico do app. A resposta automática no chat está desligada.',
+      to: '/suporte',
+      action: 'Abrir atendimento',
+    },
   ];
 
   return (

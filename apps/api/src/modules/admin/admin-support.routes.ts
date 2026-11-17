@@ -8,6 +8,7 @@ import {
   adminStatusBodySchema,
   adminTicketListQuerySchema,
   adminTicketPatchSchema,
+  supportSettingsSchema,
   ticketParamsSchema,
 } from '../support/support.schemas.js';
 import { SupportService } from '../support/support.service.js';
@@ -105,6 +106,30 @@ export async function registerAdminSupportRoutes(app: FastifyInstance): Promise<
       },
     },
     async (request) => service.update(adminActor(request), request.params.ticketId, request.body),
+  );
+
+  routes.get(
+    '/support/settings',
+    {
+      preHandler: requireAdmin('viewer'),
+      schema: { tags: ['admin'], summary: 'Configurações do atendimento (resposta automática)', hide: true, response: { 200: supportSettingsSchema, ...commonAdminErrors } },
+    },
+    async () => service.settings(),
+  );
+
+  routes.put(
+    '/support/settings',
+    {
+      preHandler: requireAdmin('support'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Liga ou desliga a resposta automática por IA',
+        hide: true,
+        body: supportSettingsSchema,
+        response: { 200: supportSettingsSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => service.saveSettings(adminActor(request), request.body),
   );
 
   routes.post(

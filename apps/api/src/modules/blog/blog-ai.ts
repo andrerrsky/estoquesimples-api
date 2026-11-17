@@ -6,7 +6,7 @@ import type { AppServices } from '../../platform/http/context.js';
 import { AppError, ErrorCode } from '../../platform/http/errors.js';
 import { OpenAiClient } from '../reviews/openai-client.js';
 import { readOpenAiKey } from '../reviews/reviews.service.js';
-import { helpContent, type HelpArticle } from './help-content.js';
+import { relatedHelpArticles } from './help-content.js';
 import { PRODUCT_FACT_LINES } from './product-facts.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_SLUGS } from './blog.categories.js';
 import { blogPostBodySchema, type BlogPostBody } from './blog.schemas.js';
@@ -131,32 +131,15 @@ interface AiPlan {
 }
 
 
-/** A central de ajuda (packages/help/faq.json); sem ela a IA segue só com os fatos. */
-const helpArticles = (): HelpArticle[] => helpContent().articles;
-
 function fold(text: string): string {
   return text.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
 }
 
 /** Os artigos da ajuda mais ligados à pauta (por palavras em comum), para fundamentar o texto. */
 export function groundingFor(topic: AiTopic, limit = 5): string {
-  const terms = new Set(
-    fold(`${topic.brief} ${topic.keyword} ${topic.category}`)
-      .split(/[^a-z0-9]+/)
-      .filter((word) => word.length > 3),
-  );
-  const scored = helpArticles()
-    .map((article) => {
-      const haystack = fold(`${article.question} ${article.answer.join(' ')} ${(article.keywords ?? []).join(' ')}`);
-      let score = 0;
-      for (const term of terms) if (haystack.includes(term)) score += 1;
-      return { article, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-  if (scored.length === 0) return '(nenhum artigo da ajuda diretamente relacionado)';
-  return scored.map(({ article }) => `- ${article.question}\n  ${article.answer.join(' ').slice(0, 600)}`).join('\n');
+  const related = relatedHelpArticles(`${topic.brief} ${topic.keyword} ${topic.category}`, limit);
+  if (related.length === 0) return '(nenhum artigo da ajuda diretamente relacionado)';
+  return related.map((article) => `- ${article.question}\n  ${article.answer.join(' ').slice(0, 600)}`).join('\n');
 }
 
 export class BlogAiWriter {

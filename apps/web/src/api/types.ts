@@ -505,6 +505,8 @@ export interface TicketMessage {
   author: 'user' | 'support' | 'system';
   authorName: string | null;
   body: string;
+  /** Resposta automática por IA: o chat a revela no ritmo de digitação. */
+  ai?: boolean;
   createdAt: string;
 }
 

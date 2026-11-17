@@ -35,6 +35,14 @@ export const supportTickets = pgTable(
     resolvedBy: text('resolved_by'),
     userSeenAt: timestamp('user_seen_at', tz),
     adminSeenAt: timestamp('admin_seen_at', tz),
+    /**
+     * A IA do atendimento desistiu: ou não soube responder, ou a resposta
+     * depende de uma pessoa (reembolso, cobrança, bug). Nada foi enviado ao
+     * cliente nesse caso; o painel destaca e o dono recebe um e-mail.
+     */
+    needsHuman: boolean('needs_human').notNull().default(false),
+    needsHumanAt: timestamp('needs_human_at', tz),
+    needsHumanReason: text('needs_human_reason'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', tz).notNull().defaultNow(),
   },
@@ -42,6 +50,7 @@ export const supportTickets = pgTable(
     index('support_tickets_queue_idx').on(table.status, table.lastMessageAt.desc()),
     index('support_tickets_user_idx').on(table.userId, table.lastMessageAt.desc()),
     index('support_tickets_install_idx').on(table.installId, table.lastMessageAt.desc()),
+    index('support_tickets_needs_human_idx').on(table.lastMessageAt.desc()).where(sql`${table.needsHuman}`),
   ],
 );
 
@@ -57,6 +66,8 @@ export const supportMessages = pgTable(
     adminName: text('admin_name'),
     body: text('body').notNull(),
     internal: boolean('internal').notNull().default(false),
+    /** Escrita pela IA do atendimento (não por uma pessoa do time). */
+    ai: boolean('ai').notNull().default(false),
     notifyStatus: text('notify_status'),
     notifyDetail: text('notify_detail'),
     createdAt: timestamp('created_at', tz).notNull().defaultNow(),
