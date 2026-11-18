@@ -45,12 +45,16 @@ public final class SyncIndicator {
         }
         SessionManager session = SessionManager.get(activity);
         boolean comConta = session.isSignedIn() && session.workspaceId() != null;
-        item.setVisible(true);
+        // Logado mas ainda sem empresa é um estado de passagem (o login acabou
+        // de acontecer): não há o que sincronizar nem o que convidar a criar,
+        // então o ícone some, como antes.
+        boolean semConta = !session.isSignedIn();
+        item.setVisible(comConta || semConta);
         View view = item.getActionView();
-        if (view == null) {
+        if (view == null || (!comConta && !semConta)) {
             return;
         }
-        if (!comConta) {
+        if (semConta) {
             // Sem conta o ícone sumia, e com ele a única pista de que o
             // estoque existe só neste aparelho. Agora o mesmo lugar da barra
             // mostra a nuvem cortada e leva ao cadastro.

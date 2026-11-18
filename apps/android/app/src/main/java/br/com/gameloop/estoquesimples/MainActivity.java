@@ -873,7 +873,10 @@ public class MainActivity extends BaseActivity {
         android.content.SharedPreferences prefs =
                 getSharedPreferences(CLOUD_BANNER_PREFS, MODE_PRIVATE);
         long fechadoEm = prefs.getLong(CLOUD_BANNER_FECHADO_EM, 0L);
-        if (System.currentTimeMillis() - fechadoEm < CLOUD_BANNER_SILENCIO_MS) {
+        // Carimbo no futuro é relógio errado, não silêncio: sem o `>= 0` um
+        // aparelho adiantado na hora de fechar esconderia o aviso por meses.
+        long desdeQueFechou = System.currentTimeMillis() - fechadoEm;
+        if (desdeQueFechou >= 0 && desdeQueFechou < CLOUD_BANNER_SILENCIO_MS) {
             banner.setVisibility(View.GONE);
             return;
         }
