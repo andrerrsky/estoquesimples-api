@@ -1,0 +1,6 @@
+<pt-BR>
+Novidades desta versão:
+• O app agora avisa quando o seu estoque está salvo só neste aparelho
+• Um toque na nuvem da barra abre a conta grátis: seus produtos passam a ficar guardados e voltam se você trocar de celular
+• Cancelamento, arrependimento e reembolso agora têm uma seção própria, em linguagem clara
+</pt-BR>
