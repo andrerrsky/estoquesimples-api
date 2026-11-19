@@ -158,13 +158,66 @@
 
     </LinearLayout>
 
+    <!-- Aviso de que o estoque está só neste aparelho, para quem usa sem
+         conta e já tem o que perder (MainActivity.updateCloudBanner). -->
+    <LinearLayout
+        android:id="@+id/cloudBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/planBanner"
+        android:layout_marginLeft="@dimen/screen_padding_horizontal"
+        android:layout_marginRight="@dimen/screen_padding_horizontal"
+        android:layout_marginBottom="@dimen/field_gap"
+        android:background="@drawable/bg_message_warning"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:paddingLeft="@dimen/group_padding_compact"
+        android:paddingRight="@dimen/group_padding_compact"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/cloudBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/field_gap"
+            android:text="Criar conta"
+            android:textColor="@color/color_warning"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <ImageView
+            android:id="@+id/cloudBannerClose"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Fechar aviso" />
+
+    </LinearLayout>
+
     <!-- Cartão da oferta promocional da Google Play (Black Friday). Discreto,
          fechável; o texto vem do Billing (MainActivity.updatePromoCard). -->
     <LinearLayout
         android:id="@+id/promoCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/planBanner"
+        android:layout_below="@+id/cloudBanner"
         android:layout_marginLeft="@dimen/screen_padding_horizontal"
         android:layout_marginRight="@dimen/screen_padding_horizontal"
         android:layout_marginBottom="@dimen/field_gap"

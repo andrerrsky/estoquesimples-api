@@ -707,6 +707,7 @@ public class MainActivity extends BaseActivity {
 
         updateConflictsBanner();
         updatePlanBanner();
+        updateCloudBanner();
         updatePromoCard();
 
         br.com.gameloop.estoquesimples.sync.SyncStatus.addListener(syncListener);
@@ -839,6 +840,92 @@ public class MainActivity extends BaseActivity {
     private static java.util.Map<String, Object> promoProps() {
         return Analytics.props("surface", "android_cartao",
                 "campaign", br.com.gameloop.estoquesimples.billing.PromoRules.CAMPAIGN_BF2026);
+    }
+
+    /** Produtos a partir dos quais vale avisar que nada está salvo fora daqui. */
+    private static final int CLOUD_BANNER_MIN_PRODUTOS = 5;
+    /** Fechou o aviso: só volta depois de uma semana. */
+    private static final long CLOUD_BANNER_SILENCIO_MS = 7L * 24 * 60 * 60 * 1000;
+    private static final String CLOUD_BANNER_PREFS = "cloud_banner";
+    private static final String CLOUD_BANNER_FECHADO_EM = "fechado_em";
+    /** O evento de exibição sai uma vez por processo, não a cada volta à tela. */
+    private static boolean cloudBannerViewTracked;
+
+    /**
+     * Aviso de que o estoque está só neste aparelho.
+     *
+     * Quem usa o app sem conta não vê a nuvem em lugar nenhum: o ícone da
+     * barra some e a oferta de criar conta só existe dentro do menu. Como
+     * 9 em cada 10 instalações nunca viram conta, o aviso aparece na própria
+     * lista, mas só depois de a pessoa ter um estoque de verdade
+     * ({@link #CLOUD_BANNER_MIN_PRODUTOS} produtos) — antes disso não há o
+     * que perder e o aviso seria só barulho. Fechável, volta em uma semana.
+     */
+    private void updateCloudBanner() {
+        View banner = findViewById(R.id.cloudBanner);
+        if (banner == null || stock == null || !stock.isOpen()) {
+            return;
+        }
+        if (br.com.gameloop.estoquesimples.sync.SessionManager.get(this).isSignedIn()) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        android.content.SharedPreferences prefs =
+                getSharedPreferences(CLOUD_BANNER_PREFS, MODE_PRIVATE);
+        long fechadoEm = prefs.getLong(CLOUD_BANNER_FECHADO_EM, 0L);
+        // Carimbo no futuro é relógio errado, não silêncio: sem o `>= 0` um
+        // aparelho adiantado na hora de fechar esconderia o aviso por meses.
+        long desdeQueFechou = System.currentTimeMillis() - fechadoEm;
+        if (desdeQueFechou >= 0 && desdeQueFechou < CLOUD_BANNER_SILENCIO_MS) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        int produtos = contarProdutosAtivos();
+        if (produtos < CLOUD_BANNER_MIN_PRODUTOS) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+        TextView texto = findViewById(R.id.cloudBannerText);
+        if (texto != null) {
+            texto.setText("Seus " + produtos + " produtos estão só neste aparelho");
+        }
+        banner.setVisibility(View.VISIBLE);
+        banner.setOnClickListener(v -> {
+            Analytics.track(this, "signup.prompt_clicked", Analytics.props("surface", "lista"));
+            startActivity(new Intent(this, AccountActivity.class));
+        });
+        View fechar = findViewById(R.id.cloudBannerClose);
+        if (fechar != null) {
+            fechar.setOnClickListener(v -> {
+                prefs.edit().putLong(CLOUD_BANNER_FECHADO_EM, System.currentTimeMillis()).apply();
+                banner.setVisibility(View.GONE);
+                Analytics.track(this, "signup.prompt_dismissed", Analytics.props("surface", "lista"));
+            });
+        }
+        if (!cloudBannerViewTracked) {
+            cloudBannerViewTracked = true;
+            Analytics.track(this, "signup.prompt_viewed",
+                    Analytics.props("surface", "lista", "products", produtos));
+        }
+    }
+
+    /** Conta os produtos que a lista mostra (os não apagados). */
+    private int contarProdutosAtivos() {
+        Cursor cursor = null;
+        try {
+            synchronized (DB_LOCK) {
+                cursor = stock.rawQuery(
+                        "SELECT COUNT(*) FROM Estoque WHERE " + LocalDb.ACTIVE_PRODUCTS, null);
+                return cursor != null && cursor.moveToFirst() ? cursor.getInt(0) : 0;
+            }
+        } catch (Exception e) {
+            Log.w("MainActivity", "contagem de produtos falhou: " + e.getClass().getSimpleName());
+            return 0;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
     }
 
     private void updateConflictsBanner() {
@@ -1637,6 +1724,7 @@ public class MainActivity extends BaseActivity {
             updateList();
             updateConflictsBanner();
             updatePlanBanner();
+            updateCloudBanner();
             updatePromoCard();
         }
         android.view.View pill = findViewById(R.id.syncPill);

@@ -14,6 +14,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.TooltipCompat;
 
+import br.com.gameloop.estoquesimples.analytics.Analytics;
 import br.com.gameloop.estoquesimples.sync.EntitlementManager;
 import br.com.gameloop.estoquesimples.sync.SessionManager;
 import br.com.gameloop.estoquesimples.sync.SyncBootstrap;
@@ -44,12 +45,42 @@ public final class SyncIndicator {
         }
         SessionManager session = SessionManager.get(activity);
         boolean comConta = session.isSignedIn() && session.workspaceId() != null;
-        item.setVisible(comConta);
+        // Logado mas ainda sem empresa é um estado de passagem (o login acabou
+        // de acontecer): não há o que sincronizar nem o que convidar a criar,
+        // então o ícone some, como antes.
+        boolean semConta = !session.isSignedIn();
+        item.setVisible(comConta || semConta);
         View view = item.getActionView();
-        if (!comConta || view == null) {
+        if (view == null || (!comConta && !semConta)) {
+            return;
+        }
+        if (semConta) {
+            // Sem conta o ícone sumia, e com ele a única pista de que o
+            // estoque existe só neste aparelho. Agora o mesmo lugar da barra
+            // mostra a nuvem cortada e leva ao cadastro.
+            bindSemConta(activity, view);
             return;
         }
         new Controller(activity, view).attach();
+    }
+
+    /** Nuvem cortada, fixa: um toque abre a tela de conta para criar conta. */
+    private static void bindSemConta(AppCompatActivity activity, View view) {
+        ImageView icon = view.findViewById(R.id.syncIndicatorIcon);
+        TextView badge = view.findViewById(R.id.syncIndicatorBadge);
+        if (icon != null) {
+            icon.setImageResource(R.drawable.ic_cloud_off);
+        }
+        if (badge != null) {
+            badge.setVisibility(View.GONE);
+        }
+        String descricao = "Seu estoque está só neste aparelho. Toque para criar uma conta grátis.";
+        view.setContentDescription(descricao);
+        TooltipCompat.setTooltipText(view, descricao);
+        view.setOnClickListener(v -> {
+            Analytics.track(activity, "signup.prompt_clicked", Analytics.props("surface", "barra"));
+            activity.startActivity(new Intent(activity, AccountActivity.class));
+        });
     }
 
     private static final class Controller implements SyncStatus.Listener,
