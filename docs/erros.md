@@ -17,6 +17,23 @@ vencido não impede o registro). Limites: 20 por lote, 30 por minuto por IP,
 64 KB; a web manda no máximo 20 por carregamento e o mesmo erro uma vez; o
 app guarda no máximo 30 na fila.
 
+## O que não vira registro (e o que entra como aviso)
+
+O painel só serve se o que está nele for defeito nosso. Fica de fora:
+
+- **Script de outro domínio**: o "Script error." opaco (navegador embutido do
+  Facebook/Instagram, extensões) e também o erro com pilha legível cujos
+  endereços são todos de fora — o Google Identity falhando ao baixar
+  `apis.google.com` em quem usa bloqueador, por exemplo.
+- **Pedaço do app de uma versão antiga**: a tela se recupera recarregando.
+- **Falha do armazenamento de fotos** (`IMAGES_UNAVAILABLE`): já é tratada na
+  tela e a API registra a causa do lado dela.
+
+Entram como **aviso** (badge amarelo, em vez de vermelho) as respostas 502,
+503 e 504: vêm da borda, não da API — a requisição não chegou (rede da
+pessoa, proxy, servidor reiniciando). Quando o corpo não é o nosso JSON, o
+app escreve "504 (a requisição não chegou à API)" em vez de "504 null: null".
+
 **Privacidade**: nunca entra corpo de requisição, conteúdo do estoque ou o
 que foi digitado. Mensagens e pilhas passam por `scrub()` (e-mails, tokens,
 JWT e `senha=`/`password=` viram `<email>`/`<oculto>`). O contexto aceita só

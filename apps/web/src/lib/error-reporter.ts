@@ -95,13 +95,26 @@ export function reportError(input: Omit<ClientError, 'source' | 'level' | 'route
 
 export function reportException(error: unknown, kind: Kind = 'exception'): void {
   const err = error instanceof Error ? error : new Error(typeof error === 'string' ? error : JSON.stringify(error ?? null));
+  if (isThirdPartyStack(err.stack)) return;
   reportError({ kind, code: err.name, message: `${err.name}: ${err.message}`, stack: err.stack ?? null });
 }
 
-/** Resposta 5xx (ou corpo ilegível) da API: guarda o código que o servidor deu. */
+/**
+ * Resposta 5xx (ou corpo ilegível) da API: guarda o código que o servidor deu.
+ *
+ * Duas exceções, para o registro mostrar defeito e não indisponibilidade:
+ * a falha do armazenamento de fotos já é tratada na tela (a pessoa salva o
+ * produto sem foto) e a API registra a causa do lado dela; e 502/503/504
+ * entram como aviso — são a borda dizendo que a requisição não chegou, não
+ * um erro do código.
+ */
+const GATEWAY = [502, 503, 504];
+
 export function reportApiFailure(input: { method?: string; path: string; status: number; code: string; message: string; correlationId?: string | null }): void {
+  if (input.code === 'IMAGES_UNAVAILABLE') return;
   reportError({
     kind: 'api',
+    level: GATEWAY.includes(input.status) ? 'warning' : 'error',
     code: input.code,
     message: `${input.status} ${input.code}: ${input.message}`,
     httpMethod: input.method ?? null,
@@ -117,6 +130,26 @@ function ignorable(message: string): boolean {
 }
 
 /** Erro de script de outro domínio, que o navegador esconde por segurança (mensagem genérica, sem arquivo). */
+/**
+ * Erro de script de terceiro com pilha legível: o Google Identity, por
+ * exemplo, falha ao carregar `apis.google.com` em navegador com bloqueador e
+ * rejeita uma promessa com a pilha dele. Não há o que corrigir aqui, e no
+ * registro isso esconde os erros que são nossos. Só conta como de terceiro
+ * quando a pilha tem endereço e nenhum deles é da nossa origem.
+ */
+export function isThirdPartyStack(stack?: string | null): boolean {
+  if (!stack) return false;
+  const urls = stack.match(/https?:\/\/[^\s)]+/g);
+  if (!urls) return false;
+  return urls.every((url) => {
+    try {
+      return new URL(url).origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function isOpaqueCrossOriginError(message: string, filename?: string | null): boolean {
   if (!/^(Uncaught )?Script error\.?$/i.test(message.trim())) return false;
   if (!filename) return true;
@@ -159,6 +192,9 @@ export function installGlobalErrorReporting(): void {
     // Falhas da API já foram registradas na resposta (as 5xx); as demais são esperadas.
     if (reason && typeof reason === 'object' && (reason as { name?: string }).name === 'ApiError') return;
     if (ignorable(message)) return;
+    // Promessa rejeitada com o "Script error." opaco: quem falhou foi script de
+    // outro domínio, como no evento `error` acima. Nada a corrigir aqui.
+    if (isOpaqueCrossOriginError(message)) return;
     reportException(reason, 'unhandled_rejection');
   });
   window.addEventListener('pagehide', flush);

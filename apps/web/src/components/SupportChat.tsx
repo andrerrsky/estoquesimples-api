@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Ticket } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
-import { importPage } from '../lib/chunks';
+import { importPage, pageComponent } from '../lib/chunks';
 import { installId } from '../lib/device';
 import { Icon } from './Icon';
 
@@ -44,7 +44,7 @@ export function writeChatTicket(id: string | null): void {
 }
 
 // O balão só é baixado quando alguém abre o chat.
-const Panel = lazy(() => importPage(() => import('./SupportChatPanel')));
+const Panel = lazy(() => importPage(() => import('./SupportChatPanel')).then((module) => pageComponent(module, 'default')));
 
 /** Telas largas o bastante para o balão não cobrir o conteúdo. */
 const DESKTOP = '(min-width: 900px)';
