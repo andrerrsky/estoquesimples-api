@@ -43,3 +43,22 @@ export function importPage<T>(loader: () => Promise<T>): Promise<T> {
     throw error;
   });
 }
+
+/**
+ * A tela que veio no arquivo, pronta para o `lazy` do React.
+ *
+ * Quando o pedaço chega sem a tela dentro (restou de uma versão antiga, ou
+ * uma extensão do navegador mexeu no arquivo), o React quebra com um erro
+ * sem nome — "Minified React error #306" — que em Admin › Erros não diz
+ * nem qual tela era. Aqui a página se recupera recarregando, como faz com
+ * um pedaço que não existe mais; se não puder recarregar, o erro ao menos
+ * tem nome.
+ */
+export function pageComponent<T, N extends keyof T>(module: T, name: N): Promise<{ default: T[N] }> {
+  const component = module[name] as unknown;
+  if (typeof component !== 'function') {
+    if (reloadForNewVersion()) return new Promise<{ default: T[N] }>(() => undefined);
+    return Promise.reject(new Error(`Tela ${String(name)} não veio no pacote do app`));
+  }
+  return Promise.resolve({ default: component as T[N] });
+}

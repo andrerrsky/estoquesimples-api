@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { Icon } from './components/Icon';
+import { pageComponent } from './lib/chunks';
 
 import './styles/support-chat.css';
 
@@ -19,7 +20,7 @@ function SessionProbe({ onSession }: { onSession: (authed: boolean) => void }) {
 // O chat só existe em telas largas (`SupportChat` se esconde abaixo de
 // 900px): no celular nem o código dele é baixado.
 const DESKTOP = '(min-width: 900px)';
-const LandingChat = lazy(() => import('./landing-chat'));
+const LandingChat = lazy(() => import('./landing-chat').then((module) => pageComponent(module, 'default')));
 
 /** Quanto do chat já foi pedido: nada, baixando em segundo plano, ou aberto. */
 type Wanted = 'no' | 'warm' | 'open';

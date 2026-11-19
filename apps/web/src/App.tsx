@@ -4,7 +4,7 @@ import { createBrowserRouter, Navigate, Outlet, ScrollRestoration, useLocation, 
 import { AppShell, CloudGate, FullScreenLoading, PageLoading } from './components/AppShell';
 import { RouteError } from './components/RouteError';
 import { SupportChat } from './components/SupportChat';
-import { importPage } from './lib/chunks';
+import { importPage, pageComponent } from './lib/chunks';
 import { resetZoom } from './lib/viewport';
 import { ensureServiceWorker, listenToServiceWorker, refreshPushSubscription } from './lib/web-push';
 import { useAuth } from './auth/AuthProvider';
@@ -20,7 +20,7 @@ import { captureCouponFromUrl } from './lib/promo';
  * página inicial ou a de entrada não baixa o código do estoque.
  */
 const page = <T extends object>(loader: () => Promise<T>, name: keyof T) =>
-  lazy(() => importPage(loader).then((module) => ({ default: module[name] as unknown as ComponentType })));
+  lazy(() => importPage(loader).then((module) => pageComponent(module, name) as Promise<{ default: ComponentType }>));
 
 const StockPage = page(() => import('./pages/StockPage'), 'StockPage');
 const HistoryPage = page(() => import('./pages/HistoryPage'), 'HistoryPage');

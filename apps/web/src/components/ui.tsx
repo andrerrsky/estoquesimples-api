@@ -720,20 +720,26 @@ export function Menu({
 
   useEffect(() => {
     if (!open) return;
-    const close = (event: Event) => {
-      if (menu.current?.contains(event.target as Node) || anchor.current?.contains(event.target as Node)) return;
+    // Toque/clique: fecha só se foi fora do menu e fora do botão. O alvo de
+    // um evento de rolagem pode ser o `document` ou a própria `window`, que
+    // não é um nó — daí a verificação antes de `contains`.
+    const closeOutside = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && (menu.current?.contains(target) || anchor.current?.contains(target))) return;
       setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', close);
+    // Redimensionar a janela sempre fecha: a posição calculada não vale mais.
+    const closeAlways = () => setOpen(false);
+    document.addEventListener('mousedown', closeOutside);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', close);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', closeAlways);
+    window.addEventListener('scroll', closeOutside, true);
     return () => {
-      document.removeEventListener('mousedown', close);
+      document.removeEventListener('mousedown', closeOutside);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', close);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', closeAlways);
+      window.removeEventListener('scroll', closeOutside, true);
     };
   }, [open]);
 
