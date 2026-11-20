@@ -38,6 +38,8 @@ public final class RemoteConfig {
     private static final String CHAVE_RECADO_ATUALIZACAO = "recado_atualizacao";
     private static final String CHAVE_BLOQUEIOS_VISTOS = "bloqueios_vistos";
     private static final String CHAVE_TREGUA_EM = "tregua_em";
+    private static final String CHAVE_CONVITE_CONTA_ATIVO = "convite_conta_ativo";
+    private static final String CHAVE_CONVITE_CONTA_FATIA = "convite_conta_fatia";
 
     private static final String URL_PLAY_PADRAO =
             "https://play.google.com/store/apps/details?id=br.com.gameloop.estoquesimples";
@@ -72,6 +74,21 @@ public final class RemoteConfig {
     public boolean isProtocolSupported() {
         return BuildConfig.SYNC_PROTOCOL >= prefs.getInt(CHAVE_PROTOCOLO_MINIMO, 1)
                 && BuildConfig.VERSION_CODE >= prefs.getInt(CHAVE_VERSAO_MINIMA, 0);
+    }
+
+    /**
+     * O convite a criar conta depois do primeiro produto está ligado.
+     *
+     * Experimento (ver {@code AccountPrompt}): o padrão é ligado, e o
+     * servidor pode desligá-lo para toda a base sem publicar versão nova.
+     */
+    public boolean accountPromptEnabled() {
+        return prefs.getBoolean(CHAVE_CONVITE_CONTA_ATIVO, true);
+    }
+
+    /** Fatia da base que entra no convite (0 a 100). */
+    public int accountPromptPercent() {
+        return prefs.getInt(CHAVE_CONVITE_CONTA_FATIA, 50);
     }
 
     public int maxBatchItems() {
@@ -185,6 +202,19 @@ public final class RemoteConfig {
                         .putInt(CHAVE_VERSAO_MAIS_NOVA, app.optInt("latestVersionCode", 0))
                         .putString(CHAVE_URL_ATUALIZACAO, app.optString("updateUrl", URL_PLAY_PADRAO))
                         .putString(CHAVE_RECADO_ATUALIZACAO, app.isNull("message") ? null : app.optString("message", null))
+                        .apply();
+            }
+
+            // Bloco opcional, como o `app`: servidor antigo não zera o que já
+            // se sabe, e um experimento ausente mantém o valor anterior.
+            JSONObject experiments = response.body.optJSONObject("experiments");
+            JSONObject convite = experiments == null
+                    ? null
+                    : experiments.optJSONObject("accountPromptFirstProduct");
+            if (convite != null) {
+                prefs.edit()
+                        .putBoolean(CHAVE_CONVITE_CONTA_ATIVO, convite.optBoolean("enabled", true))
+                        .putInt(CHAVE_CONVITE_CONTA_FATIA, convite.optInt("percent", 50))
                         .apply();
             }
 

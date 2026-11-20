@@ -378,9 +378,12 @@ public class ImportActivity extends BaseActivity {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Erro ao importar arquivo", e);
+                String formatoFalho = formato;
+                Analytics.track(this, "import.failed", Analytics.props(
+                        "format", formatoFalho, "reason", "erro_de_leitura"));
                 main.post(() -> {
                     if (status != null) {
-                        status.setText(LOG_PREFIX + "Erro ao importar: " + e.getMessage());
+                        status.setText("Erro ao importar: " + e.getMessage());
                     }
                     Toast.makeText(this, "Erro ao importar arquivo.", Toast.LENGTH_SHORT).show();
                 });
@@ -388,17 +391,34 @@ public class ImportActivity extends BaseActivity {
             }
 
             DataExchange.Report done = report;
-            Analytics.track(this, "import.completed", Analytics.props(
-                    "format", formato, "count", done.created + done.updated, "failed", done.failed));
+            int aplicados = done.created + done.updated + done.movementsImported;
+            // Importação que não aplica nada é falha, não conclusão: era
+            // justamente o caso sem rastro nenhum até a versão 33 — o painel
+            // via silêncio e não dava para distinguir "ninguém importa" de
+            // "a importação não funciona".
+            String motivo = done.failureCode != null
+                    ? done.failureCode
+                    : (aplicados == 0 ? "nada_aplicado" : null);
+            if (motivo == null) {
+                Analytics.track(this, "import.completed", Analytics.props(
+                        "format", formato, "count", done.created + done.updated,
+                        "movements", done.movementsImported, "failed", done.failed));
+            } else {
+                Analytics.track(this, "import.failed", Analytics.props(
+                        "format", formato, "reason", motivo, "failed", done.failed));
+            }
+            boolean falhou = motivo != null;
             main.post(() -> {
                 if (MainActivity.instance != null) {
                     MainActivity.instance.refreshAfterImport();
                 }
                 if (status != null) {
-                    status.setText(LOG_PREFIX + done.asLog());
+                    status.setText(falhou ? done.asLog() : LOG_PREFIX + done.asLog());
                 }
-                Toast.makeText(this, "Importação concluída.", Toast.LENGTH_SHORT).show();
-                if (done.created + done.updated > 0) {
+                Toast.makeText(this,
+                        falhou ? "Não foi possível importar." : "Importação concluída.",
+                        Toast.LENGTH_SHORT).show();
+                if (aplicados > 0) {
                     syncAfterImport();
                 }
             });
@@ -433,6 +453,8 @@ public class ImportActivity extends BaseActivity {
             boolean sucesso = ok;
             main.post(() -> {
                 if (!sucesso) {
+                    Analytics.track(this, "import.failed", Analytics.props(
+                            "format", "db", "reason", "arquivo_invalido"));
                     setImportExportDescText("O arquivo não é um banco SQLite válido.");
                     Toast.makeText(this, "Arquivo inválido.", Toast.LENGTH_LONG).show();
                     return;

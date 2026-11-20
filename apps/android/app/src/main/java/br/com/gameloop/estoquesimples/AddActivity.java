@@ -45,6 +45,11 @@ import java.util.Locale;
 
 public class AddActivity extends BaseActivity {
 
+    /** Início da medição de abandono do formulário (ver onDestroy). */
+    private long formularioAbertoEm;
+    /** O produto foi gravado: a saída não é abandono. */
+    private boolean produtoSalvo;
+
     private EditText productName;
     private EditText productAmount;
     private EditText productValue;
@@ -158,6 +163,13 @@ public class AddActivity extends BaseActivity {
         scrollView = findViewById(R.id.addScrollView);
 
         setupCurrencySpinner();
+
+        // Quanto do formulário a pessoa preenche antes de desistir: é a única
+        // evidência que sustenta (ou derruba) a ideia de uma segunda porta de
+        // entrada para o cadastro. Só contagem e duração — nada do que foi
+        // digitado sai do aparelho (docs/analytics.md).
+        formularioAbertoEm = android.os.SystemClock.elapsedRealtime();
+        Analytics.track(this, "product_form.opened");
 
         // Verificar se os campos obrigatórios foram inicializados
         if (productName == null) {
@@ -304,6 +316,38 @@ public class AddActivity extends BaseActivity {
 
     private static final int MENU_SAVE = 9001;
 
+    /**
+     * Abandono do cadastro.
+     *
+     * Em {@code onDestroy} com {@code isFinishing()}, e não em
+     * {@code onPause}: pausar acontece em rotação, troca de app, seletor de
+     * foto e leitura de código de barras, e mediria ruído como desistência.
+     */
+    @Override
+    protected void onDestroy() {
+        if (!produtoSalvo && isFinishing() && formularioAbertoEm > 0) {
+            Analytics.track(this, "product_form.abandoned", Analytics.props(
+                    "fields_filled", camposPreenchidos(),
+                    "duration_ms", android.os.SystemClock.elapsedRealtime() - formularioAbertoEm));
+        }
+        super.onDestroy();
+    }
+
+    /** Quantos dos 13 campos tinham algo escrito na hora de sair. */
+    private int camposPreenchidos() {
+        EditText[] campos = {productName, productAmount, productValue, productCost,
+                productDescription, productCategory, productSku, productBarcode,
+                productSupplier, productLocation, productMinStock, productUnit};
+        int preenchidos = newPhotoPath != null ? 1 : 0;
+        for (EditText campo : campos) {
+            if (campo != null && campo.getText() != null
+                    && campo.getText().toString().trim().length() > 0) {
+                preenchidos++;
+            }
+        }
+        return preenchidos;
+    }
+
     @Override
     public boolean onCreateOptionsMenu(android.view.Menu menu) {
         // "Salvar" também no topo: o formulário tem duas telas e meia de
@@ -449,6 +493,7 @@ public class AddActivity extends BaseActivity {
             }
 
             if (newUuid != null) {
+                produtoSalvo = true;
                 Analytics.track(this, "product.created", Analytics.props(
                         "withPhoto", newPhotoPath != null,
                         "withBarcode", productBarcode != null && productBarcode.getText().length() > 0));

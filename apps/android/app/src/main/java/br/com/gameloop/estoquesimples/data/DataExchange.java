@@ -14,10 +14,10 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Importação e exportação alinhadas ao que a nuvem realmente guarda.
@@ -86,6 +86,14 @@ public final class DataExchange {
         public int exported;
         /** Só no backup JSON: produtos gravados (o resto de {@code exported} são movimentações). */
         public int productsExported = -1;
+        /**
+         * Por que o arquivo inteiro não pôde ser lido ({@code null} = foi lido).
+         *
+         * Vai para a telemetria: até a versão 33 a importação que falhava não
+         * deixava rastro nenhum — nem evento, nem registro —, então não havia
+         * como saber se ninguém importa ou se a importação não funciona.
+         */
+        public String failureCode;
         public final List<String> lines = new ArrayList<>();
 
         void line(String text) {
@@ -263,25 +271,39 @@ public final class DataExchange {
         Report report = new Report();
         List<List<String>> rows = CsvCodec.parse(reader);
         if (rows.isEmpty()) {
+            report.failureCode = "arquivo_vazio";
             report.line("Arquivo vazio.");
             return report;
         }
 
-        Map<String, Integer> columns = null;
-        int start = 0;
-        if (CsvCodec.looksLikeHeader(rows.get(0))) {
-            columns = indexHeader(rows.get(0));
-            start = 1;
-            if (columns.containsKey("change_type") || columns.containsKey("changetype")) {
-                return importMovementRows(rows, start, columns, report);
-            }
+        /*
+         * Sem cabeçalho reconhecido, recusamos em vez de adivinhar.
+         *
+         * O caminho antigo lia a planilha por posição: a 1ª coluna era o
+         * nome, a 3ª a quantidade, a 4ª o valor. Numa lista de preços
+         * ("Descrição;Preço") isso fazia o preço virar quantidade e zerava o
+         * resto — com movimentação de ajuste, que é imutável. Mais vale uma
+         * recusa com instrução do que um estoque destruído em silêncio.
+         */
+        if (!CsvCodec.looksLikeHeader(rows.get(0))) {
+            report.failureCode = "sem_cabecalho";
+            report.failed++;
+            report.line("Não foi possível entender a planilha: a primeira linha precisa ser o "
+                    + "cabeçalho com os nomes das colunas (nome, quantidade, valor...).");
+            report.line("Exporte seus produtos aqui mesmo para ver um arquivo de exemplo com as "
+                    + "colunas certas, preencha nele e importe de volta.");
+            return report;
+        }
+
+        Map<String, Integer> columns = indexHeader(rows.get(0));
+        int start = 1;
+        if (columns.containsKey("change_type") || columns.containsKey("changetype")) {
+            return importMovementRows(rows, start, columns, report);
         }
 
         for (int i = start; i < rows.size(); i++) {
             try {
-                RowProduct row = columns == null
-                        ? RowProduct.positional(rows.get(i))
-                        : RowProduct.mapped(rows.get(i), columns);
+                RowProduct row = RowProduct.mapped(rows.get(i), columns);
                 synchronized (rowLock) {
                     applyProductRow(row, report, false);
                 }
@@ -297,6 +319,7 @@ public final class DataExchange {
     public Report importJson(JSONObject json) {
         Report report = new Report();
         if (!PortableBackup.isBackup(json)) {
+            report.failureCode = "json_estranho";
             report.failed++;
             report.line("Arquivo JSON não é uma cópia do Estoque Simples.");
             return report;
@@ -404,11 +427,11 @@ public final class DataExchange {
     }
 
     /**
-     * @param skipInitialMovement quando o JSON já traz o histórico, o saldo
-     *        inicial não pode nascer de novo como {@code importacao} — as
-     *        movimentações do arquivo é que explicam a quantidade.
+     * @param historicoNoArquivo o arquivo traz as movimentações (backup JSON),
+     *        e então a quantidade nasce delas: o saldo inicial não pode nascer
+     *        de novo como {@code importacao}, nem a atualização lançar ajuste.
      */
-    private String applyProductRow(RowProduct row, Report report, boolean skipInitialMovement) {
+    private String applyProductRow(RowProduct row, Report report, boolean historicoNoArquivo) {
         if (row.name.isEmpty()) {
             report.skipped++;
             report.line("✗ Linha sem nome, ignorada.");
@@ -417,12 +440,12 @@ public final class DataExchange {
 
         String existing = resolveExisting(row);
         if (existing != null) {
-            return updateExisting(existing, row, report, skipInitialMovement);
+            return updateExisting(existing, row, report, historicoNoArquivo);
         }
 
         ContentValues values = row.toValues();
-        String changeType = skipInitialMovement ? MovementRepository.CADASTRO : MovementRepository.IMPORTACAO;
-        if (skipInitialMovement) {
+        String changeType = historicoNoArquivo ? MovementRepository.CADASTRO : MovementRepository.IMPORTACAO;
+        if (historicoNoArquivo) {
             values.put("amount", Quantities.forStorage(0d));
         }
         String uuid = products.create(values, changeType);
@@ -457,41 +480,42 @@ public final class DataExchange {
         return products.findUuidByName(row.name);
     }
 
+    /**
+     * Atualiza o que o arquivo informou, e só isso.
+     *
+     * A decisão de cada campo está em {@link ProductMerge} (classe pura,
+     * testada): campo que o arquivo não trouxe não é tocado. Antes, tudo era
+     * gravado, e uma planilha parcial apagava os outros doze campos do
+     * produto que ela casava.
+     *
+     * @param manterQuantidadeExistente o histórico vem no arquivo, então o
+     *        ajuste de quantidade aqui duplicaria o que as movimentações
+     *        importadas já explicam.
+     */
     private String updateExisting(String uuid, RowProduct row, Report report,
-                                  boolean skipQuantity) {
+                                  boolean manterQuantidadeExistente) {
         Product current = products.findByUuid(uuid);
         if (current == null) {
             report.failed++;
             return uuid;
         }
 
-        ContentValues values = new ContentValues();
-        putIfChanged(values, "name", current.name, row.name);
-        putIfChanged(values, "description", current.description, row.description);
-        putIfNumberChanged(values, "value", current.value, row.unitValue);
-        // Coluna vazia ou ausente na planilha não apaga o custo já cadastrado.
-        if (row.unitCost != null) {
-            putIfNumberChanged(values, "cost", current.cost, row.unitCost);
-        }
-        putIfChanged(values, "category", current.category, row.category);
-        putIfChanged(values, "sku", current.sku, row.sku);
-        putIfChanged(values, "barcode", current.barcode, row.barcode);
-        putIfChanged(values, "supplier", current.supplier, row.supplier);
-        putIfChanged(values, "location", current.location, row.location);
-        putIfNumberChanged(values, "min_stock", current.minStock, row.minStock);
-        putIfChanged(values, "unit", current.unit, row.unit);
+        ProductMerge.Resultado merge = ProductMerge.merge(
+                ProductMerge.Atual.de(current), row.entrada(), manterQuantidadeExistente);
 
-        boolean qtyChanged = !skipQuantity
-                && Double.compare(current.amountAsNumber(), row.quantity) != 0;
-
-        if (values.size() == 0 && !qtyChanged) {
+        if (merge.semMudanca()) {
             report.skipped++;
             report.line("· " + row.name + " já estava igual.");
             return uuid;
         }
 
+        ContentValues values = new ContentValues();
+        for (Map.Entry<String, String> campo : merge.colunas.entrySet()) {
+            values.put(campo.getKey(), campo.getValue());
+        }
+
         if (values.size() > 0) {
-            if (products.nameTakenByOther(row.name, uuid)) {
+            if (values.containsKey("name") && products.nameTakenByOther(row.name, uuid)) {
                 values.remove("name");
             }
             if (values.size() > 0 && !products.update(uuid, values)) {
@@ -501,9 +525,9 @@ public final class DataExchange {
             }
         }
 
-        if (qtyChanged) {
+        if (merge.quantidadeMudou) {
             MovementRepository.Result result = movements.setAbsolute(
-                    uuid, MovementRepository.AJUSTE, row.quantity, "Importação");
+                    uuid, MovementRepository.AJUSTE, merge.quantidade, "Importação");
             if (!result.success) {
                 report.failed++;
                 report.line("✗ " + row.name + ": " + result.message);
@@ -514,26 +538,6 @@ public final class DataExchange {
         report.updated++;
         report.line("✓ " + row.name + " atualizado.");
         return uuid;
-    }
-
-    /**
-     * Colunas numéricas guardadas como texto ("24.90" no banco, "24.9" no
-     * arquivo exportado): comparar as strings marcava metade do cadastro como
-     * "atualizado" ao reimportar a própria exportação, sem nada ter mudado.
-     */
-    private static void putIfNumberChanged(ContentValues values, String column, String current, double next) {
-        double cur = Quantities.parse(current, Double.NaN);
-        if (Double.isNaN(cur) || Double.compare(cur, next) != 0) {
-            values.put(column, Quantities.forStorage(next));
-        }
-    }
-
-    private static void putIfChanged(ContentValues values, String column, String current, String next) {
-        String left = current == null ? "" : current.trim();
-        String right = next == null ? "" : next.trim();
-        if (!Objects.equals(left, right)) {
-            values.put(column, right);
-        }
     }
 
     private static Map<String, Integer> indexHeader(List<String> header) {
@@ -587,7 +591,21 @@ public final class DataExchange {
         }
     }
 
-    /** Uma linha de produto, já limitada ao tamanho que a API aceita. */
+    /**
+     * Uma linha de produto, já limitada ao tamanho que a API aceita, com a
+     * marca de <b>quais campos o arquivo realmente informou</b>.
+     *
+     * A presença é decidida aqui porque depende do formato:
+     * <ul>
+     *   <li><b>planilha</b>: a coluna existe e a célula tem conteúdo. Célula
+     *       vazia não apaga o que está cadastrado — quem importa a lista de
+     *       preços do fornecedor não quer limpar o resto do produto;</li>
+     *   <li><b>backup JSON</b>: a chave existe e não é nula, e aí o vazio
+     *       apaga de propósito — restaurar uma cópia precisa devolver o
+     *       produto exatamente como ele estava, inclusive nos campos que o
+     *       dono tinha limpado.</li>
+     * </ul>
+     */
     static final class RowProduct {
         String id;
         String name = "";
@@ -604,58 +622,115 @@ public final class DataExchange {
         double minStock;
         String unit = "";
 
-        static RowProduct positional(List<String> fields) {
-            RowProduct row = new RowProduct();
-            row.name = clip(at(fields, 0), MAX_NAME);
-            row.description = clip(at(fields, 1), MAX_DESCRIPTION);
-            row.quantity = Quantities.parse(at(fields, 2), 0d);
-            row.unitValue = Quantities.parse(at(fields, 3), 0d);
-            row.category = clip(at(fields, 5), MAX_SHORT);
-            row.sku = clip(at(fields, 6), MAX_CODE);
-            row.barcode = clip(at(fields, 7), MAX_CODE);
-            row.supplier = clip(at(fields, 8), MAX_SHORT);
-            row.location = clip(at(fields, 9), MAX_SHORT);
-            row.minStock = Quantities.parse(at(fields, 10), 0d);
-            row.unit = clip(at(fields, 11), MAX_UNIT);
-            return row;
-        }
+        private final EnumSet<ProductMerge.Campo> informados =
+                EnumSet.noneOf(ProductMerge.Campo.class);
 
         static RowProduct mapped(List<String> fields, Map<String, Integer> columns) {
             RowProduct row = new RowProduct();
             row.id = emptyToNull(clip(cell(fields, columns, "id", "uuid"), 36));
-            row.name = clip(cell(fields, columns, "nome", "name", "produto"), MAX_NAME);
-            row.description = clip(cell(fields, columns, "descricao", "description"), MAX_DESCRIPTION);
-            row.quantity = Quantities.parse(cell(fields, columns, "quantidade", "quantity", "qtd", "estoque"), 0d);
-            row.unitValue = Quantities.parse(cell(fields, columns, "valor", "preco", "unitvalue", "unit_value"), 0d);
-            row.unitCost = Product.costOf(cell(fields, columns, "custo", "preco_de_custo", "custo_unitario", "unitcost", "unit_cost", "cost"));
-            row.category = clip(cell(fields, columns, "categoria", "category"), MAX_SHORT);
-            row.sku = clip(cell(fields, columns, "sku"), MAX_CODE);
-            row.barcode = clip(cell(fields, columns, "codigo_barras", "codigo_de_barras", "barcode", "ean"), MAX_CODE);
-            row.supplier = clip(cell(fields, columns, "fornecedor", "supplier"), MAX_SHORT);
-            row.location = clip(cell(fields, columns, "localizacao", "location"), MAX_SHORT);
-            row.minStock = Quantities.parse(cell(fields, columns, "estoque_minimo", "min_stock", "minstock"), 0d);
-            row.unit = clip(cell(fields, columns, "unidade", "unit"), MAX_UNIT);
+            row.name = row.texto(ProductMerge.Campo.NOME,
+                    cell(fields, columns, "nome", "name", "produto"), MAX_NAME);
+            row.description = row.texto(ProductMerge.Campo.DESCRICAO,
+                    cell(fields, columns, "descricao", "description"), MAX_DESCRIPTION);
+            row.quantity = row.numero(ProductMerge.Campo.QUANTIDADE,
+                    cell(fields, columns, "quantidade", "quantity", "qtd", "estoque"));
+            row.unitValue = row.numero(ProductMerge.Campo.VALOR,
+                    cell(fields, columns, "valor", "preco", "unitvalue", "unit_value"));
+            row.unitCost = Product.costOf(cell(fields, columns, "custo", "preco_de_custo",
+                    "custo_unitario", "unitcost", "unit_cost", "cost"));
+            if (row.unitCost != null) {
+                row.informados.add(ProductMerge.Campo.CUSTO);
+            }
+            row.category = row.texto(ProductMerge.Campo.CATEGORIA,
+                    cell(fields, columns, "categoria", "category"), MAX_SHORT);
+            row.sku = row.texto(ProductMerge.Campo.SKU, cell(fields, columns, "sku"), MAX_CODE);
+            row.barcode = row.texto(ProductMerge.Campo.CODIGO_BARRAS,
+                    cell(fields, columns, "codigo_barras", "codigo_de_barras", "barcode", "ean"),
+                    MAX_CODE);
+            row.supplier = row.texto(ProductMerge.Campo.FORNECEDOR,
+                    cell(fields, columns, "fornecedor", "supplier"), MAX_SHORT);
+            row.location = row.texto(ProductMerge.Campo.LOCALIZACAO,
+                    cell(fields, columns, "localizacao", "location"), MAX_SHORT);
+            row.minStock = row.numero(ProductMerge.Campo.ESTOQUE_MINIMO,
+                    cell(fields, columns, "estoque_minimo", "min_stock", "minstock"));
+            row.unit = row.texto(ProductMerge.Campo.UNIDADE,
+                    cell(fields, columns, "unidade", "unit"), MAX_UNIT);
             return row;
         }
 
         static RowProduct fromJson(JSONObject json) {
             RowProduct row = new RowProduct();
             row.id = emptyToNull(json.optString("id", null));
-            row.name = clip(json.optString("name", ""), MAX_NAME);
-            row.description = clip(json.optString("description", ""), MAX_DESCRIPTION);
-            row.quantity = json.optDouble("quantity", 0d);
-            row.unitValue = json.optDouble("unitValue", 0d);
-            row.unitCost = json.has("unitCost") && !json.isNull("unitCost")
-                    ? json.optDouble("unitCost", 0d)
-                    : null;
-            row.category = clip(json.optString("category", ""), MAX_SHORT);
-            row.sku = clip(json.optString("sku", ""), MAX_CODE);
-            row.barcode = clip(json.optString("barcode", ""), MAX_CODE);
-            row.supplier = clip(json.optString("supplier", ""), MAX_SHORT);
-            row.location = clip(json.optString("location", ""), MAX_SHORT);
-            row.minStock = json.optDouble("minStock", 0d);
-            row.unit = clip(json.optString("unit", ""), MAX_UNIT);
+            row.name = row.jsonTexto(json, "name", ProductMerge.Campo.NOME, MAX_NAME);
+            row.description = row.jsonTexto(json, "description", ProductMerge.Campo.DESCRICAO,
+                    MAX_DESCRIPTION);
+            row.quantity = row.jsonNumero(json, "quantity", ProductMerge.Campo.QUANTIDADE);
+            row.unitValue = row.jsonNumero(json, "unitValue", ProductMerge.Campo.VALOR);
+            row.unitCost = informado(json, "unitCost") ? json.optDouble("unitCost", 0d) : null;
+            if (row.unitCost != null) {
+                row.informados.add(ProductMerge.Campo.CUSTO);
+            }
+            row.category = row.jsonTexto(json, "category", ProductMerge.Campo.CATEGORIA, MAX_SHORT);
+            row.sku = row.jsonTexto(json, "sku", ProductMerge.Campo.SKU, MAX_CODE);
+            row.barcode = row.jsonTexto(json, "barcode", ProductMerge.Campo.CODIGO_BARRAS, MAX_CODE);
+            row.supplier = row.jsonTexto(json, "supplier", ProductMerge.Campo.FORNECEDOR, MAX_SHORT);
+            row.location = row.jsonTexto(json, "location", ProductMerge.Campo.LOCALIZACAO, MAX_SHORT);
+            row.minStock = row.jsonNumero(json, "minStock", ProductMerge.Campo.ESTOQUE_MINIMO);
+            row.unit = row.jsonTexto(json, "unit", ProductMerge.Campo.UNIDADE, MAX_UNIT);
             return row;
+        }
+
+        /** O que esta linha autoriza a mudar num produto que já existe. */
+        ProductMerge.Entrada entrada() {
+            ProductMerge.Entrada entrada = new ProductMerge.Entrada();
+            entrada.nome = name;
+            entrada.descricao = description;
+            entrada.quantidade = quantity;
+            entrada.valor = unitValue;
+            entrada.custo = unitCost;
+            entrada.categoria = category;
+            entrada.sku = sku;
+            entrada.codigoBarras = barcode;
+            entrada.fornecedor = supplier;
+            entrada.localizacao = location;
+            entrada.estoqueMinimo = minStock;
+            entrada.unidade = unit;
+            for (ProductMerge.Campo campo : informados) {
+                entrada.informa(campo);
+            }
+            return entrada;
+        }
+
+        private String texto(ProductMerge.Campo campo, String raw, int max) {
+            if (raw != null && !raw.trim().isEmpty()) {
+                informados.add(campo);
+            }
+            return clip(raw, max);
+        }
+
+        private double numero(ProductMerge.Campo campo, String raw) {
+            if (raw != null && !raw.trim().isEmpty()) {
+                informados.add(campo);
+            }
+            return Quantities.parse(raw, 0d);
+        }
+
+        private String jsonTexto(JSONObject json, String key, ProductMerge.Campo campo, int max) {
+            if (informado(json, key)) {
+                informados.add(campo);
+            }
+            return clip(json.optString(key, ""), max);
+        }
+
+        private double jsonNumero(JSONObject json, String key, ProductMerge.Campo campo) {
+            if (informado(json, key)) {
+                informados.add(campo);
+            }
+            return json.optDouble(key, 0d);
+        }
+
+        private static boolean informado(JSONObject json, String key) {
+            return json.has(key) && !json.isNull(key);
         }
 
         ContentValues toValues() {
@@ -679,14 +754,6 @@ public final class DataExchange {
             values.put("min_stock", Quantities.forStorage(minStock));
             values.put("unit", unit);
             return values;
-        }
-
-        private static String at(List<String> fields, int index) {
-            if (fields == null || index >= fields.size() || fields.get(index) == null) {
-                return "";
-            }
-            String value = fields.get(index).trim();
-            return "null".equalsIgnoreCase(value) ? "" : value;
         }
 
         private static String clip(String value, int max) {

@@ -157,6 +157,18 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
               message: z.string().nullable(),
             }),
             entitlements: z.object({ offlineGraceDays: z.number().int() }),
+            /**
+             * Experimentos do app, ligados e desligados sem publicar versão
+             * (linha `experiments` de `app_config`). `percent` é a fatia da
+             * base que entra, sorteada no aparelho pelo identificador da
+             * instalação — o mesmo aparelho cai sempre do mesmo lado.
+             */
+            experiments: z.object({
+              accountPromptFirstProduct: z.object({
+                enabled: z.boolean(),
+                percent: z.number().int(),
+              }),
+            }),
           }),
         },
       },
@@ -199,6 +211,34 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
           message: z.string().max(300).nullable().optional(),
         })
         .partial();
+      const experimentOverrides = await db
+        .select({ value: appConfig.value })
+        .from(appConfig)
+        .where(eq(appConfig.key, 'experiments'))
+        .limit(1)
+        .catch(() => []);
+
+      // Mesmo cuidado do bloco `app`: editado à mão, valor inválido cai no
+      // padrão em vez de derrubar a rota para a base instalada.
+      const experimentSchema = z
+        .object({
+          accountPromptFirstProduct: z
+            .object({
+              enabled: z.boolean().optional(),
+              percent: z.number().int().min(0).max(100).optional(),
+            })
+            .optional(),
+        })
+        .partial();
+      const experimentParsed = experimentSchema.safeParse(experimentOverrides[0]?.value ?? {});
+      if (!experimentParsed.success) {
+        app.log.error(
+          { alerta: true, erros: experimentParsed.error.issues },
+          'app_config.experiments inválido; usando o padrão',
+        );
+      }
+      const experimentOverride = experimentParsed.success ? experimentParsed.data : {};
+
       const parsed = appOverrideSchema.safeParse(appOverrides[0]?.value ?? {});
       if (!parsed.success) {
         app.log.error({ alerta: true, erros: parsed.error.issues }, 'app_config.app inválido; usando o padrão');
@@ -232,6 +272,12 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
           message: appOverride.message ?? null,
         },
         entitlements: { offlineGraceDays: env.ENTITLEMENT_OFFLINE_MAX_DAYS },
+        experiments: {
+          accountPromptFirstProduct: {
+            enabled: experimentOverride.accountPromptFirstProduct?.enabled ?? true,
+            percent: experimentOverride.accountPromptFirstProduct?.percent ?? 50,
+          },
+        },
       };
     },
   );
