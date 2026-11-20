@@ -193,6 +193,30 @@ export async function registerAdminWorkspacesRoutes(app: FastifyInstance): Promi
   );
 
   routes.post(
+    '/workspaces/:workspaceId/products/:productId/delete',
+    {
+      preHandler: requireAdmin('support'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Exclui um produto do cliente (suporte, exige motivo)',
+        hide: true,
+        params: workspaceParams.extend({ productId: z.string().uuid() }),
+        body: reasonBodySchema,
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      await service.deleteProduct(
+        adminActor(request),
+        request.params.workspaceId,
+        request.params.productId,
+        request.body.reason,
+      );
+      return { message: 'Produto excluído. O cliente pode restaurá-lo no app.' };
+    },
+  );
+
+  routes.post(
     '/workspaces/:workspaceId/restore',
     {
       preHandler: requireAdmin('support'),

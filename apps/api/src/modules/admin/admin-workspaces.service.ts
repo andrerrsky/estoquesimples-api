@@ -16,6 +16,7 @@ import type { AppServices } from '../../platform/http/context.js';
 import { ErrorCode, badRequest, conflict, notFound } from '../../platform/http/errors.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
 import { BrandingService } from '../branding/branding.service.js';
+import { InventoryService } from '../inventory/inventory.service.js';
 import { BillingService, ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
 import { OWNER_ROLE } from '../workspaces/workspaces.service.js';
@@ -949,6 +950,82 @@ export class AdminWorkspacesService {
         entityType: 'invite',
         entityId: inviteId,
         metadata: { origem: 'suporte' },
+      });
+    });
+  }
+
+  /**
+   * Exclui um produto do cliente a pedido do suporte.
+   *
+   * A aba Estoque do painel é somente leitura de propósito — o estoque é do
+   * cliente. Esta é a exceção, e ela existe por um defeito nosso: até a
+   * versão 38 do app, a importação lia planilha sem cabeçalho pela posição
+   * das colunas, então um arquivo que não era catálogo (uma lista de senhas,
+   * no caso que motivou isto) nascia como produto na conta da pessoa. Pedir
+   * que o cliente limpe a sujeira que nós criamos contraria o nosso padrão de
+   * atendimento (CLAUDE.md §4: resolver do nosso lado).
+   *
+   * A exclusão passa pelo motor de sincronização, e não por um UPDATE direto,
+   * para que o aparelho do cliente receba a lápide no próximo `pull` — senão
+   * o produto voltaria no envio seguinte. É lógica: o histórico permanece e o
+   * cliente pode restaurar.
+   *
+   * O autor da operação é o **proprietário** da empresa, porque o motor de
+   * sincronização exige um membro ativo; quem de fato agiu fica registrado na
+   * auditoria do painel e na auditoria da empresa (`origem: 'suporte'`).
+   */
+  async deleteProduct(actor: AdminActor, workspaceId: string, productId: string, reason: string): Promise<void> {
+    const inventory = new InventoryService();
+    await this.db.transaction(async (tx) => {
+      const workspace = await this.lock(tx, workspaceId);
+      if (workspace.deletedAt) throw conflict(ErrorCode.CONFLICT, 'A empresa está excluída.');
+
+      const owner = await tx
+        .select({ userId: workspaceMembers.userId })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.roleKey, OWNER_ROLE),
+            eq(workspaceMembers.status, 'active'),
+          ),
+        )
+        .limit(1);
+      const ownerId = owner[0]?.userId;
+      if (!ownerId) throw conflict(ErrorCode.CONFLICT, 'A empresa não tem proprietário ativo.');
+
+      const rows = await tx.execute<{ name: string | null }>(
+        sql`SELECT name FROM products WHERE workspace_id = ${workspaceId} AND id = ${productId} AND deleted_at IS NULL`,
+      );
+      const product = rows.rows[0];
+      if (!product) throw notFound('Produto não encontrado.');
+
+      await inventory.deleteProduct(
+        tx,
+        {
+          workspaceId,
+          userId: ownerId,
+          permissions: new Set(['produtos.excluir']),
+          // Excluir não encosta em limite de produtos; `planKey` só apareceria
+          // na mensagem de um limite que não se aplica aqui.
+          plan: { productLimit: null, planKey: 'suporte' },
+        },
+        productId,
+      );
+
+      await recordAdminAudit(tx, {
+        actor,
+        action: AdminAction.WORKSPACE_PRODUCT_DELETED,
+        targetType: 'product',
+        targetId: productId,
+        metadata: { reason, workspaceId, workspaceName: workspace.name, product: product.name },
+      });
+      await recordAudit(tx, {
+        workspaceId,
+        action: AuditAction.PRODUCT_DELETED,
+        entityType: 'produto',
+        entityId: productId,
+        metadata: { origem: 'suporte', reason },
       });
     });
   }
