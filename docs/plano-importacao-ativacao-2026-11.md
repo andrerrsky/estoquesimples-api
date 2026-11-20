@@ -51,6 +51,35 @@ A0 não depende de A1-A9, não muda schema e não muda tela nenhuma — pode e d
 
 **A0.3. Quem já foi atingido.** O defeito está em produção. Não dá para saber **o que** foi apagado, mas dá para saber **quem importou**: `import.completed` existe desde antes (`ImportActivity.java:391`) e é de onde vieram as 10 importações do período. Para quem tem conta, compara-se com o retrato na nuvem anterior à importação; sem conta, a recuperação depende do `LocalBackup` no aparelho. Caminho de recuperação: `LocalBackup` no aparelho e, para quem tem conta, o retrato na nuvem anterior à importação. Entra uma entrada em `packages/help` e uma resposta pronta de suporte ("resolver do nosso lado", CLAUDE.md §4). E, como a base é pequena (35 empresas, 4 pagantes, 10 importações no período), **não se espera a reclamação** — e isso vale **antes de a v39 ir ao ar**, porque depois do conserto fica mais difícil separar "estava zerado" de "foi zerado pela importação": olha-se uma a uma quais empresas importaram CSV e confere-se o estoque delas. Com esse tamanho, esperar sai mais caro que a conferência.
 
+**A0.3 — feito em 20/11/2026, antes de a v39 ir ao ar.** Conferência no painel,
+pelo explorador de eventos (`import.completed`) e pela leitura de produtos e
+movimentações de cada empresa. A telemetria cobre de **02/10/2026** até hoje;
+antes disso não há registro.
+
+- **10 importações de CSV** no período, de **10 instalações** distintas.
+- **8 delas não têm conta**: o estoque nunca saiu do aparelho, então não há o
+  que conferir nem o que restaurar do nosso lado. Para essas, o caminho é o
+  `LocalBackup` no próprio aparelho, e só se a pessoa reclamar.
+- **2 têm empresa na nuvem, as duas no gratuito, nenhuma pagante.** Uma
+  (importação de 06/11, 104 linhas) tem **0 produtos e 0 movimentações** na
+  nuvem: nada sincronizado, nada a conferir. A outra (14/11, 14 linhas)
+  importou um arquivo que **não era catálogo de produtos** — e o caminho
+  posicional criou **14 produtos de lixo** a partir das linhas dele. O único
+  produto de verdade que a empresa tinha ficou **intacto** (quantidade,
+  categoria e unidade preservadas, `rev=1`).
+- **Varredura de confirmação em toda a nuvem**: 53 empresas, 26 com produtos,
+  1.639 movimentações lidas — **nenhuma** movimentação com a nota
+  `Importação`, que é a assinatura do ajuste que o defeito lançava, e nenhum
+  ajuste zerando saldo. Ou seja: **nenhuma empresa da nuvem teve cadastro
+  sobrescrito por importação**.
+
+Conclusão: o defeito destruía dado em tese e já destruiu confiança (o caso de
+14/11 é exatamente a planilha que a v39 passa a recusar), mas **não há perda de
+estoque registrada em cliente da nuvem**. Pendência operacional de uma linha:
+os 14 produtos de lixo da empresa de 14/11 continuam lá, e o arquivo que os
+gerou era uma lista de credenciais — vale apagá-los do nosso lado, com o aval
+do dono, em vez de pedir que o cliente faça.
+
 **A1. Extrair `data/CsvSchema.java`** — classe pura, detecção e mapa canônico.
 
 **A2. Atalho "arquivo nosso".** Cabeçalho igual a `PRODUCT_CSV_HEADER` ou `MOVEMENT_CSV_HEADER` → mapa fixo, heurística saltada. A comparação é sobre os nomes **normalizados** (`CsvCodec.normalizeHeader`) e **tolerante à ausência da última coluna**: `custo` foi acrescentado no fim para que planilhas de versões antigas continuassem válidas (`DataExchange.java:38-40`), e é esse acervo que o atalho existe para blindar. Blinda backup/restore.
