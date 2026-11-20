@@ -235,6 +235,47 @@ describe('interruptor de sincronização', () => {
     expect(vigente.json()).toMatchObject({ origem: 'banco', minAppVersionCode: 23 });
   });
 
+  it('entrega o experimento do convite de conta com o padrão de metade da base', async () => {
+    const response = await context.app.inject({ method: 'GET', url: '/v1/config' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().experiments.accountPromptFirstProduct).toEqual({
+      enabled: true,
+      percent: 50,
+    });
+  });
+
+  it('desliga o convite de conta sem publicar versão nova do app', async () => {
+    await context.services.db.execute(sql`
+      INSERT INTO app_config (key, value)
+      VALUES ('experiments', '{"accountPromptFirstProduct":{"enabled":false,"percent":10}}'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `);
+
+    const response = await context.app.inject({ method: 'GET', url: '/v1/config' });
+    expect(response.json().experiments.accountPromptFirstProduct).toEqual({
+      enabled: false,
+      percent: 10,
+    });
+  });
+
+  it('experimento com valor inválido cai no padrão em vez de derrubar a rota', async () => {
+    // A linha é editada à mão no banco, e esta é a rota por onde toda a base
+    // instalada decide se pode sincronizar e se pode abrir: um 500 aqui para
+    // o app de todo mundo.
+    await context.services.db.execute(sql`
+      INSERT INTO app_config (key, value)
+      VALUES ('experiments', '{"accountPromptFirstProduct":{"percent":"metade"}}'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `);
+
+    const response = await context.app.inject({ method: 'GET', url: '/v1/config' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().experiments.accountPromptFirstProduct).toEqual({
+      enabled: true,
+      percent: 50,
+    });
+  });
+
   it('sem valor gravado, vale o ambiente', async () => {
     const response = await context.app.inject({
       method: 'GET',

@@ -160,6 +160,7 @@ public class MainActivity extends BaseActivity {
             pendingClearSearch = true;
             lowStockOnly = false;
             pendingListRefresh = true;
+            acabouDeCadastrar = true;
         }
         if (intent != null && intent.getBooleanExtra(EXTRA_FROM_LOW_STOCK_NOTIFICATION, false)) {
             Analytics.track(this, "notification.opened", Analytics.props("kind", "low_stock"));
@@ -357,6 +358,7 @@ public class MainActivity extends BaseActivity {
         });
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_PRODUCT_ADDED, false)) {
             pendingMessage = "Produto adicionado.";
+            acabouDeCadastrar = true;
         }
 
         // Eventos de uso: abertura do app, envio periódico da fila e a origem
@@ -793,7 +795,11 @@ public class MainActivity extends BaseActivity {
         boolean avisoDePlano = planBanner != null && planBanner.getVisibility() == View.VISIBLE;
 
         // Primeiro o que não depende da Play: fora disso, nem abre conexão.
-        if (avisoDePlano || !br.com.gameloop.estoquesimples.billing.PromoRules.shouldShowCard(
+        // Com o convite de conta na tela, a oferta espera: dois pedidos na
+        // mesma tela anulam os dois, e sem conta a compra pela Play nem fica
+        // ligada a um cadastro que dê para recuperar depois.
+        if (avisoDePlano || conviteDeContaNaTela
+                || !br.com.gameloop.estoquesimples.billing.PromoRules.shouldShowCard(
                 now, true, assinante, podeComprar, fechadoEm)) {
             card.setVisibility(View.GONE);
             return;
@@ -842,12 +848,24 @@ public class MainActivity extends BaseActivity {
                 "campaign", br.com.gameloop.estoquesimples.billing.PromoRules.CAMPAIGN_BF2026);
     }
 
+    /**
+     * A pessoa chegou a esta tela salvando um produto (não apenas voltando).
+     *
+     * É o gatilho do convite a criar conta no primeiro produto
+     * ({@link AccountPrompt}); vale uma vez e é consumido na exibição.
+     */
+    private boolean acabouDeCadastrar;
+    /** Convite de conta na tela: a oferta da Play espera a próxima volta. */
+    private boolean conviteDeContaNaTela;
+
     /** Produtos a partir dos quais vale avisar que nada está salvo fora daqui. */
     private static final int CLOUD_BANNER_MIN_PRODUTOS = 5;
     /** Fechou o aviso: só volta depois de uma semana. */
     private static final long CLOUD_BANNER_SILENCIO_MS = 7L * 24 * 60 * 60 * 1000;
     private static final String CLOUD_BANNER_PREFS = "cloud_banner";
     private static final String CLOUD_BANNER_FECHADO_EM = "fechado_em";
+    /** O convite do primeiro produto é uma vez por aparelho, nunca uma régua. */
+    private static final String CLOUD_BANNER_CONVITE_FEITO = "convite_primeiro_produto";
     /** O evento de exibição sai uma vez por processo, não a cada volta à tela. */
     private static boolean cloudBannerViewTracked;
 
@@ -863,6 +881,9 @@ public class MainActivity extends BaseActivity {
      */
     private void updateCloudBanner() {
         View banner = findViewById(R.id.cloudBanner);
+        conviteDeContaNaTela = false;
+        boolean cadastrouAgora = acabouDeCadastrar;
+        acabouDeCadastrar = false;
         if (banner == null || stock == null || !stock.isOpen()) {
             return;
         }
@@ -881,17 +902,42 @@ public class MainActivity extends BaseActivity {
             return;
         }
         int produtos = contarProdutosAtivos();
-        if (produtos < CLOUD_BANNER_MIN_PRODUTOS) {
+
+        /*
+         * Convite no primeiro produto: a pessoa acabou de criar algo que não
+         * quer perder, e é aí que a conta significa alguma coisa. Experimento
+         * em parte da base, uma vez por aparelho, desligável pelo servidor
+         * (ver AccountPrompt).
+         */
+        boolean convite = AccountPrompt.deveConvidar(
+                produtos,
+                cadastrouAgora,
+                false,
+                prefs.getBoolean(CLOUD_BANNER_CONVITE_FEITO, false),
+                new br.com.gameloop.estoquesimples.sync.RemoteConfig(this).accountPromptEnabled(),
+                AccountPrompt.noExperimento(
+                        br.com.gameloop.estoquesimples.sync.SessionManager.get(this).deviceId(),
+                        new br.com.gameloop.estoquesimples.sync.RemoteConfig(this).accountPromptPercent()));
+
+        if (!convite && produtos < CLOUD_BANNER_MIN_PRODUTOS) {
             banner.setVisibility(View.GONE);
             return;
         }
+
+        String superficie = convite ? "primeiro_produto" : "lista";
         TextView texto = findViewById(R.id.cloudBannerText);
         if (texto != null) {
-            texto.setText("Seus " + produtos + " produtos estão só neste aparelho");
+            texto.setText(convite
+                    ? "Se o celular quebrar ou for roubado, seu estoque não vai com ele. Com conta, ele volta."
+                    : "Seus " + produtos + " produtos estão só neste aparelho");
         }
         banner.setVisibility(View.VISIBLE);
+        if (convite) {
+            conviteDeContaNaTela = true;
+            prefs.edit().putBoolean(CLOUD_BANNER_CONVITE_FEITO, true).apply();
+        }
         banner.setOnClickListener(v -> {
-            Analytics.track(this, "signup.prompt_clicked", Analytics.props("surface", "lista"));
+            Analytics.track(this, "signup.prompt_clicked", Analytics.props("surface", superficie));
             startActivity(new Intent(this, AccountActivity.class));
         });
         View fechar = findViewById(R.id.cloudBannerClose);
@@ -899,13 +945,15 @@ public class MainActivity extends BaseActivity {
             fechar.setOnClickListener(v -> {
                 prefs.edit().putLong(CLOUD_BANNER_FECHADO_EM, System.currentTimeMillis()).apply();
                 banner.setVisibility(View.GONE);
-                Analytics.track(this, "signup.prompt_dismissed", Analytics.props("surface", "lista"));
+                Analytics.track(this, "signup.prompt_dismissed", Analytics.props("surface", superficie));
             });
         }
-        if (!cloudBannerViewTracked) {
+        // O convite do primeiro produto sai uma vez por aparelho, então tem
+        // evento próprio sempre; o aviso da lista, uma vez por processo.
+        if (convite || !cloudBannerViewTracked) {
             cloudBannerViewTracked = true;
             Analytics.track(this, "signup.prompt_viewed",
-                    Analytics.props("surface", "lista", "products", produtos));
+                    Analytics.props("surface", superficie, "products", produtos));
         }
     }
 
@@ -1002,6 +1050,7 @@ public class MainActivity extends BaseActivity {
         pendingShowName = name;
         pendingListRefresh = true;
         if (isNew) {
+            acabouDeCadastrar = true;
             // Produto novo pode não bater com a busca nem estar com estoque baixo.
             pendingClearSearch = true;
             lowStockOnly = false;
