@@ -5,6 +5,7 @@ import type { Database, Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import { enqueueJob, registerJobHandler } from '../../platform/jobs/runner.js';
 import { AuditAction, recordAudit } from '../audit/audit.service.js';
+import { googleRecurringCents, playCycleFromRaw, playOrderId } from './play-price.js';
 
 /**
  * Aviso por e-mail aos administradores do painel (papel owner, ativos) de que
@@ -43,6 +44,8 @@ export async function enqueueSubscriptionAlert(executor: Database | Transaction,
 const money = (cents: number | null) => (cents === null ? null : (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const dateBr = (date: Date | null) => (date ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short' }).format(date) : null);
 const CYCLE: Record<string, string> = { MONTHLY: 'mensal', SEMIANNUALLY: 'semestral', YEARLY: 'anual' };
+/** Como chamar o valor de cada ciclo: "R$ 24,99 por mês". */
+const PER_CYCLE: Record<string, string> = { MONTHLY: 'por mês', SEMIANNUALLY: 'por semestre', YEARLY: 'por ano' };
 const BILLING: Record<string, string> = { PIX: 'Pix', BOLETO: 'boleto', CREDIT_CARD: 'cartão de crédito', UNDEFINED: 'a escolher' };
 
 /** Envia o aviso. Lança se nenhum envio der certo, para a fila repetir. */
@@ -68,6 +71,9 @@ export async function sendSubscriptionAlert(services: AppServices, input: { subs
       cycle: subscriptions.billingCycle,
       billingType: subscriptions.billingType,
       priceCents: subscriptions.priceCents,
+      raw: subscriptions.raw,
+      offerPriceCents: plans.googleOfferPriceCents,
+      offerCycles: plans.googleOfferCycles,
       periodEnd: subscriptions.currentPeriodEnd,
       workspaceName: workspaces.name,
       ownerId: users.id,
@@ -94,8 +100,25 @@ export async function sendSubscriptionAlert(services: AppServices, input: { subs
 
   const [count] = (await db.execute<{ live: number }>(sql`SELECT count(DISTINCT workspace_id)::int AS live FROM subscriptions WHERE state IN ('ativa', 'carencia', 'cancelada_mas_ativa')`)).rows;
   const plan = row.planName ?? row.planKey;
+  const play = row.provider === 'google_play';
   const via = row.provider === 'asaas' ? 'web (Asaas)' : 'app Android (Google Play)';
-  const price = money(row.priceCents);
+  // Compra pela Play não grava ciclo nem valor na assinatura (o Google não os
+  // manda em campo próprio): tudo vem do comprovante guardado em `raw`.
+  const cycle = row.cycle ?? (play ? playCycleFromRaw(row.raw) : null);
+  const recurringPlay = play ? googleRecurringCents(row.raw) : { cents: null, inOffer: false };
+  const price = money(play ? recurringPlay.cents : row.priceCents);
+  const perCycle = cycle ? ` ${PER_CYCLE[cycle] ?? ''}`.trimEnd() : '';
+  const offerPrice = money(row.offerPriceCents);
+  // Na oferta de entrada o Google cobra menos e não diz quanto: o valor
+  // promocional é o cadastrado no plano, em Painel › Planos.
+  const valor = recurringPlay.inOffer && offerPrice
+    ? `${offerPrice}${perCycle} na oferta de entrada${row.offerCycles ? ` (${row.offerCycles} primeiros meses)` : ''}${price ? `, depois ${price}${perCycle}` : ''}`
+    : price
+      ? `${price}${perCycle}`
+      : play
+        ? 'não informado no comprovante do Google'
+        : null;
+  const order = play ? playOrderId(row.raw) : null;
   const panel = services.env.ADMIN_PANEL_URL;
   const headline = input.kind === 'nova' ? 'Nova assinatura confirmada' : 'Assinatura reativada';
   const subject = `${input.kind === 'nova' ? '🎉 ' : ''}${headline}: ${row.workspaceName}`.slice(0, 160);
@@ -107,8 +130,10 @@ export async function sendSubscriptionAlert(services: AppServices, input: { subs
     '',
     `Empresa: ${row.workspaceName}`,
     `Responsável: ${row.ownerName} <${row.ownerEmail}>`,
-    `Plano: ${plan}${row.cycle ? ` (${CYCLE[row.cycle] ?? row.cycle})` : ''}${price ? ` · ${price}` : ''}`,
+    `Plano: ${plan}${cycle ? ` (${CYCLE[cycle] ?? cycle})` : ''}`,
+    `Valor: ${valor ?? '—'}`,
     `Por onde: ${via}${row.billingType ? ` · ${BILLING[row.billingType] ?? row.billingType}` : ''}`,
+    ...(order ? [`Pedido no Google: ${order}`] : []),
     ...(row.periodEnd ? [`Vale até: ${dateBr(row.periodEnd)}`] : []),
     '',
     `Assinaturas ativas agora: ${count?.live ?? 0}`,

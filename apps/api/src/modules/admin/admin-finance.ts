@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 
 import type { AppServices } from '../../platform/http/context.js';
 import { isPaidStatus, toCycle, CYCLE_MONTHS } from '../billing/asaas/asaas-state.js';
+import { googleRecurringCents } from '../billing/play-price.js';
 import { REPORT_TIMEZONE } from './admin-series.js';
 
 /**
@@ -310,15 +311,6 @@ export function buildFinanceReport(input: {
   };
 }
 
-/** Preço recorrente do comprovante do Google (`units` + `nanos`), em centavos. */
-export function googleRecurringCents(raw: unknown): { cents: number | null; inOffer: boolean } {
-  const item = (raw as { lineItems?: Array<Record<string, unknown>> } | null)?.lineItems?.[0];
-  const price = (item?.['autoRenewingPlan'] as { recurringPrice?: { units?: string | number; nanos?: number } } | undefined)?.recurringPrice;
-  const cents = price ? Math.round(Number(price.units ?? 0) * 100 + Number(price.nanos ?? 0) / 10_000_000) : null;
-  const phase = item?.['offerPhase'] as Record<string, unknown> | undefined;
-  const inOffer = Boolean(phase && ('introductoryPrice' in phase || 'freeTrial' in phase || 'prorationPeriod' in phase));
-  return { cents: Number.isFinite(cents) ? cents : null, inOffer };
-}
 
 export async function loadFinanceReport(services: AppServices, months: number, now = new Date()): Promise<FinanceReport> {
   const { db } = services;

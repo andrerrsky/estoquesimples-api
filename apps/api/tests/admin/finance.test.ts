@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildFinanceReport, googleRecurringCents, type FinanceSubscription } from '../../src/modules/admin/admin-finance.js';
+import { buildFinanceReport, type FinanceSubscription } from '../../src/modules/admin/admin-finance.js';
+import { googleRecurringCents } from '../../src/modules/billing/play-price.js';
 
 const google = (overrides: Partial<FinanceSubscription>): FinanceSubscription => ({
   id: 'g',
