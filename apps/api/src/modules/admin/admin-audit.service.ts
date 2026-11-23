@@ -15,6 +15,13 @@ export const AdminAction = {
   ADMIN_MFA_DISABLED: 'admin.mfa_disabled',
   ADMIN_MFA_RESET: 'admin.mfa_reset',
   ADMIN_MFA_RECOVERY_USED: 'admin.mfa_recovery_used',
+  /**
+   * Navegador que passou a dispensar o código do segundo fator por alguns
+   * dias. Nasce só com um código conferido na hora, e é sensível: quem
+   * auditar o painel precisa ver quando a exigência do código foi afrouxada.
+   */
+  ADMIN_TRUSTED_DEVICE_ADDED: 'admin.trusted_device_added',
+  ADMIN_TRUSTED_DEVICE_REVOKED: 'admin.trusted_device_revoked',
   ADMIN_LOGGED_OUT: 'admin.logged_out',
   ADMIN_CREATED: 'admin.created',
   ADMIN_UPDATED: 'admin.updated',
@@ -128,6 +135,8 @@ export const SECURITY_ADMIN_ACTIONS: readonly AdminActionValue[] = [
   AdminAction.ADMIN_MFA_DISABLED,
   AdminAction.ADMIN_MFA_RESET,
   AdminAction.ADMIN_MFA_RECOVERY_USED,
+  AdminAction.ADMIN_TRUSTED_DEVICE_ADDED,
+  AdminAction.ADMIN_TRUSTED_DEVICE_REVOKED,
   AdminAction.ADMIN_CREATED,
   AdminAction.ADMIN_UPDATED,
   AdminAction.ADMIN_PASSWORD_RESET,

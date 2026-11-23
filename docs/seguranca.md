@@ -364,6 +364,22 @@ histórico de incidentes.
   quem não cadastrou só vê a tela de cadastro (QR code + 10 códigos de
   recuperação de uso único). Um owner pode zerar o segundo fator de outro
   administrador (as sessões dele caem). Toda ação fica na auditoria.
+- **Navegador confiável do painel**: entrar com o código do autenticador e
+  marcar "confiar neste navegador" grava um segundo cookie (httpOnly,
+  SameSite=Strict, assinado, preso a `/admin`, token opaco guardado só como
+  hash). Por `ADMIN_TRUSTED_DEVICE_DAYS` dias — hoje **10** — esse navegador
+  dispensa o código e a sessão dele vive esses dias, em vez das 12 h de
+  inatividade e do teto de 7 dias das demais. O que ele **nunca** dispensa é
+  a senha, e nada disso existe sem segundo fator ativo: a confiança só nasce
+  de um código conferido na hora, então o cookie sozinho não cria outro nem
+  estica o próprio prazo (o token é rotacionado a cada entrada, com o mesmo
+  vencimento). Vários computadores podem ficar conectados ao mesmo tempo —
+  entrar num não derruba o outro, e nunca derrubou: o que derrubava era a
+  expiração curta. Cada navegador aparece em Segurança, com "deixar de
+  confiar" que também encerra as sessões nascidas dele; trocar a senha,
+  desativar o acesso, zerar ou desativar o segundo fator e revogar as sessões
+  derrubam a confiança junto. O limite é `ADMIN_TRUSTED_DEVICE_LIMIT` (5), e
+  marcar um navegador manda aviso por e-mail.
 - **Logs de segurança**: toda ação de acesso e credenciais fica na
   auditoria com quem fez (conta ou administrador), IP e navegador/app
   (User-Agent). Clientes: cadastro, login, senha errada, bloqueio, tentativa

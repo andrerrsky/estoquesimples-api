@@ -205,6 +205,16 @@ const envSchema = z
     ADMIN_SESSION_IDLE_HOURS: z.coerce.number().int().positive().default(12),
     ADMIN_SESSION_MAX_DAYS: z.coerce.number().int().positive().default(7),
     ADMIN_COOKIE_NAME: z.string().min(1).max(40).default('es_admin'),
+    /**
+     * Por quantos dias um navegador marcado como confiável dispensa o código
+     * do autenticador — e por quantos dias a sessão aberta nele vive, por
+     * inatividade e no teto absoluto. Só vale para quem tem segundo fator
+     * ativo e conferiu o código na hora de marcar.
+     */
+    ADMIN_TRUSTED_DEVICE_DAYS: z.coerce.number().int().positive().max(30).default(10),
+    /** Quantos navegadores confiáveis um administrador pode ter ao mesmo tempo. */
+    ADMIN_TRUSTED_DEVICE_LIMIT: z.coerce.number().int().positive().max(20).default(5),
+    ADMIN_TRUSTED_COOKIE_NAME: z.string().min(1).max(40).default('es_admin_device'),
     /** Endereço público do painel, usado nos links dos e-mails para a equipe. */
     ADMIN_PANEL_URL: z
       .string()

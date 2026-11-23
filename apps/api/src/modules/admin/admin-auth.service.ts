@@ -1,9 +1,9 @@
 import { randomInt } from 'node:crypto';
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { clientKey } from '../../platform/http/login-throttle.js';
-import { adminSessions, platformAdmins } from '../../platform/db/schema/index.js';
+import { adminSessions, adminTrustedDevices, platformAdmins } from '../../platform/db/schema/index.js';
 import type { Transaction } from '../../platform/db/client.js';
 import type { AppServices } from '../../platform/http/context.js';
 import {
@@ -36,6 +36,19 @@ export interface AdminContext {
   role: AdminRole;
   /** Segundo fator (TOTP) ativo. */
   mfaEnabled: boolean;
+  /** Navegador confiável de onde a sessão nasceu, quando houver. */
+  trustedDeviceId: string | null;
+}
+
+/** Um navegador confiável, como o painel o lista. */
+export interface TrustedDeviceView {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+  /** É o navegador de onde a sessão atual veio. */
+  current: boolean;
 }
 
 /** AAD do segredo TOTP: o blob só decifra na linha do próprio administrador. */
@@ -69,10 +82,24 @@ export class AdminAuthService {
   // Login e sessão
   // -------------------------------------------------------------------------
 
+  /**
+   * @param deviceToken token do cookie de navegador confiável, quando o
+   *   navegador já tem um. Ele dispensa o código do segundo fator — nunca a
+   *   senha — e dá direito à sessão longa.
+   */
   async login(
-    input: { email: string; password: string; code?: string | undefined },
+    input: { email: string; password: string; code?: string | undefined; trustDevice?: boolean | undefined },
     meta: RequestMeta,
-  ): Promise<{ token: string; expiresAt: Date; admin: AdminPublic }> {
+    deviceToken?: string | null,
+  ): Promise<{
+    token: string;
+    expiresAt: Date;
+    admin: AdminPublic;
+    /** Cookie de navegador confiável a gravar (criado agora ou com o token rotacionado). */
+    trustedDevice: { token: string; expiresAt: Date } | null;
+    /** O cookie que o navegador mandou não vale mais: o painel deve apagá-lo. */
+    forgetDevice: boolean;
+  }> {
     const found = await this.db
       .select()
       .from(platformAdmins)
@@ -108,21 +135,35 @@ export class AdminAuthService {
     }
     // Segundo fator: senha certa sem código pede o código (sem contar erro);
     // código errado conta como tentativa falha, igual à senha.
-    if (admin.totpEnabledAt && admin.totpSecret) {
-      if (!input.code) {
+    const mfaAtivo = Boolean(admin.totpEnabledAt && admin.totpSecret);
+    // Navegador já conhecido: dispensa o código, nunca a senha.
+    const conhecido = mfaAtivo && deviceToken ? await this.findTrustedDevice(admin.id, deviceToken) : null;
+    const forgetDevice = Boolean(deviceToken) && !conhecido;
+    let codigoConferido = false;
+    if (mfaAtivo) {
+      if (input.code) {
+        const accepted = await this.consumeSecondFactor(admin, input.code, meta);
+        if (!accepted) {
+          const lockSeconds = this.services.throttle.fail('admin', input.email, ip);
+          await this.registerFailedLogin(admin, lockSeconds, meta);
+          throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Código inválido ou já usado.');
+        }
+        codigoConferido = true;
+      } else if (!conhecido) {
         throw unauthorized(ErrorCode.ADMIN_MFA_REQUIRED, 'Digite o código do aplicativo autenticador.');
-      }
-      const accepted = await this.consumeSecondFactor(admin, input.code, meta);
-      if (!accepted) {
-        const lockSeconds = this.services.throttle.fail('admin', input.email, ip);
-        await this.registerFailedLogin(admin, lockSeconds, meta);
-        throw unauthorized(ErrorCode.AUTH_INVALID_CREDENTIALS, 'Código inválido ou já usado.');
       }
     }
     this.services.throttle.succeed('admin', input.email, ip);
 
+    // Confiar num navegador exige um código conferido **agora**: o cookie de
+    // um navegador confiável não cria outro nem renova o prazo do seu, senão
+    // um cookie copiado valeria para sempre.
+    const confiarAgora = mfaAtivo && input.trustDevice === true && codigoConferido;
+
     const token = generateToken();
-    const expiresAt = this.idleExpiry(new Date());
+    let trustedDeviceId: string | null = conhecido?.id ?? null;
+    let trustedCredential: { token: string; expiresAt: Date } | null = null;
+    let expiresAt = this.idleExpiry(new Date());
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -130,12 +171,56 @@ export class AdminAuthService {
         .set({ failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() })
         .where(eq(platformAdmins.id, admin.id));
 
+      if (confiarAgora) {
+        const deviceCredential = generateToken();
+        const deviceExpiry = addDays(new Date(), this.env.ADMIN_TRUSTED_DEVICE_DAYS);
+        const [created] = await tx
+          .insert(adminTrustedDevices)
+          .values({
+            adminId: admin.id,
+            tokenHash: hashToken(deviceCredential),
+            label: describeUserAgent(meta.userAgent),
+            ipAddress: meta.ipAddress,
+            userAgent: meta.userAgent,
+            expiresAt: deviceExpiry,
+          })
+          .returning({ id: adminTrustedDevices.id });
+        trustedDeviceId = created!.id;
+        trustedCredential = { token: deviceCredential, expiresAt: deviceExpiry };
+        await this.pruneTrustedDevices(tx, admin.id, trustedDeviceId);
+        await recordAdminAudit(tx, {
+          actor: { adminId: admin.id, email: admin.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
+          action: AdminAction.ADMIN_TRUSTED_DEVICE_ADDED,
+          targetType: 'admin',
+          targetId: admin.id,
+          metadata: { deviceId: trustedDeviceId, label: describeUserAgent(meta.userAgent), days: this.env.ADMIN_TRUSTED_DEVICE_DAYS },
+        });
+      } else if (conhecido) {
+        // Token novo a cada entrada, com o **mesmo** vencimento: um cookie
+        // copiado para outra máquina deixa de servir no próximo acesso do
+        // dono, e a confiança continua terminando no prazo que ela nasceu.
+        const rotacionado = generateToken();
+        await tx
+          .update(adminTrustedDevices)
+          .set({ tokenHash: hashToken(rotacionado), lastUsedAt: new Date(), ipAddress: meta.ipAddress, userAgent: meta.userAgent })
+          .where(eq(adminTrustedDevices.id, conhecido.id));
+        trustedCredential = { token: rotacionado, expiresAt: conhecido.expiresAt };
+      }
+
+      // Sessão em navegador confiável vive os dias da confiança e nunca além
+      // do vencimento dela; nos outros, segue a inatividade curta de sempre.
+      if (trustedDeviceId) {
+        const limite = trustedCredential?.expiresAt ?? addDays(new Date(), this.env.ADMIN_TRUSTED_DEVICE_DAYS);
+        expiresAt = new Date(Math.min(addDays(new Date(), this.env.ADMIN_TRUSTED_DEVICE_DAYS).getTime(), limite.getTime()));
+      }
+
       await tx.insert(adminSessions).values({
         adminId: admin.id,
         tokenHash: hashToken(token),
         ipAddress: meta.ipAddress,
         userAgent: meta.userAgent,
         expiresAt,
+        trustedDeviceId,
       });
 
       await recordAdminAudit(tx, {
@@ -143,10 +228,22 @@ export class AdminAuthService {
         action: AdminAction.ADMIN_LOGGED_IN,
         targetType: 'admin',
         targetId: admin.id,
+        metadata: {
+          segundoFator: codigoConferido ? 'codigo' : conhecido ? 'navegador_confiavel' : 'sem_mfa',
+          navegadorConfiavel: Boolean(trustedDeviceId),
+        },
       });
     });
 
-    return { token, expiresAt, admin: this.toPublic(admin) };
+    if (confiarAgora) {
+      await this.notifySecurity(
+        admin.email,
+        'Navegador marcado como confiável no painel',
+        `Um navegador (${describeUserAgent(meta.userAgent) ?? 'desconhecido'}) passou a dispensar o código do autenticador no seu acesso ao painel do Estoque Simples por ${this.env.ADMIN_TRUSTED_DEVICE_DAYS} dias. A senha continua sendo pedida.`,
+      );
+    }
+
+    return { token, expiresAt, admin: this.toPublic(admin), trustedDevice: trustedCredential, forgetDevice };
   }
 
   private async registerFailedLogin(
@@ -186,6 +283,7 @@ export class AdminAuthService {
         lastUsedAt: adminSessions.lastUsedAt,
         expiresAt: adminSessions.expiresAt,
         revokedAt: adminSessions.revokedAt,
+        trustedDeviceId: adminSessions.trustedDeviceId,
         adminId: platformAdmins.id,
         email: platformAdmins.email,
         name: platformAdmins.name,
@@ -206,7 +304,21 @@ export class AdminAuthService {
     if (row.expiresAt.getTime() <= now) {
       throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão expirada. Entre novamente.');
     }
-    const absoluteLimit = addDays(row.createdAt, this.env.ADMIN_SESSION_MAX_DAYS).getTime();
+    // Sessão nascida de navegador confiável: dias em vez de horas, e nunca
+    // além do vencimento da confiança. Se o navegador foi revogado (ou
+    // venceu), a sessão longa cai na hora — é por aí que se corta o acesso de
+    // um computador perdido.
+    let absoluteLimit = addDays(row.createdAt, this.env.ADMIN_SESSION_MAX_DAYS).getTime();
+    let idleMs = this.env.ADMIN_SESSION_IDLE_HOURS * 3_600_000;
+    if (row.trustedDeviceId) {
+      const device = await this.loadTrustedDevice(row.trustedDeviceId);
+      if (!device || device.revokedAt || device.expiresAt.getTime() <= now) {
+        throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Este navegador não é mais confiável. Entre novamente.');
+      }
+      const dias = this.env.ADMIN_TRUSTED_DEVICE_DAYS;
+      absoluteLimit = Math.min(addDays(row.createdAt, dias).getTime(), device.expiresAt.getTime());
+      idleMs = dias * 86_400_000;
+    }
     if (absoluteLimit <= now) {
       throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão expirada. Entre novamente.');
     }
@@ -215,7 +327,7 @@ export class AdminAuthService {
     }
 
     if (now - row.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
-      const expiresAt = new Date(Math.min(this.idleExpiry(new Date()).getTime(), absoluteLimit));
+      const expiresAt = new Date(Math.min(now + idleMs, absoluteLimit));
       await this.db
         .update(adminSessions)
         .set({ lastUsedAt: new Date(), expiresAt })
@@ -229,7 +341,107 @@ export class AdminAuthService {
       name: row.name,
       role: row.role as AdminRole,
       mfaEnabled: row.totpEnabledAt !== null,
+      trustedDeviceId: row.trustedDeviceId,
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Navegador confiável
+  // -------------------------------------------------------------------------
+
+  /** Acha o navegador confiável deste administrador pelo token do cookie. */
+  private async findTrustedDevice(adminId: string, token: string) {
+    const [row] = await this.db
+      .select()
+      .from(adminTrustedDevices)
+      .where(and(eq(adminTrustedDevices.tokenHash, hashToken(token)), eq(adminTrustedDevices.adminId, adminId), isNull(adminTrustedDevices.revokedAt)))
+      .limit(1);
+    if (!row || row.expiresAt.getTime() <= Date.now()) return null;
+    return row;
+  }
+
+  private async loadTrustedDevice(id: string) {
+    const [row] = await this.db.select().from(adminTrustedDevices).where(eq(adminTrustedDevices.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  /** Mantém o número de navegadores confiáveis no limite, derrubando os mais antigos. */
+  private async pruneTrustedDevices(tx: Transaction, adminId: string, keepId: string): Promise<void> {
+    const ativos = await tx
+      .select({ id: adminTrustedDevices.id })
+      .from(adminTrustedDevices)
+      .where(and(eq(adminTrustedDevices.adminId, adminId), isNull(adminTrustedDevices.revokedAt)))
+      .orderBy(asc(adminTrustedDevices.createdAt));
+    const excedente = ativos.filter((row) => row.id !== keepId).slice(0, Math.max(0, ativos.length - this.env.ADMIN_TRUSTED_DEVICE_LIMIT));
+    for (const row of excedente) {
+      await this.revokeTrustedDeviceRow(tx, row.id, 'limite_de_navegadores');
+    }
+  }
+
+  /** Revoga o navegador e encerra as sessões que nasceram dele. */
+  private async revokeTrustedDeviceRow(tx: Transaction, deviceId: string, reason: string): Promise<void> {
+    await tx
+      .update(adminTrustedDevices)
+      .set({ revokedAt: new Date(), revokedReason: reason })
+      .where(and(eq(adminTrustedDevices.id, deviceId), isNull(adminTrustedDevices.revokedAt)));
+    await tx
+      .update(adminSessions)
+      .set({ revokedAt: new Date(), revokedReason: `trusted_device_${reason}` })
+      .where(and(eq(adminSessions.trustedDeviceId, deviceId), isNull(adminSessions.revokedAt)));
+  }
+
+  /** Todos os navegadores confiáveis de um administrador caem (senha trocada, acesso desativado, segundo fator mexido). */
+  private async revokeTrustedDevices(tx: Transaction, adminId: string, reason: string): Promise<number> {
+    const ativos = await tx
+      .select({ id: adminTrustedDevices.id })
+      .from(adminTrustedDevices)
+      .where(and(eq(adminTrustedDevices.adminId, adminId), isNull(adminTrustedDevices.revokedAt)));
+    for (const row of ativos) {
+      await this.revokeTrustedDeviceRow(tx, row.id, reason);
+    }
+    return ativos.length;
+  }
+
+  async listTrustedDevices(context: AdminContext): Promise<TrustedDeviceView[]> {
+    const rows = await this.db
+      .select()
+      .from(adminTrustedDevices)
+      .where(and(eq(adminTrustedDevices.adminId, context.adminId), isNull(adminTrustedDevices.revokedAt)))
+      .orderBy(asc(adminTrustedDevices.createdAt));
+    const agora = Date.now();
+    return rows
+      .filter((row) => row.expiresAt.getTime() > agora)
+      .map((row) => ({
+        id: row.id,
+        label: row.label,
+        createdAt: row.createdAt.toISOString(),
+        lastUsedAt: row.lastUsedAt.toISOString(),
+        expiresAt: row.expiresAt.toISOString(),
+        current: row.id === context.trustedDeviceId,
+      }));
+  }
+
+  /**
+   * O administrador deixa de confiar num navegador (o computador que ficou no
+   * escritório, por exemplo). As sessões abertas nele caem junto.
+   */
+  async revokeTrustedDevice(context: AdminContext, deviceId: string, meta: RequestMeta): Promise<void> {
+    const device = await this.loadTrustedDevice(deviceId);
+    // Um administrador só mexe nos próprios navegadores, e um id de outra
+    // pessoa responde o mesmo que um id inexistente.
+    if (!device || device.adminId !== context.adminId || device.revokedAt) {
+      throw notFound('Navegador não encontrado.');
+    }
+    await this.db.transaction(async (tx) => {
+      await this.revokeTrustedDeviceRow(tx, deviceId, 'revogado_pelo_dono');
+      await recordAdminAudit(tx, {
+        actor: { adminId: context.adminId, email: context.email, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
+        action: AdminAction.ADMIN_TRUSTED_DEVICE_REVOKED,
+        targetType: 'admin',
+        targetId: context.adminId,
+        metadata: { deviceId, label: device.label },
+      });
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -332,6 +544,7 @@ export class AdminAuthService {
         .update(platformAdmins)
         .set({ totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: recoveryCodes.map((item) => hashToken(normalizeRecoveryCode(item))) })
         .where(eq(platformAdmins.id, context.adminId));
+      await this.revokeTrustedDevices(tx, context.adminId, 'mfa_ativado');
       await tx.update(adminSessions).set({ revokedAt: new Date() }).where(and(eq(adminSessions.adminId, context.adminId), isNull(adminSessions.revokedAt)));
       await tx.insert(adminSessions).values({ adminId: context.adminId, tokenHash: hashToken(token), ipAddress: meta.ipAddress, userAgent: meta.userAgent, expiresAt });
       await recordAdminAudit(tx, {
@@ -393,6 +606,8 @@ export class AdminAuthService {
         .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: [] })
         .where(eq(platformAdmins.id, targetId));
       // Sessões abertas do alvo caem: quem zerou o fator pode estar respondendo a um acesso indevido.
+      // E sem segundo fator não existe navegador confiável: a confiança nasceu de um código.
+      await this.revokeTrustedDevices(tx, targetId, 'mfa_removido');
       await tx.update(adminSessions).set({ revokedAt: new Date() }).where(and(eq(adminSessions.adminId, targetId), isNull(adminSessions.revokedAt)));
       await recordAdminAudit(tx, { actor, action, targetType: 'admin', targetId });
     });
@@ -581,7 +796,13 @@ export class AdminAuthService {
     });
   }
 
+  /**
+   * Derrubar todas as sessões de alguém é sempre resposta a credencial
+   * trocada ou a incidente — então a confiança nos navegadores dele cai
+   * também, senão o acesso voltaria sem o segundo fator.
+   */
   private async revokeSessions(tx: Transaction, adminId: string, reason: string): Promise<number> {
+    await this.revokeTrustedDevices(tx, adminId, reason);
     const revoked = await tx
       .update(adminSessions)
       .set({ revokedAt: new Date(), revokedReason: reason })
@@ -632,4 +853,30 @@ export class AdminAuthService {
 
 export function hasAdminRole(context: AdminContext, minimum: AdminRole): boolean {
   return ADMIN_ROLE_RANK[context.role] >= ADMIN_ROLE_RANK[minimum];
+}
+
+/**
+ * Rótulo curto para a lista do painel ("Chrome no macOS"). Serve para a
+ * pessoa reconhecer o computador; **não** é usado como verificação, porque o
+ * User-Agent muda a cada atualização do navegador e travar nele só
+ * produziria pedido de código fora de hora.
+ */
+export function describeUserAgent(userAgent: string | null): string | null {
+  if (!userAgent) return null;
+  const navegador =
+    /Edg\//.test(userAgent) ? 'Edge'
+    : /OPR\//.test(userAgent) ? 'Opera'
+    : /Chrome\//.test(userAgent) ? 'Chrome'
+    : /Firefox\//.test(userAgent) ? 'Firefox'
+    : /Safari\//.test(userAgent) ? 'Safari'
+    : null;
+  const sistema =
+    /Windows/.test(userAgent) ? 'Windows'
+    : /Macintosh|Mac OS X/.test(userAgent) ? 'macOS'
+    : /Android/.test(userAgent) ? 'Android'
+    : /iPhone|iPad/.test(userAgent) ? 'iOS'
+    : /Linux/.test(userAgent) ? 'Linux'
+    : null;
+  if (navegador && sistema) return `${navegador} no ${sistema}`;
+  return navegador ?? sistema ?? userAgent.slice(0, 60);
 }

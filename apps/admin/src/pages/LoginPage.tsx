@@ -48,6 +48,8 @@ export function LoginPage() {
   /** Senha conferida; falta o código do autenticador. */
   const [needsCode, setNeedsCode] = useState(false);
   const [code, setCode] = useState('');
+  /** "Confiar neste navegador": dispensa o código nos próximos dias e segura a sessão. */
+  const [trustDevice, setTrustDevice] = useState(false);
 
   useEffect(() => {
     const saved = readRemembered();
@@ -72,7 +74,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await login(email.trim(), password, needsCode ? code.trim() : undefined);
+      await login(email.trim(), password, needsCode ? code.trim() : undefined, trustDevice);
       if (remember) writeRemembered({ email: email.trim() });
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'ADMIN_MFA_REQUIRED') {
@@ -157,6 +159,12 @@ export function LoginPage() {
                 required
               />
               <span className="field__hint">Abra o aplicativo autenticador (Google Authenticator, 1Password…) e digite o código do Estoque Simples Painel.</span>
+            </label>
+          )}
+          {needsCode && (
+            <label className="checkbox">
+              <input type="checkbox" checked={trustDevice} onChange={(event) => setTrustDevice(event.target.checked)} />
+              Confiar neste navegador (dispensa o código e mantém a sessão por alguns dias)
             </label>
           )}
           <label className="checkbox">

@@ -10,6 +10,7 @@ import {
   ADMIN_CSRF_VALUE,
   adminActor,
   adminCookieOptions,
+  adminTrustedCookieOptions,
   requireAdmin,
   requireAdminContext,
 } from './admin-auth.plugin.js';
@@ -55,9 +56,80 @@ export async function registerAdminAuthRoutes(app: FastifyInstance): Promise<voi
       // O login não exige cookie, mas exige o cabeçalho anti-CSRF como toda
       // mutação: login forjado por outro site (login CSRF) também é ataque.
       requireCsrfHeader(request.headers);
-      const result = await service.login(request.body, requestMeta(request));
+      // Cookie do navegador confiável: assinado como o de sessão, e um valor
+      // adulterado é tratado como ausente (pede o código, como deve).
+      const raw = request.cookies[env.ADMIN_TRUSTED_COOKIE_NAME];
+      const unsigned = raw ? request.unsignCookie(raw) : null;
+      const deviceToken = unsigned?.valid ? unsigned.value : null;
+
+      const result = await service.login(request.body, requestMeta(request), deviceToken);
       reply.setCookie(env.ADMIN_COOKIE_NAME, result.token, adminCookieOptions(env));
+      if (result.trustedDevice) {
+        reply.setCookie(env.ADMIN_TRUSTED_COOKIE_NAME, result.trustedDevice.token, adminTrustedCookieOptions(env));
+      } else if (result.forgetDevice || (raw && !deviceToken)) {
+        reply.clearCookie(env.ADMIN_TRUSTED_COOKIE_NAME, { path: '/admin' });
+      }
       return { admin: result.admin, expiresAt: result.expiresAt.toISOString() };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Navegadores confiáveis
+  // -------------------------------------------------------------------------
+
+  routes.get(
+    '/auth/trusted-devices',
+    {
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: {
+        tags: ['admin'],
+        summary: 'Navegadores que dispensam o código do segundo fator',
+        hide: true,
+        response: {
+          200: z.object({
+            days: z.number(),
+            items: z.array(
+              z.object({
+                id: z.string().uuid(),
+                label: z.string().nullable(),
+                createdAt: z.string(),
+                lastUsedAt: z.string(),
+                expiresAt: z.string(),
+                current: z.boolean(),
+              }),
+            ),
+          }),
+          ...commonAdminErrors,
+        },
+      },
+    },
+    async (request) => ({
+      days: env.ADMIN_TRUSTED_DEVICE_DAYS,
+      items: await service.listTrustedDevices(requireAdminContext(request)),
+    }),
+  );
+
+  routes.post(
+    '/auth/trusted-devices/:deviceId/revoke',
+    {
+      preHandler: requireAdmin('viewer', { mfaSetup: true }),
+      schema: {
+        tags: ['admin'],
+        summary: 'Deixa de confiar num navegador (e encerra as sessões dele)',
+        hide: true,
+        params: uuidParam('deviceId'),
+        response: { 200: messageSchema, ...commonAdminErrors },
+      },
+    },
+    async (request, reply) => {
+      const context = requireAdminContext(request);
+      await service.revokeTrustedDevice(context, request.params.deviceId, requestMeta(request));
+      // Era este mesmo navegador: o cookie local vai junto, senão ele seguiria
+      // mandando um token morto a cada entrada.
+      if (context.trustedDeviceId === request.params.deviceId) {
+        reply.clearCookie(env.ADMIN_TRUSTED_COOKIE_NAME, { path: '/admin' });
+      }
+      return { message: 'Este navegador vai pedir o código na próxima entrada.' };
     },
   );
 
