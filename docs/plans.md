@@ -59,6 +59,27 @@ gratuito (retenção), não baixar o teto de produtos.
 | App Android | Google Play (produto `assinatura`, base plan `plano-basico`) | definido no Play Console |
 | Web (`/app/plano`) | Asaas — Pix, boleto ou cartão ([billing-asaas.md](billing-asaas.md)) | `plans.web_price_monthly_cents` / `web_price_yearly_cents`, editáveis no painel (Planos); vazio = não vendido na web |
 
+### O valor de uma compra pela Play
+
+A compra pela Play não grava ciclo nem valor na assinatura: o Google não os
+manda em campo próprio. O que sobra é o comprovante guardado em
+`subscriptions.raw`, lido por `modules/billing/play-price.ts`:
+
+- **preço cheio**: `lineItems[].autoRenewingPlan.recurringPrice`
+  (`units` + `nanos`);
+- **oferta de entrada em curso**: só a marca da fase
+  (`lineItems[].offerPhase.introductoryPrice`), sem o valor — ele vem do
+  plano (`google_offer_price_cents` / `google_offer_cycles`, em Painel ›
+  Planos);
+- **periodicidade**: deduzida de quanto falta até `expiryTime`. `startTime` é
+  o início da assinatura inteira, não do período em curso, por isso não serve
+  depois da primeira renovação.
+
+Quem depende disso: relatório financeiro, conversão offline do Google Ads e o
+aviso por e-mail aos administradores de assinatura nova ou reativada
+(`modules/billing/subscription-alerts.ts`), que mostra plano, ciclo, valor da
+oferta, preço cheio e número do pedido no Google.
+
 A assinatura é da empresa e vale nos dois clientes, qualquer que seja o
 canal. Na web valem os mesmos limites: o teto de produtos é conferido a cada
 cadastro ou importação (403 `PLAN_LIMIT_REACHED`) e, sem o recurso de equipe,

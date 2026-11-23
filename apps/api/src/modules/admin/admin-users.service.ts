@@ -18,7 +18,7 @@ import { AuditAction, SECURITY_USER_ACTIONS, recordAudit } from '../audit/audit.
 import { ENTITLED_STATES, LIVE_STATES } from '../billing/billing.service.js';
 import { AuthService, bumpPermissionVersion, revokeUserSessions } from '../auth/auth.service.js';
 import { SUBSCRIPTION_CONVERSION_NAME, type OfflineConversionRow } from '../auth/signup-attribution.js';
-import { googleRecurringCents } from './admin-finance.js';
+import { googleRecurringCents } from '../billing/play-price.js';
 import { AdminAction, SECURITY_ADMIN_ACTIONS, recordAdminAudit, type AdminActor } from './admin-audit.service.js';
 import { sqlList } from './admin-series.js';
 import { iso, offsetOf, type Paginated, type PaginationQuery } from './admin.schemas.js';
