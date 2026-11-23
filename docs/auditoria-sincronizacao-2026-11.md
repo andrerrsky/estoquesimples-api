@@ -160,6 +160,28 @@ página. Nada mais desce, e a tela mostra "sincronizado". **Confirmado.**
 O status `abandonada` existe no CHECK e nunca é gravado. Combinado com A12, o
 "tente de novo em instantes" pode ser para sempre. **Confirmado.**
 
+**A17. Texto com byte nulo derrubava todo push do aparelho — corrigido em
+23/11/2026.** `sync.schemas.ts`, `errors/error-log.ts`
+O SQLite do app aceita qualquer byte num campo de texto; o Postgres recusa
+`\u0000`. A importação de planilha de até a versão 38 lia o arquivo pela
+posição das colunas, inclusive um binário renomeado para `.csv`, então bastava
+**um** produto assim para todo `sync/push` daquele aparelho morrer em 500,
+para sempre, com a tela dizendo apenas "erro ao sincronizar". Foi o que
+prendeu os 104 produtos de uma empresa no celular desde 06/11/2026 (`estoque`,
+dois 500 registrados pelo app, em 09/11 e 23/11).
+
+Pior: o registro do erro no painel **também** falhava, porque a mensagem do
+erro de banco cita o valor que o derrubou — o 500 não aparecia em Admin ›
+Erros, e o servidor parecia são.
+
+Correção na borda, para valer já para quem tem a sujeira gravada: o contrato
+do sync limpa caracteres de controle de todo texto (menos quebra de linha e
+tabulação, que são texto de verdade), o `scrub` do registro de erros faz o
+mesmo, e o payload de produto no corpo do push passou a ser **frouxo** — a
+validação forte continua por operação, no serviço, para que um produto podre
+volte como `rejeitada` em vez de derrubar o lote inteiro com 400. Testes em
+`tests/sync/texto-binario.test.ts`. **Resolvido.**
+
 ### Grupo D — correções pontuais
 
 **A15. Produtos homônimos são endereçados por nome.** `data/ProductRepository.java:45-56`
