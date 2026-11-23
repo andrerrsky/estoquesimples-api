@@ -11,20 +11,45 @@ import { z } from 'zod';
 /** Quantidades aceitam fração porque o app tem unidades como kg e litro. */
 const quantidade = z.number().finite();
 
+/**
+ * Tira caracteres de controle do texto que vem do aparelho.
+ *
+ * O SQLite do app guarda qualquer byte num campo de texto; o Postgres recusa
+ * `\u0000` e devolve erro de banco. O caso real: a importação de planilha de
+ * até a versão 38 lia o arquivo pela posição das colunas, inclusive um
+ * binário renomeado para `.csv`, e bastava um produto assim para **todo**
+ * `sync/push` daquele aparelho morrer em 500 — o estoque inteiro ficava preso
+ * no celular, sem explicação na tela. Limpar na borda resolve para quem já
+ * tem a sujeira gravada, que é quem não pode esperar uma versão nova do app.
+ *
+ * Fica de fora da limpeza o que é texto de verdade: quebra de linha, retorno
+ * de carro e tabulação aparecem em observação e descrição.
+ */
+export function semControle(valor: string): string {
+  // eslint-disable-next-line no-control-regex
+  return valor.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
+
+/** Texto do aparelho: limpo antes de qualquer medida de tamanho. */
+const texto = (max: number) => z.string().transform(semControle).pipe(z.string().max(max));
+
+/** Texto obrigatório: o que sobra depois da limpeza é que precisa ter conteúdo. */
+const textoObrigatorio = (max: number) => z.string().transform(semControle).pipe(z.string().trim().min(1).max(max));
+
 export const productInputSchema = z
   .object({
     id: z.string().uuid(),
-    name: z.string().trim().min(1).max(200),
-    description: z.string().max(2000).nullish(),
+    name: textoObrigatorio(200),
+    description: texto(2000).nullish(),
     quantity: quantidade,
     unitValue: quantidade.nonnegative().default(0),
     minStock: quantidade.nonnegative().default(0),
-    unit: z.string().max(30).nullish(),
-    category: z.string().max(120).nullish(),
-    supplier: z.string().max(120).nullish(),
-    location: z.string().max(120).nullish(),
-    sku: z.string().max(80).nullish(),
-    barcode: z.string().max(80).nullish(),
+    unit: texto(30).nullish(),
+    category: texto(120).nullish(),
+    supplier: texto(120).nullish(),
+    location: texto(120).nullish(),
+    sku: texto(80).nullish(),
+    barcode: texto(80).nullish(),
     /**
      * Imagem do produto: SHA-256 (hex) devolvido por `PUT /images`.
      *
@@ -57,6 +82,12 @@ export const productInputSchema = z
   })
   .strict();
 
+/**
+ * O mesmo produto, sem exigir nome: serve só para o corpo do push passar pela
+ * validação de forma e deixar a decisão por operação com o serviço.
+ */
+export const productLooseSchema = productInputSchema.extend({ name: texto(200) });
+
 export const movementInputSchema = z
   .object({
     id: z.string().uuid(),
@@ -64,11 +95,11 @@ export const movementInputSchema = z
     // sumiram antes de existirem identificadores. Recusá-las faria o usuário
     // perder registros verdadeiros logo na primeira sincronização.
     productId: z.string().uuid().nullish(),
-    productName: z.string().max(200).nullish(),
-    changeType: z.string().trim().min(1).max(40),
+    productName: texto(200).nullish(),
+    changeType: textoObrigatorio(40),
     quantity: quantidade,
     occurredAt: z.number().int().nonnegative(),
-    note: z.string().max(2000).nullish(),
+    note: texto(2000).nullish(),
     /**
      * Id da movimentação original, quando esta é o estorno de outra.
      *
@@ -166,7 +197,15 @@ export const operationSchema = z
     op: z.enum(['upsert', 'delete', 'movement']),
     entityId: z.string().uuid(),
     baseRev: z.number().int().nonnegative().nullish(),
-    payload: z.union([productInputSchema, productTombstoneSchema, movementInputSchema]),
+    /**
+     * Frouxo de propósito no corpo: cada operação é revalidada uma a uma pelo
+     * serviço, com o schema estrito, e a que não passar volta como
+     * `rejeitada`. Se a validação forte estivesse aqui, **um** produto podre
+     * no lote derrubaria os outros 499 com um 400 — e o aparelho, que reenvia
+     * o mesmo lote, nunca mais conseguiria sincronizar nada. Foi assim que
+     * uma empresa ficou com o estoque preso no celular desde 06/11/2026.
+     */
+    payload: z.union([productLooseSchema, productTombstoneSchema, movementInputSchema]),
   })
   .strict();
 

@@ -41,9 +41,18 @@ export interface ErrorEventInput {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Tira dados pessoais e segredos que costumam aparecer em mensagens de erro. */
+/**
+ * Tira dados pessoais e segredos que costumam aparecer em mensagens de erro.
+ *
+ * E caracteres de controle: a mensagem de um erro de banco costuma **citar o
+ * valor** que o derrubou, então um `\u0000` vindo do aparelho voltaria aqui
+ * dentro e faria o próprio registro do erro falhar — o 500 sumia do painel
+ * justamente nos casos em que mais se precisa dele.
+ */
 export function scrub(text: string): string {
   return text
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '<email>')
     .replace(/\b(Bearer|token|senha|password|secret|key)([=:\s"']+)[^\s"'&,)]+/gi, '$1$2<oculto>')
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '<jwt>');
