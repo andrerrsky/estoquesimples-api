@@ -19,8 +19,23 @@ beforeAll(async () => {
   context = await createTestApp({ LIFECYCLE_EMAILS_MODE: 'send', SUPPORT_NOTIFY_EMAILS: 'suporte@exemplo.com.br' });
 });
 
+/**
+ * Estado conhecido: só os cupons que o próprio caso criar.
+ *
+ * O BF26 vem da migration com as datas reais da campanha (20/11 a 01/12 de
+ * 2026) e fica **desativado** por padrão. Antes ele era deixado ativo, e os
+ * casos que olham o "agora" davam certo só porque a campanha ainda não tinha
+ * começado — em 20/11/2026 ela entrou no ar e quatro testes passaram a
+ * falhar, sem nada ter mudado no código. Quem precisa dele ativo chama
+ * `ativarBf26()`.
+ */
 async function cleanCoupons(): Promise<void> {
   await context.services.db.execute(sql`DELETE FROM coupons WHERE code <> 'BF26'`);
+  await context.services.db.execute(sql`UPDATE coupons SET active = false WHERE code = 'BF26'`);
+}
+
+/** Liga a campanha real, para os casos que medem a vigência dela. */
+async function ativarBf26(): Promise<void> {
   await context.services.db.execute(sql`UPDATE coupons SET active = true WHERE code = 'BF26'`);
 }
 
@@ -115,6 +130,7 @@ async function redemptions() {
 describe('campanha e cupom (vigência e preços)', () => {
   it('BF26: próxima antes de 20/11, vigente até 01/12 23:59:59 de Brasília, depois some', async () => {
     await context.services.db.execute(sql`DELETE FROM coupons WHERE code <> 'BF26'`);
+    await ativarBf26();
     const service = new PromotionsService(context.services);
     const pricing = { monthlyCents: 2499, yearlyCents: 19990 };
 
@@ -373,8 +389,9 @@ describe('e-mails da promoção', () => {
   const at = (iso: string) => new Date(iso);
 
   async function bf26Live(): Promise<void> {
-    // O BF26 vigente no "agora" dos testes (20/11 a 01/12) e só ele.
+    // Só a campanha real, ligada: estes casos passam a data na mão.
     await context.services.db.execute(sql`DELETE FROM coupons WHERE code <> 'BF26'`);
+    await ativarBf26();
   }
 
   it('campanha: só base grátis com e-mails liberados, a partir das 10 h, uma vez por data', async () => {

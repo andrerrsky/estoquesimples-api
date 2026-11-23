@@ -23,9 +23,15 @@ async function login(role: 'owner' | 'support' | 'viewer'): Promise<Record<strin
   return { cookie, ...CSRF };
 }
 
+/**
+ * Só os cupons que cada caso criar. O BF26 vem da migration com as datas
+ * reais e fica desativado: deixá-lo ativo fazia estes testes dependerem do
+ * calendário — eles passavam enquanto a campanha não tinha começado e
+ * quebraram sozinhos em 20/11/2026, quando ela entrou no ar.
+ */
 async function cleanCoupons(): Promise<void> {
   await context.services.db.execute(sql`DELETE FROM coupons WHERE code <> 'BF26'`);
-  await context.services.db.execute(sql`UPDATE coupons SET active = true WHERE code = 'BF26'`);
+  await context.services.db.execute(sql`UPDATE coupons SET active = false WHERE code = 'BF26'`);
 }
 
 async function createCoupon(code: string, startOffsetMs: number, endOffsetMs: number): Promise<string> {
@@ -91,8 +97,8 @@ describe('painel: cupons (leitura)', () => {
     const body = list.json();
     expect(body).toMatchObject({ page: 1, total: 4, fullPricing: { monthlyCents: 2499, yearlyCents: 19990 } });
     const byCode = Object.fromEntries(body.items.map((item: { code: string }) => [item.code, item]));
-    // Antes de 20/11/2026 o BF26 está agendado.
-    if (Date.now() < Date.parse('2026-11-20T03:00:00Z')) expect(byCode['BF26'].status).toBe('agendado');
+    // O BF26 da migration entra na lista desativado (ver `cleanCoupons`).
+    expect(byCode['BF26'].status).toBe('desativado');
     expect(byCode['NOAR26']).toMatchObject({ status: 'no_ar', reserved: 1, redeemed: 1, redeemedRevenueCents: 11990, yearlyPriceCents: 11990, monthlyFirstCents: 1249 });
     expect(byCode['VELHO26'].status).toBe('encerrado');
     expect(byCode['DESLIG26'].status).toBe('desativado');
@@ -142,7 +148,7 @@ describe('painel: cupons (ações)', () => {
     expect(off.statusCode).toBe(200);
     expect(await auditRows('coupon.deactivated')).toEqual([{ target_id: id, metadata: { code: 'FREIO26', reason: 'preço errado no anúncio' } }]);
 
-    // Some da campanha em destaque (BF26 é a próxima, então ela aparece como upcoming).
+    // Some da campanha em destaque: sem outro cupom vigente, não sobra nenhuma.
     const promo = (await context.app.inject({ method: 'GET', url: '/v1/public/promo' })).json();
     expect(promo.code).not.toBe('FREIO26');
     expect(promo.active).toBe(false);
