@@ -22,7 +22,7 @@ const RANK: Record<AdminRole, number> = { viewer: 10, support: 50, owner: 100 };
 interface AuthState {
   admin: AdminMe | null;
   loading: boolean;
-  login: (email: string, password: string, code?: string) => Promise<void>;
+  login: (email: string, password: string, code?: string, trustDevice?: boolean) => Promise<void>;
   /** Relê o administrador (depois de ativar ou desativar o segundo fator). */
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
@@ -63,8 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
-  const login = useCallback(async (email: string, password: string, code?: string) => {
-    await api.post('/auth/login', { email, password, ...(code ? { code } : {}) });
+  const login = useCallback(async (email: string, password: string, code?: string, trustDevice?: boolean) => {
+    // `trustDevice` só vai junto com o código: sem ele o servidor ignora, e
+    // mandar sempre faria o painel prometer algo que não acontece.
+    await api.post('/auth/login', { email, password, ...(code ? { code } : {}), ...(code && trustDevice ? { trustDevice: true } : {}) });
     const me = await api.get<AdminMe>('/auth/me');
     setAdmin(me);
     gaEvent('login', { method: 'painel', role: me.role });

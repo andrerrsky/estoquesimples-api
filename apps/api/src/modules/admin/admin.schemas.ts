@@ -73,6 +73,12 @@ export const adminLoginBodySchema = z
     password: z.string().min(1).max(200),
     /** Código do autenticador (6 dígitos) ou de recuperação, quando o segundo fator está ativo. */
     code: z.string().trim().max(20).optional(),
+    /**
+     * "Confiar neste navegador": por alguns dias ele dispensa o código do
+     * autenticador e a sessão dura esses dias. Só vale junto com um código
+     * conferido agora — o servidor ignora a marcação em qualquer outro caso.
+     */
+    trustDevice: z.boolean().optional(),
   })
   .strict();
 

@@ -111,3 +111,21 @@ export function adminCookieOptions(env: { NODE_ENV: string; ADMIN_SESSION_MAX_DA
     maxAge: env.ADMIN_SESSION_MAX_DAYS * 86_400,
   };
 }
+
+/**
+ * Cookie do navegador confiável. Mesmas defesas do cookie de sessão
+ * (httpOnly, SameSite=Strict, assinado, preso ao caminho do painel) — ele
+ * dispensa o código do segundo fator, então não pode ser mais fácil de
+ * roubar do que a própria sessão.
+ */
+export function adminTrustedCookieOptions(env: { NODE_ENV: string; ADMIN_TRUSTED_DEVICE_DAYS: number }) {
+  const secure = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
+  return {
+    path: '/admin',
+    httpOnly: true,
+    secure,
+    sameSite: 'strict' as const,
+    signed: true,
+    maxAge: env.ADMIN_TRUSTED_DEVICE_DAYS * 86_400,
+  };
+}

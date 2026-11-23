@@ -41,6 +41,34 @@ export const platformAdmins = pgTable(
   (table) => [uniqueIndex('platform_admins_email_unique').on(sql`lower(${table.email})`)],
 );
 
+/**
+ * Navegador que o administrador marcou como confiável depois de conferir o
+ * segundo fator. Dispensa o código do autenticador — nunca a senha — e dá
+ * direito à sessão longa. O token mora só como hash.
+ */
+export const adminTrustedDevices = pgTable(
+  'admin_trusted_devices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    adminId: uuid('admin_id')
+      .notNull()
+      .references(() => platformAdmins.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** Como a lista do painel mostra o navegador ("Chrome no macOS"). */
+    label: text('label'),
+    ipAddress: inet('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', tz).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', tz).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', tz).notNull(),
+    revokedAt: timestamp('revoked_at', tz),
+    revokedReason: text('revoked_reason'),
+  },
+  (table) => [
+    index('admin_trusted_devices_admin_idx').on(table.adminId).where(sql`${table.revokedAt} IS NULL`),
+  ],
+);
+
 export const adminSessions = pgTable(
   'admin_sessions',
   {
@@ -56,6 +84,11 @@ export const adminSessions = pgTable(
     expiresAt: timestamp('expires_at', tz).notNull(),
     revokedAt: timestamp('revoked_at', tz),
     revokedReason: text('revoked_reason'),
+    /**
+     * Navegador confiável de onde esta sessão nasceu. É a marca que autoriza
+     * a sessão longa, e revogar o navegador encerra as sessões dele.
+     */
+    trustedDeviceId: uuid('trusted_device_id').references(() => adminTrustedDevices.id, { onDelete: 'set null' }),
   },
   (table) => [
     index('admin_sessions_admin_idx').on(table.adminId).where(sql`${table.revokedAt} IS NULL`),
@@ -104,5 +137,6 @@ export const adminAccountNotes = pgTable(
 
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;
 export type AdminSession = typeof adminSessions.$inferSelect;
+export type AdminTrustedDevice = typeof adminTrustedDevices.$inferSelect;
 export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
 export type AdminAccountNote = typeof adminAccountNotes.$inferSelect;

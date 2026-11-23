@@ -19,6 +19,14 @@ interface Overview {
   recentAdminActions: Array<{ id: string; adminEmail: string; action: string; targetType: string | null; targetId: string | null; at: string }>;
 }
 
+
+/**
+ * A partir de quantas pendências de conta (exclusões pedidas + contas
+ * suspensas) o cartão "Em atenção" acende. Abaixo disso é rotina: o pedido de
+ * exclusão espera o prazo legal sozinho e a suspensão foi decisão nossa.
+ */
+const ATENCAO_LIMIAR = 10;
+
 const ALERT_LABEL: Record<string, string> = {
   jobs_falhos: 'Tarefas falharam',
   fila_atrasada: 'Fila de tarefas atrasada',
@@ -140,7 +148,21 @@ export function OverviewPage() {
           label="Em atenção"
           value={fmtNumber((k['subscriptionsOnHold'] ?? 0) + (k['usersPendingDeletion'] ?? 0) + (k['usersSuspended'] ?? 0))}
           foot={`${fmtNumber(k['subscriptionsOnHold'] ?? 0)} suspensas · ${fmtNumber(k['usersPendingDeletion'] ?? 0)} exclusões · ${fmtNumber(k['usersSuspended'] ?? 0)} contas suspensas`}
-          tone={((k['subscriptionsOnHold'] ?? 0) + (k['usersPendingDeletion'] ?? 0)) > 0 ? 'alert' : undefined}
+          /*
+           * Destaque é um pedido de ação, e ele gasta: um cartão laranja que
+           * acende por duas exclusões pendentes — que o job processa sozinho,
+           * e que costumam ser contas de teste nossas — ensina a ignorar o
+           * laranja. Só assinatura suspensa é dinheiro parado e merece o
+           * destaque sozinha; o resto só acende em volume (ATENCAO_LIMIAR),
+           * quando deixa de ser rotina.
+           */
+          tone={
+            (k['subscriptionsOnHold'] ?? 0) > 0 ||
+            (k['usersPendingDeletion'] ?? 0) + (k['usersSuspended'] ?? 0) >= ATENCAO_LIMIAR
+              ? 'alert'
+              : undefined
+          }
+          hint="Assinaturas suspensas, pedidos de exclusão de conta à espera do prazo legal e contas suspensas pelo suporte."
         />
         <StatTile label="Aparelhos ativos (7d)" value={fmtNumber(k['devicesActive7d'])} foot={`${fmtNumber(k['syncOps24h'] ?? 0)} operações de sync em 24h`} hint="Instalações do app e navegadores da web vistos nos últimos 7 dias." />
         <StatTile

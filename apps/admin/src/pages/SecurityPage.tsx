@@ -13,6 +13,15 @@ interface MfaStatus {
   recoveryCodesLeft: number;
 }
 
+interface TrustedDevice {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
 /**
  * Segundo fator do painel (TOTP). Com `forced`, é a única tela que abre:
  * o painel exige o autenticador e este administrador ainda não cadastrou.
@@ -36,6 +45,23 @@ export function SecurityPage({ forced = false }: { forced?: boolean }) {
       .then(setQr)
       .catch(() => setQr(null));
   }, [setup]);
+
+  // Navegadores confiáveis: só fazem sentido com o segundo fator ativo, e é
+  // aqui que se corta o acesso de um computador que ficou para trás.
+  const devices = useQuery({
+    queryKey: ['trusted-devices'],
+    queryFn: () => api.get<{ days: number; items: TrustedDevice[] }>('/auth/trusted-devices'),
+    enabled: Boolean(status.data?.enabled),
+  });
+
+  const revokeDevice = useMutation({
+    mutationFn: (id: string) => api.post(`/auth/trusted-devices/${id}/revoke`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['trusted-devices'] });
+      toast.push('Este navegador vai pedir o código na próxima entrada.', 'success');
+    },
+    onError: (error) => toast.push(errorMessage(error), 'error'),
+  });
 
   const start = useMutation({
     mutationFn: () => api.post<{ secret: string; otpauthUri: string }>('/auth/mfa/setup'),
@@ -114,6 +140,42 @@ export function SecurityPage({ forced = false }: { forced?: boolean }) {
         <>
           <Card title="Aplicativo autenticador" actions={<Badge tone="success">ativo</Badge>}>
             <p className="muted">Todo login no painel pede o código de 6 dígitos do aplicativo. Restam {status.data.recoveryCodesLeft} código(s) de recuperação.</p>
+          </Card>
+          <Card
+            title="Navegadores confiáveis"
+            subtitle={`Entrar marcando "confiar neste navegador" dispensa o código por ${devices.data?.days ?? 10} dias e mantém a sessão aberta nesse prazo. A senha continua sendo pedida sempre, e vários computadores podem ficar conectados ao mesmo tempo.`}
+          >
+            {devices.isLoading ? (
+              <Skeleton />
+            ) : devices.data && devices.data.items.length > 0 ? (
+              <div className="table-wrap">
+                <table className="table table--compact">
+                  <thead>
+                    <tr><th>Navegador</th><th>Marcado em</th><th>Último acesso</th><th>Vence em</th><th /></tr>
+                  </thead>
+                  <tbody>
+                    {devices.data.items.map((device) => (
+                      <tr key={device.id}>
+                        <td>
+                          {device.label ?? 'Navegador'}
+                          {device.current && <> <Badge tone="success">este</Badge></>}
+                        </td>
+                        <td>{new Date(device.createdAt).toLocaleDateString('pt-BR')}</td>
+                        <td>{new Date(device.lastUsedAt).toLocaleString('pt-BR')}</td>
+                        <td>{new Date(device.expiresAt).toLocaleDateString('pt-BR')}</td>
+                        <td className="num">
+                          <button type="button" className="btn btn--sm btn--secondary" disabled={revokeDevice.isPending} onClick={() => revokeDevice.mutate(device.id)}>
+                            Deixar de confiar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="muted">Nenhum navegador confiável. Todo acesso pede o código do autenticador.</p>
+            )}
           </Card>
           <Card title="Desativar" subtitle={status.data.required ? 'O painel exige segundo fator: depois de desativar, você cadastra outro aparelho para continuar.' : 'Sem o segundo fator, só a senha protege seu acesso.'}>
             <form className="stack stack--tight" onSubmit={submitDisable} style={{ maxWidth: 420 }}>
