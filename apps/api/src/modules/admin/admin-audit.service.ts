@@ -40,6 +40,14 @@ export const AdminAction = {
   WORKSPACE_BRAND_BLOCKED: 'workspace.brand_blocked',
   WORKSPACE_BRAND_UNBLOCKED: 'workspace.brand_unblocked',
   WORKSPACE_OWNERSHIP_TRANSFERRED: 'workspace.ownership_transferred',
+  /**
+   * Produto do cliente excluído pelo suporte. A aba Estoque do painel é de
+   * leitura de propósito ("o estoque é do cliente"); esta é a exceção, criada
+   * para limpar o que um defeito nosso gravou lá — a importação que, até a
+   * versão 38, criava produtos a partir de uma planilha que não era catálogo.
+   * Exclusão lógica: o produto pode ser restaurado pelo cliente no app.
+   */
+  WORKSPACE_PRODUCT_DELETED: 'workspace.product_deleted',
   /** Dias de cortesia dados ao cliente (migration 0038). */
   WORKSPACE_COURTESY_GRANTED: 'workspace.courtesy_granted',
   WORKSPACE_COURTESY_REVOKED: 'workspace.courtesy_revoked',
@@ -138,6 +146,7 @@ export const SECURITY_ADMIN_ACTIONS: readonly AdminActionValue[] = [
   AdminAction.WORKSPACE_DELETED,
   AdminAction.WORKSPACE_RESTORED,
   AdminAction.WORKSPACE_OWNERSHIP_TRANSFERRED,
+  AdminAction.WORKSPACE_PRODUCT_DELETED,
   AdminAction.WORKSPACE_MEMBER_ROLE_CHANGED,
   AdminAction.WORKSPACE_MEMBER_STATUS_CHANGED,
   AdminAction.WORKSPACE_MEMBER_REMOVED,

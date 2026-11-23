@@ -87,6 +87,8 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `conference.finished` | app | conferência aplicada ao estoque | `scope_type`, `counted`, `divergent`, `delta_value`, `duration_ms` |
 | `conference.blocked` | app | limite gratuito de conferências atingido (vira `paywall.viewed` com `trigger=conference`) | `origin`, `done_this_month` |
 | `import.completed` / `export.completed` | app | importação/exportação concluída | `format`, `count` |
+| `product_form.opened` / `product_form.abandoned` | app | abertura do cadastro de produto e saída sem salvar | `fields_filled`, `duration_ms` |
+| `import.failed` | app | importação que não aplicou nada: arquivo recusado, ilegível ou sem linha aproveitável | `format`, `reason`, `failed` |
 | `backup.created` / `backup.restored` | app | backup local | — |
 | `paywall.viewed` | app | tela de assinatura exibida | `trigger` (de onde veio) |
 | `purchase.started` / `purchase.failed` | app | fluxo do Play Billing | `reason` (código do Billing) |
