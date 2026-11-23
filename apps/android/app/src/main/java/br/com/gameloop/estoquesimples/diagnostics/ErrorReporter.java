@@ -85,11 +85,23 @@ public final class ErrorReporter {
                 null, 0, null, null));
     }
 
-    /** Resposta 5xx da API: guarda o código para cruzar com o registro do servidor. */
+    /**
+     * Resposta 5xx da API: guarda o código para cruzar com o registro do servidor.
+     *
+     * 502, 503 e 504 vêm da borda, não da API: a requisição nem chegou (rede
+     * da pessoa, proxy, servidor reiniciando) e o corpo não é o nosso JSON —
+     * sem código nem mensagem. Entram como aviso e com texto legível, para
+     * não enterrar no painel os erros que são defeito do código.
+     */
     public static void reportApi(String method, String path, int status, String code, String message,
                                  String correlationId) {
         String endpoint = path == null ? null : UUID.matcher(path.split("\\?")[0]).replaceAll(":id");
-        enqueue(event("error", "api", code, status + " " + code + ": " + message, null,
+        boolean gateway = status == 502 || status == 503 || status == 504;
+        boolean semCorpo = code == null || code.isEmpty();
+        String resumo = semCorpo
+                ? status + (gateway ? " (a requisição não chegou à API)" : " (resposta sem corpo)")
+                : status + " " + code + ": " + message;
+        enqueue(event(gateway ? "warning" : "error", "api", code, resumo, null,
                 method + " " + endpoint, status, correlationId, null));
     }
 
