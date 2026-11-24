@@ -302,6 +302,7 @@ export class AdminAuthService {
       throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão encerrada. Entre novamente.');
     }
     if (row.expiresAt.getTime() <= now) {
+      await this.marcarVencida(row, 'inatividade');
       throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão expirada. Entre novamente.');
     }
     // Sessão nascida de navegador confiável: dias em vez de horas, e nunca
@@ -313,6 +314,7 @@ export class AdminAuthService {
     if (row.trustedDeviceId) {
       const device = await this.loadTrustedDevice(row.trustedDeviceId);
       if (!device || device.revokedAt || device.expiresAt.getTime() <= now) {
+        await this.marcarVencida(row, device?.revokedAt ? 'navegador_revogado' : 'navegador_vencido');
         throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Este navegador não é mais confiável. Entre novamente.');
       }
       const dias = this.env.ADMIN_TRUSTED_DEVICE_DAYS;
@@ -320,6 +322,7 @@ export class AdminAuthService {
       idleMs = dias * 86_400_000;
     }
     if (absoluteLimit <= now) {
+      await this.marcarVencida(row, 'teto_de_dias');
       throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão expirada. Entre novamente.');
     }
     if (row.status !== 'active') {
@@ -627,6 +630,48 @@ export class AdminAuthService {
         targetId: context.adminId,
       });
     });
+  }
+
+  /**
+   * Fecha a sessão vencida dizendo **por que** venceu.
+   *
+   * "Fui deslogado do nada" é, de fora, indistinguível de inatividade, teto
+   * de dias e navegador revogado, e a resposta HTTP não pode detalhar sem
+   * contar a estranhos como o painel se comporta. Então o motivo fica em
+   * `revoked_reason` e numa linha de auditoria, que é onde se investiga
+   * depois. Uma linha por sessão: a segunda chamada já cai no caminho de
+   * sessão revogada.
+   */
+  private async marcarVencida(
+    row: { sessionId: string; adminId: string; email: string; createdAt: Date; lastUsedAt: Date; expiresAt: Date; trustedDeviceId: string | null },
+    motivo: 'inatividade' | 'teto_de_dias' | 'navegador_revogado' | 'navegador_vencido',
+  ): Promise<void> {
+    try {
+      const marcadas = await this.db
+        .update(adminSessions)
+        .set({ revokedAt: new Date(), revokedReason: motivo })
+        .where(and(eq(adminSessions.id, row.sessionId), isNull(adminSessions.revokedAt)))
+        .returning({ id: adminSessions.id });
+      if (marcadas.length === 0) return;
+      await recordAdminAudit(this.db, {
+        actor: { adminId: row.adminId, email: row.email, ipAddress: null, userAgent: null },
+        action: AdminAction.ADMIN_SESSION_EXPIRED,
+        targetType: 'admin',
+        targetId: row.adminId,
+        metadata: {
+          motivo,
+          criadaEm: row.createdAt.toISOString(),
+          ultimoUsoEm: row.lastUsedAt.toISOString(),
+          vencimento: row.expiresAt.toISOString(),
+          navegadorConfiavel: row.trustedDeviceId !== null,
+          inatividadeHoras: this.env.ADMIN_SESSION_IDLE_HOURS,
+          tetoDias: row.trustedDeviceId ? this.env.ADMIN_TRUSTED_DEVICE_DAYS : this.env.ADMIN_SESSION_MAX_DAYS,
+        },
+      });
+    } catch (error) {
+      // Registrar o motivo não pode atrapalhar a recusa em si.
+      this.services.logger?.warn({ err: error }, 'não deu para registrar o vencimento da sessão do painel');
+    }
   }
 
   private idleExpiry(from: Date): Date {

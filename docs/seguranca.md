@@ -383,6 +383,15 @@ histórico de incidentes.
   desativar o acesso, zerar ou desativar o segundo fator e revogar as sessões
   derrubam a confiança junto. O limite é `ADMIN_TRUSTED_DEVICE_LIMIT` (5), e
   marcar um navegador manda aviso por e-mail.
+- **Por que a sessão do painel caiu**: quando uma sessão é recusada por ter
+  vencido, o motivo fica em `admin_sessions.revoked_reason` e numa linha de
+  auditoria (`admin.session_expired`), com `motivo`
+  (`inatividade` · `teto_de_dias` · `navegador_revogado` ·
+  `navegador_vencido`), quando a sessão nasceu, o último uso, o vencimento, se
+  era de navegador confiável e os prazos em vigor. A resposta HTTP continua
+  dizendo só "sessão expirada" — o detalhe não vai para quem bate na porta.
+  Existe porque "fui deslogado do nada" é, de fora, indistinguível entre os
+  quatro casos, e sem registro não há como saber depois qual foi.
 - **Logs de segurança**: toda ação de acesso e credenciais fica na
   auditoria com quem fez (conta ou administrador), IP e navegador/app
   (User-Agent). Clientes: cadastro, login, senha errada, bloqueio, tentativa

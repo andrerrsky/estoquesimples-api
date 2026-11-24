@@ -287,6 +287,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'stock.adjusted': { label: 'Estoque ajustado', tone: 'neutral' },
 
   'admin.logged_in': { label: 'Login no painel', tone: 'neutral' },
+  'admin.session_expired': { label: 'Sessão do painel vencida', tone: 'neutral' },
   'admin.login_failed': { label: 'Senha incorreta no painel', tone: 'warning' },
   'admin.mfa_enabled': { label: 'Segundo fator ativado', tone: 'success' },
   'admin.mfa_disabled': { label: 'Segundo fator desativado', tone: 'warning' },
