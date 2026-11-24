@@ -10,6 +10,7 @@ export const PRODUCT_FACT_LINES: readonly string[] = [
   'Entradas e saídas em poucos toques; o saldo se atualiza na hora; todo movimento fica no histórico com data e quem lançou; é possível estornar.',
   'Aviso de estoque baixo: na lista, nos relatórios e, no Android, uma notificação diária no aparelho; na web, avisos opcionais no navegador.',
   'Leitor de código de barras pela câmera (Android e navegadores com câmera) e por leitor USB no computador.',
+  'Conferência de estoque (contagem física/inventário): o app lista os produtos sem mostrar o saldo — contagem cega —, aponta as divergências e aplica os ajustes com a nota da conferência. Três por mês no plano Gratuito, completas; no Equipe são ilimitadas, com histórico comparando contagens, PDF da conferência e o registro de quem contou cada item.',
   'Relatórios: valor do estoque, produtos abaixo do mínimo, movimentações por período, em PDF para compartilhar. Análise avançada (tendências, giro) no plano Equipe.',
   'Importar e exportar por planilha (CSV/Excel) e JSON; backup; os dados ficam na nuvem com conta grátis.',
   'Plano Gratuito: uma pessoa, nuvem incluída, com teto de produtos. Plano Equipe (assinatura mensal, cancelável quando quiser): várias pessoas no mesmo estoque com papéis (quem cadastra, quem movimenta, quem só consulta), produtos sem limite na nuvem, análise avançada e identidade visual da empresa. Assinatura pela Google Play ou, na web, por Pix, boleto ou cartão.',

@@ -43,3 +43,15 @@ export function importPage<T>(loader: () => Promise<T>): Promise<T> {
     throw error;
   });
 }
+
+/**
+ * Saída para quando o arquivo da tela baixou mas não tem o que se esperava —
+ * aba antiga, nome de arquivo substituído por um deploy. Recarrega e deixa a
+ * promessa pendente, para a pessoa continuar vendo "carregando" em vez de um
+ * erro de render de um instante. Se não der para recarregar (recarga recente
+ * ou sem `sessionStorage`), lança: aí a tela de erro é a resposta honesta.
+ */
+export function pageFromNewVersion<T>(): Promise<T> {
+  if (reloadForNewVersion()) return new Promise<T>(() => undefined);
+  throw new Error('A tela não pôde ser carregada nesta versão da página.');
+}
