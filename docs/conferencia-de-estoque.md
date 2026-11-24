@@ -113,8 +113,16 @@ de divergências, total em reais e ajustes aplicados. Nada é escondido, nada é
 borrado, nada leva marca d'água.
 
 No plano **Equipe**: ilimitadas, mais histórico com comparação entre
-contagens (a perda está subindo ou caindo?), PDF da conferência, e o registro
-de quem contou cada item.
+contagens (a perda está subindo ou caindo?).
+
+> **O que foi para o ar (v37) e o que não foi.** O PDF da conferência e o
+> registro de quem contou cada item eram deste plano e **não existem no app**:
+> a tela de bloqueio promete apenas "ilimitada, com histórico". Enquanto não
+> forem feitos, o caminho para levar a conferência para fora do app é o
+> relatório de movimentações por período, onde os ajustes aparecem com a nota
+> `conferência <data>`. Os fatos do produto
+> (`modules/blog/product-facts.ts`), que a IA do atendimento usa, dizem isso —
+> não prometa o PDF.
 
 O contador não é um número guardado à parte: é `SELECT count(*) FROM
 inventory_sessions WHERE status='finished'` no mês corrente. Auditável, e
