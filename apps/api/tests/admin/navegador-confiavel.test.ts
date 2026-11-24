@@ -134,6 +134,16 @@ describe('navegador confiável no painel', () => {
     expect((await call('GET', '/auth/me', sessaoA)).statusCode).toBe(200);
     expect((await call('GET', '/auth/me', sessaoB)).statusCode).toBe(200);
 
+    // O navegador precisa guardar o cookie por todo o prazo da sessão: com
+    // Max-Age de 7 dias ele apagava o cookie no sétimo e pedia o código antes
+    // da hora, mesmo com a sessão ainda válida no servidor.
+    const maxAge = String(
+      (Array.isArray(computadorA.headers['set-cookie']) ? computadorA.headers['set-cookie'] : [String(computadorA.headers['set-cookie'])]).find((item) =>
+        String(item).startsWith('es_admin='),
+      ),
+    ).match(/Max-Age=(\d+)/)?.[1];
+    expect(Number(maxAge)).toBe(10 * 86_400);
+
     const devices = (await call('GET', '/auth/trusted-devices', sessaoB)).json() as { days: number; items: Array<{ current: boolean }> };
     expect(devices.days).toBe(10);
     expect(devices.items).toHaveLength(2);
