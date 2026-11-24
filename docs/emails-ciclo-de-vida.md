@@ -79,6 +79,14 @@ e-mails retroativos.
 1. Resend › Webhooks › Add endpoint: `https://estoquesimples.com.br/v1/email/resend-webhook`,
    eventos `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`,
    `email.complained`.
+1. **Resend › Domains › estoquesimples.com.br: ligar _Open tracking_ e _Click
+   tracking_.** Eles são por domínio e vêm **desligados**; assinar os eventos
+   no webhook não basta. Sem isso chegam `delivered`, `bounced` e
+   `complained`, nunca `opened` nem `clicked`, e o painel mostra 0% de
+   abertura — que se lê como "ninguém abre" quando a verdade é "ninguém mede".
+   Medido em 24/11/2026: 96 entregas, **zero** abertura e zero clique em todos
+   os tipos; o painel passou a avisar quando esse padrão aparece
+   (`tracking.likelyOff` em `/admin/api/lifecycle/summary`).
 2. Copiar o *signing secret* (`whsec_…`) para `RESEND_WEBHOOK_SECRET` no Railway.
 3. Conferir no painel (aviso some) e, depois de 2–3 dias de simulação conferida,
    `LIFECYCLE_EMAILS_MODE=send`. Anotar a data aqui.
@@ -96,3 +104,7 @@ investigar.
 ## Histórico
 
 - 7/11/2026: funil no ar em `dry_run`.
+- 24/11/2026: 102 e-mails decididos, 96 entregues, 1 bounce permanente (um
+  endereço nosso) — e **nenhuma abertura ou clique**, por falta do rastreio no
+  domínio do Resend. Nada a corrigir no envio; o que faltava era medir e não
+  tomar 0% por rejeição.
