@@ -29,6 +29,13 @@ export const AdminAction = {
   ADMIN_DISABLED: 'admin.disabled',
   ADMIN_REACTIVATED: 'admin.reactivated',
   ADMIN_SESSIONS_REVOKED: 'admin.sessions_revoked',
+  /**
+   * Sessão do painel recusada por ter vencido. Fica na auditoria porque
+   * "fui deslogado do nada" é indistinguível, de fora, de inatividade,
+   * teto de dias e navegador revogado — e sem o motivo gravado não há como
+   * saber depois qual dos três foi.
+   */
+  ADMIN_SESSION_EXPIRED: 'admin.session_expired',
 
   USER_UPDATED: 'user.updated',
   USER_SUSPENDED: 'user.suspended',

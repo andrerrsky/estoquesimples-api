@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { hashPassword } from '../../src/platform/auth/password.js';
@@ -207,6 +207,30 @@ describe('navegador confiável no painel', () => {
     const velho = await login(email, { device: primeiro });
     expect(velho.statusCode).toBe(401);
     expect(velho.json().error.code).toBe('ADMIN_MFA_REQUIRED');
+  });
+
+  it('sessão vencida fica na auditoria com o motivo, uma vez só', async () => {
+    const email = await createAdmin();
+    const { secret } = await enroll(email);
+    const entrada = await login(email, { code: codigo(secret, 1), trustDevice: true });
+    const sessao = sessionCookie(entrada);
+    expect((await call('GET', '/auth/me', sessao)).statusCode).toBe(200);
+
+    // Vencimento no passado: é o que o painel vê quando a pessoa volta depois
+    // do prazo.
+    await context.services.db.execute(sql`UPDATE admin_sessions SET expires_at = now() - interval '1 minute'`);
+    expect((await call('GET', '/auth/me', sessao)).statusCode).toBe(401);
+    expect((await call('GET', '/auth/me', sessao)).statusCode).toBe(401);
+
+    const linhas = await context.services.db.execute<{ motivo: string; confiavel: boolean; n: number }>(sql`
+      SELECT metadata->>'motivo' AS motivo, (metadata->>'navegadorConfiavel')::boolean AS confiavel, count(*)::int AS n
+      FROM admin_audit_log WHERE action = 'admin.session_expired' GROUP BY 1, 2`);
+    expect(linhas.rows).toEqual([{ motivo: 'inatividade', confiavel: true, n: 1 }]);
+
+    // A sessão de antes de ativar o segundo fator também está revogada, sem
+    // motivo: aqui interessa a que venceu agora.
+    const sessoes = await context.services.db.execute<{ revoked_reason: string }>(sql`SELECT revoked_reason FROM admin_sessions WHERE revoked_reason IS NOT NULL`);
+    expect(sessoes.rows).toEqual([{ revoked_reason: 'inatividade' }]);
   });
 
   it('cookie forjado é tratado como ausente', async () => {
