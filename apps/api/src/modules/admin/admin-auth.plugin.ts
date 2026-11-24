@@ -100,7 +100,17 @@ export function adminActor(request: FastifyRequest): AdminActor {
   };
 }
 
-export function adminCookieOptions(env: { NODE_ENV: string; ADMIN_SESSION_MAX_DAYS: number }) {
+/**
+ * Cookie de sessão do painel.
+ *
+ * O `maxAge` cobre o maior prazo que uma sessão pode ter: a de navegador
+ * confiável vive `ADMIN_TRUSTED_DEVICE_DAYS` (10 dias), mais do que os
+ * `ADMIN_SESSION_MAX_DAYS` (7) de uma sessão comum. Com 7 dias aqui, o
+ * navegador apagava o cookie no sétimo dia e pedia o código de novo antes do
+ * prazo prometido — quem manda na duração é o servidor
+ * (`admin_sessions.expires_at` e o vencimento do dispositivo), não o cookie.
+ */
+export function adminCookieOptions(env: { NODE_ENV: string; ADMIN_SESSION_MAX_DAYS: number; ADMIN_TRUSTED_DEVICE_DAYS: number }) {
   const secure = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
   return {
     path: '/admin',
@@ -108,7 +118,7 @@ export function adminCookieOptions(env: { NODE_ENV: string; ADMIN_SESSION_MAX_DA
     secure,
     sameSite: 'strict' as const,
     signed: true,
-    maxAge: env.ADMIN_SESSION_MAX_DAYS * 86_400,
+    maxAge: Math.max(env.ADMIN_SESSION_MAX_DAYS, env.ADMIN_TRUSTED_DEVICE_DAYS) * 86_400,
   };
 }
 

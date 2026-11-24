@@ -369,7 +369,10 @@ histórico de incidentes.
   SameSite=Strict, assinado, preso a `/admin`, token opaco guardado só como
   hash). Por `ADMIN_TRUSTED_DEVICE_DAYS` dias — hoje **10** — esse navegador
   dispensa o código e a sessão dele vive esses dias, em vez das 12 h de
-  inatividade e do teto de 7 dias das demais. O que ele **nunca** dispensa é
+  inatividade e do teto de 7 dias das demais (o `Max-Age` do cookie de sessão
+  acompanha o maior dos dois prazos: com os 7 dias de antes, o navegador
+  apagava o cookie no sétimo dia e pedia o código antes da hora, embora a
+  sessão ainda valesse no servidor — quem manda na duração é o servidor). O que ele **nunca** dispensa é
   a senha, e nada disso existe sem segundo fator ativo: a confiança só nasce
   de um código conferido na hora, então o cookie sozinho não cria outro nem
   estica o próprio prazo (o token é rotacionado a cada entrada, com o mesmo
