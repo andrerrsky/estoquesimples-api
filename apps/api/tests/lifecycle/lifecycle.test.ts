@@ -206,6 +206,25 @@ describe('funil de e-mails do ciclo de vida', () => {
     const templates = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/templates', headers: h })).json();
     // 7 do funil + 3 avisos de cupom + 3 da Black Friday.
     expect(templates.items).toHaveLength(13);
+
+    // Uma entrega só não é sinal de nada: o aviso de rastreio desligado espera
+    // volume antes de acusar.
+    await send.services.db.execute(sql`UPDATE lifecycle_emails SET delivered_at = now()`);
+    const poucas = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/summary', headers: h })).json();
+    expect(poucas.tracking).toMatchObject({ delivered: 1, opened: 0, clicked: 0, likelyOff: false });
+
+    // Com entregas de sobra e nenhuma abertura nem clique, o painel avisa que
+    // falta medir — em vez de deixar 0% passar por rejeição.
+    await send.services.db.execute(sql`
+      INSERT INTO lifecycle_emails (user_id, kind, dedupe_key, status, delivered_at)
+      SELECT (SELECT id FROM users LIMIT 1), 'activation_d4', 'teste-rastreio-' || g, 'sent', now() FROM generate_series(1, 25) g`);
+    const muitas = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/summary', headers: h })).json();
+    expect(muitas.tracking).toMatchObject({ delivered: 26, opened: 0, clicked: 0, likelyOff: true });
+
+    // Uma abertura registrada basta para o rastreio estar de pé.
+    await send.services.db.execute(sql`UPDATE lifecycle_emails SET opened_at = now() WHERE dedupe_key = 'teste-rastreio-1'`);
+    const comAbertura = (await send.app.inject({ method: 'GET', url: '/admin/api/lifecycle/summary', headers: h })).json();
+    expect(comAbertura.tracking).toMatchObject({ opened: 1, likelyOff: false });
   });
 });
 

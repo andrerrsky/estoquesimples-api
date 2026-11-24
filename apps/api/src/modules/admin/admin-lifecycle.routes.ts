@@ -49,9 +49,22 @@ export async function registerAdminLifecycleRoutes(app: FastifyInstance): Promis
         emailsSentToday(db),
       ]);
       const byKind = new Map(rows.rows.map((row) => [row.kind as string, row]));
+      const soma = (campo: string) => rows.rows.reduce((total, row) => total + Number(row[campo] ?? 0), 0);
+      const delivered = soma('delivered');
+      const opened = soma('opened');
+      const clicked = soma('clicked');
       return {
         mode: env.LIFECYCLE_EMAILS_MODE,
         webhookConfigured: Boolean(env.RESEND_WEBHOOK_SECRET),
+        /**
+         * No Resend, abertura e clique são rastreados por domínio e vêm
+         * **desligados**; assinar os eventos no webhook não basta. Sem isso o
+         * painel mostra 0% de abertura, que se lê como "ninguém abre" quando a
+         * verdade é "ninguém mede". Entregas suficientes com zero abertura e
+         * zero clique é o sintoma: é mais provável que o rastreio esteja
+         * desligado do que 20 pessoas não abrirem nenhum e-mail.
+         */
+        tracking: { delivered, opened, clicked, likelyOff: delivered >= 20 && opened === 0 && clicked === 0 },
         limits: { lifecycleDaily: env.LIFECYCLE_DAILY_LIMIT, totalDaily: env.EMAIL_DAILY_TOTAL_LIMIT },
         today,
         kinds: LIFECYCLE_KINDS.map((kind) => ({

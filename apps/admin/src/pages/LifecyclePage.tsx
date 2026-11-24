@@ -26,6 +26,7 @@ interface KindRow {
 interface Summary {
   mode: 'off' | 'dry_run' | 'send';
   webhookConfigured: boolean;
+  tracking?: { delivered: number; opened: number; clicked: number; likelyOff: boolean };
   limits: { lifecycleDaily: number; totalDaily: number };
   today: { total: number; lifecycle: number };
   kinds: KindRow[];
@@ -175,10 +176,26 @@ export function LifecyclePage() {
         </Card>
       )}
 
+      {data?.tracking?.likelyOff && (
+        <Card>
+          <p style={{ margin: 0 }}>
+            <strong>As aberturas e os cliques não estão sendo medidos.</strong> {fmtNumber(data.tracking.delivered)} e-mails
+            entregues, nenhuma abertura e nenhum clique registrados — no Resend o rastreio de abertura e de clique é por
+            domínio e vem desligado, e assinar os eventos no webhook não basta. Ligue em Resend › Domains ›
+            estoquesimples.com.br (Open tracking e Click tracking). Até lá, leia 0% como "sem medição", não como
+            "ninguém abriu": o que vale é "ativaram em 3 dias" e "voltaram em 3 dias".
+          </p>
+        </Card>
+      )}
+
       <div className="grid grid--tiles">
         <StatTile label="Decididos" value={fmtNumber(totals.decided)} foot={`${fmtNumber(totals.sent)} enviados`} />
-        <StatTile label="Taxa de abertura" value={pct(totals.opened, totals.sent)} foot="depende do rastreio de aberturas no Resend" />
-        <StatTile label="Taxa de clique" value={pct(totals.clicked, totals.sent)} />
+        <StatTile
+          label="Taxa de abertura"
+          value={data?.tracking?.likelyOff ? 'sem medição' : pct(totals.opened, totals.sent)}
+          foot="depende do rastreio de aberturas no Resend"
+        />
+        <StatTile label="Taxa de clique" value={data?.tracking?.likelyOff ? 'sem medição' : pct(totals.clicked, totals.sent)} />
         <StatTile label="Ativaram em 3 dias" value={fmtNumber(totals.activated)} hint="Cadastrou produto até 3 dias depois do e-mail. Indicador otimista: parte ativaria de qualquer jeito." />
         <StatTile
           label="Hoje (cota)"
