@@ -83,6 +83,7 @@ export const AdminAction = {
   NOTE_DELETED: 'note.deleted',
 
   OPS_SYNC_CONFIG_CHANGED: 'ops.sync_config_changed',
+  OPS_APP_VERSION_CHANGED: 'ops.app_version_changed',
   OPS_JOB_RETRIED: 'ops.job_retried',
   OPS_JOB_CANCELLED: 'ops.job_cancelled',
   OPS_JOB_DISMISSED: 'ops.job_dismissed',
@@ -167,6 +168,7 @@ export const SECURITY_ADMIN_ACTIONS: readonly AdminActionValue[] = [
   AdminAction.WORKSPACE_MEMBER_STATUS_CHANGED,
   AdminAction.WORKSPACE_MEMBER_REMOVED,
   AdminAction.OPS_SYNC_CONFIG_CHANGED,
+  AdminAction.OPS_APP_VERSION_CHANGED,
   AdminAction.SETTING_UPDATED,
   AdminAction.SETTING_REMOVED,
   AdminAction.DATA_EXPORTED,

@@ -12,6 +12,7 @@ API e painel administrativo, num repositório só.
 | [`packages/design`](packages/design) | tokens visuais (os do app) usados pela web e pelo painel | — |
 | [`packages/legal`](packages/legal) | Termos de Uso e Política de Privacidade: fonte única da web e do app | — |
 | [`packages/help`](packages/help) | central de ajuda (perguntas e respostas): fonte única da web, do app e do painel | — |
+| [`packages/changelog`](packages/changelog) | novidades do app (o que mudou em cada versão): fonte única da web e do app | — |
 
 API, painel e web são um **único serviço** no Railway: a API serve o painel em
 `/admin` e, nos hosts da web, a aplicação web (ver
@@ -75,6 +76,7 @@ não ficam no repositório. Contexto do app: [apps/android/AGENTS.md](apps/andro
 | `npm run seed:dev` | dados de demonstração |
 | `npm run legal:sync` / `legal:check` | copia (ou confere) os documentos legais nos assets do app |
 | `npm run help:sync` / `help:check` | copia (ou confere) a central de ajuda nos assets do app e valida os arquivos |
+| `npm run changelog:sync` / `changelog:check` | copia (ou confere) as novidades do app nos assets e valida a lista |
 | `npm run openapi` | imprime o contrato OpenAPI |
 
 ## Estrutura

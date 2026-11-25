@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selo da versão na tela de novidades: discreto, para o título continuar
+     sendo o que a pessoa lê primeiro. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/color_chip" />
+    <corners android:radius="@dimen/radius_chip" />
+</shape>

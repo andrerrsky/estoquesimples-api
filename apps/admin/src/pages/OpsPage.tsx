@@ -15,6 +15,7 @@ interface OpsStatus {
   alerts: Array<{ nome: string; detalhe: string }>;
   environment: Record<string, string | number | boolean>;
   sync: { enabled: boolean; minAppVersionCode: number; source: string; updatedAt: string | null };
+  appVersion: { latestVersionCode: number; minRequiredVersionCode: number; message: string | null; updatedAt: string | null };
   backup: { verifiedAt: string | null; hoursSince: number | null; withinLimit: boolean; maxAgeHours: number; details: Record<string, unknown> };
   migrations: Array<{ version: number; name: string; applied: boolean; reversible: boolean }>;
   jobKinds: Array<{ kind: string; pending: number; failed: number; completed24h: number; lastCompletedAt: string | null; lastError: string | null }>;
@@ -53,6 +54,8 @@ export function OpsPage() {
   const queryClient = useQueryClient();
   const [syncDialog, setSyncDialog] = useState(false);
   const [syncDraft, setSyncDraft] = useState({ enabled: true, minAppVersionCode: 0 });
+  const [versionDialog, setVersionDialog] = useState(false);
+  const [versionDraft, setVersionDraft] = useState({ latestVersionCode: 0, minRequiredVersionCode: 0, message: '' });
 
   const status = useQuery({ queryKey: ['ops', 'status'], queryFn: () => api.get<OpsStatus>('/ops/status'), refetchInterval: 60_000 });
   const data = status.data;
@@ -62,6 +65,16 @@ export function OpsPage() {
     if (!data) return;
     setSyncDraft({ enabled: data.sync.enabled, minAppVersionCode: data.sync.minAppVersionCode });
     setSyncDialog(true);
+  };
+
+  const openVersion = () => {
+    if (!data) return;
+    setVersionDraft({
+      latestVersionCode: data.appVersion.latestVersionCode,
+      minRequiredVersionCode: data.appVersion.minRequiredVersionCode,
+      message: data.appVersion.message ?? '',
+    });
+    setVersionDialog(true);
   };
 
   return (
@@ -104,6 +117,42 @@ export function OpsPage() {
             <Skeleton />
           )}
           <p className="caption" style={{ marginTop: 12 }}>Desligada, o app continua funcionando no aparelho e acumula as alterações; nada é perdido.</p>
+        </Card>
+        <Card
+          title="Versões do app Android"
+          subtitle="O que os aparelhos recebem em /v1/config: o aviso de versão nova e o bloqueio"
+          actions={can('owner') && data && <button type="button" className="btn btn--secondary btn--sm" onClick={openVersion}>Alterar</button>}
+        >
+          {data ? (
+            <KeyValue
+              items={[
+                {
+                  label: 'Versão mais nova',
+                  value:
+                    data.appVersion.latestVersionCode === 0 ? (
+                      <Badge tone="warning">não informada</Badge>
+                    ) : (
+                      `versionCode ${data.appVersion.latestVersionCode}`
+                    ),
+                },
+                {
+                  label: 'Versão obrigatória',
+                  value:
+                    data.appVersion.minRequiredVersionCode === 0
+                      ? 'ninguém é bloqueado'
+                      : `abaixo de ${data.appVersion.minRequiredVersionCode} o app para`,
+                },
+                { label: 'Recado no bloqueio', value: data.appVersion.message ?? '—' },
+                { label: 'Atualizado', value: data.appVersion.updatedAt ? <Time value={data.appVersion.updatedAt} /> : 'nunca' },
+              ]}
+            />
+          ) : (
+            <Skeleton />
+          )}
+          <p className="caption" style={{ marginTop: 12 }}>
+            Sem a versão mais nova informada, o app não avisa ninguém de que saiu atualização — ele só saberia pela
+            Play Store. Informe o versionCode logo depois de a versão ser aprovada.
+          </p>
         </Card>
         <Card title="Ambiente">
           {data ? (
@@ -175,6 +224,39 @@ export function OpsPage() {
           <Skeleton />
         )}
       </Card>
+
+      <ConfirmDialog
+        open={versionDialog}
+        onClose={() => setVersionDialog(false)}
+        title="Versões do app Android"
+        description="A versão mais nova só mostra um aviso dispensável no app. A obrigatória trava quem estiver abaixo dela."
+        confirmLabel="Aplicar"
+        danger={versionDraft.minRequiredVersionCode > 0}
+        confirmWord={versionDraft.minRequiredVersionCode > 0 ? 'bloquear' : undefined}
+        onConfirm={async (reason) => {
+          await api.put('/ops/app-version', {
+            latestVersionCode: versionDraft.latestVersionCode,
+            minRequiredVersionCode: versionDraft.minRequiredVersionCode,
+            message: versionDraft.message.trim() ? versionDraft.message.trim() : null,
+            reason,
+          });
+          toast.push('Versões do app aplicadas.', 'success');
+          void queryClient.invalidateQueries({ queryKey: ['ops'] });
+        }}
+      >
+        <label className="field">
+          <span className="field__label">Versão mais nova na loja (versionCode; 0 = não avisar)</span>
+          <input className="input" type="number" min={0} value={versionDraft.latestVersionCode} onChange={(event) => setVersionDraft({ ...versionDraft, latestVersionCode: Number(event.target.value) || 0 })} />
+        </label>
+        <label className="field">
+          <span className="field__label">Versão obrigatória (versionCode; 0 = não bloquear)</span>
+          <input className="input" type="number" min={0} value={versionDraft.minRequiredVersionCode} onChange={(event) => setVersionDraft({ ...versionDraft, minRequiredVersionCode: Number(event.target.value) || 0 })} />
+        </label>
+        <label className="field">
+          <span className="field__label">Recado na tela de bloqueio (opcional)</span>
+          <input className="input" maxLength={300} value={versionDraft.message} onChange={(event) => setVersionDraft({ ...versionDraft, message: event.target.value })} />
+        </label>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={syncDialog}

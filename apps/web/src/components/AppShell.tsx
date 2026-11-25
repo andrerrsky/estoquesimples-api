@@ -46,8 +46,9 @@ const BRAND_NAV: NavItem = { to: '/app/marca', label: 'Identidade visual', icon:
 
 const HELP_NAV: NavItem[] = [
   { to: '/app/ajuda', label: 'Central de ajuda', icon: 'book' },
+  { to: '/app/novidades', label: 'Novidades', icon: 'sparkle' },
   // O blog é o site público: abre em outra aba para não tirar a pessoa do estoque.
-  { to: '/blog', label: 'Dicas e novidades', icon: 'sparkle', newTab: true },
+  { to: '/blog', label: 'Blog', icon: 'book', newTab: true },
   { to: '/app/plataformas', label: 'Plataformas', icon: 'phone' },
   { to: '/app/suporte', label: 'Falar com o suporte', icon: 'help' },
 ];

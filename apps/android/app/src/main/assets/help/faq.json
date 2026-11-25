@@ -40,6 +40,25 @@
   ],
   "articles": [
     {
+      "id": "versao-do-app",
+      "category": "comecar",
+      "question": "Como sei se tenho a versão mais nova do app?",
+      "answer": [
+        "No menu ⋮ do aplicativo, abra **Novidades do app**: ali está o que mudou em cada versão, e a sua aparece marcada com \"você está aqui\".",
+        "Quando sai uma versão nova, o app mostra um aviso na tela inicial com o botão **Atualizar**. Você pode fechar o aviso: ele volta só no próximo lançamento.",
+        "Quem atualiza de fato é a Play Store. Se a atualização automática estiver ligada no seu celular, a versão nova chega sozinha em algumas horas.",
+        "Na versão web não é preciso atualizar nada: você usa sempre a mais recente. As novidades também aparecem em **Novidades**, no menu."
+      ],
+      "keywords": [
+        "atualizar",
+        "versão",
+        "update",
+        "novidades",
+        "play store",
+        "mudou"
+      ]
+    },
+    {
       "id": "o-que-e",
       "category": "comecar",
       "question": "O que é o Estoque Simples?",

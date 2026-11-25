@@ -41,6 +41,7 @@ const ImportExportPage = page(() => import('./pages/ImportExportPage'), 'ImportE
 const ConflictsPage = page(() => import('./pages/ConflictsPage'), 'ConflictsPage');
 const ExpiryPage = page(() => import('./pages/ExpiryPage'), 'ExpiryPage');
 const OptionsPage = page(() => import('./pages/OptionsPage'), 'OptionsPage');
+const WhatsNewPage = page(() => import('./pages/WhatsNewPage'), 'WhatsNewPage');
 const TeamPage = page(() => import('./pages/TeamPage'), 'TeamPage');
 const BrandPage = page(() => import('./pages/BrandPage'), 'BrandPage');
 const PlanPage = page(() => import('./pages/PlanPage'), 'PlanPage');
@@ -207,6 +208,7 @@ export const router = createBrowserRouter([
               { path: 'marca', element: lazyPage(BrandPage) },
               { path: 'notificacoes', element: lazyPage(NotificationsPage) },
               { path: 'ajuda', element: lazyPage(HelpPage) },
+              { path: 'novidades', element: lazyPage(WhatsNewPage) },
               { path: 'plataformas', element: lazyPage(PlatformsPage) },
               { path: 'suporte', element: lazyPage(SupportPage) },
               { path: 'suporte/novo', element: lazyPage(SupportNewPage) },

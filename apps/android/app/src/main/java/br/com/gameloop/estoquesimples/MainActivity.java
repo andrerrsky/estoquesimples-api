@@ -711,6 +711,7 @@ public class MainActivity extends BaseActivity {
         updatePlanBanner();
         updateCloudBanner();
         updatePromoCard();
+        updateUpdateBanner();
 
         br.com.gameloop.estoquesimples.sync.SyncStatus.addListener(syncListener);
         onSyncChanged(br.com.gameloop.estoquesimples.sync.SyncStatus.current());
@@ -954,6 +955,82 @@ public class MainActivity extends BaseActivity {
             cloudBannerViewTracked = true;
             Analytics.track(this, "signup.prompt_viewed",
                     Analytics.props("surface", superficie, "products", produtos));
+        }
+    }
+
+    /** O aviso de versão nova já foi medido neste processo. */
+    private static boolean updateBannerViewTracked;
+
+    /**
+     * Aviso de que saiu versão nova na Play Store.
+     *
+     * Até aqui o app só sabia <b>bloquear</b> versões proibidas: quem estava
+     * numa versão velha, mas permitida, abria o app e nunca ficava sabendo
+     * que havia novidade — foi exatamente o que aconteceu no lançamento da
+     * 40. Este aviso é o meio-termo: aparece, explica, deixa atualizar num
+     * toque e some quando a pessoa fecha, voltando só no próximo lançamento.
+     *
+     * Quem decide se há versão nova é o servidor ({@code latestVersionCode}
+     * em {@code /v1/config}): a loja não conta para o app, e inventar a
+     * comparação aqui faria o aviso aparecer antes de a versão estar no ar.
+     */
+    private void updateUpdateBanner() {
+        View banner = findViewById(R.id.updateBanner);
+        if (banner == null) {
+            return;
+        }
+        br.com.gameloop.estoquesimples.sync.RemoteConfig config =
+                new br.com.gameloop.estoquesimples.sync.RemoteConfig(this);
+        if (!config.hasNewerVersion() || config.updateNoticeDismissed()) {
+            banner.setVisibility(View.GONE);
+            return;
+        }
+
+        TextView texto = findViewById(R.id.updateBannerText);
+        if (texto != null) {
+            texto.setText("Toque para ver o que mudou na versão " + config.latestVersionCode() + ".");
+        }
+        banner.setVisibility(View.VISIBLE);
+
+        // O corpo do aviso leva às novidades, não à loja: ir direto para a
+        // Play pede uma decisão antes de dizer o que a pessoa ganha.
+        banner.setOnClickListener(v -> {
+            Analytics.track(this, "update.notice_clicked", Analytics.props("target", "whatsnew"));
+            WhatsNewActivity.open(this, "aviso");
+        });
+
+        View atualizar = findViewById(R.id.updateBannerAction);
+        if (atualizar != null) {
+            atualizar.setOnClickListener(v -> {
+                Analytics.track(this, "update.notice_clicked", Analytics.props("target", "loja"));
+                abrirLoja(config.updateUrl());
+            });
+        }
+
+        View fechar = findViewById(R.id.updateBannerClose);
+        if (fechar != null) {
+            fechar.setOnClickListener(v -> {
+                config.dismissUpdateNotice();
+                banner.setVisibility(View.GONE);
+                Analytics.track(this, "update.notice_dismissed",
+                        Analytics.props("latest", config.latestVersionCode()));
+            });
+        }
+
+        if (!updateBannerViewTracked) {
+            updateBannerViewTracked = true;
+            Analytics.track(this, "update.notice_viewed", Analytics.props(
+                    "installed", BuildConfig.VERSION_CODE,
+                    "latest", config.latestVersionCode()));
+        }
+    }
+
+    /** Abre a página do app na loja; sem loja instalada, o navegador resolve. */
+    private void abrirLoja(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível abrir a loja.", Toast.LENGTH_SHORT).show();
         }
     }
 

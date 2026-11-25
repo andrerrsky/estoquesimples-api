@@ -1,0 +1,20 @@
+{
+  "name": "@estoquesimples/changelog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Novidades do app em fonte única: o que mudou em cada versão, exibido pelo app Android (cópia nos assets) e pela web.",
+  "type": "module",
+  "files": [
+    "index.ts",
+    "releases.json",
+    "sync-android.mjs"
+  ],
+  "exports": {
+    ".": "./index.ts",
+    "./releases.json": "./releases.json"
+  },
+  "scripts": {
+    "sync": "node sync-android.mjs",
+    "check": "node sync-android.mjs --check"
+  }
+}
