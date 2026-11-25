@@ -446,6 +446,22 @@ public class CustomListView extends ArrayAdapter<String> {
             inputNote.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         }
 
+        // Lote da mercadoria, só na entrada e só para quem usa o recurso: numa
+        // loja de ferragens seriam três perguntas sem resposta a cada compra.
+        final boolean pedeLote = isEntrada
+                && br.com.gameloop.estoquesimples.sync.CompanyOptions.batchesEnabled(context);
+        final TextInputLayout loteLayout = pedeLote
+                ? FormValidation.addField(container, "Lote (opcional)",
+                        android.text.InputType.TYPE_CLASS_TEXT
+                                | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS)
+                : null;
+        final String[] fabricacao = {null};
+        final String[] validade = {null};
+        if (pedeLote) {
+            adicionarEscolhaDeData(context, container, "Fabricação", false, fabricacao);
+            adicionarEscolhaDeData(context, container, "Validade", true, validade);
+        }
+
         // Data opcional: registrar a compra de ontem com a data de hoje deixava
         // o histórico e o PDF por período errados.
         final long[] quando = {0L};
@@ -455,6 +471,7 @@ public class CustomListView extends ArrayAdapter<String> {
         dataView.setTypeface(null, android.graphics.Typeface.BOLD);
         dataView.setPadding(0, (int) (context.getResources().getDisplayMetrics().density * 12), 0, 0);
         dataView.setOnClickListener(v -> {
+            esconderTeclado(context, v);
             java.util.Calendar cal = java.util.Calendar.getInstance();
             if (quando[0] > 0) cal.setTimeInMillis(quando[0]);
             android.app.DatePickerDialog picker = new android.app.DatePickerDialog(context, (dp, y, m, d) -> {
@@ -471,6 +488,7 @@ public class CustomListView extends ArrayAdapter<String> {
                         .format(new java.util.Date(quando[0])) + " · alterar");
             }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH));
             picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+            pintarBotoes(context, picker);
             picker.show();
         });
         container.addView(dataView);
@@ -552,7 +570,14 @@ public class CustomListView extends ArrayAdapter<String> {
                         isEntrada ? MovementRepository.ENTRADA : MovementRepository.SAIDA,
                         isEntrada ? qty : -qty,
                         note,
-                        quando[0]);
+                        quando[0],
+                        pedeLote
+                                ? br.com.gameloop.estoquesimples.data.Batch.orNull(
+                                        loteLayout != null && loteLayout.getEditText() != null
+                                                ? loteLayout.getEditText().getText().toString()
+                                                : null,
+                                        fabricacao[0], validade[0])
+                                : null);
             }
 
             if (!result.success) {
@@ -619,6 +644,84 @@ public class CustomListView extends ArrayAdapter<String> {
         // do segundo toque, que caía no card de trás.
         snackbar.setDuration(UNDO_DURATION_MS);
         snackbar.show();
+    }
+
+
+    /**
+     * O teclado some antes de abrir um calendário.
+     *
+     * O diálogo de movimentação abre com o teclado em pé (a quantidade é o
+     * campo obrigatório). Com ele aberto, o botão OK do seletor de data fica
+     * atrás do teclado e a pessoa não tem como confirmar o dia escolhido.
+     */
+    /**
+     * Pinta "OK" e "Cancelar" do seletor de data.
+     *
+     * O tema do app deixa o texto dos botões do {@link android.app.DatePickerDialog}
+     * branco sobre fundo branco: eles existem, respondem ao toque e são
+     * invisíveis. Quem escolhia um dia não achava como confirmar.
+     */
+    private static void pintarBotoes(Context context, android.app.DatePickerDialog picker) {
+        picker.setOnShowListener(d -> {
+            int cor = BrandStore.color(context, R.color.color_accent);
+            android.widget.Button ok = picker.getButton(AlertDialog.BUTTON_POSITIVE);
+            android.widget.Button cancelar = picker.getButton(AlertDialog.BUTTON_NEGATIVE);
+            if (ok != null) {
+                ok.setTextColor(cor);
+            }
+            if (cancelar != null) {
+                cancelar.setTextColor(cor);
+            }
+        });
+    }
+
+    private static void esconderTeclado(Context context, android.view.View view) {
+        if (view == null) {
+            return;
+        }
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager)
+                        context.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
+    /**
+     * Linha clicável que escolhe um dia de calendário e devolve
+     * {@code YYYY-MM-DD} em {@code destino[0]} (nulo enquanto não escolherem).
+     *
+     * Validade aceita data futura — é o normal; fabricação, não: o lote não
+     * foi feito depois de hoje.
+     */
+    private static void adicionarEscolhaDeData(Context context, LinearLayout container,
+                                               String rotulo, boolean permiteFuturo,
+                                               String[] destino) {
+        final android.widget.TextView view = new android.widget.TextView(context);
+        float densidade = context.getResources().getDisplayMetrics().density;
+        view.setText(rotulo + ": informar");
+        view.setTextColor(BrandStore.color(context, R.color.color_accent));
+        view.setTypeface(null, android.graphics.Typeface.BOLD);
+        view.setPadding(0, (int) (densidade * 12), 0, 0);
+        view.setOnClickListener(v -> {
+            esconderTeclado(context, v);
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            android.app.DatePickerDialog picker = new android.app.DatePickerDialog(context,
+                    (dp, y, m, d) -> {
+                        destino[0] = String.format(java.util.Locale.US, "%04d-%02d-%02d", y, m + 1, d);
+                        view.setText(rotulo + ": "
+                                + String.format(java.util.Locale.getDefault(), "%02d/%02d/%04d", d, m + 1, y)
+                                + " · alterar");
+                    },
+                    cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH),
+                    cal.get(java.util.Calendar.DAY_OF_MONTH));
+            if (!permiteFuturo) {
+                picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+            }
+            pintarBotoes(context, picker);
+            picker.show();
+        });
+        container.addView(view);
     }
 
 }

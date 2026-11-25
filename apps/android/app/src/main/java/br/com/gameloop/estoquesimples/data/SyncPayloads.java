@@ -181,7 +181,7 @@ public final class SyncPayloads {
         try {
             cursor = db.rawQuery(
                     "SELECT uuid, product_uuid, change_type, quantity, timestamp, note, "
-                            + "reverses_uuid "
+                            + "reverses_uuid, batch_code, manufactured_on, expires_on "
                             + "FROM " + LocalDb.TABLE_MOVEMENTS + " WHERE uuid=?",
                     new String[]{uuid});
             if (!cursor.moveToFirst()) {
@@ -210,6 +210,17 @@ public final class SyncPayloads {
             // saber que ele anula outro.
             json.put("reversesMovementId",
                     cursor.isNull(6) ? JSONObject.NULL : cursor.getString(6));
+            // Lote da mercadoria. Só vai quando existe: servidor antigo não
+            // conhece os campos, e mandar nulo não acrescenta nada.
+            if (!cursor.isNull(7)) {
+                json.put("batchCode", cursor.getString(7));
+            }
+            if (!cursor.isNull(8)) {
+                json.put("manufacturedOn", cursor.getString(8));
+            }
+            if (!cursor.isNull(9)) {
+                json.put("expiresOn", cursor.getString(9));
+            }
             return json;
 
         } catch (JSONException e) {

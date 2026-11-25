@@ -132,6 +132,11 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
+            android:name=".ExpiryActivity"
+            android:label="Validades"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
             android:name=".ConferenceActivity"
             android:label="Conferência de estoque"
             android:exported="false"

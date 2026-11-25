@@ -82,6 +82,10 @@ public final class SyncWorker extends Worker {
             }
         }
 
+        // Opções da empresa (lote e validade) vêm junto: ligar na web precisa
+        // aparecer no app sem a pessoa ter de mexer em nada aqui.
+        new CompanyOptions(context).refresh();
+
         if (!entitlements.canSync()) {
             String motivo = entitlements.isStale()
                     ? "Não foi possível confirmar sua conta na nuvem. Os dados seguem no aparelho."

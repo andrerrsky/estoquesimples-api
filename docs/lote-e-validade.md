@@ -9,12 +9,11 @@ Disponível nos **dois planos** — não é recurso de assinatura. A base é de
 lojista sozinho (94%), e quem mais precisa de validade é justamente a
 mercearia pequena.
 
-**Hoje só na versão web.** O app Android ainda não mostra os campos; ele
-sincroniza as movimentações com lote sem perder nada (o protocolo aceita os
-campos novos e os devolve no `pull`), apenas não os exibe nem permite
-informá-los. [Os fatos do produto](../apps/api/src/modules/blog/product-facts.ts)
-e o [artigo da ajuda](../packages/help/faq.json) dizem isso com essas
-palavras; quando sair a versão do app, os dois precisam mudar junto.
+**Nos dois clientes.** Na web o recurso está no ar desde 25/11/2026; no app
+Android, a partir da **versão 40** (quem estiver em versão anterior
+sincroniza as movimentações com lote sem perder nada — o protocolo aceita os
+campos e os devolve no `pull` —, apenas não os vê). A versão 40 substitui a
+39, que ainda não tinha sido enviada à Play.
 
 ## A decisão que importa: lote não é entidade
 
@@ -68,10 +67,18 @@ lote venceria cedo ou tarde demais.
 
 | Lugar | O que faz |
 | --- | --- |
-| `/app/opcoes` | liga e desliga (`workspaces.settings.trackBatches`, permissão `workspace.configurar`) |
-| Entrada de estoque, cadastro de produto | campos Lote, Fabricação e Validade (só com o recurso ligado) |
-| `/app/validades` | lotes em estoque, o que vence primeiro na frente; filtros de 7/30/90 dias; vencidos em destaque |
-| Detalhe do produto | quanto há de cada lote, e quanto entrou sem lote |
+| Web: `/app/opcoes` | liga e desliga (`workspaces.settings.trackBatches`, permissão `workspace.configurar`) |
+| Web: entrada de estoque, cadastro de produto | campos Lote, Fabricação e Validade (só com o recurso ligado) |
+| Web: `/app/validades` | lotes em estoque, o que vence primeiro na frente; filtros de 7/30/90 dias; vencidos em destaque |
+| Web: detalhe do produto | quanto há de cada lote, e quanto entrou sem lote |
+| App: Configurações › Lote e validade | o mesmo interruptor (`CompanyOptions`: guarda no aparelho e manda para a nuvem por `PUT /v1/workspaces/:id`, que a rota aceita junto com `PATCH` porque o `HttpURLConnection` não faz `PATCH`) |
+| App: diálogo de entrada | campos Lote, Fabricação e Validade |
+| App: menu ⋮ › Validades | `ExpiryActivity`, a mesma lista, calculada no banco local (`BatchRepository`) para funcionar offline |
+
+No app o cálculo é o mesmo, reescrito em Java: `BatchRepository.alocar` é
+pura e tem teste (`BatchRepositoryTest`), porque errar essa conta some do
+estoque mercadoria que existe. As colunas locais chegaram na versão 11 do
+banco do aparelho (`LocalDb.upgradeToV11`).
 
 Desligar **não apaga nada**: os campos desaparecem das telas e as
 movimentações seguem com o que foi registrado.
