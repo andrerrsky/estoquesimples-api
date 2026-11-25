@@ -144,10 +144,11 @@ describe('sessão web (cookie httpOnly)', () => {
     expect(secondCookie).not.toBe(firstCookie);
 
     // Outra aba renovando com o cookie antigo no mesmo instante: não é roubo,
-    // é corrida. Recebe 409 e a sessão continua de pé.
+    // é corrida — e desde 25/11 ela recebe o seu próprio cookie em vez de um
+    // erro para repetir. A sessão continua de pé para as duas.
     const race = await context.app.inject({ method: 'POST', url: '/v1/auth/web/refresh', headers: { ...WEB, cookie: firstCookie } });
-    expect(race.statusCode).toBe(409);
-    expect(race.json().error.code).toBe('AUTH_REFRESH_IN_PROGRESS');
+    expect(race.statusCode).toBe(200);
+    expect(cookieOf(race)).not.toBe(secondCookie);
     const stillValid = await context.app.inject({ method: 'POST', url: '/v1/auth/web/refresh', headers: { ...WEB, cookie: secondCookie } });
     expect(stillValid.statusCode).toBe(200);
     const thirdCookie = cookieOf(stillValid);

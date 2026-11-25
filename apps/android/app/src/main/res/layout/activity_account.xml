@@ -212,6 +212,26 @@
                     android:layout_marginTop="@dimen/field_gap"
                     android:visibility="gone"
                     android:text="Resolver conflitos" />
+
+                <!-- Saída para as alterações que não foram aceitas: antes a
+                     pessoa via o aviso e não podia fazer nada com ele. -->
+                <Button
+                    android:id="@+id/retryFailedButton"
+                    style="@style/Widget.Estoque.Button.Secondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:visibility="gone"
+                    android:text="Tentar enviar de novo" />
+
+                <Button
+                    android:id="@+id/discardFailedButton"
+                    style="@style/Widget.Estoque.Button.Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/field_gap"
+                    android:visibility="gone"
+                    android:text="Descartar essas alterações" />
             </LinearLayout>
 
             <!-- Plano e equipe -->

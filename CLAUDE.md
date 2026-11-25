@@ -117,6 +117,7 @@ sem campanha.
 | Reembolso, arrependimento de 7 dias, cancelamento (o que a lei exige) | [docs/reembolso-e-cancelamento.md](docs/reembolso-e-cancelamento.md) |
 | Aplicação web: rotas, telas, SEO, pré-renderização | [docs/web-app.md](docs/web-app.md) |
 | Sincronização: como funciona, falhas conhecidas, pós-mortem | [docs/auditoria-sincronizacao-2026-11.md](docs/auditoria-sincronizacao-2026-11.md) |
+| Sessão do app caindo sozinha (reuso de refresh token) | [docs/sessao-do-app.md](docs/sessao-do-app.md) |
 | Fotos de produto, cota, S3, redimensionamento | [docs/images.md](docs/images.md) |
 | Eventos de uso, o que o painel entende | [docs/analytics.md](docs/analytics.md) |
 | Conferência de estoque (contagem física, limite do gratuito) | [docs/conferencia-de-estoque.md](docs/conferencia-de-estoque.md) |

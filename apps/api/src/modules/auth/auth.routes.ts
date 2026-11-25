@@ -86,12 +86,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         tags: ['auth'],
         summary: 'Rotaciona o refresh token e emite um novo access token',
         description:
-          'O refresh token apresentado é consumido. Reapresentá-lo indica roubo e encerra a sessão.',
+          'O refresh token apresentado é consumido. Reapresentá-lo depois de um minuto indica roubo e ' +
+          'encerra a sessão; dentro desse minuto, vale como reenvio de uma resposta que se perdeu e ' +
+          'devolve um token novo.',
         body: refreshBodySchema,
         response: { 200: authSuccessSchema, ...commonErrors },
       },
     },
-    async (request) => service.refresh(request.body.refreshToken, requestMeta(request)),
+    // A janela é maior que a da web de propósito: aqui quem repete é um
+    // celular cuja resposta se perdeu (rede caindo, 504 do gateway), e a nova
+    // tentativa pode demorar bem mais do que a troca entre duas abas.
+    async (request) =>
+      service.refresh(request.body.refreshToken, requestMeta(request), { reuseGraceSeconds: 60 }),
   );
 
   routes.post(

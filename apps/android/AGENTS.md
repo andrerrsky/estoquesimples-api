@@ -20,7 +20,7 @@ completo com a API fora do ar. A mesma conta abre a aplicação web
 é feito lá chega ao aparelho na sincronização seguinte, pelas mesmas regras
 de conflito.
 
-- Pacote `br.com.gameloop.estoquesimples`, `versionCode 41`, minSdk 24,
+- Pacote `br.com.gameloop.estoquesimples`, `versionCode 42`, minSdk 24,
   targetSdk 36, Java 17 (sem Kotlin, sem Compose), UI em XML com ViewBinding,
   Material Components 1.13 (tema `CustomActionBarTheme`, só claro).
 - API: `https://api.estoquesimples.com.br` (`API_BASE_URL` em

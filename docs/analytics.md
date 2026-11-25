@@ -87,6 +87,7 @@ caracteres no formato `dominio.acao` (`^[a-z0-9_]+(\.[a-z0-9_]+)*$`).
 | `conference.finished` | app | conferência aplicada ao estoque | `scope_type`, `counted`, `divergent`, `delta_value`, `duration_ms` |
 | `conference.blocked` | app | limite gratuito de conferências atingido (vira `paywall.viewed` com `trigger=conference`) | `origin`, `done_this_month` |
 | `expiry.viewed` | app | tela Validades aberta (lote e validade ligados) | `origin` |
+| `sync.failures_retried` / `sync.failures_discarded` | app | alterações com erro reenviadas ou descartadas na tela Conta e nuvem | `count` |
 | `options.batches` | web | lote e validade ligado ou desligado em Opções | `enabled` |
 | `whatsnew.viewed` | app | tela Novidades aberta | `origin` (`menu` ou `aviso`), `version` |
 | `update.notice_viewed` / `update.notice_clicked` / `update.notice_dismissed` | app | faixa de versão nova na tela inicial | `installed`, `latest`; `target` (`whatsnew` ou `loja`) |
