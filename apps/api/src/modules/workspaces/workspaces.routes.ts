@@ -133,31 +133,33 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     },
   );
 
-  routes.patch(
-    '/workspaces/:workspaceId',
-    {
-      preHandler: [app.authenticate, requireWorkspace('workspace.configurar')],
-      schema: {
-        tags: ['workspace'],
-        summary: 'Atualiza nome e configurações da empresa',
-        security: [{ bearerAuth: [] }],
-        params: workspaceParams,
-        body: z
-          .object({
-            name: z.string().trim().min(1).max(120).optional(),
-            settings: z.record(z.unknown()).optional(),
-          })
-          .strict(),
-        response: { 200: messageSchema, ...commonErrors },
-      },
+  // PUT junto com PATCH pelo mesmo motivo das rotas de membro: o cliente
+  // Android usa HttpURLConnection, que não implementa PATCH. É o que permite
+  // o app ligar e desligar as opções da empresa (lote e validade).
+  routes.route({
+    method: ['PATCH', 'PUT'],
+    url: '/workspaces/:workspaceId',
+    preHandler: [app.authenticate, requireWorkspace('workspace.configurar')],
+    schema: {
+      tags: ['workspace'],
+      summary: 'Atualiza nome e configurações da empresa',
+      security: [{ bearerAuth: [] }],
+      params: workspaceParams,
+      body: z
+        .object({
+          name: z.string().trim().min(1).max(120).optional(),
+          settings: z.record(z.unknown()).optional(),
+        })
+        .strict(),
+      response: { 200: messageSchema, ...commonErrors },
     },
-    async (request) => {
+    handler: async (request) => {
       const auth = requireAuth(request);
       const context = requireWorkspaceContext(request);
       await service.update(context.workspaceId, auth.userId, request.body, requestMeta(request));
       return { message: 'Empresa atualizada.' };
     },
-  );
+  });
 
   routes.get(
     '/workspaces/:workspaceId/members',

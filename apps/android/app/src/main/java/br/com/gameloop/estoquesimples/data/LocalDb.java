@@ -53,7 +53,7 @@ public final class LocalDb extends SQLiteOpenHelper {
      *     nenhum: o resultado de uma conferência vira movimentação `ajuste`
      *     comum, que já sobe pela outbox (ver docs/conferencia-de-estoque.md).
      */
-    public static final int VERSION = 10;
+    public static final int VERSION = 11;
 
     public static final String TABLE_PRODUCTS = "Estoque";
     public static final String TABLE_MOVEMENTS = "EstoqueHistorico";
@@ -147,6 +147,7 @@ public final class LocalDb extends SQLiteOpenHelper {
         upgradeToV8(db);
         upgradeToV9(db);
         upgradeToV10(db);
+        upgradeToV11(db);
     }
 
     @Override
@@ -179,6 +180,9 @@ public final class LocalDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 10) {
             upgradeToV10(db);
+        }
+        if (oldVersion < 11) {
+            upgradeToV11(db);
         }
     }
 
@@ -475,6 +479,26 @@ public final class LocalDb extends SQLiteOpenHelper {
         // esta tabela, então o índice serve ao caminho mais quente.
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_conference_status_finished "
                 + "ON " + TABLE_CONFERENCES + " (status, finished_at)");
+    }
+
+
+    /**
+     * Lote, fabricação e validade da mercadoria que entrou.
+     *
+     * Três colunas na movimentação, e nenhuma tabela de lotes: o saldo de
+     * cada lote é conta, não cadastro (o que vence antes sai antes), do mesmo
+     * jeito que no servidor. Ficam nulas em quem não usa o recurso, e o app
+     * continua sincronizando com servidores que ainda não as conhecem.
+     */
+    private void upgradeToV11(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_MOVEMENTS, "batch_code", "TEXT");
+        addColumnIfMissing(db, TABLE_MOVEMENTS, "manufactured_on", "TEXT");
+        addColumnIfMissing(db, TABLE_MOVEMENTS, "expires_on", "TEXT");
+
+        // A tela de validades varre as entradas com data; sem índice ela
+        // percorreria o histórico inteiro a cada abertura.
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_historico_validade "
+                + "ON " + TABLE_MOVEMENTS + " (expires_on) WHERE expires_on IS NOT NULL");
     }
 
     private void backfillProductUuids(SQLiteDatabase db) {

@@ -1737,6 +1737,7 @@ public class MainActivity extends BaseActivity {
         // onResume chama invalidateOptionsMenu(): entrar ou sair da conta
         // mostra ou esconde o ícone na volta.
         SyncIndicator.bind(this, menu);
+        AppMenu.prepare(this, menu);
         return true;
     }
 

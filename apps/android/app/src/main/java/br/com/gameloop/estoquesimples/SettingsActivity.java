@@ -11,6 +11,11 @@ import androidx.appcompat.widget.SwitchCompat;
 
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 
+import br.com.gameloop.estoquesimples.sync.CompanyOptions;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * Tela de configurações do aplicativo.
  * Permite:
@@ -28,7 +33,9 @@ public class SettingsActivity extends BaseActivity {
     public static final String KEY_LOW_STOCK_ALERTS = "low_stock_alerts";
 
     private SwitchCompat switchShowImages;
+    private SwitchCompat switchBatchTracking;
     private MaterialAutoCompleteTextView spinnerDefaultCurrency;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,7 +53,46 @@ public class SettingsActivity extends BaseActivity {
         spinnerDefaultCurrency = findViewById(R.id.spinnerDefaultCurrency);
 
         setupShowImagesSwitch(prefs);
+        setupBatchTracking();
         setupCurrencySpinner();
+    }
+
+    /**
+     * Lote e validade: opção da <b>empresa</b>, não do aparelho — quem liga
+     * aqui vê os campos também na web, e vice-versa. Por isso o interruptor
+     * reflete o que vier da nuvem assim que ela responder, e sem conta vale
+     * só a escolha local (o app funciona inteiro sem conta).
+     */
+    private void setupBatchTracking() {
+        switchBatchTracking = findViewById(R.id.switchBatchTracking);
+        if (switchBatchTracking == null) {
+            return;
+        }
+        CompanyOptions opcoes = new CompanyOptions(this);
+        switchBatchTracking.setChecked(opcoes.batchesEnabled());
+
+        executor.execute(() -> {
+            opcoes.refresh();
+            boolean naNuvem = opcoes.batchesEnabled();
+            runOnUiThread(() -> {
+                if (switchBatchTracking != null && switchBatchTracking.isChecked() != naNuvem) {
+                    switchBatchTracking.setChecked(naNuvem);
+                }
+            });
+        });
+
+        switchBatchTracking.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            // Grava já: a tela de entrada precisa respeitar a escolha mesmo
+            // sem internet. A nuvem é avisada em seguida, se der.
+            opcoes.setBatchesEnabled(isChecked);
+            executor.execute(() -> opcoes.push(isChecked));
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        executor.shutdown();
+        super.onDestroy();
     }
 
     private void setupShowImagesSwitch(final SharedPreferences prefs) {

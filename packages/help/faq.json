@@ -187,9 +187,9 @@
       "category": "estoque",
       "question": "Consigo controlar lote e data de validade?",
       "answer": [
-        "Sim, na versão web (no app Android ainda não aparece). O proprietário liga em **Opções › Lote e validade**.",
+        "Sim. Na web, o proprietário liga em **Opções › Lote e validade**; no app Android, em **Configurações › Lote e validade** (precisa da versão 40 ou mais nova). A escolha é da empresa e vale nos dois.",
         "Com isso, cada **entrada** de estoque pode registrar o lote, a data de fabricação e a validade da mercadoria. O mesmo produto pode ter vários lotes, cada um com a sua validade.",
-        "A tela **Validades** mostra os lotes que estão em estoque, o que vence primeiro na frente, e marca o que já venceu e o que vence nos próximos dias. No detalhe do produto aparece quanto há de cada lote.",
+        "A tela **Validades** mostra os lotes que estão em estoque, o que vence primeiro na frente, e marca o que já venceu e o que vence nos próximos dias. Na web, o detalhe do produto também mostra quanto há de cada lote.",
         "Na **saída** você não precisa escolher o lote: a conta segue a regra da prateleira — sai primeiro o que vence primeiro.",
         "Está nos dois planos. Desligado, os campos não aparecem e nada muda para quem não trabalha com produto que vence."
       ],
@@ -202,9 +202,6 @@
         "perecível",
         "alimento",
         "fefo"
-      ],
-      "platforms": [
-        "web"
       ]
     },
     {

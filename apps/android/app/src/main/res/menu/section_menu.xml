@@ -20,6 +20,11 @@
         android:title="Conferência de estoque"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_expiry"
+        android:title="Validades"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_analytics"
         android:title="Análise de Estoque"
         app:showAsAction="never" />

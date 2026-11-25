@@ -119,7 +119,7 @@ sem campanha.
 | Fotos de produto, cota, S3, redimensionamento | [docs/images.md](docs/images.md) |
 | Eventos de uso, o que o painel entende | [docs/analytics.md](docs/analytics.md) |
 | Conferência de estoque (contagem física, limite do gratuito) | [docs/conferencia-de-estoque.md](docs/conferencia-de-estoque.md) |
-| Lote, fabricação e validade (opcional, por empresa; só na web) | [docs/lote-e-validade.md](docs/lote-e-validade.md) |
+| Lote, fabricação e validade (opcional, por empresa; web e app) | [docs/lote-e-validade.md](docs/lote-e-validade.md) |
 | Suporte pelo app e chat, resposta automática por IA, escalonamento | [docs/support.md](docs/support.md) |
 | Notificações e push (FCM) | [docs/notifications.md](docs/notifications.md) · [docs/push.md](docs/push.md) |
 | E-mails automáticos de ativação e recuperação | [docs/emails-ciclo-de-vida.md](docs/emails-ciclo-de-vida.md) |

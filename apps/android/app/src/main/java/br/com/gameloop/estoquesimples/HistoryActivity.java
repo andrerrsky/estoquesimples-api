@@ -533,6 +533,7 @@ public class HistoryActivity extends BaseActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.section_menu, menu);
         SyncIndicator.bind(this, menu);
+        AppMenu.prepare(this, menu);
         return true;
     }
 

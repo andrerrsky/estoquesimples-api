@@ -330,6 +330,11 @@ public final class RemoteChanges {
         // nuvem) cancelou uma movimentação. Sem isso, o cancelamento chegava
         // aqui como um evento solto, indistinguível de uma correção qualquer.
         values.put("reverses_uuid", optString(data, "reversesMovementId"));
+        // Lote da entrada, quando o outro cliente informou. Ausente nas
+        // movimentações antigas e nas de quem não usa o controle de validade.
+        values.put("batch_code", optString(data, "batchCode"));
+        values.put("manufactured_on", optString(data, "manufacturedOn"));
+        values.put("expires_on", optString(data, "expiresOn"));
         values.put("rev", 0);
 
         if (db.insert(LocalDb.TABLE_MOVEMENTS, null, values) < 0) {

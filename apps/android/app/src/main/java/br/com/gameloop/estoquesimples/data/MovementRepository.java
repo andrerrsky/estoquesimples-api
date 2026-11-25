@@ -144,6 +144,17 @@ public final class MovementRepository {
      *             futuras (o chamador limita).
      */
     public Result apply(String productUuid, String changeType, double delta, String note, long when) {
+        return apply(productUuid, changeType, delta, note, when, null);
+    }
+
+    /**
+     * @param batch lote da mercadoria, ou {@code null}. Só faz sentido no que
+     *              entra: o que sai é decidido pela validade (o que vence
+     *              antes sai antes), então guardar lote numa saída criaria um
+     *              segundo saldo possível para o mesmo produto.
+     */
+    public Result apply(String productUuid, String changeType, double delta, String note, long when,
+                        Batch batch) {
         if (productUuid == null) {
             return Result.fail("Produto sem identificação.");
         }
@@ -179,8 +190,9 @@ public final class MovementRepository {
                 return Result.fail("Produto não encontrado.");
             }
 
-            String movementUuid = insertMovement(productUuid, atual.name, changeType,
-                    Math.abs(delta), note, movementTime);
+            String movementUuid = insertMovement(UUID.randomUUID().toString(), productUuid,
+                    atual.name, changeType, Math.abs(delta), note, movementTime, null,
+                    delta > 0d ? batch : null);
             if (movementUuid == null) {
                 return Result.fail("Não foi possível registrar a movimentação.");
             }
@@ -367,7 +379,8 @@ public final class MovementRepository {
         db.beginTransaction();
         try {
             cursor = db.rawQuery(
-                    "SELECT product_uuid, change_type, quantity, cancelled_at FROM "
+                    "SELECT product_uuid, change_type, quantity, cancelled_at, "
+                            + "batch_code, manufactured_on, expires_on FROM "
                             + LocalDb.TABLE_MOVEMENTS
                             + " WHERE uuid=? AND deleted_at IS NULL",
                     new String[]{movementUuid});
@@ -416,9 +429,14 @@ public final class MovementRepository {
             product.put("updated_at", now);
             db.update(LocalDb.TABLE_PRODUCTS, product, "uuid=?", new String[]{productUuid});
 
+            // Sem copiar o lote, cancelar uma entrada tiraria do saldo do
+            // produto sem tirar do lote, e a validade seguiria contando
+            // mercadoria que voltou para o fornecedor.
+            Batch loteOriginal = Batch.orNull(cursor.getString(4), cursor.getString(5),
+                    cursor.getString(6));
             String compensationUuid = insertMovement(UUID.randomUUID().toString(),
                     productUuid, atual.name, CANCELAMENTO, compensation, note, now,
-                    movementUuid);
+                    movementUuid, loteOriginal);
             if (compensationUuid == null) {
                 return Result.fail("Não foi possível registrar o cancelamento.");
             }
@@ -485,6 +503,13 @@ public final class MovementRepository {
     private String insertMovement(String movementUuid, String productUuid, String productName,
                                   String changeType, double quantity, String note, long timestamp,
                                   String reversesUuid) {
+        return insertMovement(movementUuid, productUuid, productName, changeType, quantity, note,
+                timestamp, reversesUuid, null);
+    }
+
+    private String insertMovement(String movementUuid, String productUuid, String productName,
+                                  String changeType, double quantity, String note, long timestamp,
+                                  String reversesUuid, Batch batch) {
         double stored = keepsSign(changeType) ? quantity : Math.abs(quantity);
 
         ContentValues values = new ContentValues();
@@ -501,6 +526,11 @@ public final class MovementRepository {
         }
         if (reversesUuid != null) {
             values.put("reverses_uuid", reversesUuid);
+        }
+        if (batch != null) {
+            values.put("batch_code", batch.code);
+            values.put("manufactured_on", batch.manufacturedOn);
+            values.put("expires_on", batch.expiresOn);
         }
 
         if (db.insert(LocalDb.TABLE_MOVEMENTS, null, values) < 0) {
