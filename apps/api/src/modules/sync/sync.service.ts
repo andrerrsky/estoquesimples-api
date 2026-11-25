@@ -953,6 +953,10 @@ export class SyncService {
       // que não existe cai na FK composta (workspace_id, reverses_movement_id)
       // e vira 23503 — traduzido para VALIDATION_FAILED pelo error handler.
       reversesMovementId: payload.reversesMovementId ?? null,
+      // Lote da mercadoria: vem só de quem usa o controle de validade.
+      batchCode: payload.batchCode?.trim() || null,
+      manufacturedOn: payload.manufacturedOn ?? null,
+      expiresOn: payload.expiresOn ?? null,
     });
 
     return {
@@ -1259,6 +1263,9 @@ export class SyncService {
         occurredAt: row.occurredAt.getTime(),
         recordedAt: row.recordedAt.getTime(),
         reversesMovementId: row.reversesMovementId,
+        batchCode: row.batchCode,
+        manufacturedOn: row.manufacturedOn,
+        expiresOn: row.expiresOn,
       },
     };
   }

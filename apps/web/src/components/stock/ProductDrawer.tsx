@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api } from '../../api/client';
-import type { Movement, Page, Product } from '../../api/types';
-import { fmtDateTime, fmtMoney, fmtQuantity, fmtStock } from '../../lib/format';
+import type { BatchPage, Movement, Page, Product } from '../../api/types';
+import { fmtDate, fmtDateTime, fmtMoney, fmtQuantity, fmtStock } from '../../lib/format';
 import { inventoryKeys } from '../../lib/inventory';
 import { ProductImage } from '../../lib/product-image';
 import { fmtMargin, unitMargin } from '../../lib/profit';
@@ -25,7 +25,7 @@ export function ProductDrawer({
   onEdit: (product: Product) => void;
   onMove: (product: Product, type: 'entrada' | 'saida') => void;
 }) {
-  const { workspaceId, base, can, currency } = useCurrentWorkspace();
+  const { workspaceId, base, can, currency, tracksBatches } = useCurrentWorkspace();
   const open = productId !== null;
 
   const product = useQuery({
@@ -37,6 +37,12 @@ export function ProductDrawer({
     queryKey: [...inventoryKeys.movements(workspaceId), 'recent', productId],
     queryFn: () => api.get<Page<Movement>>(`${base}/movements`, { productId, pageSize: 8 }),
     enabled: open && can('movimentacoes.ver'),
+  });
+
+  const batches = useQuery({
+    queryKey: [...inventoryKeys.batches(workspaceId), productId],
+    queryFn: () => api.get<BatchPage>(`${base}/batches?productId=${productId}&pageSize=50`),
+    enabled: open && tracksBatches,
   });
 
   const item = product.data;
@@ -104,6 +110,34 @@ export function ProductDrawer({
             <div>
               <div className="caption">Descrição</div>
               <p style={{ whiteSpace: 'pre-wrap' }}>{item.description}</p>
+            </div>
+          )}
+
+          {tracksBatches && batches.data && batches.data.items.length > 0 && (
+            <div>
+              <div className="form-section" style={{ margin: '0 0 8px' }}>Lotes em estoque</div>
+              <div className="list" style={{ margin: '0 calc(var(--card-padding) * -1)' }}>
+                {batches.data.items.map((batch) => (
+                  <div key={`${batch.batchCode ?? ''}-${batch.expiresOn ?? ''}`} className="list__item">
+                    <div className="list__main">
+                      <div className="row" style={{ gap: 8 }}>
+                        <strong>{batch.batchCode ?? 'Sem lote'}</strong>
+                        {batch.expired && <Badge tone="error">Vencido</Badge>}
+                      </div>
+                      <div className="list__sub">
+                        {batch.expiresOn ? `Vence em ${fmtDate(batch.expiresOn)}` : 'Sem validade informada'}
+                        {batch.manufacturedOn ? ` · fabricado em ${fmtDate(batch.manufacturedOn)}` : ''}
+                      </div>
+                    </div>
+                    <div className="list__meta">{fmtStock(batch.quantity, batch.unit ?? item.unit)}</div>
+                  </div>
+                ))}
+              </div>
+              {batches.data.summary.withoutBatch > 0 && (
+                <p className="muted" style={{ marginTop: 8 }}>
+                  {fmtStock(batches.data.summary.withoutBatch, item.unit)} entraram sem lote informado.
+                </p>
+              )}
             </div>
           )}
 

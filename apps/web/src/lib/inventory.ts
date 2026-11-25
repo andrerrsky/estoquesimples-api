@@ -11,6 +11,7 @@ export const inventoryKeys = {
   product: (workspaceId: string, productId: string) => ['inventory', workspaceId, 'product', productId] as const,
   facets: (workspaceId: string) => ['inventory', workspaceId, 'facets'] as const,
   movements: (workspaceId: string) => ['inventory', workspaceId, 'movements'] as const,
+  batches: (workspaceId: string) => ['inventory', workspaceId, 'batches'] as const,
   reports: (workspaceId: string) => ['inventory', workspaceId, 'reports'] as const,
   conflicts: (workspaceId: string) => ['inventory', workspaceId, 'conflicts'] as const,
 };

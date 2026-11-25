@@ -15,6 +15,7 @@ import {
   createMovementBodySchema,
   createProductBodySchema,
   importBodySchema,
+  listBatchesQuerySchema,
   listMovementsQuerySchema,
   listProductsQuerySchema,
   movementParams,
@@ -318,6 +319,32 @@ export async function registerInventoryRoutes(app: FastifyInstance): Promise<voi
     async (request) => {
       const ctx = await context(request);
       return inWorkspace(request, (tx) => service.bulkCancel(tx, ctx, request.body.movementIds, request.body.note));
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Lotes e validade
+  // -------------------------------------------------------------------------
+
+  routes.get(
+    '/workspaces/:workspaceId/batches',
+    {
+      preHandler: read('produtos.ver'),
+      schema: {
+        tags: ['estoque'],
+        summary: 'Lotes em estoque, o que vence primeiro na frente',
+        description:
+          'O saldo de cada lote é calculado por FEFO sobre o saldo do produto; ' +
+          'não há tabela de lotes. `filter=expiring` deixa só o que vence em até `window` dias (e o que já venceu).',
+        security,
+        params: workspaceParams,
+        querystring: listBatchesQuerySchema,
+        response: { 200: z.any(), ...errors },
+      },
+    },
+    async (request) => {
+      const ctx = await context(request);
+      return inWorkspace(request, (tx) => service.listBatches(tx, ctx.workspaceId, request.query));
     },
   );
 

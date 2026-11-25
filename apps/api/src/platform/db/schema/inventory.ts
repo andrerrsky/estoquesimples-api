@@ -1,5 +1,6 @@
 import {
   bigint,
+  date,
   foreignKey,
   index,
   integer,
@@ -95,6 +96,18 @@ export const stockMovements = pgTable(
     occurredAt: timestamp('occurred_at', tz).notNull(),
     recordedAt: timestamp('recorded_at', tz).notNull().defaultNow(),
 
+    /**
+     * Lote, fabricação e validade da mercadoria que entrou.
+     *
+     * Vêm preenchidos nas entradas (e no cadastro com estoque inicial) de
+     * quem ligou o controle de validade; o estorno copia os da original. O
+     * saldo de cada lote não é guardado: sai da conta FEFO sobre o saldo do
+     * produto, que continua sendo a soma das movimentações.
+     */
+    batchCode: text('batch_code'),
+    manufacturedOn: date('manufactured_on'),
+    expiresOn: date('expires_on'),
+
     reversesMovementId: uuid('reverses_movement_id'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     deviceId: uuid('device_id').references(() => devices.id, { onDelete: 'set null' }),
@@ -113,6 +126,9 @@ export const stockMovements = pgTable(
       table.workspaceId,
       table.id,
     ),
+    validadeIdx: index('stock_movements_validade_idx')
+      .on(table.workspaceId, table.expiresOn)
+      .where(sql`${table.expiresOn} IS NOT NULL`),
     // Compostas por empresa: a checagem de integridade referencial ignora RLS,
     // então é a chave que precisa carregar o workspace.
     produtoFk: foreignKey({

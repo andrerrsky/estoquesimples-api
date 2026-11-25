@@ -249,7 +249,7 @@ grava por rotas REST que **montam operações e as entregam ao mesmo
 Rotas (todas em `/v1/workspaces/:workspaceId`): `products` (lista com busca,
 filtros e paginação; `facets`; detalhe; criar; editar; excluir; `restore`;
 `bulk`; `import`), `movements` (lista; criar entrada/saída; `:id/cancel`;
-`bulk-cancel`), `reports/summary`, `reports/analysis` (plano Equipe). O
+`bulk-cancel`), `batches` (lotes em estoque, calculados por FEFO), `reports/summary`, `reports/analysis` (plano Equipe). O
 contrato completo está em `/docs` (OpenAPI).
 
 ## O que a web oferece
@@ -264,6 +264,8 @@ contrato completo está em `/docs` (OpenAPI).
 | Análise Avançada | `/app/analise` | plano Equipe |
 | Importar e exportar | `/app/importar` | CSV lido no navegador; exportações da API |
 | Conflitos | `/app/conflitos` | decisões pendentes da sincronização |
+| Validades | `/app/validades` | lotes em estoque por vencimento; só com o recurso ligado ([lote-e-validade.md](lote-e-validade.md)) |
+| Opções | `/app/opcoes` | opções da empresa (hoje: lote e validade) |
 | Identidade visual | `/app/marca` | plano Equipe; proprietário e administradores ([branding.md](branding.md)) |
 | Entrada da empresa | `/<identificador>/entrar` | pública; a mesma tela de entrada com a marca da empresa |
 | Equipe | `/app/equipe` | membros, papéis, convites (plano Equipe) |

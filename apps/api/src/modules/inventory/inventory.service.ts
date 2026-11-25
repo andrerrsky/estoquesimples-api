@@ -14,6 +14,7 @@ import type {
   CreateMovementBody,
   CreateProductBody,
   ImportRow,
+  ListBatchesQuery,
   ListMovementsQuery,
   ListProductsQuery,
   UpdateProductBody,
@@ -110,6 +111,35 @@ function productView(row: Row) {
 
 export type ProductView = ReturnType<typeof productView>;
 
+/**
+ * Um lote em estoque.
+ *
+ * `daysToExpire` vem pronto porque a conta de "quantos dias faltam" precisa
+ * ser feita no fuso do negócio: no navegador de quem está em outro fuso, a
+ * meia-noite cai em outro dia e o lote vence cedo ou tarde demais.
+ */
+function batchView(row: Row) {
+  const expiresOn = (row['expires_on'] as string | null) ?? null;
+  const hoje = (row['hoje'] as string | null) ?? null;
+  const dias =
+    expiresOn && hoje
+      ? Math.round((Date.parse(`${expiresOn}T00:00:00Z`) - Date.parse(`${hoje}T00:00:00Z`)) / 86_400_000)
+      : null;
+  return {
+    productId: row['product_id'] as string,
+    productName: text(row['product_name']),
+    unit: text(row['unit']),
+    batchCode: text(row['batch_code']),
+    manufacturedOn: (row['manufactured_on'] as string | null) ?? null,
+    expiresOn,
+    quantity: num(row['quantity']),
+    daysToExpire: dias,
+    expired: dias !== null && dias < 0,
+  };
+}
+
+export type BatchView = ReturnType<typeof batchView>;
+
 function movementView(row: Row) {
   const quantity = num(row['quantity']);
   const type = String(row['type']);
@@ -131,6 +161,9 @@ function movementView(row: Row) {
     lateEntry: recordedAt.getTime() - occurredAt.getTime() > 12 * 3_600_000,
     reversesMovementId: (row['reverses_movement_id'] as string | null) ?? null,
     reversedBy: (row['reversed_by'] as string | null) ?? null,
+    batchCode: text(row['batch_code']),
+    manufacturedOn: (row['manufactured_on'] as string | null) ?? null,
+    expiresOn: (row['expires_on'] as string | null) ?? null,
     balanceAfter: row['balance_after'] === null || row['balance_after'] === undefined ? null : num(row['balance_after']),
     createdByName: text(row['created_by_name']),
     canCancel: !reversed && type !== 'cancelamento' && row['product_id'] !== null && row['product_deleted_at'] === null,
@@ -256,6 +289,7 @@ export class InventoryService {
       WITH m AS (
         SELECT sm.id, sm.product_id, sm.product_name, sm.type, sm.quantity, sm.note, sm.occurred_at, sm.recorded_at,
                sm.reverses_movement_id, sm.change_seq,
+               sm.batch_code, sm.manufactured_on, sm.expires_on,
                p.name AS current_name, p.unit, p.deleted_at AS product_deleted_at,
                CASE WHEN sm.product_id IS NULL OR p.id IS NULL THEN NULL ELSE
                  p.quantity_cache - coalesce(sum(sm.quantity) OVER (
@@ -283,6 +317,117 @@ export class InventoryService {
       page: query.page,
       pageSize: query.pageSize,
       total: total.rows[0]?.total ?? 0,
+    };
+  }
+
+  /**
+   * Lotes em estoque, com a validade de cada um.
+   *
+   * Não existe tabela de lotes: o que entrou com lote está nas próprias
+   * movimentações, e o que *ainda está em estoque* é uma conta sobre o saldo
+   * do produto. A regra é a que o lojista já usa na prateleira — FEFO, sai
+   * primeiro o que vence primeiro — então o saldo é distribuído de trás para
+   * frente: o lote de validade mais distante é o último a sair e, por isso, o
+   * primeiro a receber o que ainda há. Lote sem validade entra antes de todos
+   * nessa fila (não há motivo para supor que já saiu).
+   *
+   * Consequência desejada: a soma dos lotes nunca passa do saldo do produto.
+   * Se o produto tem mais saldo do que os lotes conhecidos (entradas antigas,
+   * de antes de ligar o recurso), a diferença aparece em `withoutBatch` em
+   * vez de ser inventada em algum lote.
+   */
+  async listBatches(tx: Transaction, workspaceId: string, query: ListBatchesQuery) {
+    const scope: SQL[] = [
+      sql`sm.workspace_id = ${workspaceId}`,
+      sql`sm.product_id IS NOT NULL`,
+      sql`(sm.batch_code IS NOT NULL OR sm.expires_on IS NOT NULL)`,
+    ];
+    if (query.productId) scope.push(sql`sm.product_id = ${query.productId}`);
+
+    const hoje = sql`(now() AT TIME ZONE 'America/Sao_Paulo')::date`;
+    const cte = sql`
+      WITH lotes AS (
+        SELECT sm.product_id, sm.batch_code, sm.manufactured_on, sm.expires_on,
+               sum(sm.quantity) AS entrou
+        FROM stock_movements sm
+        WHERE ${sql.join(scope, sql` AND `)}
+        GROUP BY sm.product_id, sm.batch_code, sm.manufactured_on, sm.expires_on
+        HAVING sum(sm.quantity) > 0
+      ),
+      saldos AS (
+        SELECT l.product_id, l.batch_code, l.manufactured_on, l.expires_on, l.entrou,
+               p.name AS product_name, p.unit, p.min_stock, p.quantity_cache,
+               -- Quanto do saldo do produto os lotes que saem depois deste já
+               -- reservaram. O que passar disso é o que sobra para ele.
+               greatest(
+                 least(
+                   l.entrou,
+                   p.quantity_cache - coalesce(sum(l.entrou) OVER (
+                     PARTITION BY l.product_id
+                     ORDER BY (l.expires_on IS NULL) DESC, l.expires_on DESC, l.batch_code
+                     ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                   ), 0)
+                 ),
+                 0
+               ) AS quantity
+        FROM lotes l
+        JOIN products p ON p.workspace_id = ${workspaceId} AND p.id = l.product_id AND p.deleted_at IS NULL
+      ),
+      vivos AS (SELECT * FROM saldos WHERE quantity > 0)`;
+
+    const filtro =
+      query.filter === 'expiring'
+        ? sql`expires_on IS NOT NULL AND expires_on <= ${hoje} + ${`${query.window} days`}::interval`
+        : sql`true`;
+
+    const [rows, total, resumo] = await Promise.all([
+      tx.execute<Row>(sql`
+        ${cte}
+        SELECT *, ${hoje} AS hoje FROM vivos WHERE ${filtro}
+        ORDER BY expires_on ASC NULLS LAST, product_name ASC, batch_code ASC NULLS FIRST
+        LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}
+      `),
+      tx.execute<{ total: number }>(sql`${cte} SELECT count(*)::int AS total FROM vivos WHERE ${filtro}`),
+      tx.execute<Row>(sql`
+        ${cte}
+        SELECT
+          count(*) FILTER (WHERE expires_on IS NOT NULL AND expires_on < ${hoje})::int AS expired,
+          count(*) FILTER (WHERE expires_on IS NOT NULL AND expires_on >= ${hoje}
+            AND expires_on <= ${hoje} + ${`${query.window} days`}::interval)::int AS expiring_soon,
+          coalesce(sum(quantity) FILTER (WHERE expires_on IS NOT NULL AND expires_on < ${hoje}), 0) AS expired_quantity,
+          count(*)::int AS tracked,
+          coalesce(sum(quantity), 0) AS tracked_quantity
+        FROM vivos
+      `),
+    ]);
+
+    const semLote = await tx.execute<Row>(sql`
+      ${cte}
+      SELECT coalesce(sum(p.quantity_cache - coalesce(v.total, 0)), 0) AS without_batch
+      FROM products p
+      LEFT JOIN (SELECT product_id, sum(quantity) AS total FROM vivos GROUP BY product_id) v
+        ON v.product_id = p.id
+      WHERE p.workspace_id = ${workspaceId} AND p.deleted_at IS NULL
+        ${query.productId ? sql`AND p.id = ${query.productId}` : sql``}
+        AND p.quantity_cache > coalesce(v.total, 0)
+    `);
+
+    const r = resumo.rows[0] ?? {};
+    return {
+      items: rows.rows.map(batchView),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: total.rows[0]?.total ?? 0,
+      window: query.window,
+      summary: {
+        expired: Number(r['expired'] ?? 0),
+        expiringSoon: Number(r['expiring_soon'] ?? 0),
+        expiredQuantity: num(r['expired_quantity']),
+        tracked: Number(r['tracked'] ?? 0),
+        trackedQuantity: num(r['tracked_quantity']),
+        /** Saldo que não está em lote nenhum (entradas de antes do recurso). */
+        withoutBatch: num(semLote.rows[0]?.['without_batch']),
+      },
     };
   }
 
@@ -663,7 +808,15 @@ export class InventoryService {
         entity: 'movimentacao',
         op: 'movement',
         entityId: movementId,
-        payload: { id: movementId, productId: id, productName: body.name, changeType: 'cadastro', quantity: body.quantity, occurredAt: Date.now() },
+        payload: {
+          id: movementId,
+          productId: id,
+          productName: body.name,
+          changeType: 'cadastro',
+          quantity: body.quantity,
+          occurredAt: Date.now(),
+          ...this.batchPayload(body),
+        },
       });
     }
 
@@ -781,6 +934,26 @@ export class InventoryService {
     return this.getProduct(tx, ctx.workspaceId, productId);
   }
 
+  /**
+   * Campos de lote no payload da movimentação, só quando vieram preenchidos.
+   *
+   * Omitir em vez de mandar nulo mantém o corpo igual ao de antes para quem
+   * não usa o recurso — e é o que faz o estorno copiar o lote da original sem
+   * precisar saber se ela tinha algum.
+   */
+  private batchPayload(input: {
+    batchCode?: string | null;
+    manufacturedOn?: string | null;
+    expiresOn?: string | null;
+  }): Record<string, string> {
+    const payload: Record<string, string> = {};
+    const code = input.batchCode?.trim();
+    if (code) payload['batchCode'] = code;
+    if (input.manufacturedOn) payload['manufacturedOn'] = input.manufacturedOn;
+    if (input.expiresOn) payload['expiresOn'] = input.expiresOn;
+    return payload;
+  }
+
   async createMovement(tx: Transaction, ctx: InventoryContext, body: CreateMovementBody) {
     const product = await this.lockProduct(tx, ctx.workspaceId, body.productId);
     const unit = (product['unit'] as string | null) ?? null;
@@ -814,6 +987,9 @@ export class InventoryService {
         quantity: signed,
         occurredAt,
         note: body.note || null,
+        // Saída não escolhe lote: o que sai é decidido pela validade (FEFO),
+        // então guardar lote numa saída só criaria um segundo saldo possível.
+        ...(body.type === 'entrada' ? this.batchPayload(body) : {}),
       },
     };
     const results = await this.push(tx, ctx, [operation]);
@@ -867,6 +1043,14 @@ export class InventoryService {
         occurredAt: Date.now(),
         note: note || `Estorno de ${MOVEMENT_LABEL[String(original['type'])] ?? 'movimentação'}`,
         reversesMovementId: movementId,
+        // Sem isto o estorno de uma entrada tiraria do saldo do produto sem
+        // tirar do lote: a conta de validade continuaria contando mercadoria
+        // que voltou para o fornecedor.
+        ...this.batchPayload({
+          batchCode: original['batch_code'] as string | null,
+          manufacturedOn: original['manufactured_on'] as string | null,
+          expiresOn: original['expires_on'] as string | null,
+        }),
       },
     };
     const results = await this.push(tx, ctx, [operation]);

@@ -39,6 +39,8 @@ const ReportsPage = page(() => import('./pages/ReportsPage'), 'ReportsPage');
 const AnalysisPage = page(() => import('./pages/AnalysisPage'), 'AnalysisPage');
 const ImportExportPage = page(() => import('./pages/ImportExportPage'), 'ImportExportPage');
 const ConflictsPage = page(() => import('./pages/ConflictsPage'), 'ConflictsPage');
+const ExpiryPage = page(() => import('./pages/ExpiryPage'), 'ExpiryPage');
+const OptionsPage = page(() => import('./pages/OptionsPage'), 'OptionsPage');
 const TeamPage = page(() => import('./pages/TeamPage'), 'TeamPage');
 const BrandPage = page(() => import('./pages/BrandPage'), 'BrandPage');
 const PlanPage = page(() => import('./pages/PlanPage'), 'PlanPage');
@@ -198,6 +200,8 @@ export const router = createBrowserRouter([
               { path: 'analise', element: lazyPage(AnalysisPage, true) },
               { path: 'importar', element: lazyPage(ImportExportPage, true) },
               { path: 'conflitos', element: lazyPage(ConflictsPage, true) },
+              { path: 'validades', element: lazyPage(ExpiryPage, true) },
+              { path: 'opcoes', element: lazyPage(OptionsPage) },
               { path: 'equipe', element: lazyPage(TeamPage) },
               { path: 'plano', element: lazyPage(PlanPage) },
               { path: 'marca', element: lazyPage(BrandPage) },

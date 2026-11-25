@@ -10,18 +10,20 @@ import { useInvalidateInventory } from '../../lib/inventory';
 import { fractionMessage, hasFraction, isWholeUnit } from '../../lib/units';
 import { useCurrentWorkspace } from '../../workspace/WorkspaceProvider';
 import { Field, Modal, Notice, useToast } from '../ui';
+import { BatchFields, batchPayload, EMPTY_BATCH, type BatchInput } from './BatchFields';
 
 /**
  * Entrada ou saída de estoque. Depois de registrar, o aviso traz "Desfazer"
  * por 15 segundos — que grava o estorno, como no app, em vez de apagar.
  */
 export function MovementDialog({ product, type, onClose }: { product: Product | null; type: 'entrada' | 'saida'; onClose: () => void }) {
-  const { workspaceId, base } = useCurrentWorkspace();
+  const { workspaceId, base, tracksBatches } = useCurrentWorkspace();
   const toast = useToast();
   const invalidate = useInvalidateInventory(workspaceId);
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
+  const [batch, setBatch] = useState<BatchInput>(EMPTY_BATCH);
   const [error, setError] = useState<string | null>(null);
   const [movementId, setMovementId] = useState(newId);
   const open = product !== null;
@@ -32,6 +34,7 @@ export function MovementDialog({ product, type, onClose }: { product: Product | 
     setQuantity('');
     setNote('');
     setDate('');
+    setBatch(EMPTY_BATCH);
     setError(null);
     setMovementId(newId());
   }, [open, type, product?.id]);
@@ -55,6 +58,9 @@ export function MovementDialog({ product, type, onClose }: { product: Product | 
         ...(note.trim() ? { note: note.trim() } : {}),
         // Dia escolhido entra ao meio-dia, como no app; hoje é "agora".
         ...(date && date !== today ? { occurredAt: new Date(`${date}T12:00:00`).toISOString() } : {}),
+        // Lote só na entrada: a saída é decidida pela validade (FEFO), e a
+        // API ignora o que vier aqui numa saída.
+        ...(type === 'entrada' && tracksBatches ? batchPayload(batch) : {}),
       }),
     onSuccess: (result, amount) => {
       invalidate();
@@ -94,6 +100,7 @@ export function MovementDialog({ product, type, onClose }: { product: Product | 
         <Field label="Observação" optional>
           <input className="input" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder={type === 'saida' ? 'Ex.: venda no balcão' : 'Ex.: compra do fornecedor'} />
         </Field>
+        {type === 'entrada' && tracksBatches && <BatchFields value={batch} onChange={setBatch} />}
         <Field label="Data" hint="Em branco registra agora. Escolha um dia para lançar depois do fato." optional>
           <input className="input" type="date" value={date} max={today} onChange={(event) => setDate(event.target.value)} />
         </Field>
