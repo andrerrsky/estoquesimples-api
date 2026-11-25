@@ -163,7 +163,7 @@ export async function registerWebSessionRoutes(app: FastifyInstance): Promise<vo
       schema: {
         tags: ['auth'],
         summary: 'Renova a sessão web a partir do cookie',
-        description: 'Rotaciona o refresh token do cookie e devolve um novo access token. 401 = sem sessão; 409 `AUTH_REFRESH_IN_PROGRESS` = outra aba acabou de renovar, repita.',
+        description: 'Rotaciona o refresh token do cookie e devolve um novo access token. 401 = sem sessão. Duas abas renovando juntas, ou uma resposta perdida, recebem cada uma o seu token em vez de derrubar a sessão.',
         response: { 200: webAuthSchema, ...errors },
       },
     },

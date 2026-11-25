@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 
 import br.com.gameloop.estoquesimples.data.Diagnostics;
 import br.com.gameloop.estoquesimples.data.LocalDb;
+import br.com.gameloop.estoquesimples.analytics.Analytics;
 import br.com.gameloop.estoquesimples.data.OutboxRepository;
 import br.com.gameloop.estoquesimples.data.SyncMeta;
 import br.com.gameloop.estoquesimples.billing.PendingPurchase;
@@ -257,6 +258,63 @@ public class AccountActivity extends BaseActivity {
         }
     }
 
+    /**
+     * Botões para as alterações que não foram aceitas.
+     *
+     * O aviso existia desde sempre; a saída, não — a pessoa lia "algumas
+     * alterações não foram aceitas" e não tinha o que fazer, nem para tentar
+     * de novo nem para parar de ver aquilo. A maioria dessas falhas é de
+     * momento (a sessão caiu no meio do envio), então "tentar de novo" é o
+     * caminho principal; descartar é a saída, e pergunta antes.
+     */
+    private void mostrarSaidaParaFalhas(int falhas) {
+        Button tentar = findViewById(R.id.retryFailedButton);
+        Button descartar = findViewById(R.id.discardFailedButton);
+        if (tentar == null || descartar == null) {
+            return;
+        }
+        if (falhas <= 0) {
+            tentar.setVisibility(View.GONE);
+            descartar.setVisibility(View.GONE);
+            return;
+        }
+
+        tentar.setVisibility(View.VISIBLE);
+        descartar.setVisibility(View.VISIBLE);
+        tentar.setText(falhas == 1 ? "Tentar enviar de novo" : "Tentar enviar as " + falhas + " de novo");
+        tentar.setOnClickListener(v -> {
+            int voltaram;
+            synchronized (MainActivity.DB_LOCK) {
+                voltaram = new OutboxRepository(LocalDb.open(this)).retryFailed();
+            }
+            Analytics.track(this, "sync.failures_retried", Analytics.props("count", voltaram));
+            Toast.makeText(this,
+                    voltaram == 0 ? "Nada para reenviar." : "Reenviando na próxima sincronização.",
+                    Toast.LENGTH_SHORT).show();
+            // Sincroniza na hora: esperar a próxima rodada faria o botão
+            // parecer que não fez nada.
+            SyncScheduler.syncNow(this);
+            render();
+        });
+
+        descartar.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(falhas == 1 ? "Descartar a alteração?" : "Descartar as " + falhas + " alterações?")
+                .setMessage("Elas param de tentar subir para a nuvem. O que está no aparelho continua "
+                        + "como está: o que se perde é só o envio.")
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Descartar", (dialog, which) -> {
+                    int removidas;
+                    synchronized (MainActivity.DB_LOCK) {
+                        removidas = new OutboxRepository(LocalDb.open(this)).discardFailed();
+                    }
+                    Analytics.track(this, "sync.failures_discarded", Analytics.props("count", removidas));
+                    new SyncMeta(LocalDb.open(this)).remove(SyncMeta.ULTIMO_ERRO);
+                    Toast.makeText(this, "Pronto, o aviso saiu.", Toast.LENGTH_SHORT).show();
+                    render();
+                })
+                .show());
+    }
+
     private void refreshEmailStatus() {
         executor.execute(() -> {
             try {
@@ -398,6 +456,7 @@ public class AccountActivity extends BaseActivity {
                         + " — nada foi descartado, os dados seguem no aparelho.";
             }
             accountPending.setText(envio);
+            mostrarSaidaParaFalhas(falhas);
 
             String erro = meta.get(SyncMeta.ULTIMO_ERRO);
             if (erro != null) {

@@ -3,6 +3,17 @@
   "updatedAt": "2026-11-25",
   "releases": [
     {
+      "version": 42,
+      "date": "2026-11-25",
+      "title": "Fim do app pedindo login sozinho",
+      "highlights": [
+        "As alterações que não foram aceitas agora têm saída na tela Conta e nuvem: dá para tentar enviar de novo ou descartar, em vez de o aviso ficar para sempre."
+      ],
+      "fixes": [
+        "O app desconectava a conta sozinho quando a internet falhava na hora de renovar a sessão. Era o motivo de ter que entrar de novo do nada — corrigido no servidor, já valendo para todo mundo."
+      ]
+    },
+    {
       "version": 41,
       "date": "2026-11-25",
       "title": "Novidades do app e aviso de versão nova",

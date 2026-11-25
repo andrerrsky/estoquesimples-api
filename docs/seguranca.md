@@ -352,8 +352,11 @@ histórico de incidentes.
 
 - **Clientes**: argon2id, política de senha (10+ caracteres, lista de senhas
   comuns), access token de 15 min conferido no banco a cada requisição,
-  refresh opaco rotativo com detecção de reuso. A web guarda o refresh num
-  cookie httpOnly; "Lembrar meu e-mail" guarda só o e-mail (nunca a senha).
+  refresh opaco rotativo com detecção de reuso — com janela de graça (20 s na
+  web, 60 s no app) para a resposta que se perde no caminho, que derrubava
+  sessões de gente inocente ([sessao-do-app.md](sessao-do-app.md)). A web
+  guarda o refresh num cookie httpOnly; "Lembrar meu e-mail" guarda só o
+  e-mail (nunca a senha).
 - **Freio de tentativas**: bloqueio progressivo por (e-mail, IP) — ninguém
   tranca a conta de outra pessoa só sabendo o e-mail —, teto por conta para
   força bruta distribuída, e limite por e-mail em cadastro e "esqueci a

@@ -600,9 +600,20 @@ export class AuthService {
    *
    * Se um token já consumido reaparecer, assumimos que foi roubado: quem tem
    * o token legítimo é quem o usou primeiro, então revogamos a sessão inteira
-   * e obrigamos um novo login. Falso positivo é possível (dois clientes
-   * atualizando ao mesmo tempo), mas o custo é um login extra, enquanto
-   * ignorar o sinal deixaria um atacante com acesso persistente.
+   * e obrigamos um novo login.
+   *
+   * Com uma exceção, que custou caro para descobrir: **a resposta pode ter se
+   * perdido no caminho**. No celular isso é rotina — a rede oscila, o gateway
+   * devolve 504 — e aí o aparelho repete o mesmo token sem nunca ter recebido
+   * o substituto. Tratar isso como roubo derrubava a sessão de quem não fez
+   * nada: 47 vezes, em 38 contas diferentes, antes de alguém reclamar
+   * ("a conta está deslogando sozinha", solicitação #1012).
+   *
+   * Por isso, dentro de {@code reuseGraceSeconds} do primeiro uso, e **só
+   * enquanto o substituto ainda não tiver sido usado** (se foi, o cliente
+   * seguiu em frente e o token velho não tem motivo para voltar), a
+   * apresentação repetida ganha uma rotação nova em vez de revogação. Passada
+   * a janela, ou com a cadeia já adiante, volta a valer a regra dura.
    */
   async refresh(
     presentedToken: string,
@@ -629,14 +640,24 @@ export class AuthService {
         }
 
         if (stored.usedAt) {
-          // Navegador: duas abas podem renovar com o mesmo cookie no mesmo
-          // instante. A que perde a corrida não é um ladrão — o cookie já foi
-          // trocado pela que ganhou e basta repetir. Só vale por alguns
-          // segundos; depois disso, token usado de novo é reuso de verdade.
           const grace = options.reuseGraceSeconds ?? 0;
-          if (grace > 0 && Date.now() - stored.usedAt.getTime() < grace * 1000) {
-            throw new AppError(409, ErrorCode.AUTH_REFRESH_IN_PROGRESS, 'A sessão acabou de ser renovada. Tente de novo.');
+          const dentroDaJanela = grace > 0 && Date.now() - stored.usedAt.getTime() < grace * 1000;
+
+          if (dentroDaJanela) {
+            // O substituto já foi usado? Então o cliente recebeu a resposta e
+            // seguiu: o token velho reaparecendo agora não é resposta perdida.
+            const substituto = stored.replacedBy
+              ? await tx.select({ usedAt: refreshTokens.usedAt }).from(refreshTokens).where(eq(refreshTokens.id, stored.replacedBy)).limit(1)
+              : [];
+            const cadeiaIntacta = substituto.length === 0 || substituto[0]?.usedAt === null;
+            if (cadeiaIntacta) {
+              const recuperado = await this.rotacionar(tx, stored.sessionId, meta, { recuperado: true });
+              if (recuperado) {
+                return { reuse: false, value: recuperado };
+              }
+            }
           }
+
           const owner = await tx
             .select({ userId: sessions.userId })
             .from(sessions)
@@ -664,79 +685,13 @@ export class AuthService {
           throw unauthorized(ErrorCode.AUTH_TOKEN_EXPIRED, 'Refresh token expirado.');
         }
 
-        const sessionRows = await tx
-          .select()
-          .from(sessions)
-          .where(eq(sessions.id, stored.sessionId))
-          .limit(1);
-
-        const session = sessionRows[0];
-        const userRows = session ? await tx.select().from(users).where(eq(users.id, session.userId)).limit(1) : [];
-        const user = userRows[0];
-        // Bloquear a conta encerra as sessões: quem estava logado fica sabendo
-        // que foi o bloqueio, e não que a sessão "expirou".
-        if (user && !user.deletedAt && user.status === 'suspended') {
-          throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
+        const rotacionado = await this.rotacionar(tx, stored.sessionId, meta, { consumir: stored.id });
+        if (!rotacionado) {
+          // `rotacionar` só devolve nulo quando a sessão não serve mais; o
+          // motivo exato (suspensa, revogada, conta sumida) vem de lá.
+          throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Sessão encerrada. Faça login novamente.');
         }
-        if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
-          throw unauthorized(
-            ErrorCode.AUTH_SESSION_REVOKED,
-            'Sessão encerrada. Faça login novamente.',
-          );
-        }
-        if (!user || user.deletedAt || user.status !== 'active') {
-          throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Conta indisponível.');
-        }
-
-        const newToken = generateToken();
-        const inserted = await tx
-          .insert(refreshTokens)
-          .values({
-            sessionId: session.id,
-            tokenHash: hashToken(newToken),
-            expiresAt: session.expiresAt,
-          })
-          .returning();
-
-        const newRow = inserted[0];
-        if (!newRow) throw new Error('Falha ao rotacionar refresh token');
-
-        await tx
-          .update(refreshTokens)
-          .set({ usedAt: new Date(), replacedBy: newRow.id })
-          .where(eq(refreshTokens.id, stored.id));
-
-        await tx
-          .update(sessions)
-          .set({ lastUsedAt: new Date() })
-          .where(eq(sessions.id, session.id));
-
-        if (session.deviceId) {
-          await tx
-            .update(devices)
-            .set({ lastSeenAt: new Date() })
-            .where(eq(devices.id, session.deviceId));
-        }
-
-        const access = await this.services.tokens.signAccessToken({
-          sub: user.id,
-          sid: session.id,
-          ver: user.permissionVersion,
-          ...(session.deviceId ? { did: session.deviceId } : {}),
-        });
-
-        return {
-          reuse: false,
-          value: {
-            accessToken: access.token,
-            expiresIn: access.expiresIn,
-            refreshToken: newToken,
-            refreshExpiresAt: session.expiresAt.toISOString(),
-            sessionId: session.id,
-            deviceId: session.deviceId,
-            user: this.publicUser(user),
-          },
-        };
+        return { reuse: false, value: rotacionado };
       },
     );
 
@@ -748,6 +703,98 @@ export class AuthService {
     }
 
     return outcome.value;
+  }
+
+  /**
+   * Emite um refresh token novo para a sessão e devolve a sessão renovada.
+   *
+   * É o miolo do refresh, usado pelos dois caminhos: a rotação normal (que
+   * consome o token apresentado) e a recuperação de uma resposta perdida
+   * (que não consome nada — o token apresentado já estava consumido).
+   *
+   * Devolve `null` quando a sessão não serve mais; quando o problema é a
+   * conta (suspensa, apagada), o erro sai daqui, porque a pessoa precisa
+   * saber que foi bloqueio, e não "sessão expirada".
+   */
+  private async rotacionar(
+    tx: Transaction,
+    sessionId: string,
+    meta: RequestMeta,
+    options: { consumir?: string; recuperado?: boolean } = {},
+  ): Promise<AuthSuccess | null> {
+    const sessionRows = await tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+    const session = sessionRows[0];
+    const userRows = session ? await tx.select().from(users).where(eq(users.id, session.userId)).limit(1) : [];
+    const user = userRows[0];
+
+    // Bloquear a conta encerra as sessões: quem estava logado fica sabendo
+    // que foi o bloqueio, e não que a sessão "expirou".
+    if (user && !user.deletedAt && user.status === 'suspended') {
+      throw unauthorized(ErrorCode.AUTH_ACCOUNT_SUSPENDED, ACCOUNT_SUSPENDED_MESSAGE);
+    }
+    if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
+      return null;
+    }
+    if (!user || user.deletedAt || user.status !== 'active') {
+      throw unauthorized(ErrorCode.AUTH_SESSION_REVOKED, 'Conta indisponível.');
+    }
+
+    const newToken = generateToken();
+    const inserted = await tx
+      .insert(refreshTokens)
+      .values({
+        sessionId: session.id,
+        tokenHash: hashToken(newToken),
+        expiresAt: session.expiresAt,
+      })
+      .returning();
+
+    const newRow = inserted[0];
+    if (!newRow) throw new Error('Falha ao rotacionar refresh token');
+
+    if (options.consumir) {
+      await tx
+        .update(refreshTokens)
+        .set({ usedAt: new Date(), replacedBy: newRow.id })
+        .where(eq(refreshTokens.id, options.consumir));
+    }
+
+    await tx.update(sessions).set({ lastUsedAt: new Date() }).where(eq(sessions.id, session.id));
+
+    if (session.deviceId) {
+      await tx.update(devices).set({ lastSeenAt: new Date() }).where(eq(devices.id, session.deviceId));
+    }
+
+    if (options.recuperado) {
+      // Fica na auditoria para dar para medir quantas sessões o reenvio
+      // salvou — e para notar se um dia o número disparar, que seria sinal
+      // de outra coisa acontecendo.
+      await recordAudit(tx, {
+        actorUserId: user.id,
+        action: AuditAction.USER_TOKEN_REFRESH_RECOVERED,
+        entityType: 'session',
+        entityId: session.id,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+    }
+
+    const access = await this.services.tokens.signAccessToken({
+      sub: user.id,
+      sid: session.id,
+      ver: user.permissionVersion,
+      ...(session.deviceId ? { did: session.deviceId } : {}),
+    });
+
+    return {
+      accessToken: access.token,
+      expiresIn: access.expiresIn,
+      refreshToken: newToken,
+      refreshExpiresAt: session.expiresAt.toISOString(),
+      sessionId: session.id,
+      deviceId: session.deviceId,
+      user: this.publicUser(user),
+    };
   }
 
   // -------------------------------------------------------------------------

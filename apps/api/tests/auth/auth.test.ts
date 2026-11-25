@@ -228,7 +228,42 @@ describe('rotação de refresh token', () => {
     expect(withNewToken.statusCode).toBe(200);
   });
 
-  it('encerra a sessão quando um token já consumido é reapresentado', async () => {
+  it('o reenvio logo depois é resposta perdida, não roubo: devolve token novo e mantém a sessão', async () => {
+    // O caso que derrubava a base: o aparelho manda o refresh, a resposta se
+    // perde (rede do celular, 504 do gateway) e ele repete o mesmo token.
+    const user = await registerUser(context);
+
+    const primeira = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: user.refreshToken },
+    });
+    expect(primeira.statusCode).toBe(200);
+
+    const reenvio = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: user.refreshToken },
+    });
+    expect(reenvio.statusCode).toBe(200);
+    expect(reenvio.json().sessionId).toBe(user.sessionId);
+    expect(reenvio.json().refreshToken).not.toBe(primeira.json().refreshToken);
+
+    // O token que ele recebeu de verdade continua valendo.
+    const seguinte = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: reenvio.json().refreshToken },
+    });
+    expect(seguinte.statusCode).toBe(200);
+
+    const auditoria = await context.services.db.execute<{ action: string }>(
+      sql`SELECT action FROM audit_log WHERE actor_user_id = ${user.userId} AND action = 'user.token_refresh_recovered'`,
+    );
+    expect(auditoria.rows.length).toBe(1);
+  });
+
+  it('encerra a sessão quando um token já consumido é reapresentado depois da janela', async () => {
     const user = await registerUser(context);
 
     const rotated = await context.app.inject({
@@ -238,7 +273,12 @@ describe('rotação de refresh token', () => {
     });
     expect(rotated.statusCode).toBe(200);
 
-    // Reuso do token original: sinal de roubo.
+    // Passada a janela, token usado de novo é sinal de roubo — e aí a defesa
+    // precisa valer inteira.
+    await context.services.db.execute(
+      sql`UPDATE refresh_tokens SET used_at = now() - interval '10 minutes' WHERE used_at IS NOT NULL`,
+    );
+
     const reuse = await context.app.inject({
       method: 'POST',
       url: '/v1/auth/refresh',
@@ -256,6 +296,34 @@ describe('rotação de refresh token', () => {
     });
     expect(afterRevocation.statusCode).toBe(401);
     expect(afterRevocation.json().error.code).toBe('AUTH_SESSION_REVOKED');
+  });
+
+  it('token antigo volta depois de a cadeia seguir: isso é roubo, mesmo dentro da janela', async () => {
+    const user = await registerUser(context);
+
+    const segundo = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: user.refreshToken },
+    });
+    expect(segundo.statusCode).toBe(200);
+
+    // O cliente recebeu a resposta e seguiu em frente: o substituto já foi
+    // usado, então o token velho reaparecendo não é reenvio.
+    const terceiro = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: segundo.json().refreshToken },
+    });
+    expect(terceiro.statusCode).toBe(200);
+
+    const reuse = await context.app.inject({
+      method: 'POST',
+      url: '/v1/auth/refresh',
+      payload: { refreshToken: user.refreshToken },
+    });
+    expect(reuse.statusCode).toBe(401);
+    expect(reuse.json().error.code).toBe('AUTH_TOKEN_REUSE_DETECTED');
   });
 
   it('rejeita um refresh token inventado', async () => {

@@ -433,6 +433,46 @@ public final class OutboxRepository {
         }
     }
 
+    /**
+     * Devolve as operações com erro para a fila.
+     *
+     * Antes não havia saída: a operação ficava parada com o aviso "algumas
+     * alterações não foram aceitas" para sempre, e a pessoa só podia olhar.
+     * A maior parte dessas falhas é de momento (a sessão caiu no meio do
+     * envio, o servidor estava fora), então tentar de novo costuma resolver.
+     *
+     * @return quantas voltaram para a fila.
+     */
+    public int retryFailed() {
+        try {
+            ContentValues values = new ContentValues();
+            values.put("status", STATUS_PENDENTE);
+            values.put("attempts", 0);
+            values.put("next_attempt_at", 0L);
+            return db.update(LocalDb.TABLE_OUTBOX, values, "status=?", new String[]{STATUS_FALHA});
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao reenfileirar operações com erro", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Descarta as operações com erro.
+     *
+     * O dado em si fica no aparelho: o que se perde é a tentativa de mandar
+     * aquela alteração para a nuvem. Por isso a tela pergunta antes.
+     *
+     * @return quantas saíram da fila.
+     */
+    public int discardFailed() {
+        try {
+            return db.delete(LocalDb.TABLE_OUTBOX, "status=?", new String[]{STATUS_FALHA});
+        } catch (Exception e) {
+            Log.e(TAG, "falha ao descartar operações com erro", e);
+            return 0;
+        }
+    }
+
     /** Operações que falharam de forma definitiva, para exibição e exportação. */
     public List<Operation> failures() {
         List<Operation> failures = new ArrayList<>();

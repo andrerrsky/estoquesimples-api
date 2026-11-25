@@ -152,8 +152,11 @@ entregam o refresh token num cookie `httpOnly`, `SameSite=Strict`,
 `Path=/v1/auth/web` (`WEB_SESSION_COOKIE_NAME`), e o access token no corpo — a
 web o mantém só em memória e chama o resto da API com Bearer. Essas rotas
 exigem `x-requested-with: estoquesimples-web` + `Sec-Fetch-Site` (anti-CSRF).
-Reuso do refresh dentro de 20 s (duas abas) responde 409
-`AUTH_REFRESH_IN_PROGRESS` em vez de derrubar a sessão. O dispositivo é
+Reuso do refresh dentro da janela de graça (20 s na web, **60 s no app**)
+não derruba a sessão: vale como resposta perdida e ganha uma rotação nova
+(`user.token_refresh_recovered` na auditoria). Fora dela, ou com o substituto
+já usado, a sessão cai como antes — [docs/sessao-do-app.md](docs/sessao-do-app.md)
+conta por que isso existe. O dispositivo é
 gravado com `platform: 'web'`, que é como o painel distingue a origem.
 
 **Empresa**: `requireWorkspace(permissao)` resolve a participação e as

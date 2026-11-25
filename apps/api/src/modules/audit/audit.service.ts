@@ -21,6 +21,8 @@ export const AuditAction = {
   USER_PURGED: 'user.purged',
   USER_DATA_EXPORTED: 'user.data_exported',
   USER_TOKEN_REUSE_DETECTED: 'user.token_reuse_detected',
+  /** Refresh repetido dentro da janela: resposta perdida, sessão preservada. */
+  USER_TOKEN_REFRESH_RECOVERED: 'user.token_refresh_recovered',
   USER_LOGIN_BLOCKED: 'user.login_blocked',
   USER_LOGIN_DENIED: 'user.login_denied',
   USER_PROFILE_UPDATED: 'user.profile_updated',
