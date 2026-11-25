@@ -720,8 +720,15 @@ export function Menu({
 
   useEffect(() => {
     if (!open) return;
+    // O alvo de 'resize' é a window, que não é um Node: chamar contains() com ela
+    // quebrava a página em celulares onde a barra de endereço some ao rolar.
+    const dentroDoMenu = (event: Event) => {
+      const alvo = event.target;
+      if (!(alvo instanceof Node)) return false;
+      return Boolean(menu.current?.contains(alvo) || anchor.current?.contains(alvo));
+    };
     const close = (event: Event) => {
-      if (menu.current?.contains(event.target as Node) || anchor.current?.contains(event.target as Node)) return;
+      if (dentroDoMenu(event)) return;
       setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
