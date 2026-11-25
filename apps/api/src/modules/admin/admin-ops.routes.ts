@@ -21,6 +21,22 @@ const syncConfigSchema = z.object({
 });
 
 /**
+ * Versões do app, como `/v1/config` entrega para os aparelhos.
+ *
+ * Era o único bloco editado à mão no banco, e por isso ficou em zero: o
+ * aviso de versão nova nunca apareceu para ninguém, porque ninguém tinha
+ * onde dizer qual é a versão nova. Agora é tela.
+ */
+const appVersionSchema = z.object({
+  /** Mais nova publicada na loja: só avisa. Zero = não avisar. */
+  latestVersionCode: z.number().int().nonnegative().max(100_000),
+  /** Abaixo desta, o app para e manda atualizar. Zero = não bloquear ninguém. */
+  minRequiredVersionCode: z.number().int().nonnegative().max(100_000),
+  /** Recado opcional na tela de bloqueio. */
+  message: z.string().trim().max(300).nullable(),
+});
+
+/**
  * Operação pelo painel.
  *
  * Reaproveita o `OpsService` (mesmo retrato e mesmos alertas de `/ops/status`)
@@ -40,11 +56,12 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
       schema: { tags: ['admin'], summary: 'Retrato operacional, alertas e ambiente', hide: true, response: { 200: z.any(), ...commonAdminErrors } },
     },
     async () => {
-      const [snapshot, migrations, backup, syncConfig, jobKinds] = await Promise.all([
+      const [snapshot, migrations, backup, syncConfig, appVersionConfig, jobKinds] = await Promise.all([
         ops.snapshot(),
         migrationStatus(dbHandle.pool).catch(() => []),
         db.select({ value: appConfig.value, updatedAt: appConfig.updatedAt }).from(appConfig).where(eq(appConfig.key, 'backup_verificado')).limit(1),
         db.select({ value: appConfig.value, updatedAt: appConfig.updatedAt }).from(appConfig).where(eq(appConfig.key, 'sync')).limit(1),
+        db.select({ value: appConfig.value, updatedAt: appConfig.updatedAt }).from(appConfig).where(eq(appConfig.key, 'app')).limit(1),
         db.execute<{ kind: string; pending: number; failed: number; completed_24h: number; last_completed: string | null; last_error: string | null }>(sql`
           SELECT kind,
                  count(*) FILTER (WHERE completed_at IS NULL AND failed_at IS NULL)::int AS pending,
@@ -59,6 +76,9 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
       const backupRow = backup[0];
       const backupHours = backupRow ? (Date.now() - backupRow.updatedAt.getTime()) / 3_600_000 : null;
       const storedSync = syncConfig[0]?.value as { enabled?: boolean; minAppVersionCode?: number } | undefined;
+      const storedApp = appVersionConfig[0]?.value as
+        | { latestVersionCode?: number; minRequiredVersionCode?: number; message?: string | null }
+        | undefined;
 
       return {
         generatedAt: new Date().toISOString(),
@@ -85,6 +105,12 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
           source: storedSync ? 'banco' : 'ambiente',
           updatedAt: syncConfig[0]?.updatedAt?.toISOString() ?? null,
         },
+        appVersion: {
+          latestVersionCode: storedApp?.latestVersionCode ?? 0,
+          minRequiredVersionCode: storedApp?.minRequiredVersionCode ?? 0,
+          message: storedApp?.message ?? null,
+          updatedAt: appVersionConfig[0]?.updatedAt?.toISOString() ?? null,
+        },
         backup: {
           verifiedAt: backupRow?.updatedAt.toISOString() ?? null,
           hoursSince: backupHours === null ? null : Math.round(backupHours),
@@ -102,6 +128,47 @@ export async function registerAdminOpsRoutes(app: FastifyInstance): Promise<void
           lastError: row.last_error,
         })),
       };
+    },
+  );
+
+  routes.put(
+    '/ops/app-version',
+    {
+      preHandler: requireAdmin('owner'),
+      schema: {
+        tags: ['admin'],
+        summary: 'Define a versão mais nova do app e a versão mínima obrigatória',
+        description:
+          'A versão mais nova só mostra um aviso dispensável no app. A obrigatória trava o aplicativo ' +
+          'abaixo dela — a API nunca exige uma versão maior do que a mais nova publicada.',
+        hide: true,
+        body: appVersionSchema.extend({ reason: z.string().trim().min(3).max(500) }).strict(),
+        response: { 200: appVersionSchema, ...commonAdminErrors },
+      },
+    },
+    async (request) => {
+      const { reason, ...config } = request.body;
+      const before = await db.select({ value: appConfig.value }).from(appConfig).where(eq(appConfig.key, 'app')).limit(1);
+
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(appConfig)
+          .values({ key: 'app', value: config })
+          .onConflictDoUpdate({ target: appConfig.key, set: { value: config, updatedAt: new Date() } });
+        await recordAdminAudit(tx, {
+          actor: adminActor(request),
+          action: AdminAction.OPS_APP_VERSION_CHANGED,
+          targetType: 'config',
+          targetId: 'app',
+          metadata: { from: before[0]?.value ?? null, to: config, reason },
+        });
+      });
+
+      request.log.warn(
+        { config, alerta: true, admin: request.admin?.email },
+        'versões do app alteradas pelo painel',
+      );
+      return config;
     },
   );
 

@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-25",
+  "releases": [
+    {
+      "version": 41,
+      "date": "2026-11-25",
+      "title": "Novidades do app e aviso de versão nova",
+      "highlights": [
+        "Esta tela: o que mudou em cada versão do aplicativo, para você saber o que ganhou sem precisar procurar.",
+        "Quando sair uma versão nova na Play Store, o app avisa na tela inicial, com um toque para atualizar. O aviso pode ser dispensado."
+      ],
+      "fixes": [
+        "No menu, \"Dicas e novidades\" virou \"Blog\": é onde ficam os artigos do site."
+      ]
+    },
+    {
+      "version": 40,
+      "date": "2026-11-25",
+      "title": "Lote, fabricação e validade",
+      "highlights": [
+        "Ligue em Configurações › Lote e validade para registrar o lote, a fabricação e a validade em cada entrada de estoque.",
+        "O mesmo produto pode ter vários lotes, cada um com a sua validade.",
+        "Nova tela Validades: os lotes em estoque, o que vence primeiro na frente, com o vencido em destaque.",
+        "Na saída não é preciso escolher lote: sai antes o que vence antes."
+      ],
+      "fixes": [
+        "No calendário das entradas, os botões OK e Cancelar ficavam invisíveis e o teclado cobria a confirmação."
+      ]
+    },
+    {
+      "version": 39,
+      "date": "2026-11-23",
+      "title": "Importação de planilha mais segura",
+      "highlights": [],
+      "fixes": [
+        "Uma planilha com colunas fora de ordem podia apagar dados do cadastro ao importar. Agora a importação recusa a planilha em vez de gravar errado, explicando o que corrigir."
+      ]
+    },
+    {
+      "version": 38,
+      "date": "2026-11-18",
+      "title": "Aviso de estoque só no aparelho",
+      "highlights": [
+        "Quem usa sem conta passa a ver, com clareza, que o estoque está apenas neste aparelho — e como ligar a nuvem de graça para não perder nada se o celular sumir."
+      ],
+      "fixes": []
+    },
+    {
+      "version": 37,
+      "date": "2026-11-16",
+      "title": "Conferência de estoque",
+      "highlights": [
+        "Contagem física do estoque, com contagem cega: você digita quanto tem de verdade sem ver o saldo.",
+        "Escolha o que conferir: tudo, uma categoria, um local ou um fornecedor.",
+        "No fim, a diferença item a item e o total em reais a preço de custo; os ajustes entram no histórico com a nota da conferência.",
+        "Três conferências por mês no plano Gratuito; no Equipe, ilimitadas e com histórico."
+      ],
+      "fixes": []
+    },
+    {
+      "version": 36,
+      "date": "2026-11-13",
+      "title": "Conferência de saldo na nuvem",
+      "highlights": [],
+      "fixes": [
+        "Quando a conta do saldo e o histórico discordavam, o app repõe os lançamentos que faltavam na nuvem, em vez de deixar os dois números diferentes."
+      ]
+    },
+    {
+      "version": 35,
+      "date": "2026-11-13",
+      "title": "Saldo certo ao entrar na nuvem",
+      "highlights": [],
+      "fixes": [
+        "Produtos cadastrados antes do login subiam com o saldo em dobro em alguns casos. O acerto agora acontece antes do envio."
+      ]
+    },
+    {
+      "version": 34,
+      "date": "2026-11-12",
+      "title": "Melhorias internas",
+      "highlights": [],
+      "fixes": [
+        "Pedido de avaliação na hora certa e medição de origem da instalação, para saber quais anúncios valem a pena."
+      ]
+    },
+    {
+      "version": 33,
+      "date": "2026-11-11",
+      "title": "Oferta de Black Friday",
+      "highlights": [
+        "Preço promocional do plano Equipe dentro do app, durante a Black Friday."
+      ],
+      "fixes": []
+    },
+    {
+      "version": 32,
+      "date": "2026-11-10",
+      "title": "Aviso de limite do plano",
+      "highlights": [],
+      "fixes": [
+        "O aviso de limite de produtos sumia na hora ao confirmar a assinatura, em vez de insistir depois da compra."
+      ]
+    },
+    {
+      "version": 31,
+      "date": "2026-11-10",
+      "title": "Custo, lucro e lista de reposição",
+      "highlights": [
+        "Preço de custo por produto, com margem e lucro calculados.",
+        "Lista de reposição: junta o que está acabando por fornecedor e monta o pedido pronto para mandar no WhatsApp."
+      ],
+      "fixes": []
+    },
+    {
+      "version": 30,
+      "date": "2026-11-10",
+      "title": "App mais estável",
+      "highlights": [],
+      "fixes": [
+        "Travamentos na busca e na importação de planilhas grandes."
+      ]
+    }
+  ]
+}

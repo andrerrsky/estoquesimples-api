@@ -324,6 +324,7 @@ export const AUDIT_ACTION: Record<string, { label: string; tone: Tone }> = {
   'note.created': { label: 'Nota de suporte adicionada', tone: 'neutral' },
   'note.deleted': { label: 'Nota de suporte removida', tone: 'neutral' },
   'ops.sync_config_changed': { label: 'Sincronização reconfigurada', tone: 'error' },
+  'ops.app_version_changed': { label: 'Versões do app alteradas', tone: 'warning' },
   'ops.job_retried': { label: 'Tarefa recolocada na fila', tone: 'info' },
   'ops.job_cancelled': { label: 'Tarefa cancelada', tone: 'warning' },
   'ops.job_dismissed': { label: 'Tarefa falha descartada', tone: 'neutral' },

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@estoquesimples/design": "0.1.0",
+    "@estoquesimples/changelog": "0.1.0",
     "@estoquesimples/help": "0.1.0",
     "@estoquesimples/legal": "0.1.0",
     "@tanstack/react-query": "^5.105.0",

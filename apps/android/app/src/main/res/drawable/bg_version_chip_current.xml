@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A versão instalada no aparelho: a única com a cor da marca, para a
+     pessoa achar de relance onde ela está na lista. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/color_brand" />
+    <corners android:radius="@dimen/radius_chip" />
+</shape>

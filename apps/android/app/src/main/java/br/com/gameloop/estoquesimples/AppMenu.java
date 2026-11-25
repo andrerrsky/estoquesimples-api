@@ -49,6 +49,9 @@ public final class AppMenu {
         } else if (id == R.id.menu_settings) {
             activity.startActivity(new Intent(activity, SettingsActivity.class));
             return true;
+        } else if (id == R.id.menu_whats_new) {
+            WhatsNewActivity.open(activity, "menu");
+            return true;
         } else if (id == R.id.menu_blog) {
             br.com.gameloop.estoquesimples.blog.BlogActivity.open(activity);
             return true;

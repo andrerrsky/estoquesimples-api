@@ -58,6 +58,7 @@ costumam dizer "plano pró" querendo dizer Equipe.
 | **Pessoas na empresa** | só o proprietário (1) | **sem limite, e não se cobra por pessoa** |
 | Análise Avançada | não | sim |
 | **Conferência de estoque** | **3 por mês**, completas | ilimitadas, com histórico |
+| **Lote, fabricação e validade** | sim (opcional, liga por empresa) | sim |
 | Fotos (por empresa) | 100 MB | 5.000 MB |
 | Identidade visual | não | sim |
 | Histórico, relatórios, importação, exportação, backup | iguais nos dois, no aparelho | |
@@ -120,6 +121,7 @@ sem campanha.
 | Eventos de uso, o que o painel entende | [docs/analytics.md](docs/analytics.md) |
 | Conferência de estoque (contagem física, limite do gratuito) | [docs/conferencia-de-estoque.md](docs/conferencia-de-estoque.md) |
 | Lote, fabricação e validade (opcional, por empresa; web e app) | [docs/lote-e-validade.md](docs/lote-e-validade.md) |
+| Novidades do app, aviso de versão nova, versões no painel | [docs/novidades-do-app.md](docs/novidades-do-app.md) |
 | Suporte pelo app e chat, resposta automática por IA, escalonamento | [docs/support.md](docs/support.md) |
 | Notificações e push (FCM) | [docs/notifications.md](docs/notifications.md) · [docs/push.md](docs/push.md) |
 | E-mails automáticos de ativação e recuperação | [docs/emails-ciclo-de-vida.md](docs/emails-ciclo-de-vida.md) |

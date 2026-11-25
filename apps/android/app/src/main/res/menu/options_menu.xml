@@ -43,8 +43,12 @@
         android:title="@string/settings_title"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_whats_new"
+        android:title="Novidades do app"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_blog"
-        android:title="Dicas e novidades"
+        android:title="Blog"
         app:showAsAction="never" />
     <item
         android:id="@+id/menu_support"

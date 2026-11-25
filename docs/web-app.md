@@ -266,6 +266,7 @@ contrato completo está em `/docs` (OpenAPI).
 | Conflitos | `/app/conflitos` | decisões pendentes da sincronização |
 | Validades | `/app/validades` | lotes em estoque por vencimento; só com o recurso ligado ([lote-e-validade.md](lote-e-validade.md)) |
 | Opções | `/app/opcoes` | opções da empresa (hoje: lote e validade) |
+| Novidades | `/app/novidades` | o que mudou em cada versão do app ([novidades-do-app.md](novidades-do-app.md)) |
 | Identidade visual | `/app/marca` | plano Equipe; proprietário e administradores ([branding.md](branding.md)) |
 | Entrada da empresa | `/<identificador>/entrar` | pública; a mesma tela de entrada com a marca da empresa |
 | Equipe | `/app/equipe` | membros, papéis, convites (plano Equipe) |

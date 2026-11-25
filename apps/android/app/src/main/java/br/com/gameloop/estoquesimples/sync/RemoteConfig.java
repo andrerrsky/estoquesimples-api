@@ -34,6 +34,7 @@ public final class RemoteConfig {
     private static final String CHAVE_ATUALIZADO_EM = "atualizado_em";
     private static final String CHAVE_VERSAO_OBRIGATORIA = "versao_obrigatoria";
     private static final String CHAVE_VERSAO_MAIS_NOVA = "versao_mais_nova";
+    private static final String CHAVE_AVISO_DISPENSADO = "aviso_versao_dispensado";
     private static final String CHAVE_URL_ATUALIZACAO = "url_atualizacao";
     private static final String CHAVE_RECADO_ATUALIZACAO = "recado_atualizacao";
     private static final String CHAVE_BLOQUEIOS_VISTOS = "bloqueios_vistos";
@@ -165,6 +166,39 @@ public final class RemoteConfig {
             return false;
         }
         return agora >= concedida && agora - concedida < TREGUA_MS;
+    }
+
+    /**
+     * Saiu versão nova na loja?
+     *
+     * Diferente de {@link #isUpdateRequired()}, que trava o app: aqui é só um
+     * aviso. O servidor precisa ter dito qual é a mais nova
+     * ({@code latestVersionCode}); zero — o padrão, e o que respondia até
+     * hoje — significa "não sei", e nesse caso não se inventa aviso nenhum.
+     */
+    public boolean hasNewerVersion() {
+        return BuildConfig.VERSION_CODE < prefs.getInt(CHAVE_VERSAO_MAIS_NOVA, 0);
+    }
+
+    /** Qual é a mais nova segundo o servidor; zero quando ele não disse. */
+    public int latestVersionCode() {
+        return prefs.getInt(CHAVE_VERSAO_MAIS_NOVA, 0);
+    }
+
+    /**
+     * O aviso de versão nova foi dispensado para esta versão da loja?
+     *
+     * Guardar <b>qual</b> versão foi dispensada, e não um "já fechei", é o
+     * que faz o aviso voltar no lançamento seguinte sem perseguir quem
+     * decidiu ficar onde está.
+     */
+    public boolean updateNoticeDismissed() {
+        int dispensada = prefs.getInt(CHAVE_AVISO_DISPENSADO, 0);
+        return dispensada > 0 && dispensada >= latestVersionCode();
+    }
+
+    public void dismissUpdateNotice() {
+        prefs.edit().putInt(CHAVE_AVISO_DISPENSADO, latestVersionCode()).apply();
     }
 
     public String updateUrl() {

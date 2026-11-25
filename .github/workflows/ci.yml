@@ -63,6 +63,11 @@ jobs:
       - name: Central de ajuda válida e em dia no app
         run: npm run help:check
 
+      # Novidades do app: mesma regra da ajuda (fonte em packages/changelog,
+      # cópia nos assets), e valida que nenhuma versão entrou vazia.
+      - name: Novidades do app válidas e em dia
+        run: npm run changelog:check
+
       - name: Verificação de tipos
         run: npm run typecheck
 

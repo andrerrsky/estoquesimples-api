@@ -20,7 +20,7 @@ completo com a API fora do ar. A mesma conta abre a aplicação web
 é feito lá chega ao aparelho na sincronização seguinte, pelas mesmas regras
 de conflito.
 
-- Pacote `br.com.gameloop.estoquesimples`, `versionCode 40`, minSdk 24,
+- Pacote `br.com.gameloop.estoquesimples`, `versionCode 41`, minSdk 24,
   targetSdk 36, Java 17 (sem Kotlin, sem Compose), UI em XML com ViewBinding,
   Material Components 1.13 (tema `CustomActionBarTheme`, só claro).
 - API: `https://api.estoquesimples.com.br` (`API_BASE_URL` em
@@ -59,7 +59,10 @@ administrativo e a aplicação web usam estes mesmos tokens, copiados em
   (`entrada`, `saida`, `ajuste`, `cadastro`, `importacao`, `edicao`,
   `cancelamento`; legados `venda`/`compra`), `quantity` **sem sinal** (a
   direção vem do tipo; `SIGNED_QUANTITY_SQL` em `data/MovementRepository.java`),
-  `reverses_uuid` para cancelamentos.
+  `reverses_uuid` para cancelamentos, e `batch_code` / `manufactured_on` /
+  `expires_on` (lote da entrada; datas como texto `YYYY-MM-DD`, porque
+  validade é dia de calendário). Não há tabela de lotes: o saldo de cada um
+  sai de uma conta FEFO (`data/BatchRepository.java`, testada).
 - `sync_outbox` / `sync_meta`: fila de operações e cursor. No fio
   (`data/SyncPayloads.java`) a quantidade vai **com sinal**.
 
@@ -144,6 +147,24 @@ administrativo e a aplicação web usam estes mesmos tokens, copiados em
   direto. Eventos: `help.article_opened` (`article` = id do artigo) e
   `help.searched` (`results`; uma vez por busca, 1 s depois da última tecla,
   nunca com o texto digitado).
+
+## Telas de novembro de 2026
+
+- **Validades** (`ExpiryActivity`, menu ⋮): lotes em estoque, o que vence
+  primeiro na frente. O item do menu só aparece com o recurso ligado
+  (`sync/CompanyOptions`, que lê e grava `settings.trackBatches` da empresa e
+  cai para a escolha local sem conta). Entradas pedem lote, fabricação e
+  validade; o estorno copia o lote da original
+  ([docs/lote-e-validade.md](../../docs/lote-e-validade.md)).
+- **Novidades do app** (`WhatsNewActivity`, menu ⋮): o que mudou em cada
+  versão, de `assets/changelog/releases.json` (fonte em
+  `packages/changelog`, sincronizada por `npm run changelog:sync`). A versão
+  instalada ganha o selo "você está aqui".
+- **Aviso de versão nova**: faixa na tela inicial quando
+  `latestVersionCode` do `/v1/config` passa do `versionCode` instalado
+  (`RemoteConfig.hasNewerVersion`). Dispensável, e a dispensa guarda o número
+  da versão ([docs/novidades-do-app.md](../../docs/novidades-do-app.md)).
+- No menu, **"Dicas e novidades" virou "Blog"**: é o que a tela sempre foi.
 
 ## Fotos dos produtos
 
