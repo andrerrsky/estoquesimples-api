@@ -460,6 +460,9 @@ export class InitialUploadService {
           occurredAt: new Date(entry.occurredAt),
           createdBy: userId,
           changeSeq: seq,
+          batchCode: entry.batchCode?.trim() || null,
+          manufacturedOn: entry.manufacturedOn ?? null,
+          expiresOn: entry.expiresOn ?? null,
         })
         .onConflictDoNothing({ target: stockMovements.id })
         .returning({ id: stockMovements.id });

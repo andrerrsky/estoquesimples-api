@@ -37,6 +37,19 @@ export const productFieldsSchema = z.object({
   photoHash: z.string().regex(/^[0-9a-f]{64}$/, 'Identificador de imagem inválido.').nullish(),
 });
 
+/** Dia de calendário (`YYYY-MM-DD`): a validade impressa não tem fuso. */
+const calendarDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.')
+  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Data inválida.');
+
+/** Lote da mercadoria que entrou; só chega de quem usa o controle de validade. */
+export const batchFieldsSchema = z.object({
+  batchCode: optionalText(60),
+  manufacturedOn: calendarDay.nullish(),
+  expiresOn: calendarDay.nullish(),
+});
+
 export const createProductBodySchema = productFieldsSchema
   .extend({
     /** Gerado pelo cliente para que repetir o envio não duplique o produto. */
@@ -44,6 +57,7 @@ export const createProductBodySchema = productFieldsSchema
     /** Estoque inicial; vira a movimentação de `cadastro`. */
     quantity: quantity.nonnegative('A quantidade não pode ser negativa.').max(999_999_999).default(0),
   })
+  .merge(batchFieldsSchema)
   .strict();
 
 export const updateProductBodySchema = z
@@ -100,6 +114,7 @@ export const createMovementBodySchema = z
     /** Lançamento retroativo; datas futuras viram "agora". */
     occurredAt: z.coerce.date().optional(),
   })
+  .merge(batchFieldsSchema)
   .strict();
 
 export const cancelMovementBodySchema = z.object({ note: z.string().trim().max(2000).optional() }).strict();
@@ -139,6 +154,17 @@ export const importRowSchema = z
 
 export const importBodySchema = z.object({ rows: z.array(importRowSchema).min(1).max(1000) }).strict();
 
+export const listBatchesQuerySchema = z
+  .object({
+    productId: z.string().uuid().optional(),
+    /** `expiring` deixa só o que vence dentro de `window` dias (e o vencido). */
+    filter: z.enum(['all', 'expiring']).default('all'),
+    window: z.coerce.number().int().min(1).max(365).default(30),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .strict();
+
 export const reportQuerySchema = z
   .object({ period: z.enum(['today', '7d', '30d', '90d', 'all']).default('all') })
   .strict();
@@ -148,5 +174,6 @@ export type UpdateProductBody = z.infer<typeof updateProductBodySchema>;
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
 export type ListMovementsQuery = z.infer<typeof listMovementsQuerySchema>;
 export type CreateMovementBody = z.infer<typeof createMovementBodySchema>;
+export type ListBatchesQuery = z.infer<typeof listBatchesQuerySchema>;
 export type BulkBody = z.infer<typeof bulkBodySchema>;
 export type ImportRow = z.infer<typeof importRowSchema>;

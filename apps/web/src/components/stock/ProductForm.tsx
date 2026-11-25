@@ -19,6 +19,7 @@ import { BarcodeScanner } from '../BarcodeScanner';
 import { Icon } from '../Icon';
 import { SuggestInput } from '../SuggestInput';
 import { ConfirmDialog, Drawer, Field, Notice, revealIfHidden, useToast } from '../ui';
+import { BatchFields, batchPayload, EMPTY_BATCH, type BatchInput } from './BatchFields';
 
 interface FormState {
   name: string;
@@ -66,7 +67,7 @@ type PhotoChange = { kind: 'keep' } | { kind: 'new'; prepared: PreparedImage } |
  * um ajuste no histórico, e a pessoa é avisada antes de salvar.
  */
 export function ProductForm({ open, product, onClose, onSaved }: { open: boolean; product: Product | null; onClose: () => void; onSaved?: (product: Product) => void }) {
-  const { workspaceId, base, currency, can } = useCurrentWorkspace();
+  const { workspaceId, base, currency, can, tracksBatches } = useCurrentWorkspace();
   const toast = useToast();
   const invalidate = useInvalidateInventory(workspaceId);
   const listId = useId();
@@ -81,6 +82,7 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
   const [scanning, setScanning] = useState(false);
   const [photo, setPhoto] = useState<PhotoChange>({ kind: 'keep' });
   const [preparing, setPreparing] = useState(false);
+  const [batch, setBatch] = useState<BatchInput>(EMPTY_BATCH);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -203,7 +205,14 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
       };
       if (!product) {
         // `id` gerado aqui: se a resposta se perder, repetir não duplica.
-        return api.post<CreatedProduct>(`${base}/products`, { id: draftId, ...fields, ...(photoHash ? { photoHash } : {}), quantity: values.quantity });
+        return api.post<CreatedProduct>(`${base}/products`, {
+          id: draftId,
+          ...fields,
+          ...(photoHash ? { photoHash } : {}),
+          quantity: values.quantity,
+          // O estoque inicial é uma entrada como as outras: pode ter lote.
+          ...(tracksBatches && values.quantity > 0 ? batchPayload(batch) : {}),
+        });
       }
       const changes: Record<string, unknown> = {};
       const original: Record<string, string | number | null> = {};
@@ -411,6 +420,13 @@ export function ProductForm({ open, product, onClose, onSaved }: { open: boolean
               <input className="input num" value={form.minStock} onChange={(event) => set('minStock')(event.target.value)} inputMode="decimal" placeholder="0" />
             </Field>
           </div>
+
+          {!product && tracksBatches && (
+            <>
+              <div className="form-section">Lote e validade</div>
+              <BatchFields value={batch} onChange={setBatch} />
+            </>
+          )}
 
           <div className="form-section">Informações adicionais</div>
           <div className="form-grid">

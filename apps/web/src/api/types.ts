@@ -41,7 +41,7 @@ export interface WorkspaceSummary {
 export interface WorkspaceDetail {
   id: string;
   name: string;
-  settings: { currencySymbol?: string } & Record<string, unknown>;
+  settings: { currencySymbol?: string; trackBatches?: boolean } & Record<string, unknown>;
   ownerUserId: string;
   createdAt: string;
   role: RoleKey;
@@ -222,6 +222,41 @@ export interface Movement {
   balanceAfter: number | null;
   createdByName: string | null;
   canCancel: boolean;
+  /** Lote da mercadoria; só as entradas de quem usa o controle de validade. */
+  batchCode: string | null;
+  /** Dias de calendário (`YYYY-MM-DD`): a validade impressa não tem fuso. */
+  manufacturedOn: string | null;
+  expiresOn: string | null;
+}
+
+/**
+ * Um lote em estoque, como a API calcula (FEFO sobre o saldo do produto).
+ * Não existe tabela de lotes: nada aqui é editável por si.
+ */
+export interface Batch {
+  productId: string;
+  productName: string | null;
+  unit: string | null;
+  batchCode: string | null;
+  manufacturedOn: string | null;
+  expiresOn: string | null;
+  quantity: number;
+  /** Negativo = já venceu; `null` = lote sem validade informada. */
+  daysToExpire: number | null;
+  expired: boolean;
+}
+
+export interface BatchPage extends Page<Batch> {
+  window: number;
+  summary: {
+    expired: number;
+    expiringSoon: number;
+    expiredQuantity: number;
+    tracked: number;
+    trackedQuantity: number;
+    /** Saldo que não está em lote nenhum (entradas de antes do recurso). */
+    withoutBatch: number;
+  };
 }
 
 export interface Page<T> {

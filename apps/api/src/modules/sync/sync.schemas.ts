@@ -88,6 +88,12 @@ export const productInputSchema = z
  */
 export const productLooseSchema = productInputSchema.extend({ name: texto(200) });
 
+/** Dia de calendário (`YYYY-MM-DD`), que é como a validade vem impressa. */
+export const diaDoCalendario = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.')
+  .refine((valor) => !Number.isNaN(Date.parse(`${valor}T00:00:00Z`)), 'Data inválida.');
+
 export const movementInputSchema = z
   .object({
     id: z.string().uuid(),
@@ -108,6 +114,17 @@ export const movementInputSchema = z
      * estorno como um evento solto, sem saber que ele anulava outro.
      */
     reversesMovementId: z.string().uuid().nullish(),
+    /**
+     * Lote, fabricação e validade da mercadoria desta entrada.
+     *
+     * Ausentes nas versões do app que não conhecem o recurso, e nulos em
+     * quem não liga para validade. Datas em `YYYY-MM-DD`: lote é dia de
+     * calendário, não instante — a validade impressa no pacote não muda com
+     * o fuso de quem olha.
+     */
+    batchCode: texto(60).nullish(),
+    manufacturedOn: diaDoCalendario.nullish(),
+    expiresOn: diaDoCalendario.nullish(),
   })
   .strict();
 

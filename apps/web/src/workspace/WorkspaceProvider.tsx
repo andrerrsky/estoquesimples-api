@@ -31,6 +31,12 @@ interface WorkspaceContextValue {
    */
   cloudAllowed: boolean;
   currency: string;
+  /**
+   * A empresa liga o controle de lote e validade em Opções. Fica em
+   * `settings` (da empresa, não do aparelho) para valer na web e no app, e
+   * desligado esconde os campos de quem não trabalha com prazo.
+   */
+  tracksBatches: boolean;
   select: (workspaceId: string) => void;
   refresh: () => Promise<void>;
 }
@@ -153,6 +159,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       teamEnabled,
       cloudAllowed: plan ? plan.syncAllowed && (workspace?.isOwner === true || teamEnabled) : true,
       currency: typeof workspace?.settings?.currencySymbol === 'string' ? workspace.settings.currencySymbol : 'R$',
+      tracksBatches: workspace?.settings?.trackBatches === true,
       select,
       refresh,
     };

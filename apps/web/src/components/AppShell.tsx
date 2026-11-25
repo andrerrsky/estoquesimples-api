@@ -33,9 +33,13 @@ const STOCK_NAV: NavItem[] = [
 ];
 
 const COMPANY_NAV: NavItem[] = [
+  { to: '/app/opcoes', label: 'Opções', icon: 'settings' },
   { to: '/app/equipe', label: 'Equipe', icon: 'users' },
   { to: '/app/plano', label: 'Plano', icon: 'card' },
 ];
+
+/** Só aparece com o controle de lote e validade ligado em Opções. */
+const EXPIRY_NAV: NavItem = { to: '/app/validades', label: 'Validades', icon: 'history' };
 
 /** Só quem pode configurar a marca vê o item (a API confere de novo). */
 const BRAND_NAV: NavItem = { to: '/app/marca', label: 'Identidade visual', icon: 'palette' };
@@ -61,7 +65,7 @@ function useUnreadNotifications(): number {
 /** Estrutura das telas internas: barra lateral no desktop, barra inferior no celular. */
 export function AppShell() {
   const { status, user, logout } = useAuth();
-  const { workspaces, workspace, workspaceId, entitlement, loading, error, select, isPaid, refresh, can } = useWorkspace();
+  const { workspaces, workspace, workspaceId, entitlement, loading, error, select, isPaid, refresh, can, tracksBatches } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
   const unread = useUnreadNotifications();
@@ -108,6 +112,9 @@ export function AppShell() {
   ];
 
   const companyNav = can('marca.gerenciar') ? [...COMPANY_NAV, BRAND_NAV] : COMPANY_NAV;
+  // Validades fica junto do estoque, não das configurações: é tela de
+  // operação diária para quem trabalha com produto que vence.
+  const stockNav = tracksBatches ? [...STOCK_NAV.slice(0, 3), EXPIRY_NAV, ...STOCK_NAV.slice(3)] : STOCK_NAV;
 
   const renderNav = (items: NavItem[]) =>
     items.map((item) => item.newTab ? (
@@ -160,7 +167,7 @@ export function AppShell() {
           />
         )}
 
-        <nav className="nav" aria-label="Estoque">{renderNav(STOCK_NAV)}</nav>
+        <nav className="nav" aria-label="Estoque">{renderNav(stockNav)}</nav>
         <div className="sidebar__section">Empresa</div>
         <nav className="nav" aria-label="Empresa">{renderNav(companyNav)}</nav>
         <div className="sidebar__section">Ajuda</div>
@@ -251,7 +258,7 @@ export function AppShell() {
 
       <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title={workspace?.name ?? 'Mais'} description={workspace ? ROLE_LABEL[workspace.role] : undefined}>
         <nav className="nav">
-          {renderNav([...STOCK_NAV.slice(3), ...companyNav, ...HELP_NAV, { to: '/app/conta', label: 'Minha conta', icon: 'user' }, { to: '/app/empresas', label: 'Empresas', icon: 'building' }])}
+          {renderNav([...stockNav.slice(3), ...companyNav, ...HELP_NAV, { to: '/app/conta', label: 'Minha conta', icon: 'user' }, { to: '/app/empresas', label: 'Empresas', icon: 'building' }])}
           <button type="button" className="navlink" style={{ border: 'none', background: 'none', textAlign: 'left' }} onClick={() => void logout().then(() => navigate('/entrar'))}>
             <Icon name="logout" /> Sair
           </button>
